@@ -1,0 +1,10 @@
+syntax="proto3";
+
+package proto;
+
+service CatalogServer {
+	rpc CreateSpace(CreateSpaceReq) returns (CreateSpaceRes) {}
+	rpc EnlistPartitionServer(EnlistPartitionServerReq) returns(EnlistPartitionServerRes) {}
+}
+
+

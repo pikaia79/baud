@@ -1,0 +1,61 @@
+syntax="proto3";
+
+package proto;
+
+//the global partition id
+message PID {
+	uint32 space = 1;
+	uint16 pid_start = 2;
+	uint16 pid_end = 3;
+}
+
+message ServerID {
+	uint16 region
+	uint16 avzone
+	uint32 server
+}
+
+message ReplicaType {
+	UNKNOWN = 0;
+	LEADER = 1;
+	FOLLOWER = 2;
+	BACKUP = 3
+}
+
+message ReplicaInfo {
+	PID pid = 1;
+	ServerID sid = 2;
+	ReplicaType type = 3;
+}
+
+message PartitionType {
+	UNKNOWN = 0;
+	SERVING = 1;
+	SPLITTING = 2;
+	MERGING = 3;
+	DYING = 4;
+}
+
+message PartitionInfo {
+	PID id = 1;
+	repeated ServerID replicas = 2;
+	PartitionType type = 3;
+	PID parent = 4;
+	repeated PID children = 5;
+}
+
+message ServerInfo {
+	ServerID id = 1;
+	string address = 2;
+}
+
+message AVZoneInfo {
+	uint16 id = 1;
+	string name = 2;
+}
+
+message RegionInfo {
+	uint16 id = 1;
+	string name = 2;
+}
+
