@@ -7,4 +7,13 @@ service CatalogServer {
 	rpc EnlistPartitionServer(EnlistPartitionServerReq) returns(EnlistPartitionServerRes) {}
 }
 
+message CreateSpaceReq {
+	uint32 space_id = 1;
+	uint16 partition_count = 2;
+}
+
+message CreateSpaceRes {
+	string json = 1;
+}
+
 

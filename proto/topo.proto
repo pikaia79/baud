@@ -2,11 +2,11 @@ syntax="proto3";
 
 package proto;
 
-//the global partition id
-message PID {
+//the global partition id range
+message PartitionHashRange {
 	uint32 space = 1;
-	uint16 pid_start = 2;
-	uint16 pid_end = 3;
+	uint16 ph_start = 2;
+	uint16 ph_end = 3;
 }
 
 message ServerID {
@@ -15,7 +15,7 @@ message ServerID {
 	uint32 server
 }
 
-message ReplicaType {
+message ReplicaRole {
 	UNKNOWN = 0;
 	LEADER = 1;
 	FOLLOWER = 2;
@@ -23,12 +23,12 @@ message ReplicaType {
 }
 
 message ReplicaInfo {
-	PID pid = 1;
+	PartitionHashRange pid = 1;
 	ServerID sid = 2;
 	ReplicaType type = 3;
 }
 
-message PartitionType {
+message PartitionStatus {
 	UNKNOWN = 0;
 	SERVING = 1;
 	SPLITTING = 2;
@@ -37,11 +37,11 @@ message PartitionType {
 }
 
 message PartitionInfo {
-	PID id = 1;
+	PartitionHashRange id = 1;
 	repeated ServerID replicas = 2;
 	PartitionType type = 3;
-	PID parent = 4;
-	repeated PID children = 5;
+	PartitionHashRange parent = 4;
+	repeated PartitionHashRange children = 5;
 }
 
 message ServerInfo {

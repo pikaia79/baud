@@ -27,20 +27,19 @@ message Field {
 
 message Class {
 	uint16 class_id = 2;
-
-	repeated Field fields;
+	repeated Field fields = 2;
+	uint16 partition_field = 3;
 }
 
 message Space {
 	uint32 space_id = 1;	//note space_id is global
 	repeated classes = 2;
-	uint16 partition_field = 3;
 }
 
 message OID {
 	uint32 space_id;
-	uint16 partition_id;
-	uint16 otype_id;
+	uint16 partition_hash;
+	uint16 class_id;
 	uint64 auto_incr_id;
 }
 
