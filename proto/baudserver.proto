@@ -2,7 +2,7 @@ syntax="proto3";
 
 package proto;
 
-service PartitionServer {
+service BaudServer {
 	rpc CreatePartition(CreatePartitionReq) returns (CreatePartitionRes) {}
 	rpc DeletePartition(DeletePartitionReq) returns (DeletePartitionRes) {}
 	rpc FreezePartition(FreezePartitionReq) returns (FreezePartitionRes) {}

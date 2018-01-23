@@ -2,9 +2,9 @@ syntax="proto3";
 
 package proto;
 
-service CatalogServer {
+service BaudMaster {
 	rpc CreateSpace(CreateSpaceReq) returns (CreateSpaceRes) {}
-	rpc EnlistPartitionServer(EnlistPartitionServerReq) returns(EnlistPartitionServerRes) {}
+	rpc EnlistBaudServer(EnlistBaudServerReq) returns(EnlistBaudServerRes) {}
 }
 
 message CreateSpaceReq {

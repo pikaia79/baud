@@ -1,12 +1,14 @@
 # containerdb
 
+ContainerDB is a container-native distributed database system with reliability, scalability, and flexibility. 
+
 ## Data Model
 
-Field, Object, Class, Index, Space, Edge, Database
+Field, Object, Class, Index, Edge, Space
 
 ## Cluster Management
 
-ContainerDB runs on JDOS/Kubernetes
+ContainerDB runs on JDOS/Kubernetes across servers, racks, cells and regions
 
 ## Layers
 
@@ -24,10 +26,12 @@ partition ID range
 
 raft
 
-async filtered
+async
+
+filtered
 
 ## Components
 
-queryserver, partitionserver, catalogserver, storage engine
+baudrouter, baudserver, baudmaster, storage engine
 
 

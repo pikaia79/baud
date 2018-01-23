@@ -11,8 +11,9 @@ message PartitionHashRange {
 
 message ServerID {
 	uint16 region
-	uint16 avzone
-	uint32 server
+	uint16 cell
+	uint16 rack
+	uint16 node
 }
 
 message ReplicaRole {
