@@ -1,6 +1,6 @@
 # Partitioning Design
 
-ContainerDB gives applications fine-grained control over their data’s partitioning and locality.
+BaudStorage gives applications fine-grained control over their data’s partitioning and locality.
 
 storage limit, privision throughput
 

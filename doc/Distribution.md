@@ -1,6 +1,6 @@
 # Distributed Cluster Managment
 
-ContainerDB is a globally distributed system for scaling geographically. 
+BaudStorage is a globally distributed system for scaling geographically. 
 
 regions -> cells -> racks  -> nodes
 

@@ -1,4 +1,4 @@
-# ContainerDB Data Model
+# Data Model
 
 ## Observation
 

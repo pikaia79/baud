@@ -1,6 +1,6 @@
-# containerdb
+# baudstorage
 
-ContainerDB is a container-native distributed database system with reliability, scalability, and flexibility. 
+BaudStorage is a distributed data storage system with reliability, scalability, and flexibility. 
 
 ## Data Model
 
@@ -8,7 +8,7 @@ Field, Object, Class, Index, Edge, Space
 
 ## Cluster Management
 
-ContainerDB runs on JDOS/Kubernetes across servers, racks, cells and regions
+runs on JDOS/Kubernetes across servers, racks, cells and regions
 
 ## Layers
 

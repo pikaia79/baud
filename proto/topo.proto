@@ -4,7 +4,6 @@ package proto;
 
 //the global partition id range
 message PartitionHashRange {
-	uint32 space = 1;
 	uint16 ph_start = 2;
 	uint16 ph_end = 3;
 }
@@ -23,12 +22,6 @@ message ReplicaRole {
 	BACKUP = 3
 }
 
-message ReplicaInfo {
-	PartitionHashRange pid = 1;
-	ServerID sid = 2;
-	ReplicaType type = 3;
-}
-
 message PartitionStatus {
 	UNKNOWN = 0;
 	SERVING = 1;
@@ -38,9 +31,10 @@ message PartitionStatus {
 }
 
 message PartitionInfo {
+	uint32 space = 1;
 	PartitionHashRange id = 1;
 	repeated ServerID replicas = 2;
-	PartitionType type = 3;
+	PartitionStatus status  = 3;
 	PartitionHashRange parent = 4;
 	repeated PartitionHashRange children = 5;
 }

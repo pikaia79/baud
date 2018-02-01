@@ -6,7 +6,7 @@ import (
 )
 
 type Partition struct {
-	store *store.Store
+	store *engine.Store
 
 	role proto.ReplicaRole
 	status proto.PartitionStatus
