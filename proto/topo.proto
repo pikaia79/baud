@@ -15,14 +15,14 @@ message ServerID {
 	uint16 node
 }
 
-message ReplicaRole {
+enum ReplicaRole {
 	UNKNOWN = 0;
 	LEADER = 1;
 	FOLLOWER = 2;
 	BACKUP = 3
 }
 
-message PartitionStatus {
+enum PartitionStatus {
 	UNKNOWN = 0;
 	SERVING = 1;
 	SPLITTING = 2;

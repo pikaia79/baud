@@ -1,6 +1,6 @@
-# baudstorage
+# baud
 
-BaudStorage is a distributed data storage system with reliability, scalability, and flexibility. 
+Baud is a distributed data storage & search system with reliability, scalability, and flexibility. 
 
 ## Data Model
 
@@ -33,5 +33,9 @@ filtered
 ## Components
 
 baudrouter, baudserver, baudmaster, storage engine
+
+## Search
+
+## Graph
 
 
