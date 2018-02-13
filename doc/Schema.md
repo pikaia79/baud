@@ -1,6 +1,4 @@
-syntax="proto3";
-
-package schema;
+#Baud Schema Descriptions
 
 enum Type {
 	STRING = 0;

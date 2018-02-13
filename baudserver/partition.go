@@ -8,8 +8,6 @@ import (
 type Partition struct {
 	store *engine.Store
 
-	role proto.ReplicaRole
+	role   proto.ReplicaRole
 	status proto.PartitionStatus
 }
-
-

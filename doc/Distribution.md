@@ -1,6 +1,6 @@
 # Distributed Cluster Managment
 
-BaudStorage is a globally distributed system for scaling geographically. 
+Baud is a globally distributed system for scaling geographically. 
 
 regions -> cells -> racks  -> nodes
 

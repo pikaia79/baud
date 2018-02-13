@@ -1,7 +1,5 @@
 package baudmaster
 
-type Server struct {}
+type Server struct{}
 
 func (s *Server) CreateSpace() {}
-
-

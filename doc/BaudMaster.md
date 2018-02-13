@@ -61,5 +61,20 @@ baudserver nodes (roles)
 4, cutover
 
 
+## RPC description
+
+service BaudMaster {
+	rpc CreateSpace(CreateSpaceReq) returns (CreateSpaceRes) {}
+	rpc EnlistBaudServer(EnlistBaudServerReq) returns(EnlistBaudServerRes) {}
+}
+
+message CreateSpaceReq {
+	uint32 space_id = 1;
+	uint16 partition_count = 2;
+}
+
+message CreateSpaceRes {
+	string json = 1;
+}
 
 

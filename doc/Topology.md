@@ -1,6 +1,4 @@
-syntax="proto3";
-
-package proto;
+#Baud Topology Definitions
 
 //the global partition id range
 message PartitionHashRange {

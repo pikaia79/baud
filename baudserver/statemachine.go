@@ -5,7 +5,7 @@ import (
 )
 
 type StateMachine struct {
-	id uint64
+	id      uint64
 	applied uint64
-	raft *raft.RaftServer
+	raft    *raft.RaftServer
 }
