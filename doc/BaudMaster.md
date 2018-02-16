@@ -2,7 +2,7 @@
 
 three/five/.. BM instances form a replicated BM service, or leverage a distributed coordination service like etcd/consul to store the metadata of Baud itself. 
 
-we currently choose the latter approach. 
+we currently choose the first approach. 
 
 ## database metadata
 
@@ -18,8 +18,6 @@ partition (partitionhash range)
 region, cell, rack, nodes
 
 baudmaster nodes (roles)
-
-etcd nodes
 
 baudserver nodes (roles)
 
@@ -61,20 +59,13 @@ baudserver nodes (roles)
 4, cutover
 
 
-## RPC description
+## Create a BaudMaster Cluster
 
-service BaudMaster {
-	rpc CreateSpace(CreateSpaceReq) returns (CreateSpaceRes) {}
-	rpc EnlistBaudServer(EnlistBaudServerReq) returns(EnlistBaudServerRes) {}
-}
+host1:$ baudmasterd -http-addr host1:5001 -raft-addr host1:5002 ~/node
 
-message CreateSpaceReq {
-	uint32 space_id = 1;
-	uint16 partition_count = 2;
-}
+host2:$ baudmasterd -http-addr host2:5001 -raft-addr host2:5002 -join http://host1:5001 ~/node
 
-message CreateSpaceRes {
-	string json = 1;
-}
+host3:$ baudmasterd -http-addr host3:5001 -raft-addr host3:5002 -join http://host1:5001 ~/node
+
 
 
