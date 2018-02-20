@@ -1,4 +1,4 @@
-package baudserver
+package partition
 
 import (
 	"github.com/tiglabs/raft"

@@ -33,23 +33,12 @@ service BaudServer {
 	rpc Info(InfoReq) returns (InfoRes) {}
 }
 
-message CreatePartitionReq {}
+## Start a BaudServer Replication Group
 
+host5:$ baudserverd -http-addr host5:6001 -raft-addr host5:6002 -master http://host1:5001 -group 10001 ~/node
 
-message QueryReq {
-	string query = 1;
-}
+host6:$ baudserverd -http-addr host6:6001 -raft-addr host6:6002 -master http://host1:5001 -group 10001 ~/node
 
-message QueryRes {
-	bytes json = 1;
-}
-
-message MutateReq {
-	string mutation = 1;
-}
-
-message MutateRes {
-	bytes json = 1;
-}
+host7:$ baudserverd -http-addr host7:6001 -raft-addr host7:6002 -master http://host1:5001 -group 10001 ~/node
 
 

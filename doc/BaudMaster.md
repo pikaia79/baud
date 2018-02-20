@@ -2,7 +2,7 @@
 
 three/five/.. BM instances form a replicated BM service, or leverage a distributed coordination service like etcd/consul to store the metadata of Baud itself. 
 
-we currently choose the first approach. 
+we currently choose the latter approach. 
 
 ## database metadata
 
@@ -59,13 +59,9 @@ baudserver nodes (roles)
 4, cutover
 
 
-## Create a BaudMaster Cluster
+## Start a controller
 
-host1:$ baudmasterd -http-addr host1:5001 -raft-addr host1:5002 ~/node
-
-host2:$ baudmasterd -http-addr host2:5001 -raft-addr host2:5002 -join http://host1:5001 ~/node
-
-host3:$ baudmasterd -http-addr host3:5001 -raft-addr host3:5002 -join http://host1:5001 ~/node
+host2:$ baud -cm -http-addr host2:5001 -raft-addr host2:5002 -topo http://host1:5001 -data ~/node
 
 
 

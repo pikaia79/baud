@@ -1,4 +1,4 @@
-package main
+package httpd
 
 import (
 	"encoding/json"
@@ -13,20 +13,22 @@ type Service struct {
 	addr string
 	ln   net.Listener
 
-	start time.Time
+	handler http.Handler
+	start   time.Time
 
 	logger *log.Logger
 }
 
-func New(addr string) *Service {
+func New(addr string, handler http.Handler) *Service {
 	return &Service{
-		addr: addr,
+		addr:    addr,
+		handler: handler,
 	}
 }
 
 func (s *Service) Start() error {
 	server := http.Server{
-		Handler: s,
+		Handler: s.handler,
 	}
 
 	var err error
@@ -51,19 +53,4 @@ func (s *Service) Start() error {
 func (s *Service) Close() {
 	s.ln.Close()
 	return
-}
-
-func (s *Service) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	switch {
-	case strings.HasPrefix(r.URL.Path, "execute"):
-		s.handleExecute(w, r)
-	case strings.HasPrefix(r.URL.Path, "query"):
-		s.handleQuery(w, r)
-	case strings.HasPrefix(r.URL.Path, "status"):
-		s.handleStatus(w, r)
-	case strings.HasPrefix(r.URL.Path, "/debug/pprof"):
-		s.handlePprof(w, r)
-	default:
-		w.WriteHeader(http.StatusNotFound)
-	}
 }
