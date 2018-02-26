@@ -9,6 +9,8 @@ import (
 	"time"
 )
 
+type Container struct {}
+
 func (s *Container) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	switch {
 	case strings.HasPrefix(r.URL.Path, "join"):
@@ -17,8 +19,12 @@ func (s *Container) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		s.handleRemove(w, r)
 	case strings.HasPrefix(r.URL.Path, "backup"):
 		s.handleBackup(w, r)
-	case strings.HasPrefix(r.URL.Path, "execute"):
-		s.handleExecute(w, r)
+	case strings.HasPrefix(r.URL.Path, "insert"):
+		s.handleInsert(w, r)
+	case strings.HasPrefix(r.URL.Path, "update"):
+		s.handleUpdate(w, r)
+	case strings.HasPrefix(r.URL.Path, "delete"):
+		s.handleDelete(w, r)
 	case strings.HasPrefix(r.URL.Path, "query"):
 		s.handleQuery(w, r)
 	case strings.HasPrefix(r.URL.Path, "status"):
@@ -30,5 +36,4 @@ func (s *Container) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-//create a partition or insert/update objects
-func (s *Container) handleExecute(w http.ResponseWriter, r *http.Request) {}
+func (s *Container) handleQuery(w http.ResponseWriter, r *http.Request) {}
