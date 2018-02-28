@@ -63,8 +63,6 @@ foreach fulltext-indexed field, #term.#oid -> nil
 <#ft#analyzed#oid#field_id# -> analyzed terms (for fulltext-indexed fields)
 <#ft#inverted#space_id.#otype_id.#field_id.#term.#oid> -> nil
 
-* In Memory
-
 
 
 

@@ -1,4 +1,4 @@
-package schema
+package core
 
 type Space struct {
 	ID   int

@@ -9,7 +9,7 @@ import (
 	"time"
 )
 
-type Container struct {}
+type Container struct{}
 
 func (s *Container) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	switch {
