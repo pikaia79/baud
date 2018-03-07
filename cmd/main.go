@@ -9,3 +9,14 @@ const logo = "The BAUD Server"
 func main() {
 	fmt.Println(logo)
 }
+
+/*
+
+switch serverRole:
+	toposerver,
+	objectserver,
+	blobserver,
+	extentserver,
+
+
+*/
