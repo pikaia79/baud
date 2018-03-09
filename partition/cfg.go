@@ -1,6 +1,6 @@
-package object
+package partition
 
-//objectserver config
+//partitionserver config
 type Cfg struct {
 	serverID string
 	httpPort string

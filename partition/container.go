@@ -1,4 +1,4 @@
-package object
+package partition
 
 import (
 	"encoding/json"

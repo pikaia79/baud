@@ -1,3 +1,3 @@
-package object
+package partition
 
 //objectserver errors

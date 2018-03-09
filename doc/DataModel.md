@@ -22,7 +22,7 @@ Edge
 
 oid = <space_id (uint32), partition id (uint16), type_id(uint16), auto incr id (uint64)>
 
-native graph: associations located together with source objects
+native graph: associations located together with source objects or co-located per association names? the current decision is the former. 
 
 nodes and edges in the graph are fully indexed. 
 
