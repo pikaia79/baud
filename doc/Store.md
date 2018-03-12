@@ -34,21 +34,11 @@ Q: per-otype or per-partition space?
 A: PS remembers each otype's current auto incr id
 
 
-### Objects
+### Object-Index
 
 oid = <space_id, partition_id, otype_id, auto incr id>
 
 #ob#oid#field_id -> field_value
-
-
-### Edges
-
-<#ed#oid#label#dst> -> timestamp
-
-
-### Index
-
-* In RocksDB
 
 foreach uniquely-indexed field, field_value -> oid
 
@@ -65,5 +55,8 @@ foreach fulltext-indexed field, #term.#oid -> nil
 
 
 
+### Edge-Index
+
+#ed#eid#field_id -> field_value
 
 

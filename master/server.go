@@ -9,9 +9,19 @@ import (
 	"time"
 )
 
-type Server struct{}
+type Master struct{}
 
-func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+func NewServer() *Master {
+	return new(Master)
+}
+
+func (s *Master) Start(cfg *config.Config) error {
+	return nil
+}
+
+func (s *Master) Shutdown() {}
+
+func (s *Master) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	switch {
 	case strings.HasPrefix(r.URL.Path, "createdatabase"):
 		s.handleJoin(w, r)

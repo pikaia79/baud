@@ -16,7 +16,9 @@ each field can be indexed.
 
 ## Cluster Management
 
-runs on JDOS/Kubernetes across servers, racks, cells and regions
+cloud-native, and conainer-native
+
+runs on Kubernetes across servers, racks, and datacenters that could be cross regions. 
 
 ## Partitioning
 
@@ -44,8 +46,16 @@ strong indexing and search capability
 
 src --edge--> dst
 
+edges have optional attributes. 
+
 ## BLOBs
 
+field type supports BLOB
+
 ## File Extents
+
+built-in snapshot capability
+
+## Change Streaming
 
 

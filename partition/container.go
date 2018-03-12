@@ -2,6 +2,7 @@ package partition
 
 import (
 	"encoding/json"
+	"github.com/tiglabs/baud/util/config"
 	"log"
 	"net"
 	"net/http"
@@ -10,6 +11,16 @@ import (
 )
 
 type Container struct{}
+
+func NewServer() *Container {
+	return new(Conainer)
+}
+
+func (c *Container) Start(cfg *config.Config) error {
+	return nil
+}
+
+func (c *Container) Shutdown() {}
 
 func (s *Container) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	switch {
