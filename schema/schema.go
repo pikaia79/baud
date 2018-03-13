@@ -1,4 +1,4 @@
-package types
+package schema
 
 type ObjectType struct {
 	ID     int
@@ -45,7 +45,7 @@ type OID struct {
 
 type Object struct {
 	ID     OID
-	Fields [][]byte
+	Fields map[string][]byte
 }
 
 type EID struct {
@@ -53,7 +53,15 @@ type EID struct {
 	Source OID
 	Destin OID
 }
+
 type Edge struct {
 	ID     EID
-	Fields [][]byte
+	Fields map[string][]byte
+}
+
+type PartitionID struct {
+	DB        uint32
+	Space     uint32
+	StartHash uint16
+	EndHash   uint16
 }

@@ -1,4 +1,4 @@
-package partition
+package ps
 
 //partitionserver config
 type Cfg struct {

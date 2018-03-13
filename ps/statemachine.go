@@ -1,4 +1,4 @@
-package partition
+package ps
 
 import (
 	"github.com/tiglabs/raft"

@@ -9,7 +9,13 @@ import (
 	"time"
 )
 
-type Master struct{}
+type Master struct {
+	cfg *Cfg
+
+	databases map[string]*DBInfo
+
+	zones map[string]*ZoneInfo
+}
 
 func NewServer() *Master {
 	return new(Master)
@@ -20,18 +26,3 @@ func (s *Master) Start(cfg *config.Config) error {
 }
 
 func (s *Master) Shutdown() {}
-
-func (s *Master) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	switch {
-	case strings.HasPrefix(r.URL.Path, "createdatabase"):
-		s.handleJoin(w, r)
-	case strings.HasPrefix(r.URL.Path, "createspace"):
-		s.handleRemove(w, r)
-	case strings.HasPrefix(r.URL.Path, "status"):
-		s.handleStatus(w, r)
-	case strings.HasPrefix(r.URL.Path, "/debug/pprof"):
-		s.handlePprof(w, r)
-	default:
-		w.WriteHeader(http.StatusNotFound)
-	}
-}

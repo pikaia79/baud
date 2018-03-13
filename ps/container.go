@@ -1,7 +1,8 @@
-package partition
+package ps
 
 import (
 	"encoding/json"
+	. "github.com/tiglabs//baud/schema"
 	"github.com/tiglabs/baud/util/config"
 	"log"
 	"net"
@@ -10,7 +11,14 @@ import (
 	"time"
 )
 
-type Container struct{}
+type Container struct {
+	cfg         *Cfg
+	partitionID PartitionID
+	isLeader    bool
+
+	objectIndex *ObjectIndex
+	edgeIndex   *EdgeIndex
+}
 
 func NewServer() *Container {
 	return new(Conainer)
@@ -48,3 +56,5 @@ func (s *Container) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Container) handleQuery(w http.ResponseWriter, r *http.Request) {}
+
+func (s *Container) handleMutate(w http.ResponseWriter, r *http.Request) {}

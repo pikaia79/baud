@@ -1,7 +1,7 @@
-package partition
+package ps
 
 import (
-	. "github.com/tiglabs/baud/types"
+	. "github.com/tiglabs/baud/schema"
 )
 
 type EdgeIndex struct{}

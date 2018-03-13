@@ -1,4 +1,4 @@
-package partition
+package ps
 
 type ObjectIndex struct{}
 
