@@ -5,7 +5,7 @@ import (
 )
 
 type DBInfo struct {
-	schema schema.Database
+	schema Graph
 	spaces map[string]SpaceInfo
 }
 
@@ -14,11 +14,13 @@ type SpaceInfo struct {
 }
 
 type PartitionInfo struct {
-	id       schema.PartitionID
+	id       PartitionID
 	replicas []ReplicaInfo
 
 	leftCh  *PartitionInfo
 	rightCh *PartitionInfo
+
+	status string //serving, splitting, cleaning, etc.
 }
 
 type ReplicaInfo struct {
