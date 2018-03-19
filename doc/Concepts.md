@@ -8,7 +8,7 @@ Literals/Values,
 
 Associations/BinaryRelations, 
 
-Classes/Categories, 
+Classes/Categories/Concepts, 
 
 Predicates/Edges, 
 
