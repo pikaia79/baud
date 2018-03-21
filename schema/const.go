@@ -14,7 +14,7 @@ const (
 
 //the object types
 const (
-	ObjTypeOID     = 0
+	ObjTypeUID     = 0
 	ObjTypeString  = 1
 	ObjTypeInteger = 2
 )

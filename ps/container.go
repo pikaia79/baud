@@ -15,9 +15,6 @@ type Container struct {
 	cfg         *Cfg
 	partitionID PartitionID
 	isLeader    bool
-
-	objectIndex *ObjectIndex
-	edgeIndex   *EdgeIndex
 }
 
 func NewServer() *Container {

@@ -13,35 +13,40 @@ type Graph struct {
 	Spaces map[string]Space
 }
 
-type OID struct {
+type PartitionID struct {
+	Graph     uint32
+	Space     uint32
+	StartHash uint32
+	EndHash   uint32
+}
+
+//Unique ID for entities or categories
+type UID struct {
 	SpaceID       uint32
 	PartitionHash uint32
 	AutoIncrID    uint64
 }
 
-type PartitionID struct {
-	Graph     uint32
-	Space     uint32
-	StartHash uint16
-	EndHash   uint16
+type PredicateSignature struct {
+	Key         string
+	ObjectType  uint8
+	Sole        bool
+	IndexPolicy uint8
 }
 
 type Fact struct {
-	Subject     OID
-	Predicate   string
-	Object      interface{}
-	ObjType     int
-	SingleValue bool
-	IndexPolicy int
+	Subject   UID
+	Predicate PredicateSignature
+	Object    []byte
 }
 
 type Entity struct {
-	Oid   OID
+	Uid   UID
 	Facts []Fact
 }
 
 type Category struct {
-	Oid          OID //SpaceID = PartitionHash = 0
+	Uid          UID //SpaceID = PartitionHash = 0
 	Name         string
 	Superclasses []*Category
 	Subclasses   []*Category

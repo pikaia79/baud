@@ -21,7 +21,7 @@ KG = a set of facts = (Entities or Classes) X Predicates X (Entities or Classes 
 
 * Entity Identification
 
-OID is unique within the entire graph
+UID is unique within the entire graph
 
 
 * Prediate Signature
@@ -46,7 +46,7 @@ examples: attr-o2m-string-address, attr-o2o-int-age, asso-o2m-dir2ino-test
 
 * Indexing
 
-every entity attribute is indexed for fast search, and fulltext indexing is also the first-class citizen. 
+Attributes and edges can be indexed for fast search, and fulltext indexing is also the first-class citizen. 
 
 * Association
 
