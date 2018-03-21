@@ -3,14 +3,14 @@ package schema
 type Space struct {
 	Name               string
 	ID                 uint32
-	PartitionAttribute string
+	PartitionPredicate string
+	Categories         map[string]*Category
 }
 
 type Graph struct {
-	Name       string
-	ID         uint32
-	Spaces     map[string]Space
-	Categories []Category
+	Name   string
+	ID     uint32
+	Spaces map[string]Space
 }
 
 type OID struct {
@@ -40,8 +40,9 @@ type Entity struct {
 	Facts []Fact
 }
 
-//note that Category is also an entity in the #0 space located at the master.
 type Category struct {
-	Oid   OID
-	Facts []Fact
+	Oid          OID //SpaceID = PartitionHash = 0
+	Name         string
+	Superclasses []*Category
+	Subclasses   []*Category
 }

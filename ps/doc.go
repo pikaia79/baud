@@ -10,11 +10,13 @@ RaftServer
 
 Partition
 
-ObjectIndex
-
-EdgeIndex
-
 PartialReplication
+
+Index
+
+Request
+
+Result
 
 */
 package ps

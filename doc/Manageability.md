@@ -8,7 +8,7 @@ Dashboard
 
 cluster-level statistics
 
-namespace-level info
+space-level info
 
 individual nodes
 
