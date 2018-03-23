@@ -11,7 +11,6 @@ type Space struct {
 	ID   uint32
 
 	partitionPolicy PartitionPolicy
-	predicates      map[string]Predicate
 	categories      map[string]*Category
 }
 
@@ -34,17 +33,13 @@ type UID struct {
 	AutoIncrID    uint64
 }
 
-type Predicate struct {
-	Key         string
-	ObjectType  uint8
-	Sole        bool
-	IndexPolicy uint8
-}
-
 type Fact struct {
-	Subject   UID
-	Predicate string
-	Object    []byte
+	Subject     UID
+	Predicate   string
+	Object      []byte
+	ObjectType  uint8
+	SoleValue   bool
+	IndexPolicy uint8
 }
 
 type Entity struct {
