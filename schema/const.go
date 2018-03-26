@@ -7,11 +7,6 @@ const (
 	PredicateSuperclassOf = "SuperclassOf"
 )
 
-const (
-	PredicateAttributePrefix   = "Attr-"
-	PredicateAssociationPrefix = "Asso-"
-)
-
 //the object types
 const (
 	ObjTypeUID     = 0
