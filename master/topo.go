@@ -5,8 +5,8 @@ import (
 )
 
 type DBInfo struct {
-	schema Graph
-	spaces map[string]SpaceInfo
+	schema DB
+	spaces map[string]*SpaceInfo
 }
 
 type SpaceInfo struct {

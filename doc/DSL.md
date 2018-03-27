@@ -1,5 +1,5 @@
 # Query DSL
 
-a variant of GraphSQL
+a variant of ElasticSearch DSL
 
 

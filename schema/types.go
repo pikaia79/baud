@@ -1,17 +1,16 @@
 package schema
 
-type Graph struct {
+type DB struct {
 	Name   string
 	ID     uint32
-	Spaces map[string]Space
+	Spaces map[string]*Space
 }
 
+//each document has a uint32 field _slot_
 type Space struct {
-	Name string
-	ID   uint32
-
-	Partitioning PartitioningPolicy
-	Mapping      []Field
+	Name    string
+	ID      uint32
+	Mapping []Field
 }
 
 type Field struct {
@@ -22,22 +21,17 @@ type Field struct {
 	MultiValue  bool
 }
 
-type PartitioningPolicy struct {
-	Field       string
-	ValueToSlot int //hash, value, etc.
-}
-
 type PartitionID struct {
-	Graph     uint32
+	DB        uint32
 	Space     uint32
 	StartSlot uint32
 	EndSlot   uint32
 }
 
 type UID struct {
-	SpaceID       uint32
-	PartitionSlot uint32
-	AutoIncrID    uint64
+	SpaceID    uint32
+	SlotID     uint32
+	AutoIncrID uint64
 }
 
 type Association struct {
