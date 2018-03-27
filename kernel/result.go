@@ -1,4 +1,4 @@
-package index
+package kernel
 
 type Result struct {
 	//TODO

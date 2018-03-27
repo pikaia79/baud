@@ -1,4 +1,4 @@
-package index
+package kernel
 
 type Request struct {
 	//TODO
