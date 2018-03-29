@@ -6,11 +6,14 @@ type DB struct {
 	Spaces map[string]*Space
 }
 
-//each document has a uint32 field _slot_
+//each document has a uint32 field __slot
 type Space struct {
-	Name    string
-	ID      uint32
-	Mapping []Field
+	Name       string
+	ID         uint32
+	Mapping    []Field
+	Categories []*Category
+
+	shardingPolicy ShardingPolicy
 }
 
 type Field struct {
@@ -39,4 +42,15 @@ type Association struct {
 	Predicate  String
 	Object     UID
 	MultiValue bool
+}
+
+type Category struct {
+	ID           UID /// SpaceID = SlotID = 0
+	Names        []string
+	Superclasses []UID
+	Subclasses   []UID
+}
+
+type ShardingPolicy struct {
+	field string
 }

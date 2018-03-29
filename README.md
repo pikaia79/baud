@@ -1,7 +1,6 @@
 # baud.ai
 
-BAUD is a distributed document-graph database
-
+BAUD is a document-graph distributed database, i.e., a storage & search system for documents and graphs. 
 
 ## Concepts
 
