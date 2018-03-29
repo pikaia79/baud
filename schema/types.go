@@ -13,7 +13,7 @@ type Space struct {
 	Mapping    []Field
 	Categories []*Category
 
-	shardingPolicy ShardingPolicy
+	ShardingPolicy ShardingPolicy
 }
 
 type Field struct {
@@ -52,5 +52,6 @@ type Category struct {
 }
 
 type ShardingPolicy struct {
-	field string
+	ShardingKey       string
+	InitialPartitions int
 }

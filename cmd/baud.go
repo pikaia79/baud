@@ -64,8 +64,6 @@ func main() {
 		server = partition.NewServer()
 	case "router":
 		server = router.NewServer()
-	case "extent":
-		server = extent.NewServer()
 
 	default:
 		log.Println("Fatal: unmath role: ", role)
