@@ -1,4 +1,3 @@
-//json cfg file utility
 package config
 
 import (

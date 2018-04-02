@@ -80,29 +80,6 @@ func (rg *RaftGroup) Release() error {
 	return rg.raftServer.RemoveRaft(rg.id)
 }
 
-//func (rg *RaftGroup) GetDownPeers(rangeId uint64) []raft.DownReplica {
-//	return rg.raftServer.GetDownReplicas(rangeId)
-//}
-//
-//func (rg *RaftGroup) GetPendingPeers(rangeId uint64) []uint64 {
-//	return rg.raftServer.GetPendingReplica(rangeId)
-//}
-//
-//func (rg *RaftGroup) LeaderTransfer(ctx context.Context, rangeId uint64) error {
-//	// TODO: future need param 'ctx' to select context done
-//	future := rg.raftServer.TryToLeader(rangeId)
-//	resp, err := future.Response()
-//	if err != nil {
-//		return err
-//	}
-//
-//	if err, ok := resp.(error); ok {
-//		return err
-//	}
-//
-//	return nil
-//}
-
 func (rg *RaftGroup) submit(ctx context.Context, cmd []byte) (interface{}, error) {
 	// TODO:ctx
 	future := rg.raftServer.Submit(rg.id, cmd)
@@ -132,31 +109,6 @@ func (rg *RaftGroup) SubmitCommand(ctx context.Context, req *ms_raftcmdpb.Reques
 	}
 	return nil, errUnknownResponseType
 }
-//
-//func (rg *RaftGroup) ChangePeer(ctx context.Context, typ raftproto.ConfChangeType, nodeId uint64) error {
-//	ccPeer := raftproto.Peer{Type: raftproto.PeerNormal, ID: nodeId}
-//
-//	future := rg.raftServer.ChangeMember(rg.id, typ, ccPeer, nil)
-//	resp, err := future.Response()
-//	if err != nil {
-//		return err
-//	}
-//	switch resp.(type) {
-//	case error:
-//		return resp.(error)
-//	case nil:
-//		return nil
-//	}
-//	return errUnknownResponseType
-//}
-//
-//func (rg *RaftGroup) IsLeader() bool {
-//	return rg.raftServer.IsLeader(rg.id)
-//}
-//
-//func (rg *RaftGroup) LeaderTerm() (leader, term uint64) {
-//	return rg.raftServer.LeaderTerm(rg.id)
-//}
 
 /////////////////////////callback begin////////////////////////////////
 func (rg *RaftGroup) RegisterApplyHandle(handler RaftApplyHandler) {
@@ -207,14 +159,6 @@ func (rg *RaftGroup) ApplyMemberChange(confChange *raftproto.ConfChange, index u
 	} else {
 		err = errNoPeerChangeHandler
 	}
-
-	//raftErr := rg.raftStorage.StoreApplyIndex(index)
-	//if raftErr != nil {
-	//	rg.HandleFatalEvent(&raft.FatalError{
-	//		ID:  rg.id,
-	//		Err: fmt.Errorf("save applyIndex failed: %v", raftErr),
-	//	})
-	//}
 
 	return
 }
