@@ -28,8 +28,8 @@ func NewApiServer(config *Config) *ApiServer {
 	return apiServer
 }
 
-func (s *ApiServer) Start() {
-	s.httpServer.Run()
+func (s *ApiServer) Start() error {
+	return s.httpServer.Run()
 }
 
 func (s *ApiServer) Close() {

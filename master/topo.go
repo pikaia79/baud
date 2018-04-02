@@ -5,14 +5,10 @@ import (
 	"time"
 )
 
-type DBInfo struct {
-	//schema DB
-	spaces map[string]*SpaceInfo
-}
-type MSInfo struct {
+type TopoInfo struct {
 	Spaces				map[string]SpaceInfo
 	Partitions			map[uint32]PartitionInfo
-	PSInfos				map[uint32]PSInfo
+	PSInfos				map[uint32]ServerInfo
 }
 
 type SpaceInfo struct {
@@ -55,7 +51,7 @@ const (
 	PSState_Logout
 )
 
-type PSInfo struct {
+type ServerInfo struct {
 	PSId			uint32
 	Addr			string
 	PartId 			uint32

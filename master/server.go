@@ -9,12 +9,8 @@ type Master struct {
 	config			*Config
 
 	cluster			*Cluster
-
 	apiServer		*ApiServer
 	rpcServer		*RpcServer
-	//ctx 			context.Context
-	//ctxCancel		context.CancelFunc
-
 }
 
 func NewServer() *Master {
@@ -23,26 +19,39 @@ func NewServer() *Master {
 
 func (ms *Master) Start(config *Config) error {
 	ms.config = config
-	//ms.ctx, ms.ctxCancel = context.WithCancel(context.Background())
 
-	cluster := NewCluster()
-	if err := cluster.Start(config); err != nil {
+	ms.cluster = NewCluster(config)
+	if err := ms.cluster.Start(); err != nil {
 		log.Error("fail to start cluster. err:[%v]", err)
 		return err
 	}
 
-	ms.apiServer = NewApiServer(config)
 	ms.rpcServer = NewRpcServer()
+	if err := ms.rpcServer.Start(); err != nil {
+		log.Error("fail to start rpc server. err:[%v]", err)
+		ms.cluster.Close()
+		return err
+	}
 
+	ms.apiServer = NewApiServer(config)
+	if err := ms.apiServer.Start(); err != nil {
+		log.Error("fail to start api server. err:[%v]", err)
+		ms.rpcServer.Close()
+		ms.cluster.Close()
+		return err
+	}
 
 	return nil
 }
 
 func (ms *Master) Shutdown() {
-	if ms.cluster != nil {
-		ms.cluster.Close()
-	}
 	if ms.apiServer != nil {
 		ms.apiServer.Close()
+	}
+	if ms.rpcServer != nil {
+		ms.rpcServer.Close()
+	}
+	if ms.cluster != nil {
+		ms.cluster.Close()
 	}
 }

@@ -111,12 +111,13 @@ func (s *Server) isClosed() bool {
 }
 
 // Run runs the server.
-func (s *Server) Run() {
+func (s *Server) Run() error {
 	var l net.Listener
 	var err error
 	l, err = net.Listen("tcp", s.sock)
 	if err != nil {
-		log.Fatal("Listen: %v", err)
+		log.Error("Listen: %v", err)
+		return err
 	}
 	if s.connLimit > 0 {
 		l = netutil.LimitListener(l, s.connLimit)
@@ -124,10 +125,11 @@ func (s *Server) Run() {
 
 	err = http.Serve(l, s)
 	if err != nil {
-		log.Fatal("http.listenAndServe failed: %s", err.Error())
+		log.Error("http.listenAndServe failed: %s", err)
+		return err
 	}
 	s.l = l
-	return
+	return nil
 }
 
 func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {

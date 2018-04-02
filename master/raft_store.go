@@ -90,7 +90,7 @@ func (rs *RaftStore) Start() error {
 	return nil
 }
 
-func (rs *RaftStore) Close() error {
+func (rs *RaftStore) Close() {
 	if rs.raftGroup != nil {
 		if err := rs.raftGroup.Release(); err != nil {
 			log.Error("fail to close raftgroup. err:[%v]", err)
@@ -107,7 +107,6 @@ func (rs *RaftStore) Close() error {
 			log.Error("fail to close boltdb store. err:[%v]", err)
 		}
 	}
-	return nil
 }
 
 func (rs *RaftStore) initRaftStoreCfg() error {
@@ -292,8 +291,7 @@ type Batch interface {
 }
 
 func (rs *RaftStore) Open() error {
-	err := rs.raftGroup.Create(rs.raftConfig)
-	if err != nil {
+	if err := rs.raftGroup.Start(rs.raftConfig); err != nil {
 		return err
 	}
 	rs.wg.Add(1)

@@ -6,33 +6,30 @@ import (
 
 type Cluster struct {
 	config			*Config
-	metaInfo 		MSInfo
+	topoInfo 		TopoInfo
 
 	store 			*RaftStore
 }
 
-func NewCluster() *Cluster {
-	return new(Cluster)
+func NewCluster(config *Config) *Cluster {
+	return &Cluster{
+		config: 	config,
+		store:		NewRaftStore(config),
+	}
 }
 
-func (c *Cluster) Start(config *Config) (err error) {
-	c.config = config
-
-	store := NewRaftStore(config)
-	if err = store.Start(); err != nil {
+func (c *Cluster) Start() (err error) {
+	if err = c.store.Start(); err != nil {
 		log.Error("fail to create raft store. err:[%v]", err)
 		return
 	}
-	c.store = store
-
 
 	return nil
 }
+
 func (c *Cluster) Close() {
 	if c.store != nil {
-		if err := c.store.Close(); err != nil {
-			log.Error("fail to close raft store")
-		}
+		c.store.Close()
 	}
 }
 

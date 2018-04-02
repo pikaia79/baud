@@ -8,6 +8,9 @@ func NewRpcServer() *RpcServer {
 	return new(RpcServer)
 }
 
-func Start() {
+func (rs *RpcServer) Start() error {
+	return nil
+}
 
+func (rs *RpcServer) Close() {
 }
