@@ -6,14 +6,11 @@ type DB struct {
 	Spaces map[string]*Space
 }
 
-//each document has a uint32 field __slot
 type Space struct {
-	Name       string
-	ID         uint32
-	Mapping    []Field
-	Categories []*Category
-
-	ShardingPolicy ShardingPolicy
+	Name         string
+	ID           uint32 //odd number as entity space, even number as edge space.
+	Mapping      []Field
+	Partitioning PartitionPolicy
 }
 
 type Field struct {
@@ -37,21 +34,8 @@ type UID struct {
 	AutoIncrID uint64
 }
 
-type Association struct {
-	Subject    UID
-	Predicate  String
-	Object     UID
-	MultiValue bool
-}
-
-type Category struct {
-	ID           UID /// SpaceID = SlotID = 0
-	Names        []string
-	Superclasses []UID
-	Subclasses   []UID
-}
-
-type ShardingPolicy struct {
-	ShardingKey       string
-	InitialPartitions int
+type PartitionPolicy struct {
+	Key           string
+	Function      string
+	NumPartitions int
 }

@@ -1,10 +1,12 @@
 # Concepts
 
-Entities/Objects, 
+Entities/Objects/Documents 
 
 Attributes/Fields, 
 
 Literals/Values, 
+
+Terms
 
 Associations/BinaryRelations, 
 
