@@ -6,20 +6,28 @@ import (
 )
 
 type TopoInfo struct {
-	Spaces				map[string]SpaceInfo
+	DBInfos				map[uint32]DBInfo
+	Spaces				map[uint32]SpaceInfo
 	Partitions			map[uint32]PartitionInfo
-	PSInfos				map[uint32]ServerInfo
+	PSInfos				map[uint32]PartitionServerInfo
+}
+
+type DBInfo struct {
+	Id     				uint32
+	Name   				string
+	Spaces 				map[string]*SpaceInfo
 }
 
 type SpaceInfo struct {
-	SpaceName			string
+	Id 					uint32
+	Name				string
 	PartIds 			[]uint32
 	sortedPartitions	btree.BTree
 }
 
 type PartitionInfo struct {
-	PartId       		uint32
-	SpaceName			string
+	Id		       		uint32
+	SpaceId				uint32
 
 	startSlotId			uint32
 	endSlotId 			uint32
@@ -29,18 +37,18 @@ type PartitionInfo struct {
 }
 
 type ReplicaInfo struct {
-	ReplicaId 			uint32
-	isLeader			bool
+	Id		 			uint32
+	IsLeader			bool
 	LastHbTime 			time.Time // only belong to leader
 	//State
 	PartId 				uint32
 	PSId 				uint32
 }
 
-type PSState 	uint32
+type PartitionServerState uint32
 
 const (
-	PSState_Invalid 	PSState = iota
+	PSState_Invalid PartitionServerState = iota
 	// 工作状态，可以提供服务
 	PSState_Login
 	// 此状态下节点不分配新的range，不迁移range
@@ -51,11 +59,11 @@ const (
 	PSState_Logout
 )
 
-type ServerInfo struct {
-	PSId			uint32
-	Addr			string
-	PartId 			uint32
-	ReplicaId 		uint32
-	State 			PSState
-	LastHbTime  	time.Time
+type PartitionServerInfo struct {
+	Id 			    uint32
+	Addr       		string
+	PartId     		uint32
+	ReplicaId  		uint32
+	State      		PartitionServerState
+	LastHbTime		time.Time
 }

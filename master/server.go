@@ -33,7 +33,7 @@ func (ms *Master) Start(config *Config) error {
 		return err
 	}
 
-	ms.apiServer = NewApiServer(config)
+	ms.apiServer = NewApiServer(config, ms.cluster)
 	if err := ms.apiServer.Start(); err != nil {
 		log.Error("fail to start api server. err:[%v]", err)
 		ms.rpcServer.Close()

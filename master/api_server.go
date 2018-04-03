@@ -2,6 +2,7 @@ package master
 
 import (
 	"util/server"
+	"net/http"
 )
 
 const (
@@ -11,12 +12,14 @@ const (
 type ApiServer struct {
 	config 			*Config
 	httpServer 		*server.Server
+	cluster 		*Cluster
 }
 
-func NewApiServer(config *Config) *ApiServer {
+func NewApiServer(config *Config, cluster *Cluster) *ApiServer {
 	apiServer := &ApiServer{
 		config:		config,
 		httpServer:	server.NewServer(),
+		cluster:	cluster,
 	}
 
 	apiServer.httpServer.Init("master-api-server", &server.ServerConfig{
@@ -38,7 +41,34 @@ func (s *ApiServer) Close() {
 	}
 }
 
-
 func (s *ApiServer) initAdminHandler() {
-
+	s.httpServer.Handle("/manage/db/create", s.handleDbCreate)
+	s.httpServer.Handle("/manage/db/delete", s.handleDbDelete)
+	s.httpServer.Handle("/manage/db/rename", s.handleDbRename)
+	s.httpServer.Handle("/manage/space/create", s.handleSpaceCreate)
+	s.httpServer.Handle("/manage/space/delete", s.handleSpaceDelete)
+	s.httpServer.Handle("/manage/space/rename", s.handleSpaceRename)
+	s.httpServer.Handle("/manage/index/create", s.handleIndexCreate)
 }
+
+func (s *ApiServer) handleDbCreate(w http.ResponseWriter, r *http.Request) {
+}
+
+func (s *ApiServer) handleDbDelete(w http.ResponseWriter, r *http.Request) {
+}
+
+func (s *ApiServer) handleDbRename(w http.ResponseWriter, r *http.Request) {
+}
+
+func (s *ApiServer) handleSpaceCreate(w http.ResponseWriter, r *http.Request) {
+}
+
+func (s *ApiServer) handleSpaceDelete(w http.ResponseWriter, r *http.Request) {
+}
+
+func (s *ApiServer) handleSpaceRename(w http.ResponseWriter, r *http.Request) {
+}
+
+func (s *ApiServer) handleIndexCreate(w http.ResponseWriter, r *http.Request) {
+}
+
