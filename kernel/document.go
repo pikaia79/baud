@@ -1,5 +1,11 @@
 package kernel
 
+type UID struct {
+	SpaceID    uint32
+	SlotID     uint32
+	AutoIncrID uint64
+}
+
 type Entity struct {
 	uid UID
 	doc []byte
