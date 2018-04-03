@@ -5,8 +5,9 @@ import (
 )
 
 type Cluster struct {
-	config   *Config
-	topoInfo TopoInfo
+	replGroups []ReplGroup
+
+	config *Config
 
 	store *RaftStore
 }

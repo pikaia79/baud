@@ -7,7 +7,7 @@ type Partition struct {
 	startSlot    uint32
 	endSlot      uint32
 
-	replicas []*Replica
+	replGroup uint32
 
 	//for splitting & merging
 	leftCh  *Partition
@@ -17,9 +17,18 @@ type Partition struct {
 	status string //serving, splitting, cleaning, etc.
 }
 
-type Replica struct {
+type ReplGroup struct {
+	id       uint32
+	replicas []PartitionServer
+}
+
+type PartitionServer struct {
 	role string
 	zone string
 	ip   string
 	port string
+
+	cpu    int
+	memory int
+	disk   int
 }
