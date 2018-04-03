@@ -1,28 +1,57 @@
 package master
 
 import (
-	"encoding/json"
-	"log"
-	"net"
-	"net/http"
-	"strconv"
-	"time"
+	//"golang.org/x/net/context"
+	"util/log"
 )
 
 type Master struct {
-	cfg *Cfg
+	config *Config
 
-	databases map[string]*DBInfo
-
-	zones map[string]*ZoneInfo
+	cluster   *Cluster
+	apiServer *ApiServer
+	rpcServer *RpcServer
 }
 
 func NewServer() *Master {
 	return new(Master)
 }
 
-func (s *Master) Start(cfg *config.Config) error {
+func (ms *Master) Start(config *Config) error {
+	ms.config = config
+
+	ms.cluster = NewCluster(config)
+	if err := ms.cluster.Start(); err != nil {
+		log.Error("fail to start cluster. err:[%v]", err)
+		return err
+	}
+
+	ms.rpcServer = NewRpcServer()
+	if err := ms.rpcServer.Start(); err != nil {
+		log.Error("fail to start rpc server. err:[%v]", err)
+		ms.cluster.Close()
+		return err
+	}
+
+	ms.apiServer = NewApiServer(config, ms.cluster)
+	if err := ms.apiServer.Start(); err != nil {
+		log.Error("fail to start api server. err:[%v]", err)
+		ms.rpcServer.Close()
+		ms.cluster.Close()
+		return err
+	}
+
 	return nil
 }
 
-func (s *Master) Shutdown() {}
+func (ms *Master) Shutdown() {
+	if ms.apiServer != nil {
+		ms.apiServer.Close()
+	}
+	if ms.rpcServer != nil {
+		ms.rpcServer.Close()
+	}
+	if ms.cluster != nil {
+		ms.cluster.Close()
+	}
+}
