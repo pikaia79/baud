@@ -11,6 +11,7 @@ var (
 	ErrParamError				= errors.New("param error")
 	ErrDupDb					= errors.New("duplicated database")
 	ErrBoltDbOps				= errors.New("boltdb operation error")
+	ErrUnknownRaftCmdType 		= errors.New("unknown raft command type")
 )
 
 // http response error code and error message definitions
