@@ -1,0 +1,47 @@
+syntax = "proto3";
+package metapb;
+
+import "gogoproto/gogo.proto";
+
+option (gogoproto.marshaler_all) = true;
+option (gogoproto.sizer_all) = true;
+option (gogoproto.unmarshaler_all) = true;
+
+message DB {
+    uint32          id      = 1
+    string          name    = 2
+}
+
+message Space {
+    uint32          id      = 1
+    string          name    = 2
+}
+
+message Partition {
+    uint32                  id                  = 1
+	string                  entityOrEdge        = 2
+	uint32                  db                  = 3
+	uint32                  space               = 4
+	uint32                  startSlot           = 5
+	uint32                  endSlot             = 6
+	ReplGroup               replGroup           = 7
+}
+
+type ReplGroup struct {
+	uint32                      id              = 1
+	repeated PartitionServer    replicas        = 2
+}
+
+message PartitionServer {
+    uint32          id                  = 1
+    string          role                = 2
+    string          zone                = 3
+    string          ip                  = 4
+    string          port                = 5
+}
+
+message Route {
+    Partition               partition           = 1;
+    uint32                  leader              = 2;
+}
+
