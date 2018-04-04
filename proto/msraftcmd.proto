@@ -1,5 +1,5 @@
 syntax = "proto3";
-package ms_raftcmdpb;
+package msraftcmdpb;
 
 import "gogoproto/gogo.proto";
 

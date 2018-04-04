@@ -27,11 +27,26 @@ const (
 var (
 	raftBucket []byte = []byte("MasterRaftBucket")
 	dbBucket   []byte = []byte("MasterDbBucket")
-
-	ErrUnknownCommandType = errors.New("unknown command type")
 )
 
-//////////////////raft begin/////////////////
+////////////////////store begin///////////////////
+type Store interface {
+	Open() error
+	Put(key, value []byte) error
+	Delete(key []byte) error
+	Get(key []byte) ([]byte, error)
+	Scan(startKey, limitKey []byte) raftkvstore.Iterator
+	NewBatch() Batch
+	Close() error
+}
+
+type Batch interface {
+	Put(key []byte, value []byte)
+	Delete(key []byte)
+
+	Commit() error
+}
+
 type RaftStore struct {
 	config     *Config
 	localStore raftkvstore.Store
@@ -80,20 +95,92 @@ func NewRaftStore(config *Config) *RaftStore {
 	return rs
 }
 
-func (rs *RaftStore) Start() error {
+func (rs *RaftStore) Open() error {
 	if err := rs.initRaftStoreCfg(); err != nil {
 		return err
 	}
 	if err := rs.initRaftServer(); err != nil {
 		return err
 	}
+
+	if err := rs.raftGroup.Start(rs.raftConfig); err != nil {
+		return err
+	}
+	rs.wg.Add(1)
+	go rs.raftLogCleanup()
 	return nil
 }
 
-func (rs *RaftStore) Close() {
+func (rs *RaftStore) Put(key, value []byte) error {
+	req := &ms_raftcmdpb.Request{
+		CmdType: ms_raftcmdpb.CmdType_Put,
+		PutReq: &ms_raftcmdpb.PutRequest{
+			Key:   key,
+			Value: value,
+		},
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), DEFAULT_SUBMIT_TIMEOUT_MAX)
+	defer cancel()
+	_, err := rs.raftGroup.SubmitCommand(ctx, req)
+	if err != nil {
+		log.Error("raft submit failed, err[%v]", err)
+		return err
+	}
+	return nil
+}
+
+func (rs *RaftStore) Delete(key []byte) error {
+	req := &ms_raftcmdpb.Request{
+		CmdType: ms_raftcmdpb.CmdType_Delete,
+		DeleteReq: &ms_raftcmdpb.DeleteRequest{
+			Key: key,
+		},
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), DEFAULT_SUBMIT_TIMEOUT_MAX)
+	defer cancel()
+	_, err := rs.raftGroup.SubmitCommand(ctx, req)
+	if err != nil {
+		log.Error("raft submit failed, err[%v]", err)
+		return err
+	}
+	return nil
+}
+
+func (rs *RaftStore) Get(key []byte) ([]byte, error) {
+	if rs.localRead {
+		return rs.localStore.Get(key)
+	}
+	req := &ms_raftcmdpb.Request{
+		CmdType: ms_raftcmdpb.CmdType_Get,
+		GetReq: &ms_raftcmdpb.GetRequest{
+			Key: key,
+		},
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), DEFAULT_SUBMIT_TIMEOUT_MAX)
+	defer cancel()
+	resp, err := rs.raftGroup.SubmitCommand(ctx, req)
+	if err != nil {
+		return nil, err
+	}
+	value := resp.GetGetResp().GetValue()
+	return value, nil
+}
+
+func (rs *RaftStore) Scan(startKey, limitKey []byte) raftkvstore.Iterator {
+	// TODO: when localRead is false
+	return rs.localStore.NewIterator(startKey, limitKey)
+}
+
+func (rs *RaftStore) NewBatch() Batch {
+	return NewSaveBatch(rs.raftGroup)
+}
+
+func (rs *RaftStore) Close() error {
+	var lastErr error
 	if rs.raftGroup != nil {
 		if err := rs.raftGroup.Release(); err != nil {
 			log.Error("fail to close raftgroup. err:[%v]", err)
+			lastErr = err
 		}
 	}
 
@@ -105,10 +192,76 @@ func (rs *RaftStore) Close() {
 	if rs.localStore != nil {
 		if err := rs.localStore.Close(); err != nil {
 			log.Error("fail to close boltdb store. err:[%v]", err)
+			lastErr = err
 		}
 	}
+
+	return lastErr
 }
 
+type SaveBatch struct {
+	raft  *RaftGroup
+	lock  sync.RWMutex
+	batch []*ms_raftcmdpb.KvPairExecute
+}
+
+func NewSaveBatch(raft *RaftGroup) *SaveBatch {
+	return &SaveBatch{raft: raft, batch: nil}
+}
+
+func (b *SaveBatch) Put(key, value []byte) {
+	_key := make([]byte, len(key))
+	_value := make([]byte, len(value))
+	copy(_key, key)
+	copy(_value, value)
+	exec := &ms_raftcmdpb.KvPairExecute{
+		Do:     ms_raftcmdpb.ExecuteType_ExecPut,
+		KvPair: &ms_raftcmdpb.KvPair{Key: _key, Value: _value},
+	}
+	b.lock.Lock()
+	defer b.lock.Unlock()
+	b.batch = append(b.batch, exec)
+}
+
+func (b *SaveBatch) Delete(key []byte) {
+	_key := make([]byte, len(key))
+	copy(_key, key)
+	exec := &ms_raftcmdpb.KvPairExecute{
+		Do:     ms_raftcmdpb.ExecuteType_ExecDelete,
+		KvPair: &ms_raftcmdpb.KvPair{Key: _key},
+	}
+	b.lock.Lock()
+	defer b.lock.Unlock()
+	b.batch = append(b.batch, exec)
+}
+
+func (b *SaveBatch) Commit() error {
+	b.lock.Lock()
+	defer b.lock.Unlock()
+
+	batch := b.batch
+	b.batch = nil
+	// 空提交
+	if len(batch) == 0 {
+		return nil
+	}
+	req := &ms_raftcmdpb.Request{
+		CmdType: ms_raftcmdpb.CmdType_Execute,
+		ExecuteReq: &ms_raftcmdpb.ExecuteRequest{
+			Execs: batch,
+		},
+	}
+	_, err := b.raft.SubmitCommand(context.Background(), req)
+	if err != nil {
+		// TODO error
+		log.Error("raft submit failed, err[%v]", err.Error())
+		return err
+	}
+	return nil
+}
+/////////////////////store end////////////////////////
+
+////////////////////raft begin////////////////////////
 func (rs *RaftStore) initRaftStoreCfg() error {
 	raftStoreCfg := new(RaftStoreConfig)
 	raftStoreCfg.NodeId = rs.config.NodeId
@@ -270,162 +423,7 @@ func (r *Resolver) NodeAddress(nodeID uint64, stype raft.SocketType) (addr strin
 		return "", errors.New("unknown raft socket type")
 	}
 }
-
 ////////////////////raft end////////////////////////
-
-////////////////////store begin///////////////////
-type Store interface {
-	Open() error
-	Put(key, value []byte) error
-	Delete(key []byte) error
-	Get(key []byte) ([]byte, error)
-	Scan(startKey, limitKey []byte) raftkvstore.Iterator
-	NewBatch() Batch
-	Close() error
-}
-
-type Batch interface {
-	Put(key []byte, value []byte)
-	Delete(key []byte)
-
-	Commit() error
-}
-
-func (rs *RaftStore) Open() error {
-	if err := rs.raftGroup.Start(rs.raftConfig); err != nil {
-		return err
-	}
-	rs.wg.Add(1)
-	go rs.raftLogCleanup()
-	return nil
-}
-
-func (rs *RaftStore) Put(key, value []byte) error {
-	req := &ms_raftcmdpb.Request{
-		CmdType: ms_raftcmdpb.CmdType_Put,
-		PutReq: &ms_raftcmdpb.PutRequest{
-			Key:   key,
-			Value: value,
-		},
-	}
-	ctx, cancel := context.WithTimeout(context.Background(), DEFAULT_SUBMIT_TIMEOUT_MAX)
-	defer cancel()
-	_, err := rs.raftGroup.SubmitCommand(ctx, req)
-	if err != nil {
-		log.Error("raft submit failed, err[%v]", err)
-		return err
-	}
-	return nil
-}
-
-func (rs *RaftStore) Delete(key []byte) error {
-	req := &ms_raftcmdpb.Request{
-		CmdType: ms_raftcmdpb.CmdType_Delete,
-		DeleteReq: &ms_raftcmdpb.DeleteRequest{
-			Key: key,
-		},
-	}
-	ctx, cancel := context.WithTimeout(context.Background(), DEFAULT_SUBMIT_TIMEOUT_MAX)
-	defer cancel()
-	_, err := rs.raftGroup.SubmitCommand(ctx, req)
-	if err != nil {
-		log.Error("raft submit failed, err[%v]", err)
-		return err
-	}
-	return nil
-}
-
-func (rs *RaftStore) Get(key []byte) ([]byte, error) {
-	if rs.localRead {
-		return rs.localStore.Get(key)
-	}
-	req := &ms_raftcmdpb.Request{
-		CmdType: ms_raftcmdpb.CmdType_Get,
-		GetReq: &ms_raftcmdpb.GetRequest{
-			Key: key,
-		},
-	}
-	ctx, cancel := context.WithTimeout(context.Background(), DEFAULT_SUBMIT_TIMEOUT_MAX)
-	defer cancel()
-	resp, err := rs.raftGroup.SubmitCommand(ctx, req)
-	if err != nil {
-		return nil, err
-	}
-	value := resp.GetGetResp().GetValue()
-	return value, nil
-}
-
-func (rs *RaftStore) Scan(startKey, limitKey []byte) raftkvstore.Iterator {
-	// TODO: when localRead is false
-	return rs.localStore.NewIterator(startKey, limitKey)
-}
-
-func (rs *RaftStore) NewBatch() Batch {
-	return NewSaveBatch(rs.raftGroup)
-}
-
-type SaveBatch struct {
-	raft  *RaftGroup
-	lock  sync.RWMutex
-	batch []*ms_raftcmdpb.KvPairExecute
-}
-
-func NewSaveBatch(raft *RaftGroup) *SaveBatch {
-	return &SaveBatch{raft: raft, batch: nil}
-}
-
-func (b *SaveBatch) Put(key, value []byte) {
-	_key := make([]byte, len(key))
-	_value := make([]byte, len(value))
-	copy(_key, key)
-	copy(_value, value)
-	exec := &ms_raftcmdpb.KvPairExecute{
-		Do:     ms_raftcmdpb.ExecuteType_ExecPut,
-		KvPair: &ms_raftcmdpb.KvPair{Key: _key, Value: _value},
-	}
-	b.lock.Lock()
-	defer b.lock.Unlock()
-	b.batch = append(b.batch, exec)
-}
-
-func (b *SaveBatch) Delete(key []byte) {
-	_key := make([]byte, len(key))
-	copy(_key, key)
-	exec := &ms_raftcmdpb.KvPairExecute{
-		Do:     ms_raftcmdpb.ExecuteType_ExecDelete,
-		KvPair: &ms_raftcmdpb.KvPair{Key: _key},
-	}
-	b.lock.Lock()
-	defer b.lock.Unlock()
-	b.batch = append(b.batch, exec)
-}
-
-func (b *SaveBatch) Commit() error {
-	b.lock.Lock()
-	defer b.lock.Unlock()
-
-	batch := b.batch
-	b.batch = nil
-	// 空提交
-	if len(batch) == 0 {
-		return nil
-	}
-	req := &ms_raftcmdpb.Request{
-		CmdType: ms_raftcmdpb.CmdType_Execute,
-		ExecuteReq: &ms_raftcmdpb.ExecuteRequest{
-			Execs: batch,
-		},
-	}
-	_, err := b.raft.SubmitCommand(context.Background(), req)
-	if err != nil {
-		// TODO error
-		log.Error("raft submit failed, err[%v]", err.Error())
-		return err
-	}
-	return nil
-}
-
-/////////////////////store end////////////////////////
 
 /////////////////////callback implement begin///////////////
 func (rs *RaftStore) raftKvRawGet(req *ms_raftcmdpb.GetRequest, raftIndex uint64) (*ms_raftcmdpb.GetResponse, error) {
@@ -532,7 +530,7 @@ func (rs *RaftStore) HandlePeerChange(confChange *raftproto.ConfChange) (res int
 		log.Debug("update range peer")
 		res, err = nil, nil
 	default:
-		res, err = nil, ErrUnknownCommandType
+		res, err = nil, ErrUnknownRaftCmdType
 	}
 
 	return
