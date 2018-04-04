@@ -2,7 +2,7 @@ package boltdb
 
 import (
 	"github.com/boltdb/bolt"
-	"github.com/tiglabs/baud/kernel/store/kvstore"
+	"baud/kernel/store/kvstore"
 )
 
 type Reader struct {

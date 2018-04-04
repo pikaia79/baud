@@ -5,7 +5,7 @@ import (
 	"sync"
 
 	"github.com/boltdb/bolt"
-	"github.com/tiglabs/baud/kernel/store/kvstore"
+	"baud/kernel/store/kvstore"
 )
 
 var _ kvstore.KVIterator = &Iterator{}

@@ -5,7 +5,7 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/tiglabs/baud/kernel/store/kvstore"
+	"baud/kernel/store/kvstore"
 )
 
 func CommonTestReaderIsolation(t *testing.T, s kvstore.KVStore) {
@@ -19,7 +19,6 @@ func CommonTestReaderIsolation(t *testing.T, s kvstore.KVStore) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	// **************************************************
 
 	batch = s.NewKVBatch()
 	batch.Set([]byte("a"), []byte("val-a"))

@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/tiglabs/baud/kernel/store/kvstore"
+	"baud/kernel/store/kvstore"
 )
 
 // tests around the correct behavior of iterators
@@ -17,7 +17,6 @@ type testRow struct {
 }
 
 func batchWriteRows(s kvstore.KVStore, rows []testRow) error {
-	// write the data
 	batch := s.NewKVBatch()
 	for _, row := range rows {
 		batch.Set(row.key, row.val)

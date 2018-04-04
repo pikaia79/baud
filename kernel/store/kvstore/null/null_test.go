@@ -1,23 +1,9 @@
-//  Copyright (c) 2014 Couchbase, Inc.
-//
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-// 		http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
-
 package null
 
 import (
 	"testing"
 
-	"github.com/tiglabs/baud/kernel/store/kvstore"
+	"baud/kernel/store/kvstore"
 )
 
 func TestStore(t *testing.T) {
@@ -33,12 +19,7 @@ func TestStore(t *testing.T) {
 // compared to CommonTestKVStore
 func NullTestKVStore(t *testing.T, s kvstore.KVStore) {
 
-	writer, err := s.Writer()
-	if err != nil {
-		t.Error(err)
-	}
-
-	batch := writer.NewBatch()
+	batch := s.NewKVBatch()
 	batch.Set([]byte("b"), []byte("val-b"))
 	batch.Set([]byte("c"), []byte("val-c"))
 	batch.Set([]byte("d"), []byte("val-d"))
@@ -49,11 +30,7 @@ func NullTestKVStore(t *testing.T, s kvstore.KVStore) {
 	batch.Set([]byte("i"), []byte("val-i"))
 	batch.Set([]byte("j"), []byte("val-j"))
 
-	err = writer.ExecuteBatch(batch)
-	if err != nil {
-		t.Fatal(err)
-	}
-	err = writer.Close()
+	err := s.ExecuteBatch(batch)
 	if err != nil {
 		t.Fatal(err)
 	}

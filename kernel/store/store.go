@@ -1,15 +1,22 @@
 package store
 
-import "github.com/tiglabs/baud/document"
+import (
+	"baud/kernel/document"
+)
 
 // 一个索引需要创建一个store,这个store是一个逻辑store,
 type Store interface {
-	// 写入一个文档
-    InsertDoc(doc *document.Document) error
-	// 根据doc ID查询一个文档
-	QueryDoc(slotID uint32, id string) (*document.Document, error)
-	MultiQueryDoc(slotID uint32, ids []string) ([]*document.Document, error)
-	// 删除一个文档
-	DeleteDoc(slotID uint32, id string) error
+	// 写入一个entity
+	InsertEntity(doc *document.Entity) error
+	// 根据UID查询一个entity
+	QueryEntity(uid document.UID) (*document.Entity, error)
+	// 删除一个entity
+	DeleteEntity(uid document.UID) error
+	// 写入一个entity
+	InsertEdge(edge *document.Edge) error
+	// 根据UID pair 查询一个edge
+	QueryEdge(src, dst document.UID) (*document.Edge, error)
+	// 删除一个edge
+	DeleteEdge(src, dst document.UID) error
 	Close()
 }

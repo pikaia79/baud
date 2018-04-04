@@ -1,11 +1,14 @@
 package kernel
 
 import (
-	"github.com/tiglabs/baud/schema"
+	"baud/kernel/document"
+	"baud/kernel/store"
 )
 
-type Store struct{}
+type Store struct{
+	docEngine   store.Store
+}
 
-func (i *Store) Insert(uid schema.UID, document []byte) error {
+func (i *Store) Insert(uid document.UID, document []byte) error {
 	return nil
 }

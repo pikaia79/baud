@@ -5,7 +5,7 @@ import (
 	"errors"
 
 	"github.com/boltdb/bolt"
-	"github.com/tiglabs/baud/kernel/store/kvstore"
+	"baud/kernel/store/kvstore"
 )
 
 type StoreConfig struct {

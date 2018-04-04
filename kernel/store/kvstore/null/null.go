@@ -1,7 +1,7 @@
 package null
 
 import (
-	"github.com/tiglabs/baud/kernel/store/kvstore"
+	"baud/kernel/store/kvstore"
 )
 
 var _ kvstore.KVStore = &Store{}

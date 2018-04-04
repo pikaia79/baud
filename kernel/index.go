@@ -2,18 +2,18 @@
 package kernel
 
 import (
-	"github.com/tiglabs/baud/schema"
+	"baud/kernel/document"
 )
 
 type Index interface {
-	Insert(uid schema.UID, document []byte) error
+	Insert(uid document.UID, document []byte) error
 	Search(*Request) (*Result, error)
 	Stat() (*Stats, error)
 }
 
 type Kernel struct{}
 
-func (i *Kernel) Insert(uid schema.UID, document []byte) error {
+func (i *Kernel) Insert(uid document.UID, document []byte) error {
 	return nil
 }
 
