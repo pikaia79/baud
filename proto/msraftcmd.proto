@@ -24,7 +24,6 @@ message GetRequest {
 }
 
 message GetResponse {
-    // 0: success 1: not leader 2: raft busy 3: other error
     int32  code           = 1;
     bytes  value          = 2;
 }
@@ -75,12 +74,12 @@ enum CmdType {
 }
 
 message Request {
-    CmdType              cmd_type        = 2;
+    CmdType              cmd_type        = 1;
 
-    GetRequest           get_req         = 3;
-    PutRequest           put_req         = 4;
-    DeleteRequest        delete_req      = 5;
-    ExecuteRequest       execute_req     = 6;
+    GetRequest           get_req         = 2;
+    PutRequest           put_req         = 3;
+    DeleteRequest        delete_req      = 4;
+    ExecuteRequest       execute_req     = 5;
 }
 
 message Response {
@@ -90,4 +89,11 @@ message Response {
     PutResponse           put_resp         = 3;
     DeleteResponse        delete_resp      = 4;
     ExecuteResponse       execute_resp     = 5;
+}
+
+enum ResponseCode {
+    Success               = 0;
+    UnknownErr            = 1;
+    NoLeader              = 2;
+    RaftBusy              = 3;
 }

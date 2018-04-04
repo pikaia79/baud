@@ -10,7 +10,7 @@ var (
 	ErrIntarnalError			= errors.New("internal error")
 	ErrParamError				= errors.New("param error")
 	ErrDupDb					= errors.New("duplicated database")
-	ErrBoltDbOps				= errors.New("boltdb operation error")
+	ErrBoltDbOpsFailed			= errors.New("boltdb operation error")
 	ErrUnknownRaftCmdType 		= errors.New("unknown raft command type")
 )
 

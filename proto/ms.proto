@@ -2,6 +2,7 @@ syntax = "proto3";
 package metapb;
 
 import "gogoproto/gogo.proto";
+import "meta.proto";
 
 option (gogoproto.marshaler_all) = true;
 option (gogoproto.sizer_all) = true;
@@ -16,8 +17,8 @@ message RequestHeader {
 }
 
 message ResponseHeader {
-    int32       code
-    string      msg
+    int32       code                = 1;
+    string      msg                 = 2;
 }
 
 message GetRouteRequest {

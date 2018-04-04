@@ -5,12 +5,12 @@ import (
 )
 
 type Cluster struct {
-	replGroups 	[]ReplGroup
+	replGroups 		[]ReplGroup
 
-	config 		*Config
+	config 			*Config
 
-	store 		Store
-	idGenor		*IDGenerator
+	store 			Store
+	idGenerator		*IDGenerator
 }
 
 func NewCluster(config *Config) *Cluster {
@@ -36,5 +36,6 @@ func (c *Cluster) Close() {
 }
 
 func (c *Cluster) createDb(dbName string) (*DB, error) {
+
 	return nil, nil
 }
