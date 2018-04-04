@@ -34,6 +34,6 @@ func (c *Cluster) Close() {
 	}
 }
 
-func (c *Cluster) createDb(dbName string) (*DBInfo, error) {
+func (c *Cluster) createDb(dbName string) (*DB, error) {
 	return nil, nil
 }
