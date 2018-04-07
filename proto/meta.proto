@@ -18,7 +18,6 @@ message Space {
 }
 
 message Partition {
-    uint32                  id                  = 1;
 	string                  entityOrEdge        = 2;
 	uint32                  db                  = 3;
 	uint32                  space               = 4;

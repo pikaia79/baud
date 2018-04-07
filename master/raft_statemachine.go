@@ -95,7 +95,7 @@ func (rg *RaftGroup) submit(ctx context.Context, cmd []byte) (interface{}, error
 	return resp, nil
 }
 
-func (rg *RaftGroup) SubmitCommand(ctx context.Context, req *msraftcmdpb.Request) (*msraftcmdb.Response, error) {
+func (rg *RaftGroup) SubmitCommand(ctx context.Context, req *msraftcmdpb.Request) (*msraftcmdpb.Response, error) {
 	cmd, err := proto.Marshal(req)
 	if err != nil {
 		return nil, err
