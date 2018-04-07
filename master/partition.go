@@ -1,7 +1,6 @@
 package master
 
 type Partition struct {
-	id 			 string // equals replGroup id
 	entityOrEdge string
 	db           uint32
 	space        uint32

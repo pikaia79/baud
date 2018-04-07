@@ -13,7 +13,15 @@ const (
 	DEFAULT_CONN_LIMIT		= 10000
 
 	// definition for http url parameter name
-	DB_NAME		= "db_name"
+	DB_NAME         = "db_name"
+	SRC_DB_NAME     = "src_db_name"
+	DEST_DB_NAME    = "dest_db_name"
+	SPACE_NAME      = "space_name"
+	SRC_SPACE_NAME  = "src_space_name"
+	DEST_SPACE_NAME = "dest_space_name"
+	PARTITION_KEY   = "partition_key"
+	PARTITION_FUNC  = "partition_func"
+	PARTITION_NUM   = "partition_num"
 )
 
 type ApiServer struct {
@@ -77,15 +85,77 @@ func (s *ApiServer) handleDbDelete(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *ApiServer) handleDbRename(w http.ResponseWriter, r *http.Request) {
+	srcDbName, err := checkMissingParam(w, r, SRC_DB_NAME)
+	if err != nil {
+		return
+	}
+	destDbName, err := checkMissingParam(w, r, DEST_DB_NAME)
+	if err != nil {
+		return
+	}
+
+	if err := s.cluster.renameDb(srcDbName, destDbName); err != nil {
+		sendReply(w, newHttpErrReply(err))
+		return
+	}
+
+	sendReply(w, newHttpSucReply(""))
 }
 
 func (s *ApiServer) handleSpaceCreate(w http.ResponseWriter, r *http.Request) {
+	dbName, err := checkMissingParam(w, r, DB_NAME)
+	if err != nil {
+		return
+	}
+	spaceName, err := checkMissingParam(w, r, SPACE_NAME)
+	if err != nil {
+		return
+	}
+	partitionKey, err := checkMissingParam(w, r, PARTITION_KEY)
+	if err != nil {
+		return
+	}
+
+	partitionFunc, err := checkMissingParam(w, r, PARTITION_FUNC)
+	if err != nil {
+		return
+	}
+	partitionNum, err := checkMissingAndNumericParam(w, r, PARTITION_NUM)
+	if err != nil {
+		return
+	}
+
+	space, err := s.cluster.createSpace(dbName, spaceName, partitionKey, partitionFunc, partitionNum)
+	if err != nil {
+		sendReply(w, newHttpErrReply(err))
+		return
+	}
+
+	sendReply(w, newHttpSucReply(space))
 }
 
 func (s *ApiServer) handleSpaceDelete(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *ApiServer) handleSpaceRename(w http.ResponseWriter, r *http.Request) {
+	dbName, err := checkMissingParam(w, r, DB_NAME)
+	if err != nil {
+		return
+	}
+	srcSpaceName, err := checkMissingParam(w, r, SRC_SPACE_NAME)
+	if err != nil {
+		return
+	}
+	destSpaceName, err := checkMissingParam(w, r, DEST_SPACE_NAME)
+	if err != nil {
+		return
+	}
+
+	if err := s.cluster.renameSpace(dbName, srcSpaceName, destSpaceName); err != nil {
+		sendReply(w, newHttpErrReply(err))
+	}
+
+	sendReply(w, newHttpSucReply(""))
 }
 
 func (s *ApiServer) handleIndexCreate(w http.ResponseWriter, r *http.Request) {
@@ -135,6 +205,23 @@ func checkMissingParam(w http.ResponseWriter, r *http.Request, paramName string)
 		return nil, ErrParamError
 	}
 	return paramVal, nil
+}
+
+func checkMissingAndNumericParam(w http.ResponseWriter, r *http.Request, paramName string) (int, error) {
+	paramValStr, err := checkMissingParam(w, r, paramName)
+	if err != nil {
+		return 0, err
+	}
+
+	paramValInt, err := strconv.Atoi(paramValStr)
+	if err != nil {
+		reply := newHttpErrReply(ErrParamError)
+		newMsg := fmt.Sprintf("%s, unmatched type[%s]", reply.Msg, paramName)
+		reply.Msg = newMsg
+		sendReply(w, reply)
+		return nil, ErrParamError
+	}
+	return paramValInt, nil
 }
 
 func sendReply(w http.ResponseWriter, httpReply *HttpReply) {
