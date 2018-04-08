@@ -2,14 +2,16 @@ package master
 
 import (
 	"util/log"
+	//"sync"
 )
 
 type Cluster struct {
 	config 			*Config
 	store 			Store
 
-	replGroups 		[]ReplGroup
+	//clusterLock     sync.RWMutex
 	dbCache 		*DBCache
+	psCache 		*PSCache
 }
 
 func NewCluster(config *Config) *Cluster {
@@ -83,13 +85,10 @@ func (c *Cluster) renameDb(srcDbName, destDbName string) error {
 }
 
 func (c *Cluster) createSpace(dbName, spaceName, partitionKey, partitionFunc string, partitionNum int) (*Space, error) {
-	c.dbCache.lock.RLock()
 	db := c.dbCache.findDbByName(dbName)
 	if db == nil {
-		c.dbCache.lock.RUnlock()
 		return nil, ErrDbNotExists
 	}
-	c.dbCache.lock.RUnlock()
 	// my be hold out of db from memory, but will clear it when master startup
 
 	spaceCache := db.spaceCache
@@ -99,7 +98,7 @@ func (c *Cluster) createSpace(dbName, spaceName, partitionKey, partitionFunc str
 		return nil, ErrDupSpace
 	}
 
-	space, err := NewSpace(spaceName, partitionKey, partitionFunc, partitionNum)
+	space, err := NewSpace(db.Id, dbName, spaceName, partitionKey, partitionFunc, partitionNum)
 	if err != nil {
 		return nil, err
 	}
@@ -142,4 +141,8 @@ func (c *Cluster) renameSpace(dbName, srcSpaceName, destSpaceName string) error 
 	spaceCache.addSpace(srcSpace)
 
 	return nil
+}
+
+func (c *Cluster) detailSpace(spaceId int) (*Space, error) {
+
 }

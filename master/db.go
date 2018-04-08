@@ -16,7 +16,8 @@ const (
 type DB struct {
 	*metapb.DB
 
-	spaceCache *SpaceCache        `json:"-"`
+	spaceCache   *SpaceCache        `json:"-"`
+	propertyLock sync.RWMutex           `json:"-"`
 }
 
 func NewDB(dbName string) (*DB, error) {
@@ -36,6 +37,9 @@ func NewDB(dbName string) (*DB, error) {
 }
 
 func (db *DB) persistent(store Store) error {
+	db.propertyLock.RLock()
+	defer db.propertyLock.RUnlock()
+
 	copy := deepcopy.Iface(db.DB).(*metapb.DB)
 	dbVal, err := json.Marshal(copy)
 	if err != nil {
@@ -53,6 +57,9 @@ func (db *DB) persistent(store Store) error {
 }
 
 func (db *DB) erase(store Store) error {
+	db.propertyLock.RLock()
+	defer db.propertyLock.RUnlock()
+	
 	dbKey := []byte(fmt.Sprintf("%s %d", PREFIX_DB, db.DB.Id))
 	if err := store.Delete(dbKey); err != nil {
 		log.Error("fail to delete db[%v] from store. err:[%v]", db.DB, err)
@@ -63,16 +70,23 @@ func (db *DB) erase(store Store) error {
 }
 
 func (db *DB) rename(newDbName string) {
+	db.propertyLock.Lock()
+	defer db.propertyLock.Unlock()
+
 	db.Name = newDbName
 }
 
 type DBCache struct {
 	lock      sync.RWMutex
-	dbNameMap map[string]*DB
+	dbs       map[string]*DB
+	idNameMap map[uint32]string
 }
 
 func (c *DBCache) findDbByName(dbName string) *DB {
-	db, ok := c.dbNameMap[dbName]
+	c.lock.RLock()
+	defer c.lock.RUnlock()
+
+	db, ok := c.dbs[dbName]
 	if !ok {
 		return nil
 	}
@@ -80,9 +94,17 @@ func (c *DBCache) findDbByName(dbName string) *DB {
 }
 
 func (c *DBCache) addDb(db *DB) {
-	c.dbNameMap[db.Name] = db
+	c.lock.Lock()
+	defer c.lock.Unlock()
+
+	c.dbs[db.Name] = db
+	c.idNameMap[db.Id] = db.Name
 }
 
 func (c *DBCache) deleteDb(db *DB) {
-	delete(c.dbNameMap, db.Name)
+	c.lock.Lock()
+	defer c.lock.Unlock()
+
+	delete(c.dbs, db.Name)
+	delete(c.idNameMap, db.Id)
 }

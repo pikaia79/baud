@@ -3,7 +3,6 @@ package master
 import (
 	"sync"
 	"proto/metapb"
-	"btree"
 	"util/log"
 	"util/deepcopy"
 	"encoding/json"
@@ -15,19 +14,19 @@ const (
 )
 
 type PartitionPolicy struct {
-	key           string
-	function      string
-	numPartitions int
+	Key           string
+	Function      string
+	NumPartitions int
 }
 
 type Space struct {
 	*metapb.Space
-	entityOrEdge string
 
-	partitioning PartitionPolicy
-	mapping      []Field
+	Partitioning PartitionPolicy
+	Mapping      []Field
 
-	partitions	 btree.BTree        `json:"-"`
+	Partitions   PartitionTree      `json:"-"`
+	propertyLock sync.RWMutex        `json:"-"`
 }
 
 type Field struct {
@@ -38,7 +37,7 @@ type Field struct {
 	MultiValue  bool
 }
 
-func NewSpace(spaceName, partitionKey, partitionFunction string, partitionNum int) (*Space, error) {
+func NewSpace(dbId uint32, dbName, spaceName, partitionKey, partitionFunction string, partitionNum int) (*Space, error) {
 	spaceId, err := IdGeneratorSingleInstance(nil).GenID()
 	if err != nil {
 		log.Error("generate space id is failed. err:[%v]", err)
@@ -47,19 +46,25 @@ func NewSpace(spaceName, partitionKey, partitionFunction string, partitionNum in
 
 	return &Space{
 		Space: &metapb.Space{
-			Name: spaceName,
-			Id:   spaceId,
+			Name:   spaceName,
+			Id:     spaceId,
+			DbId:   dbId,
+			DbName: dbName,
+			Status: metapb.SpaceStatus_Init,
 		},
-		partitioning: PartitionPolicy{
-			key:           partitionKey,
-			function:      partitionFunction,
-			numPartitions: partitionNum,
+		Partitioning: PartitionPolicy{
+			Key:           partitionKey,
+			Function:      partitionFunction,
+			NumPartitions: partitionNum,
 		},
 	}, nil
 }
 
 func (s *Space) persistent(store Store) error {
-	copy := deepcopy.Iface(s.Space).(*metapb.Space)
+	s.propertyLock.RLock()
+	defer s.propertyLock.RUnlock()
+
+	copy := deepcopy.Iface(*s).(Space)
 	spaceVal, err := json.Marshal(copy)
 	if err != nil {
 		log.Error("fail to marshal space[%v]. err:[%v]", copy, err)
@@ -75,6 +80,9 @@ func (s *Space) persistent(store Store) error {
 }
 
 func (s *Space) erase(store Store) error {
+	s.propertyLock.RLock()
+	defer s.propertyLock.RUnlock()
+
 	spaceKey := []byte(fmt.Sprintf("%s %d", PREFIX_SPACE, ))
 	if err := store.Delete(spaceKey); err != nil {
 		log.Error("fail to delete space[%v] from store. err:[%v]", s.Space, err)
@@ -85,17 +93,23 @@ func (s *Space) erase(store Store) error {
 }
 
 func (s *Space) rename(newName string) {
+	s.propertyLock.Lock()
+	defer s.propertyLock.Unlock()
+
 	s.Name = newName
 }
 
 type SpaceCache struct {
-	lock 		 sync.RWMutex
-	spaceNameMap map[string]uint32
-	spaces       map[uint32]*Space
+	lock      sync.RWMutex
+	NameIdMap map[string]uint32
+	spaces    map[uint32]*Space
 }
 
 func (c *SpaceCache) findSpaceByName(spaceName string) *Space {
-	spaceId, ok := c.spaceNameMap[spaceName]
+	c.lock.RLock()
+	defer c.lock.RUnlock()
+
+	spaceId, ok := c.NameIdMap[spaceName]
 	if !ok {
 		return nil
 	}
@@ -107,15 +121,21 @@ func (c *SpaceCache) findSpaceByName(spaceName string) *Space {
 	return space
 }
 
-func (c *SpaceCache) addSpace(space *Space)  {
-	c.spaceNameMap[space.Name] = space.Id
+func (c *SpaceCache) addSpace(space *Space) {
+	c.lock.Lock()
+	defer c.lock.Unlock()
+
+	c.NameIdMap[space.Name] = space.Id
 	c.spaces[space.Id] = space
 }
 
 func (c *SpaceCache) deleteSpace(space *Space) {
+	c.lock.Lock()
+	defer c.lock.Unlock()
+
 	oldSpace, ok := c.spaces[space.Id]
 	if !ok {
 		return
 	}
-	delete(c.spaceNameMap, oldSpace.Name)
+	delete(c.NameIdMap, oldSpace.Name)
 }

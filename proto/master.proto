@@ -9,7 +9,7 @@ option (gogoproto.sizer_all) = true;
 option (gogoproto.unmarshaler_all) = true;
 
 
-service MsRpc {
+service MasterRpc {
     rpc GetRoute(GetRouteRequest) returns (GetRouteResponse) {}
 }
 

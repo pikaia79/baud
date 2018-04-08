@@ -30,6 +30,7 @@ var (
 
 ////////////////////store begin///////////////////
 type Store interface {
+	// TODO: all methods need to add parameter timeout
 	Open() error
 	Put(key, value []byte) error
 	Delete(key []byte) error

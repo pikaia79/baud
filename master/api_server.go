@@ -17,6 +17,7 @@ const (
 	SRC_DB_NAME     = "src_db_name"
 	DEST_DB_NAME    = "dest_db_name"
 	SPACE_NAME      = "space_name"
+	SPACE_ID		= "space_id"
 	SRC_SPACE_NAME  = "src_space_name"
 	DEST_SPACE_NAME = "dest_space_name"
 	PARTITION_KEY   = "partition_key"
@@ -63,6 +64,7 @@ func (s *ApiServer) initAdminHandler() {
 	s.httpServer.Handle("/manage/space/create", s.handleSpaceCreate)
 	s.httpServer.Handle("/manage/space/delete", s.handleSpaceDelete)
 	s.httpServer.Handle("/manage/space/rename", s.handleSpaceRename)
+	s.httpServer.Handle("/manage/space/detail", s.handleSpaceDetail)
 	s.httpServer.Handle("/manage/index/create", s.handleIndexCreate)
 }
 
@@ -156,6 +158,15 @@ func (s *ApiServer) handleSpaceRename(w http.ResponseWriter, r *http.Request) {
 	}
 
 	sendReply(w, newHttpSucReply(""))
+}
+
+func (s *ApiServer) handleSpaceDetail(w http.ResponseWriter, r *http.Request) {
+	spaceId, err := checkMissingAndNumericParam(w, r, SPACE_ID)
+	if err != nil {
+		return
+	}
+
+	s.cluster.detailSpace(spaceId)
 }
 
 func (s *ApiServer) handleIndexCreate(w http.ResponseWriter, r *http.Request) {

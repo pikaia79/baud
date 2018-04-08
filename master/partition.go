@@ -1,13 +1,15 @@
 package master
 
-type Partition struct {
-	entityOrEdge string
-	db           uint32
-	space        uint32
-	startSlot    uint32
-	endSlot      uint32
+import (
+	"proto/metapb"
+	"btree"
+	"sync"
+)
 
-	replGroup 	 uint32
+type Partition struct {
+	*metapb.Partition
+
+	//replGroup 	 uint32
 
 	//for splitting & merging
 	leftCh  *Partition
@@ -17,19 +19,27 @@ type Partition struct {
 	status string //serving, splitting, cleaning, etc.
 }
 
-type ReplGroup struct {
+type ReplicaGroup struct {
 	id       uint32
 	replicas []PartitionServer
 }
 
-type PartitionServer struct {
-	id 		uint32			// equals ip
-	role 	string
-	zone 	string
-	ip   	string
-	port 	string
-
-	cpu    	int
-	memory 	int
-	disk   	int
+type PartitionTree struct {
+	btree 	btree.BTree
 }
+
+type PartitionServer struct {
+	*metapb.PartitionServer
+
+	cpu    int            `json:"-"`
+	memory int                `json:"-"`
+	disk   int                 `json:"-"`
+
+	partition Partition   `json:"-"`
+}
+
+type PSCache struct {
+	lock 	sync.RWMutex
+	nodes   map[uint32]*PartitionServer
+}
+

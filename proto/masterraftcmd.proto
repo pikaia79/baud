@@ -1,5 +1,5 @@
 syntax = "proto3";
-package msraftcmdpb;
+package masterraftcmdpb;
 
 import "gogoproto/gogo.proto";
 
@@ -8,10 +8,10 @@ option (gogoproto.sizer_all) = true;
 option (gogoproto.unmarshaler_all) = true;
 
 message RaftKvPair {
-    bytes key         = 1;
-    bytes value       = 2;
-    uint64 timestamp  = 3;
-    uint64 applyIndex = 4;
+    bytes key               = 1;
+    bytes value             = 2;
+    uint64 timestamp        = 3;
+    uint64 apply_index      = 4;
 }
 
 message KvPair {
