@@ -5,22 +5,16 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/tiglabs/baud/kernel/store/kvstore"
+	"github.com/tiglabs/baud/kernel/store/memstore"
 )
 
-// tests which focus on the byte ownership
-
-// CommonTestReaderOwnsGetBytes attempts to mutate the returned bytes
-// first, while the reader is still open, second after that reader is
-// closed, then the original key is read again, to ensure these
-// modifications did not cause panic, or mutate the stored value
-func CommonTestReaderOwnsGetBytes(t *testing.T, s kvstore.KVStore) {
+func CommonTestReaderOwnsGetValue(t *testing.T, s memstore.MemStore) {
 
 	originalKey := []byte("key")
 	originalVal := []byte("val")
 
 	// write key/val
-	batch := s.NewKVBatch()
+	batch := s.NewBatch()
 	batch.Set(originalKey, originalVal)
 	err := s.ExecuteBatch(batch)
 	if err != nil {
@@ -28,27 +22,28 @@ func CommonTestReaderOwnsGetBytes(t *testing.T, s kvstore.KVStore) {
 	}
 
 	// read key
-	returnedVal, err := s.Get(originalKey)
+	rVal, err := s.Get(originalKey)
 	if err != nil {
 		t.Fatal(err)
 	}
-
+	returnedVal := rVal.([]byte)
 	// check that it is the expected value
 	if !reflect.DeepEqual(returnedVal, originalVal) {
 		t.Fatalf("expected value: %v for '%s', got %v", originalVal, originalKey, returnedVal)
 	}
 
 	// mutate the returned value with reader still open
-	for i := range returnedVal {
+	for i := range []byte(returnedVal) {
 		returnedVal[i] = '1'
 	}
 
 	// read the key again
-	returnedVal2, err := s.Get(originalKey)
+	rVal2, err := s.Get(originalKey)
 	if err != nil {
 		t.Fatal(err)
 	}
 
+	returnedVal2 := rVal2.([]byte)
 	// check that it is the expected value
 	if !reflect.DeepEqual(returnedVal2, originalVal) {
 		t.Fatalf("expected value: %v for '%s', got %v", originalVal, originalKey, returnedVal2)
@@ -60,11 +55,12 @@ func CommonTestReaderOwnsGetBytes(t *testing.T, s kvstore.KVStore) {
 	}
 
 	// read the key again
-	returnedVal3, err := s.Get(originalKey)
+	rVal3, err := s.Get(originalKey)
 	if err != nil {
 		t.Fatal(err)
 	}
 
+	returnedVal3 := rVal3.([]byte)
 	// check that it is the expected value
 	if !reflect.DeepEqual(returnedVal3, originalVal) {
 		t.Fatalf("expected value: %v for '%s', got %v", originalVal, originalKey, returnedVal3)
@@ -78,13 +74,13 @@ func CommonTestReaderOwnsGetBytes(t *testing.T, s kvstore.KVStore) {
 	}
 }
 
-func CommonTestWriterOwnsBytes(t *testing.T, s kvstore.KVStore) {
+func CommonTestWriterOwnsValues(t *testing.T, s memstore.MemStore) {
 
 	keyBuffer := make([]byte, 5)
 	valBuffer := make([]byte, 5)
 
 	// write key/val pairs reusing same buffer
-	batch := s.NewKVBatch()
+	batch := s.NewBatch()
 	for i := 0; i < 10; i++ {
 		keyBuffer[0] = 'k'
 		keyBuffer[1] = 'e'
@@ -97,6 +93,7 @@ func CommonTestWriterOwnsBytes(t *testing.T, s kvstore.KVStore) {
 		valBuffer[3] = '-'
 		valBuffer[4] = byte('0' + i)
 		batch.Set(keyBuffer, valBuffer)
+		valBuffer = make([]byte, 5)
 	}
 	err := s.ExecuteBatch(batch)
 	if err != nil {
@@ -106,20 +103,20 @@ func CommonTestWriterOwnsBytes(t *testing.T, s kvstore.KVStore) {
 	// check that we can read back what we expect
 	allks := make([][]byte, 0)
 	allvs := make([][]byte, 0)
-	iter := s.RangeIterator(nil, nil)
-	for iter.Valid() {
-		// if we want to keep bytes from iteration we must copy
-		k := iter.Key()
-		copyk := make([]byte, len(k))
-		copy(copyk, k)
+	err = s.RangeIterator(nil, nil, func(key []byte, value interface{}) bool {
+		copyk := make([]byte, len(key))
+		copy(copyk, key)
 		allks = append(allks, copyk)
-		v := iter.Value()
+		v, ok := value.([]byte)
+		if !ok {
+			t.Fatal("invalid value")
+		}
 		copyv := make([]byte, len(v))
 		copy(copyv, v)
 		allvs = append(allvs, copyv)
-		iter.Next()
-	}
-	err = iter.Close()
+		return true
+	})
+
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -133,12 +130,12 @@ func CommonTestWriterOwnsBytes(t *testing.T, s kvstore.KVStore) {
 			t.Errorf("expected key %v to end in %d", key, []byte{byte('0' + i)})
 		}
 		if !bytes.HasSuffix(val, []byte{byte('0' + i)}) {
-			t.Errorf("expected val %v to end in %d", val, []byte{byte('0' + i)})
+			t.Errorf("expected val %v to end in %d", string(val), []byte{byte('0' + i)})
 		}
 	}
 
 	// now delete using same approach
-	batch = s.NewKVBatch()
+	batch = s.NewBatch()
 	for i := 0; i < 10; i++ {
 		keyBuffer[0] = 'k'
 		keyBuffer[1] = 'e'
@@ -152,23 +149,18 @@ func CommonTestWriterOwnsBytes(t *testing.T, s kvstore.KVStore) {
 		t.Fatal(err)
 	}
 
-
 	// check that we can read back what we expect
 	allks = make([][]byte, 0)
-	iter = s.RangeIterator(nil, nil)
-	for iter.Valid() {
-		// if we want to keep bytes from iteration we must copy
-		k := iter.Key()
-		copyk := make([]byte, len(k))
-		copy(copyk, k)
+	err = s.RangeIterator(nil, nil, func(key []byte, value interface{}) bool {
+		copyk := make([]byte, len(key))
+		copy(copyk, key)
 		allks = append(allks, copyk)
-		v := iter.Value()
+		v := value.([]byte)
 		copyv := make([]byte, len(v))
 		copy(copyv, v)
 		allvs = append(allvs, copyv)
-		iter.Next()
-	}
-	err = iter.Close()
+		return true
+	})
 	if err != nil {
 		t.Fatal(err)
 	}

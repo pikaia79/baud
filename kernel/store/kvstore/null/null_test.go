@@ -3,7 +3,7 @@ package null
 import (
 	"testing"
 
-	"baud/kernel/store/kvstore"
+	"github.com/tiglabs/baud/kernel/store/kvstore"
 )
 
 func TestStore(t *testing.T) {
@@ -35,17 +35,17 @@ func NullTestKVStore(t *testing.T, s kvstore.KVStore) {
 		t.Fatal(err)
 	}
 
-	reader, err := s.Reader()
+	snap, err := s.GetSnapshot()
 	if err != nil {
 		t.Error(err)
 	}
 	defer func() {
-		err := reader.Close()
+		err := snap.Close()
 		if err != nil {
 			t.Fatal(err)
 		}
 	}()
-	it := reader.RangeIterator([]byte("b"), nil)
+	it := snap.RangeIterator([]byte("b"), nil)
 	key, val, valid := it.Current()
 	if valid {
 		t.Fatalf("valid true, expected false")

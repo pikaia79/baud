@@ -1,7 +1,7 @@
 package store
 
 import (
-	"baud/kernel/document"
+	"github.com/tiglabs/baud/kernel/document"
 )
 
 // 一个索引需要创建一个store,这个store是一个逻辑store,

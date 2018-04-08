@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"baud/kernel/store/kvstore"
+	"github.com/tiglabs/baud/kernel/store/kvstore"
 )
 
 // tests around the correct behavior of iterators

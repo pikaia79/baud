@@ -1,24 +1,39 @@
-package btreeDB
+package llrbdb
 
 import (
 	"sync"
 	"errors"
-	"baud/util/match"
 	"bytes"
 
-	"github.com/google/btree"
-	"golang.org/x/net/context"
+	"github.com/tiglabs/baud/util/match"
+	"github.com/petar/GoLLRB/llrb"
 )
+
+type IterFunc func(key []byte, value interface{}) bool
 
 type dbItem struct {
 	key     []byte
-	value   []byte
+	value   interface{}
 }
 
-func (dbi *dbItem) Less(item btree.Item, ctx interface{}) bool {
-	dbi2 := item.(*dbItem)
+func (dbi *dbItem) Key() []byte {
+	if dbi == nil {
+		return nil
+	}
+	return dbi.key
+}
 
-	return bytes.Compare(dbi.key, dbi2.key) < 0
+func (dbi *dbItem) Less(item llrb.Item) bool {
+	if dbi == nil {
+		return true
+	}
+	switch i := item.(type) {
+	case *dbItem:
+		return bytes.Compare(dbi.Key(), i.Key()) < 0
+	default:
+		return !item.Less(dbi)
+	}
+	return true
 }
 
 type Tx struct {
@@ -29,7 +44,7 @@ type Tx struct {
 }
 
 type txWriteContext struct {
-	rbKeys *btree.BTree      // a tree of all item ordered by key
+	rbKeys *llrb.LLRB      // a tree of all item ordered by key
 
 	rollbackItems   map[string]*dbItem // details for rolling back tx.
 	iterCount       int                // stack of iterators
@@ -50,6 +65,8 @@ var (
 	// ErrInvalid is returned when the database file is an invalid format.
 	ErrInvalid = errors.New("invalid database")
 
+	ErrInvalidConfig = errors.New("invalid db config")
+
 	// ErrDatabaseClosed is returned when the database is closed.
 	ErrDatabaseClosed = errors.New("database closed")
 
@@ -57,13 +74,22 @@ var (
 	ErrTxIterating = errors.New("tx is iterating")
 )
 
+type Config struct {
+	Degree    int
+}
+
+var DefaultConfig = &Config{Degree: 10}
+
 type DB struct {
 	mu        sync.RWMutex
-	keys      *btree.BTree      // a tree of all item ordered by key
+	keys      *llrb.LLRB      // a tree of all item ordered by key
 
 	closed    bool              // set when the database has been closed
 }
 
+func NewDB() (*DB, error) {
+	return &DB{keys: llrb.New()}, nil
+}
 
 // Close releases all database resources.
 // All transactions must be closed before closing the database.
@@ -134,7 +160,7 @@ func (tx *Tx) rollbackInner() {
 		tx.db.keys = tx.wc.rbKeys
 	}
 	for key, item := range tx.wc.rollbackItems {
-		tx.db.deleteFromDatabase(&dbItem{key: key})
+		tx.db.deleteFromDatabase(&dbItem{key: []byte(key)})
 		if item != nil {
 			// When an item is not nil, we will need to reinsert that item
 			// into the database overwriting the current one.
@@ -184,7 +210,7 @@ func (tx *Tx) Rollback() error {
 	return nil
 }
 
-func (tx *Tx) Set(key, value []byte) (preValue []byte,
+func (tx *Tx) Set(key []byte, value interface{}) (preValue interface{},
 replaced bool, err error) {
 	if tx.db == nil {
 		return nil, false, ErrTxClosed
@@ -204,14 +230,14 @@ replaced bool, err error) {
 			// create a rollback entry with a nil value. A nil value indicates
 			// that the entry should be deleted on rollback. When the value is
 			// *not* nil, that means the entry should be reverted.
-			tx.wc.rollbackItems[key] = nil
+			tx.wc.rollbackItems[string(key)] = nil
 		} else {
 			// A previous item already exists in the database. Let's create a
 			// rollback entry with the item as the value. We need to check the
 			// map to see if there isn't already an item that matches the
 			// same key.
-			if _, ok := tx.wc.rollbackItems[key]; !ok {
-				tx.wc.rollbackItems[key] = prev
+			if _, ok := tx.wc.rollbackItems[string(key)]; !ok {
+				tx.wc.rollbackItems[string(key)] = prev
 			}
 			preValue, replaced = prev.value, true
 		}
@@ -220,7 +246,7 @@ replaced bool, err error) {
 }
 
 // Get returns a value for a key. If the item does not exist then ErrNotFound is returned.
-func (tx *Tx) Get(key []byte) (val []byte, err error) {
+func (tx *Tx) Get(key []byte) (val interface{}, err error) {
 	if tx.db == nil {
 		return nil, ErrTxClosed
 	}
@@ -238,7 +264,7 @@ func (tx *Tx) Get(key []byte) (val []byte, err error) {
 //
 // Only a writable transaction can be used for this operation.
 // This operation is not allowed during iterations such as Ascend* & Descend*.
-func (tx *Tx) Delete(key []byte) (val []byte, err error) {
+func (tx *Tx) Delete(key []byte) (val interface{}, err error) {
 	if tx.db == nil {
 		return nil, ErrTxClosed
 	} else if !tx.writable {
@@ -252,16 +278,40 @@ func (tx *Tx) Delete(key []byte) (val []byte, err error) {
 	}
 	// create a rollback entry if there has not been a deleteAll call.
 	if tx.wc.rbKeys == nil {
-		if _, ok := tx.wc.rollbackItems[key]; !ok {
-			tx.wc.rollbackItems[key] = item
+		if _, ok := tx.wc.rollbackItems[string(key)]; !ok {
+			tx.wc.rollbackItems[string(key)] = item
 		}
 	}
 
 	return item.value, nil
 }
 
-func (tx *Tx) NewCursor() *Cursor {
-	return &Cursor{tx: tx}
+func (tx *Tx) descendRange(lessOrEqual, greaterThan llrb.Item, iterator llrb.ItemIterator) {
+	iter := func(i llrb.Item) bool {
+		// i == greaterThan
+		if i.Less(greaterThan) {
+			return false
+		}
+		if !i.Less(greaterThan) && !greaterThan.Less(i) {
+			return false
+		}
+		return iterator(i)
+	}
+	tx.db.keys.DescendLessOrEqual(lessOrEqual, iter)
+}
+
+func (tx *Tx) descendGreaterThan(greater llrb.Item, iterator llrb.ItemIterator) {
+	iter := func(i llrb.Item) bool {
+		if greater.Less(i) {
+			return iterator(i)
+		}
+		return false
+	}
+	tx.db.keys.DescendLessOrEqual(llrb.Inf(1), iter)
+}
+
+func (tx *Tx) descend(iterator llrb.ItemIterator) {
+	tx.db.keys.DescendLessOrEqual(llrb.Inf(1), iterator)
 }
 
 // scan iterates through a specified index and calls user-defined iterator
@@ -274,23 +324,31 @@ func (tx *Tx) NewCursor() *Cursor {
 // The start and stop params are the greaterThan, lessThan limits. For
 // descending order, these will be lessThan, greaterThan.
 // An error will be returned if the tx is closed or the index is not found.
-func (tx *Tx) scan(desc, gt, lt bool, start, stop []byte,
-iterator func(key, value []byte) bool) error {
+func (tx *Tx) scan(desc, gt, lt bool, start, stop []byte, iterator IterFunc) error {
 	if tx.db == nil {
 		return ErrTxClosed
 	}
 	// wrap a btree specific iterator around the user-defined iterator.
-	iter := func(item btree.Item) bool {
+	iter := func(item llrb.Item) bool {
 		dbi := item.(*dbItem)
 		return iterator(dbi.key, dbi.value)
 	}
-	var tr *btree.BTree
+	var tr *llrb.LLRB
 	tr = tx.db.keys
 	// create some limit items
-	var itemA, itemB *dbItem
+	//var itemA, itemB *dbItem
+	var itemA, itemB llrb.Item
 	if gt || lt {
-		itemA = &dbItem{key: start}
-		itemB = &dbItem{key: stop}
+		if start != nil {
+			itemA = &dbItem{key: start}
+		} else {
+			itemA = llrb.Inf(-1)
+		}
+		if stop != nil {
+			itemB = &dbItem{key: stop}
+		} else {
+			itemB = llrb.Inf(1)
+		}
 	}
 	// execute the scan on the underlying tree.
 	if tx.wc != nil {
@@ -302,14 +360,14 @@ iterator func(key, value []byte) bool) error {
 	if desc {
 		if gt {
 			if lt {
-				tr.DescendRange(itemA, itemB, iter)
+				tx.descendRange(itemA, itemB, iter)
 			} else {
-				tr.DescendGreaterThan(itemA, iter)
+				tx.descendGreaterThan(itemA, iter)
 			}
 		} else if lt {
 			tr.DescendLessOrEqual(itemA, iter)
 		} else {
-			tr.Descend(iter)
+			tx.descend(iter)
 		}
 	} else {
 		if gt {
@@ -319,9 +377,9 @@ iterator func(key, value []byte) bool) error {
 				tr.AscendGreaterOrEqual(itemA, iter)
 			}
 		} else if lt {
-			tr.AscendLessThan(itemA, iter)
+			tr.AscendRange(llrb.Inf(-1), itemA, iter)
 		} else {
-			tr.Ascend(iter)
+			tr.AscendGreaterOrEqual(llrb.Inf(-1), iter)
 		}
 	}
 	return nil
@@ -335,16 +393,15 @@ func Match(key, pattern []byte) bool {
 }
 
 // AscendKeys allows for iterating through keys based on the specified pattern.
-func (tx *Tx) AscendKeys(pattern []byte,
-iterator func(key, value []byte) bool) error {
-	if pattern == "" {
+func (tx *Tx) AscendKeys(pattern []byte, iterator IterFunc) error {
+	if len(pattern) == 0 {
 		return nil
 	}
 	if pattern[0] == '*' {
 		if string(pattern) == "*" {
 			return tx.Ascend(iterator)
 		}
-		return tx.Ascend(func(key, value []byte) bool {
+		return tx.Ascend(func(key []byte, value interface{}) bool {
 			if match.Match(key, pattern) {
 				if !iterator(key, value) {
 					return false
@@ -354,8 +411,8 @@ iterator func(key, value []byte) bool) error {
 		})
 	}
 	min, max := match.Allowable(pattern)
-	return tx.AscendGreaterOrEqual(min, func(key, value []byte) bool {
-		if key > max {
+	return tx.AscendGreaterOrEqual(min, func(key []byte, value interface{}) bool {
+		if bytes.Compare(key, max) > 0 {
 			return false
 		}
 		if match.Match(key, pattern) {
@@ -368,8 +425,7 @@ iterator func(key, value []byte) bool) error {
 }
 
 // DescendKeys allows for iterating through keys based on the specified pattern.
-func (tx *Tx) DescendKeys(pattern []byte,
-iterator func(key, value []byte) bool) error {
+func (tx *Tx) DescendKeys(pattern []byte, iterator IterFunc) error {
 	if pattern == nil {
 		return nil
 	}
@@ -377,7 +433,7 @@ iterator func(key, value []byte) bool) error {
 		if string(pattern) == "*" {
 			return tx.Descend(iterator)
 		}
-		return tx.Descend(func(key, value []byte) bool {
+		return tx.Descend(func(key []byte, value interface{}) bool {
 			if match.Match(key, pattern) {
 				if !iterator(key, value) {
 					return false
@@ -387,8 +443,8 @@ iterator func(key, value []byte) bool) error {
 		})
 	}
 	min, max := match.Allowable(pattern)
-	return tx.DescendLessOrEqual(max, func(key, value []byte) bool {
-		if key < min {
+	return tx.DescendLessOrEqual(max, func(key []byte, value interface{}) bool {
+		if bytes.Compare(key, min) < 0 {
 			return false
 		}
 		if match.Match(key, pattern) {
@@ -404,23 +460,21 @@ iterator func(key, value []byte) bool) error {
 // [first, last], until iterator returns false.
 // The results will be ordered by the item key.
 // An invalid index will return an error.
-func (tx *Tx) Ascend(iterator func(key, value []byte) bool) error {
+func (tx *Tx) Ascend(iterator IterFunc) error {
 	return tx.scan(false, false, false, nil, nil, iterator)
 }
 
 // AscendGreaterOrEqual calls the iterator for every item in the database within
 // the range [pivot, last], until iterator returns false.
 // The results will be ordered by the item key.
-func (tx *Tx) AscendGreaterOrEqual(pivot []byte,
-iterator func(key, value []byte) bool) error {
+func (tx *Tx) AscendGreaterOrEqual(pivot []byte, iterator IterFunc) error {
 	return tx.scan(false, true, false, pivot, nil, iterator)
 }
 
 // AscendLessThan calls the iterator for every item in the database within the
 // range [first, pivot), until iterator returns false.
 // the results will be ordered by the item key.
-func (tx *Tx) AscendLessThan(pivot []byte,
-iterator func(key, value []byte) bool) error {
+func (tx *Tx) AscendLessThan(pivot []byte, iterator IterFunc) error {
 	return tx.scan(false, false, true, pivot, nil, iterator)
 }
 
@@ -428,15 +482,14 @@ iterator func(key, value []byte) bool) error {
 // the range [greaterOrEqual, lessThan), until iterator returns false.
 // The results will be ordered by the item key.
 // An invalid index will return an error.
-func (tx *Tx) AscendRange(greaterOrEqual, lessThan []byte,
-iterator func(key, value []byte) bool) error {
+func (tx *Tx) AscendRange(greaterOrEqual, lessThan []byte, iterator IterFunc) error {
 	return tx.scan(false, true, true, greaterOrEqual, lessThan, iterator)
 }
 
 // Descend calls the iterator for every item in the database within the range
 // [last, first], until iterator returns false.
 // The results will be ordered by the item key.
-func (tx *Tx) Descend(iterator func(key, value []byte) bool) error {
+func (tx *Tx) Descend(iterator IterFunc) error {
 	return tx.scan(true, false, false, nil, nil, iterator)
 }
 
@@ -444,8 +497,7 @@ func (tx *Tx) Descend(iterator func(key, value []byte) bool) error {
 // the range [last, pivot), until iterator returns false.
 // The results will be ordered by the item key.
 // An invalid index will return an error.
-func (tx *Tx) DescendGreaterThan(pivot []byte,
-iterator func(key, value []byte) bool) error {
+func (tx *Tx) DescendGreaterThan(pivot []byte, iterator IterFunc) error {
 	return tx.scan(true, true, false, pivot, nil, iterator)
 }
 
@@ -453,17 +505,15 @@ iterator func(key, value []byte) bool) error {
 // the range [pivot, first], until iterator returns false.
 // The results will be ordered by the item key.
 // An invalid index will return an error.
-func (tx *Tx) DescendLessOrEqual(pivot string,
-iterator func(key, value string) bool) error {
-	return tx.scan(true, false, true, pivot, "", iterator)
+func (tx *Tx) DescendLessOrEqual(pivot []byte, iterator IterFunc) error {
+	return tx.scan(true, false, true, pivot, nil, iterator)
 }
 
 // DescendRange calls the iterator for every item in the database within
 // the range [lessOrEqual, greaterThan), until iterator returns false.
 // The results will be ordered by the item key.
 // An invalid index will return an error.
-func (tx *Tx) DescendRange(lessOrEqual, greaterThan []byte,
-iterator func(key, value []byte) bool) error {
+func (tx *Tx) DescendRange(lessOrEqual, greaterThan []byte, iterator IterFunc) error {
 	return tx.scan(true, true, true, lessOrEqual, greaterThan, iterator)
 }
 
@@ -471,13 +521,12 @@ iterator func(key, value []byte) bool) error {
 // pivot, until iterator returns false.
 // The results will be ordered by the item key.
 // An invalid index will return an error.
-func (tx *Tx) AscendEqual(pivot []byte,
-iterator func(key, value []byte) bool) error {
-	return tx.AscendGreaterOrEqual(pivot, func(_key, _value []byte) bool {
-		if bytes.Compare(_key, pivot) != 0 {
+func (tx *Tx) AscendEqual(pivot []byte, iterator IterFunc) error {
+	return tx.AscendGreaterOrEqual(pivot, func(key []byte, value interface{}) bool {
+		if bytes.Compare(key, pivot) != 0 {
 			return false
 		}
-		return iterator(_key, _value)
+		return iterator(key, value)
 	})
 }
 
@@ -485,13 +534,12 @@ iterator func(key, value []byte) bool) error {
 // pivot, until iterator returns false
 // The results will be ordered by the item key.
 // An invalid index will return an error.
-func (tx *Tx) DescendEqual(pivot []byte,
-iterator func(key, value []byte) bool) error {
-	return tx.DescendLessOrEqual(pivot, func(_key, _value []byte) bool {
-		if bytes.Compare(_key, pivot) != 0 {
+func (tx *Tx) DescendEqual(pivot []byte, iterator IterFunc) error {
+	return tx.DescendLessOrEqual(pivot, func(key []byte, value interface{}) bool {
+		if bytes.Compare(key, pivot) != 0 {
 			return false
 		}
-		return iterator(_key, _value)
+		return iterator(key, value)
 	})
 }
 
@@ -580,77 +628,10 @@ func (db *DB) Update(fn func(tx *Tx) error) error {
 }
 
 // get return an item or nil if not found.
-func (db *DB) get(key string) *dbItem {
+func (db *DB) get(key []byte) *dbItem {
 	item := db.keys.Get(&dbItem{key: key})
 	if item != nil {
 		return item.(*dbItem)
 	}
 	return nil
-}
-
-type KV struct {
-	key     []byte
-	value   []byte
-}
-
-type Cursor struct {
-	tx *Tx
-
-	ctx      context.Context
-	cancel   context.CancelFunc
-	running  bool
-	wg       sync.WaitGroup
-	pipe     chan *KV
-	firstKV  *KV
-	kv       *KV
-}
-
-func (c *Cursor) iter() {
-	c.wg.Add(1)
-	go func()
-}
-
-func (c *Cursor) Seek(seek []byte) (key []byte, value []byte){
-	// 已经存在一个迭代器了,先 close
-	if c.running {
-		c.wg.Wait()
-		close(c.pipe)
-		c.pipe = make(chan *KV, 1000)
-		c.firstKV = nil
-		c.kv = nil
-		c.running = false
-	}
-	c.tx.AscendGreaterOrEqual(seek, func(k, v []byte) bool {
-		if c.firstKV == nil {
-			c.firstKV = &KV{key: k, value: v}
-		} else {
-			select {
-			case <-c.ctx.Done():
-				return false
-			case c.pipe <-&KV{key: k, value: v}:
-				return true
-			}
-		}
-	})
-}
-
-func (c *Cursor) First() (key []byte, value []byte) {
-	// 还没有开始迭代
-	if c.firstKV == nil {
-		return c.firstKV.key, c.firstKV.value
-	}
-	return nil, nil
-}
-
-func (c *Cursor) Next() (key []byte, value []byte) {
-	select {
-	case kv, ok :=<-c.pipe:
-	    if !ok {
-		    return nil, nil
-	    }
-		return kv.key, kv.value
-	default:
-		return nil, nil
-	}
-	return nil, nil
 }

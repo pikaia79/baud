@@ -1,9 +1,9 @@
 package kvstore
 
 type KVStore interface {
-	Put(key, value []byte) error
+	Put(key, value []byte, ops ...*Option) error
 	Get(key []byte) ([]byte, error)
-	Delete(key []byte) error
+	Delete(key []byte, ops ...*Option) error
 
 	// MultiGet retrieves multiple values in one call.
 	MultiGet(keys [][]byte) ([][]byte, error)
@@ -17,28 +17,32 @@ type KVStore interface {
 	RangeIterator(start, end []byte) KVIterator
 
 	NewKVBatch() KVBatch
-	ExecuteBatch(batch KVBatch) error
+	ExecuteBatch(batch KVBatch, ops ...*Option) error
 
-	// Reader returns a KVReader which can be used to
-	// read data from the KVStore.  If a reader cannot
+	// GetSnapshot returns a Snapshot which can be used to
+	// read data from the KVStore.  If a Snapshot cannot
 	// be obtained a non-nil error is returned.
-	Reader() (KVReader, error)
+	GetSnapshot() (Snapshot, error)
 	Close() error
 }
 
-// KVReader is an abstraction of an **ISOLATED** reader
+// Snapshot is an abstraction of an **ISOLATED** reader
 // In this context isolated is defined to mean that
-// writes/deletes made after the KVReader is opened
+// writes/deletes made after the Snapshot is opened
 // are not observed.
 // Because there is usually a cost associated with
 // keeping isolated readers active, users should
 // close them as soon as they are no longer needed.
-type KVReader interface {
+type Snapshot interface {
 
 	// Get returns the value associated with the key
 	// If the key does not exist, nil is returned.
 	// The caller owns the bytes returned.
 	Get(key []byte) ([]byte, error)
+
+	// Get last option which is Set by store.
+	// We can use it to get last raft apply ID of the snapshot.
+	LastOption() (*Option, error)
 
 	// MultiGet retrieves multiple values in one call.
 	MultiGet(keys [][]byte) ([][]byte, error)
@@ -108,7 +112,7 @@ type KVBatch interface {
 // MultiGet is a helper function to retrieve mutiple keys from a
 // KVReader, and might be used by KVStore implementations that don't
 // have a native multi-get facility.
-func MultiGet(reader KVReader, keys [][]byte) ([][]byte, error) {
+func MultiGet(reader Snapshot, keys [][]byte) ([][]byte, error) {
 	vals := make([][]byte, 0, len(keys))
 
 	for i, key := range keys {
@@ -121,4 +125,9 @@ func MultiGet(reader KVReader, keys [][]byte) ([][]byte, error) {
 	}
 
 	return vals, nil
+}
+
+type Option struct {
+	// only for raft when write
+	ApplyID   uint64
 }

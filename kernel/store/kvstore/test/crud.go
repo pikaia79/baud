@@ -3,7 +3,7 @@ package test
 import (
 	"testing"
 
-	"baud/kernel/store/kvstore"
+	"github.com/tiglabs/baud/kernel/store/kvstore"
 )
 
 // basic crud tests

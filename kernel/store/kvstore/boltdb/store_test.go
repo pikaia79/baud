@@ -5,8 +5,8 @@ import (
 	"testing"
 
 	"github.com/boltdb/bolt"
-	"baud/kernel/store/kvstore"
-	"baud/kernel/store/kvstore/test"
+	"github.com/tiglabs/baud/kernel/store/kvstore"
+	"github.com/tiglabs/baud/kernel/store/kvstore/test"
 )
 
 func open(t *testing.T) kvstore.KVStore {
@@ -85,7 +85,7 @@ func TestBoltDBConfig(t *testing.T) {
 		fillPercent float64
 	}{
 		{
-			&StoreConfig{Path: "test", Bucket: "mybucket", NoSync: true, FillPercent: 0.75},
+			&StoreConfig{Path: "test", Bucket: "mybucket", NoSync: true},
 			"test",
 			"mybucket",
 			true,
@@ -117,9 +117,6 @@ func TestBoltDBConfig(t *testing.T) {
 		}
 		if bs.noSync != test.noSync {
 			t.Fatalf("noSync: expected %t, got %t", test.noSync, bs.noSync)
-		}
-		if bs.fillPercent != test.fillPercent {
-			t.Fatalf("fillPercent: expected %f, got %f", test.fillPercent, bs.fillPercent)
 		}
 		cleanup(t, kv)
 	}

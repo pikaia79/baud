@@ -2,15 +2,16 @@ package boltdb
 
 import (
 	"github.com/boltdb/bolt"
-	"baud/kernel/store/kvstore"
+	"github.com/tiglabs/baud/kernel/store/kvstore"
+	"encoding/binary"
 )
 
-type Reader struct {
+type Snapshot struct {
 	tx     *bolt.Tx
 	bucket *bolt.Bucket
 }
 
-func (r *Reader) Get(key []byte) ([]byte, error) {
+func (r *Snapshot) Get(key []byte) ([]byte, error) {
 	if r == nil {
 		return nil, nil
 	}
@@ -23,14 +24,14 @@ func (r *Reader) Get(key []byte) ([]byte, error) {
 	return rv, nil
 }
 
-func (r *Reader) MultiGet(keys [][]byte) ([][]byte, error) {
+func (r *Snapshot) MultiGet(keys [][]byte) ([][]byte, error) {
 	if r == nil {
 		return nil, nil
 	}
 	return kvstore.MultiGet(r, keys)
 }
 
-func (r *Reader) PrefixIterator(prefix []byte) kvstore.KVIterator {
+func (r *Snapshot) PrefixIterator(prefix []byte) kvstore.KVIterator {
 	if r == nil {
 		return nil
 	}
@@ -46,7 +47,7 @@ func (r *Reader) PrefixIterator(prefix []byte) kvstore.KVIterator {
 	return rv
 }
 
-func (r *Reader) RangeIterator(start, end []byte) kvstore.KVIterator {
+func (r *Snapshot) RangeIterator(start, end []byte) kvstore.KVIterator {
 	if r == nil {
 		return nil
 	}
@@ -63,7 +64,21 @@ func (r *Reader) RangeIterator(start, end []byte) kvstore.KVIterator {
 	return rv
 }
 
-func (r *Reader) Close() error {
+func (r *Snapshot) LastOption() (*kvstore.Option, error) {
+	if r == nil {
+		return nil, nil
+	}
+
+	raft := r.tx.Bucket(raftBucket)
+	v := raft.Get(RAFT_APPLY_ID)
+	if len(v) == 0 {
+		return &kvstore.Option{}, nil
+	} else {
+		return &kvstore.Option{ApplyID: binary.BigEndian.Uint64(v)}, nil
+	}
+}
+
+func (r *Snapshot) Close() error {
 	if r == nil {
 		return nil
 	}

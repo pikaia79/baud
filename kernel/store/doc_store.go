@@ -1,9 +1,8 @@
 package store
 
 import (
-	// add github.com/tiglabs/ before baud
-	"baud/kernel/document"
-	"baud/kernel/store/kvstore"
+	"github.com/tiglabs/baud/kernel/document"
+	"github.com/tiglabs/baud/kernel/store/kvstore"
 )
 
 type DocStore struct {

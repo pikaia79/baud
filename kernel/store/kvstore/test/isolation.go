@@ -5,7 +5,7 @@ import (
 	"reflect"
 	"testing"
 
-	"baud/kernel/store/kvstore"
+	"github.com/tiglabs/baud/kernel/store/kvstore"
 )
 
 func CommonTestReaderIsolation(t *testing.T, s kvstore.KVStore) {
@@ -28,19 +28,19 @@ func CommonTestReaderIsolation(t *testing.T, s kvstore.KVStore) {
 	}
 
 	// create an isolated reader
-	reader, err := s.Reader()
+	snap, err := s.GetSnapshot()
 	if err != nil {
 		t.Error(err)
 	}
 	defer func() {
-		err := reader.Close()
+		err := snap.Close()
 		if err != nil {
 			t.Fatal(err)
 		}
 	}()
 
 	// verify that we see the value already inserted
-	val, err := reader.Get([]byte("a"))
+	val, err := snap.Get([]byte("a"))
 	if err != nil {
 		t.Error(err)
 	}
@@ -50,7 +50,7 @@ func CommonTestReaderIsolation(t *testing.T, s kvstore.KVStore) {
 
 	// verify that an iterator sees it
 	count := 0
-	it := reader.RangeIterator([]byte{0}, []byte{'x'})
+	it := snap.RangeIterator([]byte{0}, []byte{'x'})
 	defer func() {
 		err := it.Close()
 		if err != nil {
@@ -73,7 +73,7 @@ func CommonTestReaderIsolation(t *testing.T, s kvstore.KVStore) {
 	}
 
 	// ensure that a newer reader sees it
-	newReader, err := s.Reader()
+	newReader, err := s.GetSnapshot()
 	if err != nil {
 		t.Error(err)
 	}
@@ -109,7 +109,7 @@ func CommonTestReaderIsolation(t *testing.T, s kvstore.KVStore) {
 	}
 
 	// but that the isolated reader does not
-	val, err = reader.Get([]byte("b"))
+	val, err = snap.Get([]byte("b"))
 	if err != nil {
 		t.Error(err)
 	}
@@ -119,7 +119,7 @@ func CommonTestReaderIsolation(t *testing.T, s kvstore.KVStore) {
 
 	// and ensure that the iterator on the isolated reader also does not
 	count = 0
-	it3 := reader.RangeIterator([]byte{0}, []byte{'x'})
+	it3 := snap.RangeIterator([]byte{0}, []byte{'x'})
 	defer func() {
 		err := it3.Close()
 		if err != nil {

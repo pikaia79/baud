@@ -5,7 +5,7 @@ import (
 	"errors"
 	"encoding/binary"
 
-	"baud/kernel/document"
+	"github.com/tiglabs/baud/kernel/document"
 )
 
 type KEY_TYPE byte

@@ -3,17 +3,23 @@ package boltdb
 import (
 	"os"
 	"errors"
+	"bytes"
+	"encoding/binary"
 
 	"github.com/boltdb/bolt"
-	"baud/kernel/store/kvstore"
+	"github.com/tiglabs/baud/kernel/store/kvstore"
 )
+
+var _ kvstore.KVStore = &Store{}
+
+var raftBucket []byte = []byte("raft")
+var RAFT_APPLY_ID []byte = []byte("#raft_apply_id")
 
 type StoreConfig struct {
 	Path       string
 	Bucket     string
 	NoSync     bool
 	ReadOnly   bool
-	FillPercent float64
 }
 
 type Store struct {
@@ -21,7 +27,6 @@ type Store struct {
 	bucket      []byte
 	db          *bolt.DB
 	noSync      bool
-	fillPercent float64
 }
 
 func New(config *StoreConfig) (kvstore.KVStore, error) {
@@ -36,12 +41,10 @@ func New(config *StoreConfig) (kvstore.KVStore, error) {
 	if config.Bucket == "" {
 		bucket = "baud"
 	}
-	noSync := config.NoSync
-	fillPercent := config.FillPercent
-	if fillPercent == 0.0 {
-		fillPercent = bolt.DefaultFillPercent
+	if bytes.Compare([]byte(bucket), raftBucket) == 0 {
+		return nil, errors.New("reserved bucket")
 	}
-
+	noSync := config.NoSync
 	bo := &bolt.Options{}
 	bo.ReadOnly = config.ReadOnly
 
@@ -67,7 +70,6 @@ func New(config *StoreConfig) (kvstore.KVStore, error) {
 		bucket:      []byte(bucket),
 		db:          db,
 		noSync:      noSync,
-		fillPercent: fillPercent,
 	}
 	return &rv, nil
 }
@@ -87,7 +89,7 @@ func (bs *Store)Get(key []byte) (value []byte, err error) {
 	return
 }
 
-func (bs *Store)Put(key []byte, value []byte) error {
+func (bs *Store)Put(key []byte, value []byte, ops ...*kvstore.Option) error {
 	if bs == nil {
 		return nil
 	}
@@ -97,11 +99,21 @@ func (bs *Store)Put(key []byte, value []byte) error {
 		if err != nil {
 			return err
 		}
+		if len(ops) > 0 {
+			var buff [8]byte
+			r := tx.Bucket(raftBucket)
+			binary.BigEndian.PutUint64(buff[:], ops[0].ApplyID)
+			err = r.Put(RAFT_APPLY_ID, buff[:])
+			if err != nil {
+				return err
+			}
+
+		}
 		return nil
 	})
 }
 
-func (bs *Store)Delete(key []byte) error {
+func (bs *Store)Delete(key []byte, ops ...*kvstore.Option) error {
 	if bs == nil {
 		return nil
 	}
@@ -111,6 +123,16 @@ func (bs *Store)Delete(key []byte) error {
 		if err != nil {
 			return err
 		}
+		if len(ops) > 0 {
+			var buff [8]byte
+			r := tx.Bucket(raftBucket)
+			binary.BigEndian.PutUint64(buff[:], ops[0].ApplyID)
+			err = r.Put(RAFT_APPLY_ID, buff[:])
+			if err != nil {
+				return err
+			}
+
+		}
 		return nil
 	})
 }
@@ -119,20 +141,20 @@ func (bs *Store)MultiGet(keys [][]byte) ([][]byte, error) {
 	if bs == nil {
 		return nil, nil
 	}
-	r, err := bs.Reader()
+	snap, err := bs.GetSnapshot()
 	if err != nil {
 		return nil, err
 	}
-	defer r.Close()
-	return r.MultiGet(keys)
+	defer snap.Close()
+	return snap.MultiGet(keys)
 }
 
-func (bs *Store) Reader() (kvstore.KVReader, error) {
+func (bs *Store) GetSnapshot() (kvstore.Snapshot, error) {
 	tx, err := bs.db.Begin(false)
 	if err != nil {
 		return nil, err
 	}
-	return &Reader{
+	return &Snapshot{
 		tx:     tx,
 		bucket: tx.Bucket(bs.bucket),
 	}, nil
@@ -176,7 +198,7 @@ func (bs *Store)NewKVBatch() kvstore.KVBatch {
 	return kvstore.NewBatch()
 }
 
-func (bs *Store)ExecuteBatch(batch kvstore.KVBatch) (err error) {
+func (bs *Store)ExecuteBatch(batch kvstore.KVBatch, ops ...*kvstore.Option) (err error) {
 	if bs == nil {
 		return nil
 	}
@@ -198,8 +220,6 @@ func (bs *Store)ExecuteBatch(batch kvstore.KVBatch) (err error) {
 	}()
 
 	bucket := tx.Bucket([]byte(bs.bucket))
-	bucket.FillPercent = bs.fillPercent
-
 	for _, op := range batch.Operations() {
 		if op.Value() != nil {
 			err = bucket.Put(op.Key(), op.Value())
@@ -213,10 +233,22 @@ func (bs *Store)ExecuteBatch(batch kvstore.KVBatch) (err error) {
 			}
 		}
 	}
+	if len(ops) > 0 {
+		var buff [8]byte
+		r := tx.Bucket(raftBucket)
+		binary.BigEndian.PutUint64(buff[:], ops[0].ApplyID)
+		err = r.Put(RAFT_APPLY_ID, buff[:])
+		if err != nil {
+			return
+		}
+	}
 	return
 }
 
 func (bs *Store) Close() error {
+	if bs == nil {
+		return nil
+	}
 	return bs.db.Close()
 }
 

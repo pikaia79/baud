@@ -1,8 +1,8 @@
 package kernel
 
 import (
-	"baud/kernel/document"
-	"baud/kernel/store"
+	"github.com/tiglabs/baud/kernel/document"
+	"github.com/tiglabs/baud/kernel/store"
 )
 
 type Store struct{

@@ -2,7 +2,7 @@
 package kernel
 
 import (
-	"baud/kernel/document"
+	"github.com/tiglabs/baud/kernel/document"
 )
 
 type Index interface {

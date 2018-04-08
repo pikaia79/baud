@@ -132,7 +132,7 @@ var maxRuneBytes = func() []byte {
 // for infinite.
 func Allowable(pattern []byte) (min, max []byte) {
 	if pattern == nil || pattern[0] == '*' {
-		return "", ""
+		return nil, nil
 	}
 
 	minb := make([]byte, 0, len(pattern))
