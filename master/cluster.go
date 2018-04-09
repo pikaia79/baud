@@ -12,6 +12,7 @@ type Cluster struct {
 	//clusterLock     sync.RWMutex
 	dbCache 		*DBCache
 	psCache 		*PSCache
+	partitionCache  *PartitionCache
 }
 
 func NewCluster(config *Config) *Cluster {

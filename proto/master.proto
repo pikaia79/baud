@@ -11,6 +11,10 @@ option (gogoproto.unmarshaler_all) = true;
 
 service MasterRpc {
     rpc GetRoute(GetRouteRequest) returns (GetRouteResponse) {}
+
+    rpc PsLogin(PsLoginRequest) returns (PsLoginRequest) {}
+    rpc CreateReplica(CreatePartitionRequest) returns (CreatePartitionResponse) {}
+    rpc PsHeartbeat(PSHeartbeatRequest) returns (PSHeartbeatResponse) {}
 }
 
 message RequestHeader {
@@ -30,4 +34,35 @@ message GetRouteRequest {
 message GetRouteResponse {
     ResponseHeader          header          = 1;
     repeated Route          routes          = 2;
+}
+
+message PsLoginRequest {
+    RequestHeader       header          = 1;
+    PartitionServer     server = 2;
+}
+
+message PsLoginResponse {
+    ResponseHeader          header          = 1;
+}
+
+message CreatePartitionRequest {
+    RequestHeader       header          = 1;
+    Partition           partition       = 2;
+    ReplicaGroup        replicas        = 3;
+}
+
+message CreatePartitionResponse {
+    ResponseHeader      header         = 1;
+}
+
+message PSHeartbeatRequest {
+    RequestHeader       header     = 1;
+    Partition           partition  = 2;
+    uint32              ps_id = 3;
+    PSStatus            ps_status = 4;
+    bool                is_leader  = 5;
+}
+
+message PSHeartbeatResponse {
+    ResponseHeader      header         = 1;
 }

@@ -7,7 +7,8 @@ import (
 //master global error definitions
 var (
 	ErrSuc			 			= errors.New("success")
-	ErrIntarnalError			= errors.New("internal error")
+	ErrInternalError 			= errors.New("internal error")
+	ErrSysBusy          		= errors.New("system busy")
 	ErrParamError				= errors.New("param error")
 
 	ErrDupDb					= errors.New("duplicated database")
@@ -18,6 +19,7 @@ var (
 	ErrGenIdFailed 				= errors.New("generate id is failed")
 	ErrBoltDbOpsFailed			= errors.New("boltdb operation error")
 	ErrUnknownRaftCmdType 		= errors.New("unknown raft command type")
+
 	//ErrEntryNotFound		    = errors.New("storage entry not found")
 )
 
@@ -30,7 +32,7 @@ const (
 )
 var httpErrMap = map[string]int32 {
 	ErrSuc:					ERRCODE_SUCCESS,
-	ErrIntarnalError:		ERRCODE_INTERNAL_ERROR,
+	ErrInternalError:		ERRCODE_INTERNAL_ERROR,
 	ErrParamError:			ERRCODE_PARAM_ERROR,
 	ErrDupDb:				ERRCODE_DUP_DB,
 }

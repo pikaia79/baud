@@ -25,7 +25,7 @@ type Space struct {
 	Partitioning PartitionPolicy
 	Mapping      []Field
 
-	Partitions   PartitionTree      `json:"-"`
+	Partitions   *PartitionTree      `json:"-"`
 	propertyLock sync.RWMutex        `json:"-"`
 }
 

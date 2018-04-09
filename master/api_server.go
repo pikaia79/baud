@@ -201,7 +201,7 @@ func newHttpErrReply(err error) *HttpReply {
 	} else {
 		return &HttpReply{
 			Code:		ERRCODE_INTERNAL_ERROR,
-			Msg:		ErrIntarnalError.Error(),
+			Msg:		ErrInternalError.Error(),
 		}
 	}
 }
@@ -239,7 +239,7 @@ func sendReply(w http.ResponseWriter, httpReply *HttpReply) {
 	reply, err := json.Marshal(httpReply)
 	if err != nil {
 		log.Error("fail to marshal http reply[%v]. err:[%v]", httpReply, err)
-		sendReply(w, newHttpErrReply(ErrIntarnalError))
+		sendReply(w, newHttpErrReply(ErrInternalError))
 		return
 	}
 	w.Header().Set("content-type", "application/json")

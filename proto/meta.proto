@@ -13,21 +13,21 @@ message DB {
 }
 
 enum SpaceStatus {
-    Invalid       = 0;
+    SS_Invalid       = 0;
     // 初始状态，space刚刚创建，分片还不能提供服务
-    Init          = 1;
+    SS_Init          = 1;
     // 准备状态，等待space的初始分片补足三个副本
-    Prepare       = 2;
+    SS_Prepare       = 2;
     // 正常状态，可以提供完全的服务
-    Running       = 3;
+    SS_Running       = 3;
     // 标记删除，元数据都保留，允许分片参与调度,但不能分裂
-    Delete        = 4;
+    SS_Delete        = 4;
     // 正在删除
-    Deleting      = 5;
+    SS_Deleting      = 5;
 }
 
 message Space {
-    string          entity_or_edge        = 1;
+    string          type        = 1;  // entity/edge/blob
     uint32          id      = 2;
     string          name    = 3;
     uint32          db_id   = 4;
@@ -36,12 +36,12 @@ message Space {
 }
 
 message Partition {
-	string                  entity_or_edge        = 2;
+    uint32                  id   = 1;
+	string                  type        = 2;  // entity/edge/blob
 	uint32                  db_id                  = 3;
 	uint32                  space_id               = 4;
 	uint32                  start_slot           = 5;
 	uint32                  end_slot             = 6;
-	ReplicaGroup               replica_group           = 7;
 }
 
 message ReplicaGroup {
@@ -49,9 +49,16 @@ message ReplicaGroup {
 	repeated PartitionServer    replicas        = 2;
 }
 
+enum PSStatus {
+    PS_Invalid   = 0;
+    PS_Initial   = 1;  // first created
+    PS_Login     = 2;  // when new allocated or restarted ps startup
+    PS_Offline   = 3;  // reject any r/w request
+    PS_Logout    = 4;  // wait destroy
+}
+
 message PartitionServer {
     uint32          id                  = 1;
-    string          role                = 2;
     string          zone                = 3;
     string          ip                  = 4;
     string          port                = 5;
@@ -59,6 +66,7 @@ message PartitionServer {
 
 message Route {
     Partition               partition           = 1;
-    uint32                  leader              = 2;
+    ReplicaGroup            replicas        = 2;
+    uint32                  leaderPSId      = 3;
 }
 
