@@ -89,20 +89,11 @@ marshalled and written to boltdb
 
 * Create a Space
 
-0, foreach partition among the space
-
-1, call JDOS to start several ps nodes;
-
-2, ask the baudserver nodes to form a raft group as well as optional async replicas
-
-3, call the raft leader to create a partition
-
+foreach partition among the space, select a destination PS raft group (PSRG) to create the partition.
 
 * Split a Partition
 
-0, call JDOS to start PS nodes
-
-1, call the nodes to form two new raft groups
+1, select two PSRG as the destinations
 
 2, call the two raft leaders to setup async filtered replication with the original to-be-splitted partition leader
 
@@ -112,18 +103,13 @@ marshalled and written to boltdb
 
 * Merge Partitions
 
-0, call JDOS to start PS nodes
+the reverse process of split
 
-1, call the nodes to form a new raft groups
+* Migrate a Partition
 
-2, call the raft leader to setup async replication with the original to-be-merged partition leaders
-
-3, replicate
-
-4, cutover
+based on the async replication between dest and source. 
 
 * PS metrics reporting
-
 
 * Router metrics reporting
 
@@ -137,11 +123,11 @@ Several PS nodes form a raft group, partitionserver group (PSG). And one PSG usu
 for entity partition, UID -> Document; 
 for edge partition, (UID1, UID2) -> Document;
 
-* store
+on-disk document store, based on bolt or other store engines
 
-* indexing
+in-memory indexing, based on our own data structures
 
-* search
+* search 
 
 
 ### Key Operations

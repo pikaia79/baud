@@ -25,7 +25,7 @@ var (
 
 // http response error code and error message definitions
 const (
-	ERRCODE_SUCCESS 				= iota
+	ERRCODE_SUCCESS = iota
 	ERRCODE_INTERNAL_ERROR
 	ERRCODE_PARAM_ERROR
 	ERRCODE_DUP_DB

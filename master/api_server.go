@@ -1,16 +1,16 @@
 package master
 
 import (
-	"util/server"
+	"encoding/json"
+	"fmt"
 	"net/http"
 	"strconv"
-	"encoding/json"
 	"util/log"
-	"fmt"
+	"util/server"
 )
 
 const (
-	DEFAULT_CONN_LIMIT		= 10000
+	DEFAULT_CONN_LIMIT = 10000
 
 	// definition for http url parameter name
 	DB_NAME         = "db_name"
@@ -26,22 +26,22 @@ const (
 )
 
 type ApiServer struct {
-	config 			*Config
-	httpServer 		*server.Server
-	cluster 		*Cluster
+	config     *Config
+	httpServer *server.Server
+	cluster    *Cluster
 }
 
 func NewApiServer(config *Config, cluster *Cluster) *ApiServer {
 	apiServer := &ApiServer{
-		config:		config,
-		httpServer:	server.NewServer(),
-		cluster:	cluster,
+		config:     config,
+		httpServer: server.NewServer(),
+		cluster:    cluster,
 	}
 
 	apiServer.httpServer.Init("master-api-server", &server.ServerConfig{
-		Sock:		config.webManageAddr,
-		Version:	"v1",
-		ConnLimit: 	DEFAULT_CONN_LIMIT,
+		Sock:      config.webManageAddr,
+		Version:   "v1",
+		ConnLimit: DEFAULT_CONN_LIMIT,
 	})
 
 	return apiServer
@@ -172,18 +172,17 @@ func (s *ApiServer) handleSpaceDetail(w http.ResponseWriter, r *http.Request) {
 func (s *ApiServer) handleIndexCreate(w http.ResponseWriter, r *http.Request) {
 }
 
-
 type HttpReply struct {
-	Code    int32       `json:"code"`
-	Msg 	string      `json:"msg"`
-	Data    interface{} `json:"data"`
+	Code int32       `json:"code"`
+	Msg  string      `json:"msg"`
+	Data interface{} `json:"data"`
 }
 
 func newHttpSucReply(data interface{}) *HttpReply {
 	return &HttpReply{
-		Code:	ERRCODE_SUCCESS,
-		Msg:	ErrSuc.Error(),
-		Data:	data,
+		Code: ERRCODE_SUCCESS,
+		Msg:  ErrSuc.Error(),
+		Data: data,
 	}
 }
 
@@ -195,8 +194,8 @@ func newHttpErrReply(err error) *HttpReply {
 	code, ok := httpErrMap[err.Error()]
 	if ok {
 		return &HttpReply{
-			Code:		code,
-			Msg:		err.Error(),
+			Code: code,
+			Msg:  err.Error(),
 		}
 	} else {
 		return &HttpReply{
