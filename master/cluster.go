@@ -5,12 +5,12 @@ import (
 )
 
 type Cluster struct {
-	replGroups 	[]ReplGroup
+	replGroups []ReplGroup
 
-	config 		*Config
+	config *Config
 
-	store 		Store
-	idGenor		*IDGenerator
+	store   Store
+	idGenor *IDGenerator
 }
 
 func NewCluster(config *Config) *Cluster {

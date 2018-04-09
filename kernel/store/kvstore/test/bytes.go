@@ -152,7 +152,6 @@ func CommonTestWriterOwnsBytes(t *testing.T, s kvstore.KVStore) {
 		t.Fatal(err)
 	}
 
-
 	// check that we can read back what we expect
 	allks = make([][]byte, 0)
 	iter = s.RangeIterator(nil, nil)

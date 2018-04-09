@@ -1,9 +1,9 @@
 package boltdb
 
 import (
+	"encoding/binary"
 	"github.com/boltdb/bolt"
 	"github.com/tiglabs/baud/kernel/store/kvstore"
-	"encoding/binary"
 )
 
 type Snapshot struct {

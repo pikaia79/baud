@@ -13,26 +13,26 @@ func New() (memstore.MemStore, error) {
 }
 
 // value is an object for memory, and it can be changed out of the store
-func (r *Store)Put(key []byte, value interface{}) error
-func (r *Store)Get(key []byte) (interface{}, error)
-func (r *Store)Delete(key []byte) error
+func (r *Store) Put(key []byte, value interface{}) error
+func (r *Store) Get(key []byte) (interface{}, error)
+func (r *Store) Delete(key []byte) error
 
 // PrefixIterator will visit all K/V pairs with the provided prefix.
 // Returns an error if the store is closed or the tx is closed.
 // Because it will block the write operation, users should
 // not do slow operation as much as possible.
-func (r *Store)PrefixIterator(prefix []byte, iter IterFunc) error
+func (r *Store) PrefixIterator(prefix []byte, iter IterFunc) error
 
 // RangeIterator will visit all K/V pairs >= start AND < end
 // Returns an error if the store is closed or the tx is closed.
 // Because it will block the write operation, users should
 // not do slow operation as much as possible.
-func (r *Store)RangeIterator(start, end []byte, iter IterFunc) error
+func (r *Store) RangeIterator(start, end []byte, iter IterFunc) error
 
-func (r *Store)NewBatch() MemBatch
-func (r *Store)ExecuteBatch(batch MemBatch) error
+func (r *Store) NewBatch() MemBatch
+func (r *Store) ExecuteBatch(batch MemBatch) error
 
-func (r *Store)Close() error
+func (r *Store) Close() error
 
 func (r *Store) Get(key []byte) ([]byte, error) {
 	return nil, nil
@@ -88,7 +88,6 @@ func (i *iterator) Close() error {
 	return nil
 }
 
-
 func (i *Store) GetSnapshot() (kvstore.Snapshot, error) {
 	return &reader{}, nil
 }
@@ -117,9 +116,9 @@ func (r *reader) Close() error {
 
 type batch struct{}
 
-func (i *batch) Set(key, val []byte)   {}
-func (i *batch) Delete(key []byte)     {}
-func (i *batch) Merge(key, val []byte) {}
-func (i *batch) Reset()                {}
+func (i *batch) Set(key, val []byte)             {}
+func (i *batch) Delete(key []byte)               {}
+func (i *batch) Merge(key, val []byte)           {}
+func (i *batch) Reset()                          {}
 func (i *batch) Operations() []kvstore.Operation { return nil }
-func (i *batch) Close() error          { return nil }
+func (i *batch) Close() error                    { return nil }

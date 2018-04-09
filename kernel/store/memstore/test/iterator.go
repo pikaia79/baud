@@ -60,7 +60,7 @@ func CommonTestPrefixIterator(t *testing.T, s memstore.MemStore) {
 
 	// get a prefix reader
 	cats := make([][]byte, 0)
-	err = s.PrefixIterator([]byte("cat"), func(key []byte, val interface{})bool {
+	err = s.PrefixIterator([]byte("cat"), func(key []byte, val interface{}) bool {
 		k := key
 		copyk := make([]byte, len(k))
 		copy(copyk, k)
@@ -78,7 +78,7 @@ func CommonTestPrefixIterator(t *testing.T, s memstore.MemStore) {
 
 	// get a prefix reader
 	dogs := make([][]byte, 0)
-	err = s.PrefixIterator([]byte("dog"), func(key []byte, val interface{})bool {
+	err = s.PrefixIterator([]byte("dog"), func(key []byte, val interface{}) bool {
 		copyk := make([]byte, len(key))
 		copy(copyk, key)
 		dogs = append(dogs, copyk)
@@ -131,7 +131,7 @@ func CommonTestRangeIterator(t *testing.T, s memstore.MemStore) {
 
 	// get a range iterator (all)
 	all := make([][]byte, 0)
-	err = s.RangeIterator(nil, nil, func(key []byte, val interface{})bool {
+	err = s.RangeIterator(nil, nil, func(key []byte, val interface{}) bool {
 		copyk := make([]byte, len(key))
 		copy(copyk, key)
 		all = append(all, copyk)
@@ -148,7 +148,7 @@ func CommonTestRangeIterator(t *testing.T, s memstore.MemStore) {
 
 	// get range iterator from b - c
 	bToC := make([][]byte, 0)
-	err = s.RangeIterator([]byte("b"), []byte("c"), func(key []byte, val interface{})bool {
+	err = s.RangeIterator([]byte("b"), []byte("c"), func(key []byte, val interface{}) bool {
 		copyk := make([]byte, len(key))
 		copy(copyk, key)
 		bToC = append(bToC, copyk)
@@ -165,7 +165,7 @@ func CommonTestRangeIterator(t *testing.T, s memstore.MemStore) {
 
 	// get range iterator from c - d, but seek to 'c3'
 	cToDSeek3 := make([][]byte, 0)
-	err = s.RangeIterator([]byte("c"), []byte("d"), func(key []byte, val interface{})bool{
+	err = s.RangeIterator([]byte("c"), []byte("d"), func(key []byte, val interface{}) bool {
 		// skip c2
 		if bytes.Compare(key, []byte("c2")) == 0 {
 			return true
@@ -186,7 +186,7 @@ func CommonTestRangeIterator(t *testing.T, s memstore.MemStore) {
 
 	// get range iterator from c to the end
 	cToEnd := make([][]byte, 0)
-	err = s.RangeIterator([]byte("c"), nil, func(key []byte, val interface{})bool{
+	err = s.RangeIterator([]byte("c"), nil, func(key []byte, val interface{}) bool {
 		copyk := make([]byte, len(key))
 		copy(copyk, key)
 		cToEnd = append(cToEnd, copyk)
@@ -201,4 +201,3 @@ func CommonTestRangeIterator(t *testing.T, s memstore.MemStore) {
 		t.Fatalf("expected b-c %v, got %v", expectedCToEnd, cToEnd)
 	}
 }
-

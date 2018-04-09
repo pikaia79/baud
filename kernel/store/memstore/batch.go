@@ -13,14 +13,14 @@ type op struct {
 	V interface{}
 }
 
-func (o *op)Key() []byte {
+func (o *op) Key() []byte {
 	if o == nil {
 		return nil
 	}
 	return o.K
 }
 
-func (o *op)Value() interface{} {
+func (o *op) Value() interface{} {
 	if o == nil {
 		return nil
 	}
@@ -28,12 +28,12 @@ func (o *op)Value() interface{} {
 }
 
 type Batch struct {
-	Ops    []Operation
+	Ops []Operation
 }
 
 func NewBatch() *Batch {
 	return &Batch{
-		Ops:    make([]Operation, 0, 1000),
+		Ops: make([]Operation, 0, 1000),
 	}
 }
 

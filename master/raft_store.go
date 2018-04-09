@@ -259,6 +259,7 @@ func (b *SaveBatch) Commit() error {
 	}
 	return nil
 }
+
 /////////////////////store end////////////////////////
 
 ////////////////////raft begin////////////////////////
@@ -423,6 +424,7 @@ func (r *Resolver) NodeAddress(nodeID uint64, stype raft.SocketType) (addr strin
 		return "", errors.New("unknown raft socket type")
 	}
 }
+
 ////////////////////raft end////////////////////////
 
 /////////////////////callback implement begin///////////////

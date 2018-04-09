@@ -6,14 +6,14 @@ import (
 )
 
 type DocStore struct {
-	store       kvstore.KVStore
+	store kvstore.KVStore
 }
 
 func NewDocStore(store kvstore.KVStore) *DocStore {
 	return &DocStore{store: store}
 }
 
-func(s *DocStore) InsertEntity(doc *document.Entity) error {
+func (s *DocStore) InsertEntity(doc *document.Entity) error {
 	// now we only store source
 	key, err := encodeStoreKey(doc.UID())
 	if err != nil {
@@ -28,7 +28,7 @@ func(s *DocStore) InsertEntity(doc *document.Entity) error {
 	return s.store.Put(key, value)
 }
 
-func(s *DocStore) QueryEntity(uid document.UID) (*document.Entity, error) {
+func (s *DocStore) QueryEntity(uid document.UID) (*document.Entity, error) {
 	// now we only store source
 	key, err := encodeStoreKey(uid)
 	if err != nil {
@@ -41,7 +41,7 @@ func(s *DocStore) QueryEntity(uid document.UID) (*document.Entity, error) {
 	return document.NewEntity(uid, value), nil
 }
 
-func(s *DocStore) DeleteEntity(uid document.UID) error {
+func (s *DocStore) DeleteEntity(uid document.UID) error {
 	key, err := encodeStoreKey(uid)
 	if err != nil {
 		return err
@@ -49,7 +49,7 @@ func(s *DocStore) DeleteEntity(uid document.UID) error {
 	return s.store.Delete(key)
 }
 
-func(s *DocStore) InsertEdge(edge *document.Edge) error {
+func (s *DocStore) InsertEdge(edge *document.Edge) error {
 	// now we only store source
 	src, dst, err := edge.Nodes()
 	if err != nil {
@@ -68,7 +68,7 @@ func(s *DocStore) InsertEdge(edge *document.Edge) error {
 	return s.store.Put(key, value)
 }
 
-func(s *DocStore) QueryEdge(src, dst document.UID) (*document.Edge, error) {
+func (s *DocStore) QueryEdge(src, dst document.UID) (*document.Edge, error) {
 	// must <src, dst> for store key!!!!
 	key, err := encodeStoreKey(src, dst)
 	if err != nil {
@@ -81,7 +81,7 @@ func(s *DocStore) QueryEdge(src, dst document.UID) (*document.Edge, error) {
 	return document.NewEdge(src, dst, value), nil
 }
 
-func(s *DocStore) DeleteEdge(src, dst document.UID) error {
+func (s *DocStore) DeleteEdge(src, dst document.UID) error {
 	// must <src, dst> for store key!!!!
 	key, err := encodeStoreKey(src, dst)
 	if err != nil {
@@ -90,4 +90,4 @@ func(s *DocStore) DeleteEdge(src, dst document.UID) error {
 	return s.store.Delete(key)
 }
 
-func(s *DocStore) Close()
+func (s *DocStore) Close()

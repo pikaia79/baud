@@ -1,9 +1,9 @@
 package store
 
 import (
-	"fmt"
-	"errors"
 	"encoding/binary"
+	"errors"
+	"fmt"
 
 	"github.com/tiglabs/baud/kernel/document"
 )
@@ -21,8 +21,8 @@ var KeyType_name = map[byte]string{
 }
 
 var KeyType_value = map[string]byte{
-	"Source":   'S',
-	"Field":    'F',
+	"Source": 'S',
+	"Field":  'F',
 }
 
 func (x KEY_TYPE) String() string {

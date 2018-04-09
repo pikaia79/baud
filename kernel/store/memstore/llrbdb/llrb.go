@@ -1,19 +1,19 @@
 package llrbdb
 
 import (
-	"sync"
-	"errors"
 	"bytes"
+	"errors"
+	"sync"
 
-	"github.com/tiglabs/baud/util/match"
 	"github.com/petar/GoLLRB/llrb"
+	"github.com/tiglabs/baud/util/match"
 )
 
 type IterFunc func(key []byte, value interface{}) bool
 
 type dbItem struct {
-	key     []byte
-	value   interface{}
+	key   []byte
+	value interface{}
 }
 
 func (dbi *dbItem) Key() []byte {
@@ -37,17 +37,17 @@ func (dbi *dbItem) Less(item llrb.Item) bool {
 }
 
 type Tx struct {
-	db       *DB    // the underlying database.
+	db       *DB             // the underlying database.
 	writable bool            // when false mutable operations fail.
 	funcd    bool            // when true Commit and Rollback panic.
 	wc       *txWriteContext // context for writable transactions.
 }
 
 type txWriteContext struct {
-	rbKeys *llrb.LLRB      // a tree of all item ordered by key
+	rbKeys *llrb.LLRB // a tree of all item ordered by key
 
-	rollbackItems   map[string]*dbItem // details for rolling back tx.
-	iterCount       int                // stack of iterators
+	rollbackItems map[string]*dbItem // details for rolling back tx.
+	iterCount     int                // stack of iterators
 }
 
 var (
@@ -75,16 +75,16 @@ var (
 )
 
 type Config struct {
-	Degree    int
+	Degree int
 }
 
 var DefaultConfig = &Config{Degree: 10}
 
 type DB struct {
-	mu        sync.RWMutex
-	keys      *llrb.LLRB      // a tree of all item ordered by key
+	mu   sync.RWMutex
+	keys *llrb.LLRB // a tree of all item ordered by key
 
-	closed    bool              // set when the database has been closed
+	closed bool // set when the database has been closed
 }
 
 func NewDB() (*DB, error) {
@@ -106,7 +106,6 @@ func (db *DB) Close() error {
 	db.keys = nil
 	return nil
 }
-
 
 // Begin opens a new transaction.
 // Multiple read-only transactions can be opened at the same time but there can
@@ -211,7 +210,7 @@ func (tx *Tx) Rollback() error {
 }
 
 func (tx *Tx) Set(key []byte, value interface{}) (preValue interface{},
-replaced bool, err error) {
+	replaced bool, err error) {
 	if tx.db == nil {
 		return nil, false, ErrTxClosed
 	} else if !tx.writable {
@@ -573,7 +572,6 @@ func (db *DB) deleteFromDatabase(item *dbItem) *dbItem {
 	}
 	return pdbi
 }
-
 
 // managed calls a block of code that is fully contained in a transaction.
 // This method is intended to be wrapped by Update and View

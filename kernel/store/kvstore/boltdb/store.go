@@ -1,10 +1,10 @@
 package boltdb
 
 import (
-	"os"
-	"errors"
 	"bytes"
 	"encoding/binary"
+	"errors"
+	"os"
 
 	"github.com/boltdb/bolt"
 	"github.com/tiglabs/baud/kernel/store/kvstore"
@@ -16,17 +16,17 @@ var raftBucket []byte = []byte("raft")
 var RAFT_APPLY_ID []byte = []byte("#raft_apply_id")
 
 type StoreConfig struct {
-	Path       string
-	Bucket     string
-	NoSync     bool
-	ReadOnly   bool
+	Path     string
+	Bucket   string
+	NoSync   bool
+	ReadOnly bool
 }
 
 type Store struct {
-	path        string
-	bucket      []byte
-	db          *bolt.DB
-	noSync      bool
+	path   string
+	bucket []byte
+	db     *bolt.DB
+	noSync bool
 }
 
 func New(config *StoreConfig) (kvstore.KVStore, error) {
@@ -66,15 +66,15 @@ func New(config *StoreConfig) (kvstore.KVStore, error) {
 	}
 
 	rv := Store{
-		path:        path,
-		bucket:      []byte(bucket),
-		db:          db,
-		noSync:      noSync,
+		path:   path,
+		bucket: []byte(bucket),
+		db:     db,
+		noSync: noSync,
 	}
 	return &rv, nil
 }
 
-func (bs *Store)Get(key []byte) (value []byte, err error) {
+func (bs *Store) Get(key []byte) (value []byte, err error) {
 	if bs == nil {
 		return nil, nil
 	}
@@ -89,7 +89,7 @@ func (bs *Store)Get(key []byte) (value []byte, err error) {
 	return
 }
 
-func (bs *Store)Put(key []byte, value []byte, ops ...*kvstore.Option) error {
+func (bs *Store) Put(key []byte, value []byte, ops ...*kvstore.Option) error {
 	if bs == nil {
 		return nil
 	}
@@ -113,7 +113,7 @@ func (bs *Store)Put(key []byte, value []byte, ops ...*kvstore.Option) error {
 	})
 }
 
-func (bs *Store)Delete(key []byte, ops ...*kvstore.Option) error {
+func (bs *Store) Delete(key []byte, ops ...*kvstore.Option) error {
 	if bs == nil {
 		return nil
 	}
@@ -137,7 +137,7 @@ func (bs *Store)Delete(key []byte, ops ...*kvstore.Option) error {
 	})
 }
 
-func (bs *Store)MultiGet(keys [][]byte) ([][]byte, error) {
+func (bs *Store) MultiGet(keys [][]byte) ([][]byte, error) {
 	if bs == nil {
 		return nil, nil
 	}
@@ -160,7 +160,7 @@ func (bs *Store) GetSnapshot() (kvstore.Snapshot, error) {
 	}, nil
 }
 
-func (bs *Store)PrefixIterator(prefix []byte) kvstore.KVIterator {
+func (bs *Store) PrefixIterator(prefix []byte) kvstore.KVIterator {
 	tx, err := bs.db.Begin(false)
 	if err != nil {
 		return nil
@@ -177,7 +177,7 @@ func (bs *Store)PrefixIterator(prefix []byte) kvstore.KVIterator {
 	return rv
 }
 
-func (bs *Store)RangeIterator(start, end []byte) kvstore.KVIterator {
+func (bs *Store) RangeIterator(start, end []byte) kvstore.KVIterator {
 	tx, err := bs.db.Begin(false)
 	if err != nil {
 		return nil
@@ -194,11 +194,11 @@ func (bs *Store)RangeIterator(start, end []byte) kvstore.KVIterator {
 	return rv
 }
 
-func (bs *Store)NewKVBatch() kvstore.KVBatch {
+func (bs *Store) NewKVBatch() kvstore.KVBatch {
 	return kvstore.NewBatch()
 }
 
-func (bs *Store)ExecuteBatch(batch kvstore.KVBatch, ops ...*kvstore.Option) (err error) {
+func (bs *Store) ExecuteBatch(batch kvstore.KVBatch, ops ...*kvstore.Option) (err error) {
 	if bs == nil {
 		return nil
 	}

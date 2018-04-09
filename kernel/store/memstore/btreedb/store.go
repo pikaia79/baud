@@ -7,7 +7,7 @@ import (
 var _ memstore.MemStore = &Store{}
 
 type Store struct {
-	db     *DB
+	db *DB
 }
 
 func New() (memstore.MemStore, error) {
@@ -23,7 +23,7 @@ func (s *Store) Put(key []byte, value interface{}) error {
 		return nil
 	}
 	return s.db.Update(func(tx *Tx) error {
-		_,_,err := tx.Set(key, value)
+		_, _, err := tx.Set(key, value)
 		if err != nil {
 			return err
 		}
@@ -49,7 +49,7 @@ func (s *Store) Delete(key []byte) error {
 		return nil
 	}
 	return s.db.Update(func(tx *Tx) error {
-		_,err := tx.Delete(key)
+		_, err := tx.Delete(key)
 		if err != nil {
 			return err
 		}
@@ -67,7 +67,7 @@ func (s *Store) PrefixIterator(prefix []byte, iter memstore.IterFunc) error {
 	}
 	defer tx.Rollback()
 	var _prefix []byte
-	_prefix = make([]byte, len(prefix) + 1)
+	_prefix = make([]byte, len(prefix)+1)
 	copy(_prefix, prefix)
 	_prefix[len(prefix)] = byte('*')
 	return tx.AscendKeys(_prefix, func(key []byte, value interface{}) bool {
@@ -101,7 +101,7 @@ func (s *Store) ExecuteBatch(batch memstore.MemBatch) (err error) {
 		return nil
 	}
 	var tx *Tx
-	tx, err= s.db.Begin(true)
+	tx, err = s.db.Begin(true)
 	if err != nil {
 		return
 	}
@@ -116,12 +116,12 @@ func (s *Store) ExecuteBatch(batch memstore.MemBatch) (err error) {
 
 	for _, op := range batch.Operations() {
 		if op.Value() != nil {
-			_,_,err = tx.Set(op.Key(), op.Value())
+			_, _, err = tx.Set(op.Key(), op.Value())
 			if err != nil {
 				return
 			}
 		} else {
-			_,err = tx.Delete(op.Key())
+			_, err = tx.Delete(op.Key())
 			if err != nil {
 				return
 			}
@@ -136,5 +136,3 @@ func (s *Store) Close() error {
 	}
 	return s.db.Close()
 }
-
-

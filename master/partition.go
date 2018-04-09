@@ -1,14 +1,14 @@
 package master
 
 type Partition struct {
-	id 			 string // equals replGroup id
+	id           string // equals replGroup id
 	entityOrEdge string
 	db           uint32
 	space        uint32
 	startSlot    uint32
 	endSlot      uint32
 
-	replGroup 	 uint32
+	replGroup uint32
 
 	//for splitting & merging
 	leftCh  *Partition
@@ -24,13 +24,13 @@ type ReplGroup struct {
 }
 
 type PartitionServer struct {
-	id 		uint32			// equals ip
-	role 	string
-	zone 	string
-	ip   	string
-	port 	string
+	id   uint32 // equals ip
+	role string
+	zone string
+	ip   string
+	port string
 
-	cpu    	int
-	memory 	int
-	disk   	int
+	cpu    int
+	memory int
+	disk   int
 }

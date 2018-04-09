@@ -76,7 +76,6 @@ func (i *iterator) Close() error {
 	return nil
 }
 
-
 func (i *Store) GetSnapshot() (kvstore.Snapshot, error) {
 	return &reader{}, nil
 }
@@ -109,9 +108,9 @@ func (r *reader) Close() error {
 
 type batch struct{}
 
-func (i *batch) Set(key, val []byte)   {}
-func (i *batch) Delete(key []byte)     {}
-func (i *batch) Merge(key, val []byte) {}
-func (i *batch) Reset()                {}
+func (i *batch) Set(key, val []byte)             {}
+func (i *batch) Delete(key []byte)               {}
+func (i *batch) Merge(key, val []byte)           {}
+func (i *batch) Reset()                          {}
 func (i *batch) Operations() []kvstore.Operation { return nil }
-func (i *batch) Close() error          { return nil }
+func (i *batch) Close() error                    { return nil }
