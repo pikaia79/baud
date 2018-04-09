@@ -13,16 +13,21 @@ type KEY_TYPE byte
 const (
 	TYPE_S KEY_TYPE = 'S'
 	TYPE_F KEY_TYPE = 'F'
+	// Do not use by app, but used inner for store raft apply ID
+	// In blotDB, we use another bucket to store raft apply
+	TYPE_R KEY_TYPE = 'R'
 )
 
 var KeyType_name = map[byte]string{
 	'S': "Source",
 	'F': "Field",
+	'R': "Raft",
 }
 
 var KeyType_value = map[string]byte{
 	"Source":   'S',
 	"Field":    'F',
+	"Raft":     'R',
 }
 
 func (x KEY_TYPE) String() string {
@@ -33,10 +38,9 @@ func (x KEY_TYPE) String() string {
 	return "unknown"
 }
 
-// document 存储格式: <key>                                                                          <value>
+// Document format in disk: <key>                                                                   <value>
 //               [type(1 byte)]+[space ID(4 bytes)]+[slot ID(4 bytes)]+[Custom ID(8 bytes)] ...     [document]
-// slot ID 编码到key中可以方便整体迁移指定slot上的文档
-// 对于 edge的UID pair的编码,暂时按照<UID,UID>编码,后面再考虑优化,比如spaceID或者slotID相同
+// Encode <UID> as store key for entity, encode <src UID, dst UID> as store key for edge
 func decodeUID(key []byte) (doc document.UID, err error) {
 	if len(key) < 16 {
 		err = fmt.Errorf("key[%+v] can't be identified", key)

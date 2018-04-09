@@ -23,6 +23,7 @@ func (u *UID) Valid() bool {
 type Entity struct {
 	uid UID
 	doc []byte
+	version uint32
 }
 
 func NewEntity(uid UID, doc []byte) *Entity {
@@ -53,6 +54,7 @@ type Edge struct {
 	src UID
 	dst UID
 	doc []byte
+	version uint32
 }
 
 func NewEdge(src, dst UID, doc []byte) *Edge {
