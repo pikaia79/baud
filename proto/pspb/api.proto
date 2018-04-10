@@ -1,0 +1,62 @@
+syntax = "proto3";
+
+import "github.com/gogo/protobuf/gogoproto/gogo.proto";
+import "errorpb.proto";
+
+option go_package = "pspb";
+
+option optimize_for = SPEED;
+option (gogoproto.marshaler_all) = true;
+option (gogoproto.sizer_all) = true;
+option (gogoproto.unmarshaler_all) = true;
+option (gogoproto.gostring_all) = true;
+option (gogoproto.equal_all) = true;
+option (gogoproto.verbose_equal_all) = false;
+option (gogoproto.goproto_stringer_all) = false;
+option (gogoproto.stringer_all) =  true;
+option (gogoproto.populate_all) = true;
+option (gogoproto.testgen_all) = false;
+option (gogoproto.benchgen_all) = false;
+option (gogoproto.goproto_getters_all) = false;
+
+service Internal {
+    rpc Get(GetRequest) returns (GetResponse) {}
+    rpc Update(UpdateRequest) returns (UpdateResponse) {}
+    rpc Delete(DeleteRequest) returns (DeleteResponse) {}
+}
+
+message ResponseHeader {
+    Error error = 1;
+}
+
+message UpdateRequest {
+    uint32      space_id = 1 [(gogoproto.customname) = "SpaceID", (gogoproto.casttype) = "github.com/tiglabs/baud/proto.SpaceID"];
+    uint32      slot_id  = 2 [(gogoproto.customname) = "SlotID", (gogoproto.casttype) = "github.com/tiglabs/baud/proto.SlotID"];
+    bytes       key      = 3 [(gogoproto.casttype) = "github.com/tiglabs/baud/proto.Key"];
+    bytes       value    = 4 [(gogoproto.casttype) = "github.com/tiglabs/baud/proto.Value"];
+}
+
+message UpdateResponse {
+    ResponseHeader header = 1 [(gogoproto.nullable) = false, (gogoproto.embed) = true];
+    bytes          key    = 2 [(gogoproto.casttype) = "github.com/tiglabs/baud/proto.Key"];
+}
+
+message DeleteRequest {
+    bytes         key    = 1 [(gogoproto.casttype) = "github.com/tiglabs/baud/proto.Key"];
+}
+
+message DeleteResponse {
+    ResponseHeader header  = 1 [(gogoproto.nullable) = false, (gogoproto.embed) = true];
+    bool           deleted = 2;
+}
+
+message GetRequest {
+    bytes         key    = 1 [(gogoproto.casttype) = "github.com/tiglabs/baud/proto.Key"];
+}
+
+message GetResponse {
+    ResponseHeader header  = 1 [(gogoproto.nullable) = false, (gogoproto.embed) = true];
+    uint64         version = 2;
+    bool           found   = 3;
+    bytes          source  = 4 [(gogoproto.casttype) = "github.com/tiglabs/baud/proto.Value"];
+}

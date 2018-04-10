@@ -1,47 +1,53 @@
 syntax = "proto3";
-package metapb;
 
-import "gogoproto/gogo.proto";
+import "github.com/gogo/protobuf/gogoproto/gogo.proto";
 
+option go_package = "proto";
+
+option optimize_for = SPEED;
 option (gogoproto.marshaler_all) = true;
 option (gogoproto.sizer_all) = true;
 option (gogoproto.unmarshaler_all) = true;
+option (gogoproto.gostring_all) = true;
+option (gogoproto.equal_all) = true;
+option (gogoproto.verbose_equal_all) = false;
+option (gogoproto.goproto_stringer_all) = false;
+option (gogoproto.stringer_all) =  true;
+option (gogoproto.populate_all) = true;
+option (gogoproto.testgen_all) = false;
+option (gogoproto.benchgen_all) = false;
+option (gogoproto.goproto_getters_all) = false;
 
 message DB {
-    uint32          id      = 1
-    string          name    = 2
+    uint32 id   = 1 [(gogoproto.customname) = "ID", (gogoproto.casttype) = "DBID"];
+    string name = 2;
 }
 
 message Space {
-    uint32          id      = 1
-    string          name    = 2
+    uint32 id   = 1 [(gogoproto.customname) = "ID", (gogoproto.casttype) = "SpaceID"];
+    string name = 2;
 }
 
 message Partition {
-    uint32                  id                  = 1
-	string                  entityOrEdge        = 2
-	uint32                  db                  = 3
-	uint32                  space               = 4
-	uint32                  startSlot           = 5
-	uint32                  endSlot             = 6
-	ReplGroup               replGroup           = 7
+    uint32    id            = 1 [(gogoproto.customname) = "ID", (gogoproto.casttype) = "PartitionID"];
+	string    entityOrEdge  = 2;
+	uint32    db_id         = 3 [(gogoproto.customname) = "DBID", (gogoproto.casttype) = "DBID"];
+	uint32    space_id      = 4 [(gogoproto.customname) = "SpaceID", (gogoproto.casttype) = "SpaceID"];
+	uint32    start_slot    = 5 [(gogoproto.customname) = "StartSlot", (gogoproto.casttype) = "SlotID"];
+	uint32    end_slot      = 6 [(gogoproto.customname) = "EndSlot", (gogoproto.casttype) = "SlotID"];
+	ReplGroup repl_group    = 7 [(gogoproto.customname) = "ReplGroup"];
 }
 
-type ReplGroup struct {
-	uint32                      id              = 1
-	repeated PartitionServer    replicas        = 2
+message ReplGroup {
+	uint32   id           = 1 [(gogoproto.customname) = "ID", (gogoproto.casttype) = "GroupID"];
+	repeated Peer peers   = 2;
 }
 
-message PartitionServer {
-    uint32          id                  = 1
-    string          role                = 2
-    string          zone                = 3
-    string          ip                  = 4
-    string          port                = 5
-}
-
-message Route {
-    Partition               partition           = 1;
-    uint32                  leader              = 2;
+message Peer {
+    uint32 id    = 1 [(gogoproto.customname) = "ID", (gogoproto.casttype) = "PeerID"];
+    string role  = 2;
+    string zone  = 3;
+    string ip    = 4;
+    uint32 port  = 5 [(gogoproto.casttype) = "int"];
 }
 
