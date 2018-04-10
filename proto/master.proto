@@ -13,7 +13,7 @@ service MasterRpc {
     rpc GetRoute(GetRouteRequest) returns (GetRouteResponse) {}
 
     rpc PsLogin(PsLoginRequest) returns (PsLoginRequest) {}
-    rpc CreateReplica(CreatePartitionRequest) returns (CreatePartitionResponse) {}
+    rpc CreateReplica(CreateReplicaRequest) returns (CreateReplicaResponse) {}
     rpc PsHeartbeat(PSHeartbeatRequest) returns (PSHeartbeatResponse) {}
 }
 
@@ -39,28 +39,29 @@ message GetRouteResponse {
 message PsLoginRequest {
     RequestHeader       header          = 1;
     PartitionServer     server = 2;
+    ServerResource      serverResource = 3;
 }
 
 message PsLoginResponse {
     ResponseHeader          header          = 1;
 }
 
-message CreatePartitionRequest {
+message CreateReplicaRequest {
     RequestHeader       header          = 1;
     Partition           partition       = 2;
-    ReplicaGroup        replicas        = 3;
+    uint32              replica_id      = 3;
+    repeated PartitionServer     partition_servers        = 4;
 }
 
-message CreatePartitionResponse {
+message CreateReplicaResponse {
     ResponseHeader      header         = 1;
 }
 
 message PSHeartbeatRequest {
     RequestHeader       header     = 1;
-    Partition           partition  = 2;
     uint32              ps_id = 3;
     PSStatus            ps_status = 4;
-    bool                is_leader  = 5;
+    repeated  Replica   replicas = 5;
 }
 
 message PSHeartbeatResponse {

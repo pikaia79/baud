@@ -44,9 +44,16 @@ message Partition {
 	uint32                  end_slot             = 6;
 }
 
-message ReplicaGroup {
-	uint32                      id              = 1;
-	repeated PartitionServer    replicas        = 2;
+enum ReplicaStatue {
+    RS_Invalid = 0;
+}
+
+message Replica {
+    uint32      id = 1;
+    uint32      partition_id = 2;
+    uint32      ps_id       = 3;
+    ReplicaStatue      status   = 4;
+    bool        is_leader  = 5;
 }
 
 enum PSStatus {
@@ -64,9 +71,15 @@ message PartitionServer {
     string          port                = 5;
 }
 
+message ServerResource {
+    int32           cpu     = 1;
+    int32           memory  = 2;
+    int32           disk    = 3;
+}
+
 message Route {
-    Partition               partition           = 1;
-    ReplicaGroup            replicas        = 2;
-    uint32                  leaderPSId      = 3;
+    Partition                   partition           = 1;
+    repeated PartitionServer        partition_server        = 2;
+    uint32                      leader_ps_id      = 3;
 }
 
