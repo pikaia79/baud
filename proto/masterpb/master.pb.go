@@ -19,7 +19,7 @@
 		PSHeartbeatRequest
 		PSHeartbeatResponse
 */
-package metapb
+package masterpb
 
 import (
 	"fmt"

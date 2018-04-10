@@ -1,5 +1,5 @@
 syntax = "proto3";
-package metapb;
+package masterpb;
 
 import "gogoproto/gogo.proto";
 import "meta.proto";
