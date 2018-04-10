@@ -22,10 +22,10 @@ type PartitionPolicy struct {
 type Space struct {
 	*metapb.Space
 
-	Partitioning PartitionPolicy
+	partitioning *PartitionPolicy    `json:"-"`
 	Mapping      []Field
 
-	Partitions   *PartitionTree      `json:"-"`
+	searchTree   *PartitionTree      `json:"-"`
 	propertyLock sync.RWMutex        `json:"-"`
 }
 
@@ -37,7 +37,7 @@ type Field struct {
 	MultiValue  bool
 }
 
-func NewSpace(dbId uint32, dbName, spaceName, partitionKey, partitionFunction string, partitionNum int) (*Space, error) {
+func NewSpace(dbId uint32, dbName, spaceName string, policy *PartitionPolicy) (*Space, error) {
 	spaceId, err := IdGeneratorSingleInstance(nil).GenID()
 	if err != nil {
 		log.Error("generate space id is failed. err:[%v]", err)
@@ -50,13 +50,10 @@ func NewSpace(dbId uint32, dbName, spaceName, partitionKey, partitionFunction st
 			Id:     spaceId,
 			DbId:   dbId,
 			DbName: dbName,
-			Status: metapb.SpaceStatus_Init,
+			Status: metapb.SpaceStatus_SS_Init,
 		},
-		Partitioning: PartitionPolicy{
-			Key:           partitionKey,
-			Function:      partitionFunction,
-			NumPartitions: partitionNum,
-		},
+		partitioning: policy,
+		searchTree: NewPartitionTree(),
 	}, nil
 }
 
@@ -64,7 +61,7 @@ func (s *Space) persistent(store Store) error {
 	s.propertyLock.RLock()
 	defer s.propertyLock.RUnlock()
 
-	copy := deepcopy.Iface(*s).(Space)
+	copy := deepcopy.Iface(*s).(*Space)
 	spaceVal, err := json.Marshal(copy)
 	if err != nil {
 		log.Error("fail to marshal space[%v]. err:[%v]", copy, err)
@@ -97,6 +94,13 @@ func (s *Space) rename(newName string) {
 	defer s.propertyLock.Unlock()
 
 	s.Name = newName
+}
+
+func (s *Space) putPartition(partition *Partition) {
+	s.propertyLock.Lock()
+	defer s.propertyLock.Unlock()
+
+	s.searchTree.update(partition.Partition)
 }
 
 type SpaceCache struct {

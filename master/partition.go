@@ -4,12 +4,16 @@ import (
 	"proto/metapb"
 	"github.com/google/btree"
 	"sync"
-	"bytes"
+	"util/log"
+	"util/deepcopy"
+	"fmt"
+	"github.com/gin-gonic/gin/json"
 )
 
 const (
-	PREFIX_PARTITION 	string = "schema partition"
-	defaultBTreeDegree = 64
+	PREFIX_PARTITION   string = "schema partition"
+	defaultBTreeDegree        = 64
+	FIXED_REPLICA_NUM   	  = 3
 )
 
 type Partition struct {
@@ -20,13 +24,55 @@ type Partition struct {
 	rightCh *Partition
 	parent  *Partition
 
-	status string //serving, splitting, cleaning, etc.
+	status       metapb.PSStatus //serving, splitting, cleaning, etc.
+	propertyLock sync.RWMutex
+	replicaGroup *ReplicaGroup
 }
 
-//type ReplicaGroup struct {
-//	id       uint32
-//	replicas []*PartitionServer
-//}
+func NewPartition(dbId, spaceId, startSlot, endSlot uint32) (*Partition, error) {
+	partId, err := IdGeneratorSingleInstance(nil).GenID()
+	if err != nil {
+		log.Error("generate partition id is failed. err:[%v]", err)
+		return nil, ErrGenIdFailed
+	}
+	return &Partition{
+		Partition: &metapb.Partition{
+			Id:        partId,
+			Type:      "",
+			DbId:      dbId,
+			SpaceId:   spaceId,
+			StartSlot: startSlot,
+			EndSlot:   endSlot,
+		},
+		status:metapb.PSStatus_PS_Initial,
+		replicaGroup:new(ReplicaGroup),
+	}, nil
+}
+
+type ReplicaGroup struct {
+	lock 		sync.RWMutex
+	replicas 	map[uint32]*Replica
+	replicaPS   map[uint32]*PartitionServer
+}
+
+func (p *Partition) persistent(store Store) error {
+	p.propertyLock.RLock()
+	defer p.propertyLock.RUnlock()
+
+	copy := deepcopy.Iface(p.Partition).(*metapb.Partition)
+	marshalVal, err := json.Marshal(copy)
+	if err != nil {
+		log.Error("fail to marshal partition[%v]. err:[%v]", copy, err)
+		return err
+	}
+	key := []byte(fmt.Sprintf("%s %d", PREFIX_PARTITION, copy.Id))
+	if err := store.Put(key, marshalVal); err != nil {
+		log.Error("fail to put partition[%v] into store. err:[%v]", copy, err)
+		return ErrBoltDbOpsFailed
+	}
+
+	return nil
+}
 
 type PartitionCache struct {
 	lock  		 sync.RWMutex
@@ -35,6 +81,21 @@ type PartitionCache struct {
 
 type PartitionItem struct {
 	partition   *metapb.Partition
+}
+
+// Less returns true if the region start key is greater than the other.
+// So we will sort the region with start key reversely.
+func (r *PartitionItem) Less(other btree.Item) bool {
+	left := r.partition.GetStartSlot()
+	right := other.(*PartitionItem).partition.GetStartSlot()
+	//return bytes.Compare(left, right) > 0
+	return left > right
+}
+
+func (r *PartitionItem) Contains(slot uint32) bool {
+	start, end := r.partition.GetStartSlot(), r.partition.GetEndSlot()
+	//return bytes.Compare(key, start) >= 0 && bytes.Compare(key, end) < 0
+	return slot >= start && slot < end
 }
 
 type PartitionTree struct {
@@ -55,18 +116,19 @@ func (t *PartitionTree) length() int {
 // It finds and deletes all the overlapped regions first, and then
 // insert the region.
 func (t *PartitionTree) update(rng *metapb.Partition) {
-	item := &rangeItem{region: rng}
+	item := &PartitionItem{partition: rng}
 
 	result := t.find(rng)
 	if result == nil {
 		result = item
 	}
 
-	var overlaps []*rangeItem
+	var overlaps []*PartitionItem
 	var count int
 	t.tree.DescendLessOrEqual(result, func(i btree.Item) bool {
-		over := i.(*rangeItem)
-		if bytes.Compare(rng.EndKey, over.region.StartKey) <= 0 {
+		over := i.(*PartitionItem)
+		//if bytes.Compare(rng.EndSlot, over.region.StartKey) <= 0 {
+		if rng.EndSlot <= over.partition.StartSlot {
 			return false
 		}
 		overlaps = append(overlaps, over)
@@ -89,7 +151,7 @@ func (t *PartitionTree) update(rng *metapb.Partition) {
 // is not the same with the region.
 func (t *PartitionTree) remove(rng *metapb.Partition) {
 	result := t.find(rng)
-	if result == nil || result.region.GetId() != rng.GetId() {
+	if result == nil || result.partition.GetId() != rng.GetId() {
 		return
 	}
 
@@ -97,51 +159,55 @@ func (t *PartitionTree) remove(rng *metapb.Partition) {
 }
 
 // search returns a region that contains the key.
-func (t *PartitionTree) search(key []byte) *metapb.Partition {
-	rng := &metapb.Range{StartKey: key}
+func (t *PartitionTree) search(slot uint32) *metapb.Partition {
+	rng := &metapb.Partition{StartSlot: slot}
 	log.Debug("################### len=%v", t.tree.Len())
 	result := t.find(rng)
 	if result == nil {
 		return nil
 	}
-	return result.region
+	return result.partition
 }
 
-func (t *PartitionTree) multipleSearch(key []byte, num int) []*metapb.Partition {
-	rng := &metapb.Range{StartKey: key}
+func (t *PartitionTree) multipleSearch(slot uint32, num int) []*metapb.Partition {
+	rng := &metapb.Partition{StartSlot: slot}
 	results := t.ascendScan(rng, num)
-	var ranges []*metapb.Range
-	ranges = make([]*metapb.Range, 0, num)
-	var endKey []byte
+	var ranges []*metapb.Partition
+	ranges = make([]*metapb.Partition, 0, num)
+	var endSlot uint32
+	var isFound = false
 	for _, r := range results {
-		if len(endKey) != 0 {
-			if bytes.Compare(r.region.GetStartKey(), endKey) != 0 {
+		//if len(endKey) != 0 {
+		if isFound {
+			//if bytes.Compare(r.region.GetStartKey(), endKey) != 0 {
+			if r.partition.GetStartSlot() != endSlot {
 				break
 			}
 		}
-		ranges = append(ranges, r.region)
-		endKey = r.region.GetEndKey()
+		ranges = append(ranges, r.partition)
+		endSlot = r.partition.GetEndSlot()
+		isFound = true
 	}
 	return ranges
 }
 
 // This is a helper function to find an item.
 func (t *PartitionTree) find(rng *metapb.Partition) *PartitionItem {
-	item := &rangeItem{region: rng}
+	item := &PartitionItem{partition: rng}
 
-	var result *rangeItem
+	var result *PartitionItem
 	t.tree.AscendGreaterOrEqual(item, func(i btree.Item) bool {
-		result = i.(*rangeItem)
+		result = i.(*PartitionItem)
 		return false
 	})
 
-	log.Debug("####range find: result=%v, startkey=%v", result, rng.StartKey)
+	log.Debug("####range find: result=%v, startkey=%v", result, rng.StartSlot)
 
 	if result != nil {
-		log.Debug("####range find: result range =%v, startkey=%v", result.region, rng.StartKey)
+		log.Debug("####range find: result range =%v, startkey=%v", result.partition, rng.StartSlot)
 	}
 
-	if result == nil || !result.Contains(rng.StartKey) {
+	if result == nil || !result.Contains(rng.StartSlot) {
 		return nil
 	}
 
@@ -154,12 +220,12 @@ func (t *PartitionTree) ascendScan(rng *metapb.Partition, num int) []*PartitionI
 		return nil
 	}
 
-	var results []*rangeItem
+	var results []*PartitionItem
 	//var firstItem *rangeItem
-	results = make([]*rangeItem, 0, num)
+	results = make([]*PartitionItem, 0, num)
 	count := 0
 	t.tree.DescendLessOrEqual(result, func(i btree.Item) bool {
-		results = append(results, i.(*rangeItem))
+		results = append(results, i.(*PartitionItem))
 		count++
 		if count == num {
 			return false

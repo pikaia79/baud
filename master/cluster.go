@@ -2,14 +2,15 @@ package master
 
 import (
 	"util/log"
-	//"sync"
+	"sync"
+	"math"
 )
 
 type Cluster struct {
 	config 			*Config
 	store 			Store
 
-	//clusterLock     sync.RWMutex
+	clusterLock     sync.RWMutex
 	dbCache 		*DBCache
 	psCache 		*PSCache
 	partitionCache  *PartitionCache
@@ -41,8 +42,8 @@ func (c *Cluster) Close() {
 }
 
 func (c *Cluster) createDb(dbName string) (*DB, error) {
-	c.dbCache.lock.Lock()
-	defer c.dbCache.lock.Unlock()
+	c.clusterLock.Lock()
+	defer c.clusterLock.Unlock()
 
 	db := c.dbCache.findDbByName(dbName)
 	if db != nil {
@@ -63,8 +64,8 @@ func (c *Cluster) createDb(dbName string) (*DB, error) {
 }
 
 func (c *Cluster) renameDb(srcDbName, destDbName string) error {
-	c.dbCache.lock.Lock()
-	defer c.dbCache.lock.Unlock()
+	c.clusterLock.Lock()
+	defer c.clusterLock.Unlock()
 
 	srcDb := c.dbCache.findDbByName(srcDbName)
 	if srcDb == nil {
@@ -86,20 +87,23 @@ func (c *Cluster) renameDb(srcDbName, destDbName string) error {
 }
 
 func (c *Cluster) createSpace(dbName, spaceName, partitionKey, partitionFunc string, partitionNum int) (*Space, error) {
+	c.clusterLock.Lock()
+	defer c.clusterLock.Unlock()
+
 	db := c.dbCache.findDbByName(dbName)
 	if db == nil {
 		return nil, ErrDbNotExists
 	}
-	// my be hold out of db from memory, but will clear it when master startup
-
-	spaceCache := db.spaceCache
-	spaceCache.lock.Lock()
-	defer spaceCache.lock.Unlock()
 	if space := db.spaceCache.findSpaceByName(spaceName); space != nil {
 		return nil, ErrDupSpace
 	}
 
-	space, err := NewSpace(db.Id, dbName, spaceName, partitionKey, partitionFunc, partitionNum)
+	policy := &PartitionPolicy{
+		Key: partitionKey,
+		Function:partitionFunc,
+		NumPartitions:partitionNum,
+	}
+	space, err := NewSpace(db.Id, dbName, spaceName, policy)
 	if err != nil {
 		return nil, err
 	}
@@ -107,43 +111,92 @@ func (c *Cluster) createSpace(dbName, spaceName, partitionKey, partitionFunc str
 	if err := space.persistent(c.store); err != nil {
 		return nil, err
 	}
-	spaceCache.addSpace(space)
+	db.spaceCache.addSpace(space)
+
+	slots := slotSplit(0, math.MaxUint32, partitionNum + 1)
+	if slots == nil {
+		log.Error("fail to split slot range [%v-%v]", 0, math.MaxUint32)
+		return nil, ErrInternalError
+	}
+	for i := 0; i < len(slots) - 1; i++ {
+		partition, err := NewPartition(db.Id, space.Id, slots[i], slots[i+1])
+		if err != nil {
+			return nil, err
+		}
+
+		if err := partition.persistent(c.store); err != nil {
+			return nil, err
+		}
+		space.putPartition(partition)
+	}
 
 	return space, nil
 }
 
 func (c *Cluster) renameSpace(dbName, srcSpaceName, destSpaceName string) error {
-	c.dbCache.lock.RLock()
+	c.clusterLock.Lock()
+	defer c.clusterLock.Unlock()
+
 	db := c.dbCache.findDbByName(dbName)
 	if db == nil {
-		c.dbCache.lock.RUnlock()
 		return ErrDbNotExists
 	}
-	c.dbCache.lock.RUnlock()
-	// my be hold out of db from memory, but will clear it when master startup
 
-	spaceCache := db.spaceCache
-	spaceCache.lock.Lock()
-	defer spaceCache.lock.Unlock()
-	srcSpace := spaceCache.findSpaceByName(srcSpaceName)
+	srcSpace := db.spaceCache.findSpaceByName(srcSpaceName)
 	if srcSpace == nil {
 		return ErrSpaceNotExists
 	}
-	destSpace := spaceCache.findSpaceByName(destSpaceName)
+	destSpace := db.spaceCache.findSpaceByName(destSpaceName)
 	if destSpace != nil {
 		return ErrDupSpace
 	}
 
-	spaceCache.deleteSpace(srcSpace)
+	db.spaceCache.deleteSpace(srcSpace)
 	srcSpace.rename(destSpaceName)
 	if err := srcSpace.persistent(c.store); err != nil {
 		return err
 	}
-	spaceCache.addSpace(srcSpace)
+	db.spaceCache.addSpace(srcSpace)
 
 	return nil
 }
 
 func (c *Cluster) detailSpace(spaceId int) (*Space, error) {
+	return nil, nil
+}
 
+func slotSplit(start, end uint32, n int) []uint32 {
+	if n <= 0 {
+		return nil
+	}
+	if end - start + 1 < uint32(n) {
+		return nil
+	}
+
+	var min, max uint32
+	if start <= end {
+		min = start
+		max = end
+	} else {
+		min = end
+		max = start
+	}
+
+	ret := make([]uint32, 0)
+	switch n {
+	case 1:
+		ret = append(ret, min)
+	case 2:
+		ret = append(ret, min)
+		ret = append(ret, max)
+	default:
+		step := (max - min) / uint32(n - 1)
+		ret = append(ret, min)
+		for i := 1 ; i < n - 1; i++ {
+			ret = append(ret, min + uint32(i) * step)
+		}
+		ret = append(ret, max)
+	}
+
+	return ret
 }

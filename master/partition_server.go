@@ -3,16 +3,28 @@ package master
 import (
     "sync"
     "proto/metapb"
+    "time"
+)
+
+const (
+    DEFAULT_REPLICA_LIMIT_PER_PS = 1
 )
 
 type PartitionServer struct {
     *metapb.PartitionServer
+    *metapb.ServerResource            `json:"-"`
 
+    status        metapb.PSStatus
+    lastHeartbeat time.Time
     replicaCache  *ReplicaCache
+    propertyLock  sync.RWMutex
+}
 
-    cpu    int            `json:"-"`
-    memory int                `json:"-"`
-    disk   int                 `json:"-"`
+func (p *PartitionServer) isReplicaFull() bool {
+    p.propertyLock.RLock()
+    defer p.propertyLock.RUnlock()
+
+    return p.replicaCache.count() == DEFAULT_REPLICA_LIMIT_PER_PS
 }
 
 type PSCache struct {
@@ -31,4 +43,5 @@ func (c *PSCache) getAllPartitionServers() []*PartitionServer {
 
     return nodes
 }
+
 
