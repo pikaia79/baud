@@ -4,122 +4,47 @@ package telnet
 import (
 	"crypto/tls"
 	"net"
+	"errors"
 )
 
-type CmdHandler func(Context, string, []string) error
+// Program register CmdHandler for processing incoming TELNET command
+// Session is communication context to decode/encode and other process
+type TelnetCmdCB func(Session, string, []string) error
 
-
-// ListenAndServe listens on the TCP network address `addr` and then spawns a call to the ServeTELNET
-// method on the `handler` to serve each incoming connection.
-//
-// For a very simple example:
-//
-//	package main
-//	
-//	import (
-//		"github.com/reiver/go-telnet"
-//	)
-//	
-//	func main() {
-//	
-//		//@TODO: In your code, you would probably want to use a different handler.
-//		var handler telnet.Handler = telnet.EchoHandler
-//	
-//		err := telnet.ListenAndServe(":5555", handler)
-//		if nil != err {
-//			//@TODO: Handle this error better.
-//			panic(err)
-//		}
-//	}
-func ListenAndServe(addr string, handler Handler) error {
-	server := &Server{Addr: addr, Handler: handler}
-	return server.ListenAndServe()
+type cmdInfo struct {
+	cb TelnetCmdCB
+	helpStr string
 }
 
-
-// Serve accepts an incoming TELNET or TELNETS client connection on the net.Listener `listener`.
-func Serve(listener net.Listener, handler Handler) error {
-
-	server := &Server{Handler: handler}
-	return server.Serve(listener)
-}
-
-
-// A Server defines parameters of a running TELNET server.
-//
-// For a simple example:
-//
-//	package main
-//	
-//	import (
-//		"github.com/reiver/go-telnet"
-//	)
-//	
-//	func main() {
-//	
-//		var handler telnet.Handler = telnet.EchoHandler
-//	
-//		server := &telnet.Server{
-//			Addr:":5555",
-//			Handler:handler,
-//		}
-//	
-//		err := server.ListenAndServe()
-//		if nil != err {
-//			//@TODO: Handle this error better.
-//			panic(err)
-//		}
-//	}
 type Server struct {
-	Addr    string  // TCP address to listen on; ":telnet" or ":telnets" if empty (when used with ListenAndServe or ListenAndServeTLS respectively).
+	Addr    	string  // TCP address to listen on; ":telnet" or ":telnets" if empty (when used with ListenAndServe or ListenAndServeTLS respectively).
+	Logger		Logger
+	TLSConfig 	*tls.Config // optional TLS configuration; used by ListenAndServeTLS.
+	Prompt string
 
-	TLSConfig *tls.Config // optional TLS configuration; used by ListenAndServeTLS.
+	registeredCmdMap map[string]*cmdInfo
 }
 
 // Register a command to process telnet command
-func (server *Server) RegisterCmd(cmdName, helpStr string, handler CmdHandler)  {
-
+func (server *Server) RegisterCmd(cmdName, helpStr string, cb TelnetCmdCB) error {
+	if _, ok := server.registeredCmdMap[cmdName]; ok {
+		return errors.New("command already registered")
+	}
+	server.registeredCmdMap[cmdName] = &cmdInfo{cb: cb, helpStr: helpStr}
+	return nil
 }
 
 // ListenAndServe listens on the TCP network address 'server.Addr' and then spawns a call to the ServeTELNET
-// method on the 'server.Handler' to serve each incoming connection.
-//
-// For a simple example:
-//
-//	package main
-//	
-//	import (
-//		"github.com/reiver/go-telnet"
-//	)
-//	
-//	func main() {
-//	
-//		var handler telnet.Handler = telnet.EchoHandler
-//	
-//		server := &telnet.Server{
-//			Addr:":5555",
-//			Handler:handler,
-//		}
-//	
-//		err := server.ListenAndServe()
-//		if nil != err {
-//			//@TODO: Handle this error better.
-//			panic(err)
-//		}
-//	}
 func (server *Server) ListenAndServe() error {
-
 	addr := server.Addr
 	if "" == addr {
 		addr = ":telnet"
 	}
 
-
 	listener, err := net.Listen("tcp", addr)
 	if nil != err {
 		return err
 	}
-
 
 	return server.Serve(listener)
 }
@@ -127,21 +52,12 @@ func (server *Server) ListenAndServe() error {
 
 // Serve accepts an incoming TELNET client connection on the net.Listener `listener`.
 func (server *Server) Serve(listener net.Listener) error {
-
 	defer listener.Close()
 
-
 	logger := server.logger()
-
-
-	handler := server.Handler
-	if nil == handler {
-//@TODO: Should this be a "ShellHandler" instead, that gives a shell-like experience by default
-//       If this is changd, then need to change the comment in the "type Server struct" definition.
-		logger.Debug("Defaulted handler to EchoHandler.")
-		handler = EchoHandler
+	if server.Prompt == "" {
+		server.Prompt = "> "
 	}
-
 
 	for {
 		// Wait for a new TELNET client connection.
@@ -155,51 +71,19 @@ func (server *Server) Serve(listener net.Listener) error {
 
 		// Handle the new TELNET client connection by spawning
 		// a new goroutine.
-		go server.handle(conn, handler)
+		go func() {
+			session := NewSession(server.Prompt, conn, func(session Session, cmdName string, params []string) error {
+				cmdInfo, ok := server.registeredCmdMap[cmdName]
+				if !ok {
+					return errors.New("cannot found telnet cmd: " + cmdName)
+				}
+				return cmdInfo.cb(session, cmdName, params)
+			})
+			session.SetLogger(server.logger())
+		}()
 		logger.Debugf("Spawned handler to handle connection from %q.", conn.RemoteAddr())
 	}
 }
-
-func (server *Server) handle(c net.Conn, handler Handler) {
-	defer c.Close()
-
-	logger := server.logger()
-
-	defer func(){
-		if r := recover(); nil != r {
-			if nil != logger {
-				logger.Errorf("Recovered from: (%T) %v", r, r)
-			}
-		}
-	}()
-
-	var ctx Context = NewContext().InjectLogger(logger)
-
-	var w Writer = newDataWriter(c)
-	var reader Reader = newDataReader(c)
-
-	for {
-		w.Write(prompt)
-		line, err := reader.ReadLine()
-		if err != nil {
-			return
-		}
-		cmdName, params, err := parseCommand(line)
-		if err != nil {
-			return
-		}
-		if cmdName == "quit" {
-			break
-		}
-		cmdHandler, err := commandMap[cmdName]
-		if err != nil {
-			return
-		}
-		cmdHandler(params, w)
-	}
-}
-
-
 
 func (server *Server) logger() Logger {
 	logger := server.Logger
@@ -209,3 +93,4 @@ func (server *Server) logger() Logger {
 
 	return logger
 }
+

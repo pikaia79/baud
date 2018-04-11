@@ -11,7 +11,8 @@ do
     command -v $cmd >/dev/null 2>&1 || { echo >&2 "I require "$cmd" but it's not installed.  Aborting."; exit 1; }
 done
 
-gopath_array=$(go env GOPATH|tr ":" "\n")
+gopath_array=($(go env GOPATH|tr ":" "\n"))
+
 first_gopath=${gopath_array[0]}
 
 if [ -z "$first_gopath" ]; then
@@ -54,32 +55,21 @@ if ! cmd_exists protoc-gen-gofast; then
     fi
 fi
 
-cd proto
-for file in `ls *.proto`
-do
-    base_name=$(basename $file ".proto")
-    mkdir -p ../pkg/$base_name
-    if [ -z $GO_OUT_M ]; then
-        GO_OUT_M="M$file=$GO_PREFIX_PATH/$base_name"
-    else
-        GO_OUT_M="$GO_OUT_M,M$file=$GO_PREFIX_PATH/$base_name"
-    fi
-done
-
 echo "generate go code..."
+cd proto
 ret=0
 for file in `ls *.proto`
 do
-    base_name=$(basename $file ".proto")
-    #protoc -I.:${GOGO_ROOT}:${GOGO_ROOT}/protobuf --gofast_out=plugins=grpc,$GO_OUT_M:../pkg/$base_name $file || ret=$?
-    protoc -I.:${GOGO_ROOT}:${GOGO_ROOT}/protobuf --gofast_out=plugins=grpc,$GO_OUT_M:../pkg/$base_name $file || ret=$?
-    cd ../pkg/$base_name
+    base_name=$(basename $file ".proto")"pb"
+    mkdir -p $base_name
+    protoc -I.:${GOGO_ROOT}:${GOGO_ROOT}/protobuf --gofast_out=plugins=grpc,$GO_OUT_M:$base_name $file || ret=$?
+    cd $base_name
     sed -i.bak -E 's/import _ \"gogoproto\"//g' *.pb.go
     sed -i.bak -E 's/import fmt \"fmt\"//g' *.pb.go
     sed -i.bak -E 's/import io \"io\"//g' *.pb.go
     sed -i.bak -E 's/import math \"math\"//g' *.pb.go
     rm -f *.bak
     goimports -w *.pb.go
-    cd ../../proto
+    cd ..
 done
 exit $ret
