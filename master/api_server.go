@@ -48,7 +48,12 @@ func NewApiServer(config *Config, cluster *Cluster) *ApiServer {
 }
 
 func (s *ApiServer) Start() error {
-	return s.httpServer.Run()
+	go func() {
+		if err := s.httpServer.Run(); err != nil {
+			log.Error("api server run error[%v]", err)
+		}
+	}()
+	return nil
 }
 
 func (s *ApiServer) Close() {

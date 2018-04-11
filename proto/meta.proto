@@ -79,7 +79,7 @@ message ServerResource {
 
 message Route {
     Partition                   partition           = 1;
-    repeated PartitionServer        partition_server        = 2;
+    repeated PartitionServer    partition_server        = 2;
     uint32                      leader_ps_id      = 3;
 }
 
