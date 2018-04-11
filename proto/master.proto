@@ -13,57 +13,37 @@ service MasterRpc {
     rpc GetRoute(GetRouteRequest) returns (GetRouteResponse) {}
 
     rpc PsLogin(PsLoginRequest) returns (PsLoginRequest) {}
-    rpc CreateReplica(CreateReplicaRequest) returns (CreateReplicaResponse) {}
     rpc PsHeartbeat(PSHeartbeatRequest) returns (PSHeartbeatResponse) {}
 }
 
-message RequestHeader {
-}
-
-message ResponseHeader {
-    int32       code                = 1;
-    string      msg                 = 2;
-}
-
 message GetRouteRequest {
-    RequestHeader       header          = 1;
+    metapb.RequestHeader       header          = 1;
     uint32              space           = 2;
     uint32              slot            = 3;
 }
 
 message GetRouteResponse {
-    ResponseHeader          header          = 1;
-    repeated Route          routes          = 2;
+    metapb.ResponseHeader          header          = 1;
+    repeated metapb.Route          routes          = 2;
 }
 
 message PsLoginRequest {
-    RequestHeader       header          = 1;
-    PartitionServer     server = 2;
-    ServerResource      serverResource = 3;
+    metapb.RequestHeader       header          = 1;
+    metapb.PartitionServer     server = 2;
+    metapb.ServerResource      serverResource = 3;
 }
 
 message PsLoginResponse {
-    ResponseHeader          header          = 1;
-}
-
-message CreateReplicaRequest {
-    RequestHeader       header          = 1;
-    Partition           partition       = 2;
-    uint32              replica_id      = 3;
-    repeated PartitionServer     partition_servers        = 4;
-}
-
-message CreateReplicaResponse {
-    ResponseHeader      header         = 1;
+    metapb.ResponseHeader          header          = 1;
 }
 
 message PSHeartbeatRequest {
-    RequestHeader       header     = 1;
+    metapb.RequestHeader       header     = 1;
     uint32              ps_id = 3;
-    PSStatus            ps_status = 4;
-    repeated  Replica   replicas = 5;
+    metapb.PSStatus            ps_status = 4;
+    repeated  metapb.Replica   replicas = 5;
 }
 
 message PSHeartbeatResponse {
-    ResponseHeader      header         = 1;
+    metapb.ResponseHeader      header         = 1;
 }

@@ -7,6 +7,14 @@ option (gogoproto.marshaler_all) = true;
 option (gogoproto.sizer_all) = true;
 option (gogoproto.unmarshaler_all) = true;
 
+message RequestHeader {
+}
+
+message ResponseHeader {
+    int32       code                = 1;
+    string      msg                 = 2;
+}
+
 message DB {
     uint32          id      = 1;
     string          name    = 2;
@@ -79,7 +87,7 @@ message ServerResource {
 
 message Route {
     Partition                   partition           = 1;
-    repeated PartitionServer        partition_server        = 2;
+    repeated PartitionServer    partition_server        = 2;
     uint32                      leader_ps_id      = 3;
 }
 
