@@ -4,7 +4,7 @@ import (
 	"sync"
 	"fmt"
 	"github.com/gin-gonic/gin/json"
-	"github.com/prometheus/common/log"
+	"util/log"
 	"proto/metapb"
 	"util/deepcopy"
 )

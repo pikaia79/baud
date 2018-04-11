@@ -21,6 +21,10 @@ var (
 	ErrUnknownRaftCmdType 		= errors.New("unknown raft command type")
 
 	//ErrEntryNotFound		    = errors.New("storage entry not found")
+
+	ErrGrpcInvalidResp          = errors.New("invalid grpc response")
+	ErrGrpcInvalidReq           = errors.New("invalid grpc request")
+	ErrGrpcInvokeFailed			= errors.New("invoke grpc is failed")
 )
 
 // http response error code and error message definitions

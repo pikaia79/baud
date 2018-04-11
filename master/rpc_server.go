@@ -36,10 +36,11 @@ func (rs *RpcServer) Start() error {
 		return err
 	}
 
-	if err := rs.grpcServer.Serve(l); err != nil {
-		log.Error("grpc server serve error[%v]", err)
-		return err
-	}
+	go func() {
+		if err := rs.grpcServer.Serve(l); err != nil {
+			log.Error("grpc server serve error[%v]", err)
+		}
+	}()
 
 	return nil
 }

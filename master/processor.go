@@ -54,10 +54,16 @@ func (p *SpaceCreateProcessor) Run() {
 		case <-p.ctx.Done():
 			return
 		case space = <-p.spaceCh:
-			numPartitions := space.Partitioning.NumPartitions
-
-			server := p.serverSelector.SelectTarget(p.cluster.psCache.getAllPartitionServers())
-
+			//numPartitions := space.Partitioning.NumPartitions
+			//
+			//server := p.serverSelector.SelectTarget(p.cluster.psCache.getAllPartitionServers())
+			//if server == nil {
+			//	log.Error("Do not distribute suitable server")
+			//	// TODO: calling jdos api to allocate a container asynchronously
+			//	break
+			//} else {
+			//	client.CreateRplica
+			//}
 
 		}
 	}
