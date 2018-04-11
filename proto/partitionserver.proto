@@ -9,7 +9,7 @@ option (gogoproto.sizer_all) = true;
 option (gogoproto.unmarshaler_all) = true;
 
 
-service PSRpc {
+service PartitionServerRpc {
     rpc CreateReplica(CreateReplicaRequest) returns (CreateReplicaResponse) {}
 }
 
