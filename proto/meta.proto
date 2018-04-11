@@ -90,4 +90,3 @@ message Route {
     repeated PartitionServer    partition_server        = 2;
     uint32                      leader_ps_id      = 3;
 }
-
