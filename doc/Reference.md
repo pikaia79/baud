@@ -36,6 +36,8 @@
 
 ## Tinkerpop Gremlin
 
+## Vespa
+
 ## Vitess
 
 

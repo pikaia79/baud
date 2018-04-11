@@ -5,10 +5,12 @@ import (
 )
 
 type Cluster struct {
-	config   *Config
-	topoInfo TopoInfo
+	replGroups []ReplGroup
 
-	store *RaftStore
+	config *Config
+
+	store   Store
+	idGenor *IDGenerator
 }
 
 func NewCluster(config *Config) *Cluster {
@@ -19,7 +21,7 @@ func NewCluster(config *Config) *Cluster {
 }
 
 func (c *Cluster) Start() (err error) {
-	if err = c.store.Start(); err != nil {
+	if err = c.store.Open(); err != nil {
 		log.Error("fail to create raft store. err:[%v]", err)
 		return
 	}
@@ -33,6 +35,6 @@ func (c *Cluster) Close() {
 	}
 }
 
-func (c *Cluster) createDb(dbName string) (*DBInfo, error) {
+func (c *Cluster) createDb(dbName string) (*DB, error) {
 	return nil, nil
 }
