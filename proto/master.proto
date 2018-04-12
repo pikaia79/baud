@@ -29,12 +29,13 @@ message GetRouteResponse {
 
 message PsLoginRequest {
     metapb.RequestHeader       header          = 1;
-    metapb.PartitionServer     server = 2;
-    metapb.ServerResource      serverResource = 3;
+    metapb.PartitionServer     server          = 2;
+    metapb.ServerResource      serverResource  = 3;
 }
 
 message PsLoginResponse {
-    metapb.ResponseHeader          header          = 1;
+    metapb.ResponseHeader      header          = 1;
+    metapb.PartitionServer     server          = 2;
 }
 
 message PSHeartbeatRequest {
