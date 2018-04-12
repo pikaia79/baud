@@ -30,7 +30,7 @@ func (c *Cluster) Start() (err error) {
 		return
 	}
 
-	IdGeneratorSingleInstance(c.store)
+	GetIdGeneratorInstance(c.store)
 
 	return nil
 }

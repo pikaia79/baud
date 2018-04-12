@@ -21,7 +21,7 @@ type DB struct {
 }
 
 func NewDB(dbName string) (*DB, error) {
-	dbId, err := IdGeneratorSingleInstance(nil).GenID()
+	dbId, err := GetIdGeneratorInstance(nil).GenID()
 	if err != nil {
 		log.Error("generate db id is failed. err[%v]", err)
 		return nil, ErrGenIdFailed

@@ -20,7 +20,7 @@ type IDGenerator interface {
 	GenID() (uint32, error)
 }
 
-func IdGeneratorSingleInstance(store Store) IDGenerator {
+func GetIdGeneratorInstance(store Store) IDGenerator {
 	singleInstanceSyncOnce.Do(func() {
 		singleInstance = NewIDGenerator([]byte(AUTO_INCREMENT_ID), GEN_STEP, store)
 	})

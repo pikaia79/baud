@@ -8,6 +8,7 @@ import (
 
 type Replica struct {
 	*metapb.Replica
+//	ps 				*PartitionServer
 
     lastHeartbeat   time.Time
 	propertyLock    sync.RWMutex

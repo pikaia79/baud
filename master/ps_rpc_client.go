@@ -16,15 +16,29 @@ const (
 	GRPC_CONN_TIMEOUT    = time.Second * 3
 )
 
+var (
+	singleInstance *PSRpcClient
+	instanceLock 	sync.RWMutex
+)
+
 type PSRpcClient struct {
 	connPool map[string]*PSConn
 	lock     sync.RWMutex
 }
 
-func NewPSRpcClient() *PSRpcClient {
-	return &PSRpcClient{
-		connPool: make(map[string]*PSConn),
+func GetPSRpcClientInstance() *PSRpcClient {
+	if singleInstance != nil {
+		return singleInstance
 	}
+
+	instanceLock.Lock()
+	defer instanceLock.Unlock()
+	if singleInstance == nil {
+		singleInstance = &PSRpcClient{
+			connPool: make(map[string]*PSConn),
+		}
+	}
+	return singleInstance
 }
 
 type PSConn struct {

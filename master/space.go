@@ -38,7 +38,7 @@ type Field struct {
 }
 
 func NewSpace(dbId uint32, dbName, spaceName string, policy *PartitionPolicy) (*Space, error) {
-	spaceId, err := IdGeneratorSingleInstance(nil).GenID()
+	spaceId, err := GetIdGeneratorInstance(nil).GenID()
 	if err != nil {
 		log.Error("generate space id is failed. err:[%v]", err)
 		return nil, ErrGenIdFailed

@@ -4,6 +4,7 @@ import (
 	"context"
 	"time"
 	"util/log"
+	"fmt"
 )
 
 const (
@@ -11,61 +12,86 @@ const (
 	PROCESSOR_DEFAULT_CHANNEL_LIMIT = 1000
 )
 
-type Processor interface {
-	PushMsg(interface{}) error
-	Run()
-}
+var (
+	ProcessorPartitionCh chan*Partition
+)
 
-type SpaceCreateProcessor struct {
-	ctx 	context.Context
-	ctxCancel context.CancelFunc
-	timeout 	time.Duration
-	spaceCh   chan*Space
+type PartitionCreateProcessor struct {
+	ctx         context.Context
+	cancelFunc  context.CancelFunc
+	timeout     time.Duration
 
 	cluster  *Cluster
 	serverSelector Selector
 }
 
-func NewSpaceCreateProcessor(cluster *Cluster) Processor {
-	p := new(SpaceCreateProcessor)
-	p.ctx, p.ctxCancel = context.WithCancel(context.Background())
-	p.spaceCh = make(chan *Space, PROCESSOR_DEFAULT_CHANNEL_LIMIT)
-	p.cluster = cluster
-	p.serverSelector = NewIdleSelector()
+func NewPartitionCreateProcessor(cluster *Cluster) *PartitionCreateProcessor {
+	ProcessorPartitionCh = make(chan *Partition, PROCESSOR_DEFAULT_CHANNEL_LIMIT)
+	p := &PartitionCreateProcessor{
+		cluster:        cluster,
+		serverSelector: NewIdleSelector(),
+	}
+	p.ctx, p.cancelFunc = context.WithCancel(context.Background())
+
 	return p
 }
 
-func (p *SpaceCreateProcessor) PushMsg(msg interface{}) error {
-	if len(p.spaceCh) >= PROCESSOR_DEFAULT_CHANNEL_LIMIT * 0.9 {
-		log.Error("space create processor will full, rejected the space[%v] request", space)
+func PushMsg(msg interface{}) error {
+	if len(ProcessorPartitionCh) >= PROCESSOR_DEFAULT_CHANNEL_LIMIT * 0.9 {
+		log.Error("partition create processor will full, reject msg[%v]", msg)
 		return ErrSysBusy
 	}
 
-	p.spaceCh <- msg.(*Space)
+	ProcessorPartitionCh <- msg.(*Partition)
 
 	return nil
 }
 
-func (p *SpaceCreateProcessor) Run() {
+func (p *PartitionCreateProcessor) Run() {
+	go func() {
+		psRpcClient := GetPSRpcClientInstance()
+		idGenerator := GetIdGeneratorInstance(nil)
 
-	for {
-		var space *Space
-		select {
-		case <-p.ctx.Done():
-			return
-		case space = <-p.spaceCh:
-			//numPartitions := space.Partitioning.NumPartitions
-			//
-			//server := p.serverSelector.SelectTarget(p.cluster.psCache.getAllPartitionServers())
-			//if server == nil {
-			//	log.Error("Do not distribute suitable server")
-			//	// TODO: calling jdos api to allocate a container asynchronously
-			//	break
-			//} else {
-			//	client.CreateRplica
-			//}
+		for {
+			select {
+			case <-p.ctx.Done():
+				return
+			case partitionToCreate := <-ProcessorPartitionCh:
 
+				server := p.serverSelector.SelectTarget(p.cluster.psCache.getAllPartitionServers())
+				if server == nil {
+					log.Error("Do not distribute suitable server")
+					// TODO: calling jdos api to allocate a container asynchronously
+					break
+				} else {
+					addr := fmt.Sprintf("%s:%s", server.Ip, server.Port)
+					replicaId, err := idGenerator.GenID()
+					if err != nil {
+						log.Error("fail to generate new replicaid. err:[%v]", err)
+						break
+					}
+
+					servers := partitionToCreate.replicaGroup.getAllServers()
+					if len(servers) >= FIXED_REPLICA_NUM {
+						log.Error("!!!Cannot add new replica, because replica numbers[%v] of partition[%v]",
+							" exceed fixed replica number[%v]", len(servers), partitionToCreate, FIXED_REPLICA_NUM)
+						break
+					}
+					servers = append(servers, server)
+					if err := psRpcClient.CreateReplica(addr, partitionToCreate.Partition, replicaId, servers); err != nil {
+						log.Error("fail to do rpc create replica of partition[%v]. err:[%v]",
+							partitionToCreate.Partition, err)
+						break
+					}
+				}
+			}
 		}
+	}()
+}
+
+func (p *PartitionCreateProcessor) Stop() {
+	if p.cancelFunc != nil {
+		p.cancelFunc()
 	}
 }
 

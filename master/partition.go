@@ -24,13 +24,13 @@ type Partition struct {
 	rightCh *Partition
 	parent  *Partition
 
-	status       metapb.PSStatus //serving, splitting, cleaning, etc.
+	status       metapb.PartitionStatus //serving, splitting, cleaning, etc.
 	propertyLock sync.RWMutex
 	replicaGroup *ReplicaGroup
 }
 
 func NewPartition(dbId, spaceId, startSlot, endSlot uint32) (*Partition, error) {
-	partId, err := IdGeneratorSingleInstance(nil).GenID()
+	partId, err := GetIdGeneratorInstance(nil).GenID()
 	if err != nil {
 		log.Error("generate partition id is failed. err:[%v]", err)
 		return nil, ErrGenIdFailed
@@ -44,15 +44,9 @@ func NewPartition(dbId, spaceId, startSlot, endSlot uint32) (*Partition, error) 
 			StartSlot: startSlot,
 			EndSlot:   endSlot,
 		},
-		status:metapb.PSStatus_PS_Initial,
+		status:		metapb.PartitionStatus_PA_NOTREAD,
 		replicaGroup:new(ReplicaGroup),
 	}, nil
-}
-
-type ReplicaGroup struct {
-	lock 		sync.RWMutex
-	replicas 	map[uint32]*Replica
-	replicaPS   map[uint32]*PartitionServer
 }
 
 func (p *Partition) persistent(store Store) error {
@@ -72,6 +66,23 @@ func (p *Partition) persistent(store Store) error {
 	}
 
 	return nil
+}
+
+type ReplicaGroup struct {
+	lock 		sync.RWMutex
+	replicas 	map[uint32]*Replica  // key: replicaId
+	servers  	map[uint32]*PartitionServer // key:replicaId
+}
+
+func (g *ReplicaGroup) getAllServers() []*PartitionServer {
+	g.lock.RLock()
+	defer g.lock.RUnlock()
+
+	servers := make([]*PartitionServer, 0)
+	for _, server := range g.servers {
+		servers = append(servers, server)
+	}
+	return servers
 }
 
 type PartitionCache struct {
