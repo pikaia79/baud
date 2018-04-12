@@ -43,7 +43,7 @@ message Space {
     SpaceStatus     status  = 6;
 }
 
-message PartitionStatus {
+enum PartitionStatus {
     PA_Invalid  = 0;
     PA_READWRITE       = 1;
     PA_READONLY  = 2;
