@@ -56,13 +56,17 @@ if ! cmd_exists protoc-gen-gofast; then
 fi
 
 echo "generate go code..."
-cd proto
+
+if [ "$1" ]; then
+    cd $1
+fi
+
 ret=0
 for file in `ls *.proto`
 do
     base_name=$(basename $file ".proto")"pb"
     mkdir -p $base_name
-    protoc -I.:${GOGO_ROOT}:${GOGO_ROOT}/protobuf --gofast_out=plugins=grpc,$GO_OUT_M:$base_name $file || ret=$?
+    protoc -I.:${first_gopath}/src:${GOGO_ROOT}:${GOGO_ROOT}/protobuf --gofast_out=plugins=grpc,$GO_OUT_M:$base_name $file || ret=$?
     cd $base_name
     sed -i.bak -E 's/import _ \"gogoproto\"//g' *.pb.go
     sed -i.bak -E 's/import fmt \"fmt\"//g' *.pb.go
