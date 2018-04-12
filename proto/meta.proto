@@ -43,6 +43,13 @@ message Space {
     SpaceStatus     status  = 6;
 }
 
+message PartitionStatus {
+    PA_Invalid  = 0;
+    PA_READWRITE       = 1;
+    PA_READONLY  = 2;
+    PA_SPLITTING  = 3;
+}
+
 message Partition {
     uint32                  id   = 1;
 	string                  type        = 2;  // entity/edge/blob
@@ -50,6 +57,7 @@ message Partition {
 	uint32                  space_id               = 4;
 	uint32                  start_slot           = 5;
 	uint32                  end_slot             = 6;
+	PartitionStatus         status               = 7;
 }
 
 enum ReplicaStatue {
