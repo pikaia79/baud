@@ -6,10 +6,12 @@ import (
 	"sync"
 	"time"
 
+	"github.com/tiglabs/baud/proto/metapb"
 	"github.com/tiglabs/baud/proto/pspb"
 	"github.com/tiglabs/baud/ps/rpc"
 	"github.com/tiglabs/baud/util/config"
 	"github.com/tiglabs/baud/util/log"
+	"github.com/tiglabs/baud/util/netutil"
 	netSvr "github.com/tiglabs/baud/util/server"
 	"github.com/tiglabs/raft"
 	"google.golang.org/grpc"
@@ -18,9 +20,9 @@ import (
 
 // Server partition server
 type Server struct {
-	conf         *Config
-	raftConf     *raft.Config
-	node         *pspb.Node
+	Config
+	raftConf     raft.Config
+	node         metapb.Node
 	nodeResolver *NodeResolver
 	partitions   *sync.Map
 	quit         chan struct{}
@@ -37,6 +39,7 @@ func NewServer(conf *config.Config) (*Server, error) {
 		return nil, err
 	}
 
+	ip := netutil.GetPrivateIP()
 	// setting raft config
 	resolver := NewNodeResolver()
 	rc := raft.DefaultConfig()
@@ -47,18 +50,19 @@ func NewServer(conf *config.Config) (*Server, error) {
 	rc.Resolver = resolver
 	rc.MaxReplConcurrency = serverConf.RaftReplicaConcurrency
 	rc.MaxSnapConcurrency = serverConf.RaftSnapshotConcurrency
-	rc.NodeID = serverConf.NodeID
+	rc.NodeID = uint64(serverConf.NodeID)
 	rs, err := raft.NewRaftServer(rc)
 	if err != nil {
 		return nil, fmt.Errorf("boot raft server failed, error: %v", err)
 	}
 
 	// self info
-	node := &pspb.Node{
-		ID:      serverConf.NodeID,
-		Address: fmt.Sprintf(":%d", serverConf.RPCPort),
-		State:   pspb.STATE_INITIAL,
-		RaftAddrs: &pspb.RaftAddrs{
+	node := metapb.Node{
+		ID:    serverConf.NodeID,
+		Ip:    ip.String(),
+		Port:  serverConf.RPCPort,
+		State: metapb.NS_INITIAL,
+		RaftAddrs: metapb.RaftAddrs{
 			HeartbeatAddr: serverConf.RaftHeartbeatAddr,
 			ReplicateAddr: serverConf.RaftReplicaAddr,
 		},
@@ -66,8 +70,8 @@ func NewServer(conf *config.Config) (*Server, error) {
 	}
 
 	s := &Server{
-		conf:         serverConf,
-		raftConf:     rc,
+		Config:       *serverConf,
+		raftConf:     *rc,
 		node:         node,
 		nodeResolver: resolver,
 		partitions:   &sync.Map{},
@@ -81,7 +85,7 @@ func NewServer(conf *config.Config) (*Server, error) {
 
 // Start start server
 func (s *Server) Start() error {
-	ln, err := net.Listen("tcp", fmt.Sprintf(":%d", s.conf.RPCPort))
+	ln, err := net.Listen("tcp", fmt.Sprintf(":%d", s.Config.RPCPort))
 	if err != nil {
 		return fmt.Errorf("Server failed to listen: %v", err)
 	}

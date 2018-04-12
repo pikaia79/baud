@@ -8,15 +8,14 @@
 		api.proto
 
 	It has these top-level messages:
-		ResponseHeader
 		UpdateRequest
 		UpdateResponse
 		DeleteRequest
 		DeleteResponse
 		GetRequest
 		GetResponse
-		RaftAddrs
-		Node
+		CreatePartitionRequest
+		CreatePartitionResponse
 */
 package pspb
 
@@ -24,11 +23,9 @@ import proto "github.com/gogo/protobuf/proto"
 import fmt "fmt"
 import math "math"
 import _ "github.com/gogo/protobuf/gogoproto"
-import errorpb "."
+import meta "github.com/tiglabs/baud/proto/metapb"
 
-import github_com_tiglabs_baud_proto "github.com/tiglabs/baud/proto"
-
-import strconv "strconv"
+import github_com_tiglabs_baud_proto_metapb "github.com/tiglabs/baud/proto/metapb"
 
 import bytes "bytes"
 
@@ -51,154 +48,120 @@ var _ = math.Inf
 // proto package needs to be updated.
 const _ = proto.GoGoProtoPackageIsVersion2 // please upgrade the proto package
 
-type NodeState int32
+type ResponseStatus int32
 
 const (
-	STATE_INVALID NodeState = 0
-	STATE_INITIAL NodeState = 1
-	STATE_UPGRADE NodeState = 2
+	RESP_CODE_NOTLEADER         ResponseStatus = 0
+	RESP_CODE_NOLEADER          ResponseStatus = 1
+	RESP_CODE_PARTITIONNOTFOUND ResponseStatus = 2
+	RESP_CODE_KEYEXISTS         ResponseStatus = 3
+	RESP_CODE_KEYNOTEXISTS      ResponseStatus = 4
 )
 
-var NodeState_name = map[int32]string{
-	0: "STATE_INVALID",
-	1: "STATE_INITIAL",
-	2: "STATE_UPGRADE",
+var ResponseStatus_name = map[int32]string{
+	0: "RESP_CODE_NOTLEADER",
+	1: "RESP_CODE_NOLEADER",
+	2: "RESP_CODE_PARTITIONNOTFOUND",
+	3: "RESP_CODE_KEYEXISTS",
+	4: "RESP_CODE_KEYNOTEXISTS",
 }
-var NodeState_value = map[string]int32{
-	"STATE_INVALID": 0,
-	"STATE_INITIAL": 1,
-	"STATE_UPGRADE": 2,
-}
-
-func (NodeState) EnumDescriptor() ([]byte, []int) { return fileDescriptorApi, []int{0} }
-
-type ResponseHeader struct {
-	Error *errorpb.Error `protobuf:"bytes,1,opt,name=error" json:"error,omitempty"`
+var ResponseStatus_value = map[string]int32{
+	"RESP_CODE_NOTLEADER":         0,
+	"RESP_CODE_NOLEADER":          1,
+	"RESP_CODE_PARTITIONNOTFOUND": 2,
+	"RESP_CODE_KEYEXISTS":         3,
+	"RESP_CODE_KEYNOTEXISTS":      4,
 }
 
-func (m *ResponseHeader) Reset()                    { *m = ResponseHeader{} }
-func (*ResponseHeader) ProtoMessage()               {}
-func (*ResponseHeader) Descriptor() ([]byte, []int) { return fileDescriptorApi, []int{0} }
+func (x ResponseStatus) String() string {
+	return proto.EnumName(ResponseStatus_name, int32(x))
+}
+func (ResponseStatus) EnumDescriptor() ([]byte, []int) { return fileDescriptorApi, []int{0} }
 
 type UpdateRequest struct {
-	SpaceID github_com_tiglabs_baud_proto.SpaceID `protobuf:"varint,1,opt,name=space_id,json=spaceId,proto3,casttype=github.com/tiglabs/baud/proto.SpaceID" json:"space_id,omitempty"`
-	SlotID  github_com_tiglabs_baud_proto.SlotID  `protobuf:"varint,2,opt,name=slot_id,json=slotId,proto3,casttype=github.com/tiglabs/baud/proto.SlotID" json:"slot_id,omitempty"`
-	Key     github_com_tiglabs_baud_proto.Key     `protobuf:"bytes,3,opt,name=key,proto3,casttype=github.com/tiglabs/baud/proto.Key" json:"key,omitempty"`
-	Value   github_com_tiglabs_baud_proto.Value   `protobuf:"bytes,4,opt,name=value,proto3,casttype=github.com/tiglabs/baud/proto.Value" json:"value,omitempty"`
+	Space github_com_tiglabs_baud_proto_metapb.SpaceID `protobuf:"varint,1,opt,name=space,proto3,casttype=github.com/tiglabs/baud/proto/metapb.SpaceID" json:"space,omitempty"`
+	Slot  github_com_tiglabs_baud_proto_metapb.SlotID  `protobuf:"varint,2,opt,name=slot,proto3,casttype=github.com/tiglabs/baud/proto/metapb.SlotID" json:"slot,omitempty"`
+	Key   github_com_tiglabs_baud_proto_metapb.Key     `protobuf:"bytes,3,opt,name=key,proto3,casttype=github.com/tiglabs/baud/proto/metapb.Key" json:"key,omitempty"`
+	Value github_com_tiglabs_baud_proto_metapb.Value   `protobuf:"bytes,4,opt,name=value,proto3,casttype=github.com/tiglabs/baud/proto/metapb.Value" json:"value,omitempty"`
 }
 
 func (m *UpdateRequest) Reset()                    { *m = UpdateRequest{} }
 func (*UpdateRequest) ProtoMessage()               {}
-func (*UpdateRequest) Descriptor() ([]byte, []int) { return fileDescriptorApi, []int{1} }
+func (*UpdateRequest) Descriptor() ([]byte, []int) { return fileDescriptorApi, []int{0} }
 
 type UpdateResponse struct {
-	ResponseHeader `protobuf:"bytes,1,opt,name=header,embedded=header" json:"header"`
-	Key            github_com_tiglabs_baud_proto.Key `protobuf:"bytes,2,opt,name=key,proto3,casttype=github.com/tiglabs/baud/proto.Key" json:"key,omitempty"`
+	meta.ResponseHeader `protobuf:"bytes,1,opt,name=header,embedded=header" json:"header"`
+	Key                 github_com_tiglabs_baud_proto_metapb.Key `protobuf:"bytes,2,opt,name=key,proto3,casttype=github.com/tiglabs/baud/proto/metapb.Key" json:"key,omitempty"`
 }
 
 func (m *UpdateResponse) Reset()                    { *m = UpdateResponse{} }
 func (*UpdateResponse) ProtoMessage()               {}
-func (*UpdateResponse) Descriptor() ([]byte, []int) { return fileDescriptorApi, []int{2} }
+func (*UpdateResponse) Descriptor() ([]byte, []int) { return fileDescriptorApi, []int{1} }
 
 type DeleteRequest struct {
-	Key github_com_tiglabs_baud_proto.Key `protobuf:"bytes,1,opt,name=key,proto3,casttype=github.com/tiglabs/baud/proto.Key" json:"key,omitempty"`
+	Key github_com_tiglabs_baud_proto_metapb.Key `protobuf:"bytes,1,opt,name=key,proto3,casttype=github.com/tiglabs/baud/proto/metapb.Key" json:"key,omitempty"`
 }
 
 func (m *DeleteRequest) Reset()                    { *m = DeleteRequest{} }
 func (*DeleteRequest) ProtoMessage()               {}
-func (*DeleteRequest) Descriptor() ([]byte, []int) { return fileDescriptorApi, []int{3} }
+func (*DeleteRequest) Descriptor() ([]byte, []int) { return fileDescriptorApi, []int{2} }
 
 type DeleteResponse struct {
-	ResponseHeader `protobuf:"bytes,1,opt,name=header,embedded=header" json:"header"`
-	Deleted        bool `protobuf:"varint,2,opt,name=deleted,proto3" json:"deleted,omitempty"`
+	meta.ResponseHeader `protobuf:"bytes,1,opt,name=header,embedded=header" json:"header"`
+	Deleted             bool `protobuf:"varint,2,opt,name=deleted,proto3" json:"deleted,omitempty"`
 }
 
 func (m *DeleteResponse) Reset()                    { *m = DeleteResponse{} }
 func (*DeleteResponse) ProtoMessage()               {}
-func (*DeleteResponse) Descriptor() ([]byte, []int) { return fileDescriptorApi, []int{4} }
+func (*DeleteResponse) Descriptor() ([]byte, []int) { return fileDescriptorApi, []int{3} }
 
 type GetRequest struct {
-	Key github_com_tiglabs_baud_proto.Key `protobuf:"bytes,1,opt,name=key,proto3,casttype=github.com/tiglabs/baud/proto.Key" json:"key,omitempty"`
+	Key github_com_tiglabs_baud_proto_metapb.Key `protobuf:"bytes,1,opt,name=key,proto3,casttype=github.com/tiglabs/baud/proto/metapb.Key" json:"key,omitempty"`
 }
 
 func (m *GetRequest) Reset()                    { *m = GetRequest{} }
 func (*GetRequest) ProtoMessage()               {}
-func (*GetRequest) Descriptor() ([]byte, []int) { return fileDescriptorApi, []int{5} }
+func (*GetRequest) Descriptor() ([]byte, []int) { return fileDescriptorApi, []int{4} }
 
 type GetResponse struct {
-	ResponseHeader `protobuf:"bytes,1,opt,name=header,embedded=header" json:"header"`
-	Version        uint64                              `protobuf:"varint,2,opt,name=version,proto3" json:"version,omitempty"`
-	Found          bool                                `protobuf:"varint,3,opt,name=found,proto3" json:"found,omitempty"`
-	Source         github_com_tiglabs_baud_proto.Value `protobuf:"bytes,4,opt,name=source,proto3,casttype=github.com/tiglabs/baud/proto.Value" json:"source,omitempty"`
+	meta.ResponseHeader `protobuf:"bytes,1,opt,name=header,embedded=header" json:"header"`
+	Version             uint64                                     `protobuf:"varint,2,opt,name=version,proto3" json:"version,omitempty"`
+	Found               bool                                       `protobuf:"varint,3,opt,name=found,proto3" json:"found,omitempty"`
+	Source              github_com_tiglabs_baud_proto_metapb.Value `protobuf:"bytes,4,opt,name=source,proto3,casttype=github.com/tiglabs/baud/proto/metapb.Value" json:"source,omitempty"`
 }
 
 func (m *GetResponse) Reset()                    { *m = GetResponse{} }
 func (*GetResponse) ProtoMessage()               {}
-func (*GetResponse) Descriptor() ([]byte, []int) { return fileDescriptorApi, []int{6} }
+func (*GetResponse) Descriptor() ([]byte, []int) { return fileDescriptorApi, []int{5} }
 
-type RaftAddrs struct {
-	HeartbeatAddr string `protobuf:"bytes,1,opt,name=heartbeat_addr,json=heartbeatAddr,proto3" json:"heartbeat_addr,omitempty"`
-	ReplicateAddr string `protobuf:"bytes,2,opt,name=replicate_addr,json=replicateAddr,proto3" json:"replicate_addr,omitempty"`
+type CreatePartitionRequest struct {
+	meta.Partition `protobuf:"bytes,1,opt,name=partition,embedded=partition" json:"partition"`
+	Replicas       []meta.Replica `protobuf:"bytes,2,rep,name=replicas" json:"replicas"`
 }
 
-func (m *RaftAddrs) Reset()                    { *m = RaftAddrs{} }
-func (*RaftAddrs) ProtoMessage()               {}
-func (*RaftAddrs) Descriptor() ([]byte, []int) { return fileDescriptorApi, []int{7} }
+func (m *CreatePartitionRequest) Reset()                    { *m = CreatePartitionRequest{} }
+func (*CreatePartitionRequest) ProtoMessage()               {}
+func (*CreatePartitionRequest) Descriptor() ([]byte, []int) { return fileDescriptorApi, []int{6} }
 
-type Node struct {
-	ID        github_com_tiglabs_baud_proto.NodeID `protobuf:"varint,1,opt,name=id,proto3,casttype=github.com/tiglabs/baud/proto.NodeID" json:"id,omitempty"`
-	Address   string                               `protobuf:"bytes,2,opt,name=address,proto3" json:"address,omitempty"`
-	Version   string                               `protobuf:"bytes,3,opt,name=version,proto3" json:"version,omitempty"`
-	RaftAddrs *RaftAddrs                           `protobuf:"bytes,4,opt,name=raft_addrs,json=raftAddrs" json:"raft_addrs,omitempty"`
-	State     NodeState                            `protobuf:"varint,5,opt,name=state,proto3,enum=NodeState" json:"state,omitempty"`
+type CreatePartitionResponse struct {
+	meta.ResponseHeader `protobuf:"bytes,1,opt,name=header,embedded=header" json:"header"`
+	Created             bool `protobuf:"varint,2,opt,name=created,proto3" json:"created,omitempty"`
 }
 
-func (m *Node) Reset()                    { *m = Node{} }
-func (*Node) ProtoMessage()               {}
-func (*Node) Descriptor() ([]byte, []int) { return fileDescriptorApi, []int{8} }
+func (m *CreatePartitionResponse) Reset()                    { *m = CreatePartitionResponse{} }
+func (*CreatePartitionResponse) ProtoMessage()               {}
+func (*CreatePartitionResponse) Descriptor() ([]byte, []int) { return fileDescriptorApi, []int{7} }
 
 func init() {
-	proto.RegisterType((*ResponseHeader)(nil), "ResponseHeader")
 	proto.RegisterType((*UpdateRequest)(nil), "UpdateRequest")
 	proto.RegisterType((*UpdateResponse)(nil), "UpdateResponse")
 	proto.RegisterType((*DeleteRequest)(nil), "DeleteRequest")
 	proto.RegisterType((*DeleteResponse)(nil), "DeleteResponse")
 	proto.RegisterType((*GetRequest)(nil), "GetRequest")
 	proto.RegisterType((*GetResponse)(nil), "GetResponse")
-	proto.RegisterType((*RaftAddrs)(nil), "RaftAddrs")
-	proto.RegisterType((*Node)(nil), "Node")
-	proto.RegisterEnum("NodeState", NodeState_name, NodeState_value)
-}
-func (x NodeState) String() string {
-	s, ok := NodeState_name[int32(x)]
-	if ok {
-		return s
-	}
-	return strconv.Itoa(int(x))
-}
-func (this *ResponseHeader) Equal(that interface{}) bool {
-	if that == nil {
-		return this == nil
-	}
-
-	that1, ok := that.(*ResponseHeader)
-	if !ok {
-		that2, ok := that.(ResponseHeader)
-		if ok {
-			that1 = &that2
-		} else {
-			return false
-		}
-	}
-	if that1 == nil {
-		return this == nil
-	} else if this == nil {
-		return false
-	}
-	if !this.Error.Equal(that1.Error) {
-		return false
-	}
-	return true
+	proto.RegisterType((*CreatePartitionRequest)(nil), "CreatePartitionRequest")
+	proto.RegisterType((*CreatePartitionResponse)(nil), "CreatePartitionResponse")
+	proto.RegisterEnum("ResponseStatus", ResponseStatus_name, ResponseStatus_value)
 }
 func (this *UpdateRequest) Equal(that interface{}) bool {
 	if that == nil {
@@ -219,10 +182,10 @@ func (this *UpdateRequest) Equal(that interface{}) bool {
 	} else if this == nil {
 		return false
 	}
-	if this.SpaceID != that1.SpaceID {
+	if this.Space != that1.Space {
 		return false
 	}
-	if this.SlotID != that1.SlotID {
+	if this.Slot != that1.Slot {
 		return false
 	}
 	if !bytes.Equal(this.Key, that1.Key) {
@@ -368,14 +331,14 @@ func (this *GetResponse) Equal(that interface{}) bool {
 	}
 	return true
 }
-func (this *RaftAddrs) Equal(that interface{}) bool {
+func (this *CreatePartitionRequest) Equal(that interface{}) bool {
 	if that == nil {
 		return this == nil
 	}
 
-	that1, ok := that.(*RaftAddrs)
+	that1, ok := that.(*CreatePartitionRequest)
 	if !ok {
-		that2, ok := that.(RaftAddrs)
+		that2, ok := that.(CreatePartitionRequest)
 		if ok {
 			that1 = &that2
 		} else {
@@ -387,22 +350,27 @@ func (this *RaftAddrs) Equal(that interface{}) bool {
 	} else if this == nil {
 		return false
 	}
-	if this.HeartbeatAddr != that1.HeartbeatAddr {
+	if !this.Partition.Equal(&that1.Partition) {
 		return false
 	}
-	if this.ReplicateAddr != that1.ReplicateAddr {
+	if len(this.Replicas) != len(that1.Replicas) {
 		return false
+	}
+	for i := range this.Replicas {
+		if !this.Replicas[i].Equal(&that1.Replicas[i]) {
+			return false
+		}
 	}
 	return true
 }
-func (this *Node) Equal(that interface{}) bool {
+func (this *CreatePartitionResponse) Equal(that interface{}) bool {
 	if that == nil {
 		return this == nil
 	}
 
-	that1, ok := that.(*Node)
+	that1, ok := that.(*CreatePartitionResponse)
 	if !ok {
-		that2, ok := that.(Node)
+		that2, ok := that.(CreatePartitionResponse)
 		if ok {
 			that1 = &that2
 		} else {
@@ -414,34 +382,13 @@ func (this *Node) Equal(that interface{}) bool {
 	} else if this == nil {
 		return false
 	}
-	if this.ID != that1.ID {
+	if !this.ResponseHeader.Equal(&that1.ResponseHeader) {
 		return false
 	}
-	if this.Address != that1.Address {
-		return false
-	}
-	if this.Version != that1.Version {
-		return false
-	}
-	if !this.RaftAddrs.Equal(that1.RaftAddrs) {
-		return false
-	}
-	if this.State != that1.State {
+	if this.Created != that1.Created {
 		return false
 	}
 	return true
-}
-func (this *ResponseHeader) GoString() string {
-	if this == nil {
-		return "nil"
-	}
-	s := make([]string, 0, 5)
-	s = append(s, "&pspb.ResponseHeader{")
-	if this.Error != nil {
-		s = append(s, "Error: "+fmt.Sprintf("%#v", this.Error)+",\n")
-	}
-	s = append(s, "}")
-	return strings.Join(s, "")
 }
 func (this *UpdateRequest) GoString() string {
 	if this == nil {
@@ -449,8 +396,8 @@ func (this *UpdateRequest) GoString() string {
 	}
 	s := make([]string, 0, 8)
 	s = append(s, "&pspb.UpdateRequest{")
-	s = append(s, "SpaceID: "+fmt.Sprintf("%#v", this.SpaceID)+",\n")
-	s = append(s, "SlotID: "+fmt.Sprintf("%#v", this.SlotID)+",\n")
+	s = append(s, "Space: "+fmt.Sprintf("%#v", this.Space)+",\n")
+	s = append(s, "Slot: "+fmt.Sprintf("%#v", this.Slot)+",\n")
 	s = append(s, "Key: "+fmt.Sprintf("%#v", this.Key)+",\n")
 	s = append(s, "Value: "+fmt.Sprintf("%#v", this.Value)+",\n")
 	s = append(s, "}")
@@ -511,30 +458,31 @@ func (this *GetResponse) GoString() string {
 	s = append(s, "}")
 	return strings.Join(s, "")
 }
-func (this *RaftAddrs) GoString() string {
+func (this *CreatePartitionRequest) GoString() string {
 	if this == nil {
 		return "nil"
 	}
 	s := make([]string, 0, 6)
-	s = append(s, "&pspb.RaftAddrs{")
-	s = append(s, "HeartbeatAddr: "+fmt.Sprintf("%#v", this.HeartbeatAddr)+",\n")
-	s = append(s, "ReplicateAddr: "+fmt.Sprintf("%#v", this.ReplicateAddr)+",\n")
+	s = append(s, "&pspb.CreatePartitionRequest{")
+	s = append(s, "Partition: "+strings.Replace(this.Partition.GoString(), `&`, ``, 1)+",\n")
+	if this.Replicas != nil {
+		vs := make([]*meta.Replica, len(this.Replicas))
+		for i := range vs {
+			vs[i] = &this.Replicas[i]
+		}
+		s = append(s, "Replicas: "+fmt.Sprintf("%#v", vs)+",\n")
+	}
 	s = append(s, "}")
 	return strings.Join(s, "")
 }
-func (this *Node) GoString() string {
+func (this *CreatePartitionResponse) GoString() string {
 	if this == nil {
 		return "nil"
 	}
-	s := make([]string, 0, 9)
-	s = append(s, "&pspb.Node{")
-	s = append(s, "ID: "+fmt.Sprintf("%#v", this.ID)+",\n")
-	s = append(s, "Address: "+fmt.Sprintf("%#v", this.Address)+",\n")
-	s = append(s, "Version: "+fmt.Sprintf("%#v", this.Version)+",\n")
-	if this.RaftAddrs != nil {
-		s = append(s, "RaftAddrs: "+fmt.Sprintf("%#v", this.RaftAddrs)+",\n")
-	}
-	s = append(s, "State: "+fmt.Sprintf("%#v", this.State)+",\n")
+	s := make([]string, 0, 6)
+	s = append(s, "&pspb.CreatePartitionResponse{")
+	s = append(s, "ResponseHeader: "+strings.Replace(this.ResponseHeader.GoString(), `&`, ``, 1)+",\n")
+	s = append(s, "Created: "+fmt.Sprintf("%#v", this.Created)+",\n")
 	s = append(s, "}")
 	return strings.Join(s, "")
 }
@@ -561,6 +509,7 @@ type InternalClient interface {
 	Get(ctx context.Context, in *GetRequest, opts ...grpc.CallOption) (*GetResponse, error)
 	Update(ctx context.Context, in *UpdateRequest, opts ...grpc.CallOption) (*UpdateResponse, error)
 	Delete(ctx context.Context, in *DeleteRequest, opts ...grpc.CallOption) (*DeleteResponse, error)
+	CreatePartition(ctx context.Context, in *CreatePartitionRequest, opts ...grpc.CallOption) (*CreatePartitionResponse, error)
 }
 
 type internalClient struct {
@@ -598,12 +547,22 @@ func (c *internalClient) Delete(ctx context.Context, in *DeleteRequest, opts ...
 	return out, nil
 }
 
+func (c *internalClient) CreatePartition(ctx context.Context, in *CreatePartitionRequest, opts ...grpc.CallOption) (*CreatePartitionResponse, error) {
+	out := new(CreatePartitionResponse)
+	err := grpc.Invoke(ctx, "/Internal/CreatePartition", in, out, c.cc, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // Server API for Internal service
 
 type InternalServer interface {
 	Get(context.Context, *GetRequest) (*GetResponse, error)
 	Update(context.Context, *UpdateRequest) (*UpdateResponse, error)
 	Delete(context.Context, *DeleteRequest) (*DeleteResponse, error)
+	CreatePartition(context.Context, *CreatePartitionRequest) (*CreatePartitionResponse, error)
 }
 
 func RegisterInternalServer(s *grpc.Server, srv InternalServer) {
@@ -664,6 +623,24 @@ func _Internal_Delete_Handler(srv interface{}, ctx context.Context, dec func(int
 	return interceptor(ctx, in, info, handler)
 }
 
+func _Internal_CreatePartition_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(CreatePartitionRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(InternalServer).CreatePartition(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/Internal/CreatePartition",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(InternalServer).CreatePartition(ctx, req.(*CreatePartitionRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 var _Internal_serviceDesc = grpc.ServiceDesc{
 	ServiceName: "Internal",
 	HandlerType: (*InternalServer)(nil),
@@ -680,37 +657,13 @@ var _Internal_serviceDesc = grpc.ServiceDesc{
 			MethodName: "Delete",
 			Handler:    _Internal_Delete_Handler,
 		},
+		{
+			MethodName: "CreatePartition",
+			Handler:    _Internal_CreatePartition_Handler,
+		},
 	},
 	Streams:  []grpc.StreamDesc{},
 	Metadata: "api.proto",
-}
-
-func (m *ResponseHeader) Marshal() (dAtA []byte, err error) {
-	size := m.Size()
-	dAtA = make([]byte, size)
-	n, err := m.MarshalTo(dAtA)
-	if err != nil {
-		return nil, err
-	}
-	return dAtA[:n], nil
-}
-
-func (m *ResponseHeader) MarshalTo(dAtA []byte) (int, error) {
-	var i int
-	_ = i
-	var l int
-	_ = l
-	if m.Error != nil {
-		dAtA[i] = 0xa
-		i++
-		i = encodeVarintApi(dAtA, i, uint64(m.Error.Size()))
-		n1, err := m.Error.MarshalTo(dAtA[i:])
-		if err != nil {
-			return 0, err
-		}
-		i += n1
-	}
-	return i, nil
 }
 
 func (m *UpdateRequest) Marshal() (dAtA []byte, err error) {
@@ -728,15 +681,15 @@ func (m *UpdateRequest) MarshalTo(dAtA []byte) (int, error) {
 	_ = i
 	var l int
 	_ = l
-	if m.SpaceID != 0 {
+	if m.Space != 0 {
 		dAtA[i] = 0x8
 		i++
-		i = encodeVarintApi(dAtA, i, uint64(m.SpaceID))
+		i = encodeVarintApi(dAtA, i, uint64(m.Space))
 	}
-	if m.SlotID != 0 {
+	if m.Slot != 0 {
 		dAtA[i] = 0x10
 		i++
-		i = encodeVarintApi(dAtA, i, uint64(m.SlotID))
+		i = encodeVarintApi(dAtA, i, uint64(m.Slot))
 	}
 	if len(m.Key) > 0 {
 		dAtA[i] = 0x1a
@@ -771,11 +724,11 @@ func (m *UpdateResponse) MarshalTo(dAtA []byte) (int, error) {
 	dAtA[i] = 0xa
 	i++
 	i = encodeVarintApi(dAtA, i, uint64(m.ResponseHeader.Size()))
-	n2, err := m.ResponseHeader.MarshalTo(dAtA[i:])
+	n1, err := m.ResponseHeader.MarshalTo(dAtA[i:])
 	if err != nil {
 		return 0, err
 	}
-	i += n2
+	i += n1
 	if len(m.Key) > 0 {
 		dAtA[i] = 0x12
 		i++
@@ -827,11 +780,11 @@ func (m *DeleteResponse) MarshalTo(dAtA []byte) (int, error) {
 	dAtA[i] = 0xa
 	i++
 	i = encodeVarintApi(dAtA, i, uint64(m.ResponseHeader.Size()))
-	n3, err := m.ResponseHeader.MarshalTo(dAtA[i:])
+	n2, err := m.ResponseHeader.MarshalTo(dAtA[i:])
 	if err != nil {
 		return 0, err
 	}
-	i += n3
+	i += n2
 	if m.Deleted {
 		dAtA[i] = 0x10
 		i++
@@ -887,11 +840,11 @@ func (m *GetResponse) MarshalTo(dAtA []byte) (int, error) {
 	dAtA[i] = 0xa
 	i++
 	i = encodeVarintApi(dAtA, i, uint64(m.ResponseHeader.Size()))
-	n4, err := m.ResponseHeader.MarshalTo(dAtA[i:])
+	n3, err := m.ResponseHeader.MarshalTo(dAtA[i:])
 	if err != nil {
 		return 0, err
 	}
-	i += n4
+	i += n3
 	if m.Version != 0 {
 		dAtA[i] = 0x10
 		i++
@@ -916,7 +869,7 @@ func (m *GetResponse) MarshalTo(dAtA []byte) (int, error) {
 	return i, nil
 }
 
-func (m *RaftAddrs) Marshal() (dAtA []byte, err error) {
+func (m *CreatePartitionRequest) Marshal() (dAtA []byte, err error) {
 	size := m.Size()
 	dAtA = make([]byte, size)
 	n, err := m.MarshalTo(dAtA)
@@ -926,27 +879,35 @@ func (m *RaftAddrs) Marshal() (dAtA []byte, err error) {
 	return dAtA[:n], nil
 }
 
-func (m *RaftAddrs) MarshalTo(dAtA []byte) (int, error) {
+func (m *CreatePartitionRequest) MarshalTo(dAtA []byte) (int, error) {
 	var i int
 	_ = i
 	var l int
 	_ = l
-	if len(m.HeartbeatAddr) > 0 {
-		dAtA[i] = 0xa
-		i++
-		i = encodeVarintApi(dAtA, i, uint64(len(m.HeartbeatAddr)))
-		i += copy(dAtA[i:], m.HeartbeatAddr)
+	dAtA[i] = 0xa
+	i++
+	i = encodeVarintApi(dAtA, i, uint64(m.Partition.Size()))
+	n4, err := m.Partition.MarshalTo(dAtA[i:])
+	if err != nil {
+		return 0, err
 	}
-	if len(m.ReplicateAddr) > 0 {
-		dAtA[i] = 0x12
-		i++
-		i = encodeVarintApi(dAtA, i, uint64(len(m.ReplicateAddr)))
-		i += copy(dAtA[i:], m.ReplicateAddr)
+	i += n4
+	if len(m.Replicas) > 0 {
+		for _, msg := range m.Replicas {
+			dAtA[i] = 0x12
+			i++
+			i = encodeVarintApi(dAtA, i, uint64(msg.Size()))
+			n, err := msg.MarshalTo(dAtA[i:])
+			if err != nil {
+				return 0, err
+			}
+			i += n
+		}
 	}
 	return i, nil
 }
 
-func (m *Node) Marshal() (dAtA []byte, err error) {
+func (m *CreatePartitionResponse) Marshal() (dAtA []byte, err error) {
 	size := m.Size()
 	dAtA = make([]byte, size)
 	n, err := m.MarshalTo(dAtA)
@@ -956,42 +917,28 @@ func (m *Node) Marshal() (dAtA []byte, err error) {
 	return dAtA[:n], nil
 }
 
-func (m *Node) MarshalTo(dAtA []byte) (int, error) {
+func (m *CreatePartitionResponse) MarshalTo(dAtA []byte) (int, error) {
 	var i int
 	_ = i
 	var l int
 	_ = l
-	if m.ID != 0 {
-		dAtA[i] = 0x8
-		i++
-		i = encodeVarintApi(dAtA, i, uint64(m.ID))
+	dAtA[i] = 0xa
+	i++
+	i = encodeVarintApi(dAtA, i, uint64(m.ResponseHeader.Size()))
+	n5, err := m.ResponseHeader.MarshalTo(dAtA[i:])
+	if err != nil {
+		return 0, err
 	}
-	if len(m.Address) > 0 {
-		dAtA[i] = 0x12
+	i += n5
+	if m.Created {
+		dAtA[i] = 0x10
 		i++
-		i = encodeVarintApi(dAtA, i, uint64(len(m.Address)))
-		i += copy(dAtA[i:], m.Address)
-	}
-	if len(m.Version) > 0 {
-		dAtA[i] = 0x1a
-		i++
-		i = encodeVarintApi(dAtA, i, uint64(len(m.Version)))
-		i += copy(dAtA[i:], m.Version)
-	}
-	if m.RaftAddrs != nil {
-		dAtA[i] = 0x22
-		i++
-		i = encodeVarintApi(dAtA, i, uint64(m.RaftAddrs.Size()))
-		n5, err := m.RaftAddrs.MarshalTo(dAtA[i:])
-		if err != nil {
-			return 0, err
+		if m.Created {
+			dAtA[i] = 1
+		} else {
+			dAtA[i] = 0
 		}
-		i += n5
-	}
-	if m.State != 0 {
-		dAtA[i] = 0x28
 		i++
-		i = encodeVarintApi(dAtA, i, uint64(m.State))
 	}
 	return i, nil
 }
@@ -1005,27 +952,17 @@ func encodeVarintApi(dAtA []byte, offset int, v uint64) int {
 	dAtA[offset] = uint8(v)
 	return offset + 1
 }
-func NewPopulatedResponseHeader(r randyApi, easy bool) *ResponseHeader {
-	this := &ResponseHeader{}
-	if r.Intn(10) != 0 {
-		this.Error = errorpb.NewPopulatedError(r, easy)
-	}
-	if !easy && r.Intn(10) != 0 {
-	}
-	return this
-}
-
 func NewPopulatedUpdateRequest(r randyApi, easy bool) *UpdateRequest {
 	this := &UpdateRequest{}
-	this.SpaceID = github_com_tiglabs_baud_proto.SpaceID(r.Uint32())
-	this.SlotID = github_com_tiglabs_baud_proto.SlotID(r.Uint32())
+	this.Space = github_com_tiglabs_baud_proto_metapb.SpaceID(r.Uint32())
+	this.Slot = github_com_tiglabs_baud_proto_metapb.SlotID(r.Uint32())
 	v1 := r.Intn(100)
-	this.Key = make(github_com_tiglabs_baud_proto.Key, v1)
+	this.Key = make(github_com_tiglabs_baud_proto_metapb.Key, v1)
 	for i := 0; i < v1; i++ {
 		this.Key[i] = byte(r.Intn(256))
 	}
 	v2 := r.Intn(100)
-	this.Value = make(github_com_tiglabs_baud_proto.Value, v2)
+	this.Value = make(github_com_tiglabs_baud_proto_metapb.Value, v2)
 	for i := 0; i < v2; i++ {
 		this.Value[i] = byte(r.Intn(256))
 	}
@@ -1036,10 +973,10 @@ func NewPopulatedUpdateRequest(r randyApi, easy bool) *UpdateRequest {
 
 func NewPopulatedUpdateResponse(r randyApi, easy bool) *UpdateResponse {
 	this := &UpdateResponse{}
-	v3 := NewPopulatedResponseHeader(r, easy)
+	v3 := meta.NewPopulatedResponseHeader(r, easy)
 	this.ResponseHeader = *v3
 	v4 := r.Intn(100)
-	this.Key = make(github_com_tiglabs_baud_proto.Key, v4)
+	this.Key = make(github_com_tiglabs_baud_proto_metapb.Key, v4)
 	for i := 0; i < v4; i++ {
 		this.Key[i] = byte(r.Intn(256))
 	}
@@ -1051,7 +988,7 @@ func NewPopulatedUpdateResponse(r randyApi, easy bool) *UpdateResponse {
 func NewPopulatedDeleteRequest(r randyApi, easy bool) *DeleteRequest {
 	this := &DeleteRequest{}
 	v5 := r.Intn(100)
-	this.Key = make(github_com_tiglabs_baud_proto.Key, v5)
+	this.Key = make(github_com_tiglabs_baud_proto_metapb.Key, v5)
 	for i := 0; i < v5; i++ {
 		this.Key[i] = byte(r.Intn(256))
 	}
@@ -1062,7 +999,7 @@ func NewPopulatedDeleteRequest(r randyApi, easy bool) *DeleteRequest {
 
 func NewPopulatedDeleteResponse(r randyApi, easy bool) *DeleteResponse {
 	this := &DeleteResponse{}
-	v6 := NewPopulatedResponseHeader(r, easy)
+	v6 := meta.NewPopulatedResponseHeader(r, easy)
 	this.ResponseHeader = *v6
 	this.Deleted = bool(bool(r.Intn(2) == 0))
 	if !easy && r.Intn(10) != 0 {
@@ -1073,7 +1010,7 @@ func NewPopulatedDeleteResponse(r randyApi, easy bool) *DeleteResponse {
 func NewPopulatedGetRequest(r randyApi, easy bool) *GetRequest {
 	this := &GetRequest{}
 	v7 := r.Intn(100)
-	this.Key = make(github_com_tiglabs_baud_proto.Key, v7)
+	this.Key = make(github_com_tiglabs_baud_proto_metapb.Key, v7)
 	for i := 0; i < v7; i++ {
 		this.Key[i] = byte(r.Intn(256))
 	}
@@ -1084,12 +1021,12 @@ func NewPopulatedGetRequest(r randyApi, easy bool) *GetRequest {
 
 func NewPopulatedGetResponse(r randyApi, easy bool) *GetResponse {
 	this := &GetResponse{}
-	v8 := NewPopulatedResponseHeader(r, easy)
+	v8 := meta.NewPopulatedResponseHeader(r, easy)
 	this.ResponseHeader = *v8
 	this.Version = uint64(uint64(r.Uint32()))
 	this.Found = bool(bool(r.Intn(2) == 0))
 	v9 := r.Intn(100)
-	this.Source = make(github_com_tiglabs_baud_proto.Value, v9)
+	this.Source = make(github_com_tiglabs_baud_proto_metapb.Value, v9)
 	for i := 0; i < v9; i++ {
 		this.Source[i] = byte(r.Intn(256))
 	}
@@ -1098,24 +1035,28 @@ func NewPopulatedGetResponse(r randyApi, easy bool) *GetResponse {
 	return this
 }
 
-func NewPopulatedRaftAddrs(r randyApi, easy bool) *RaftAddrs {
-	this := &RaftAddrs{}
-	this.HeartbeatAddr = string(randStringApi(r))
-	this.ReplicateAddr = string(randStringApi(r))
+func NewPopulatedCreatePartitionRequest(r randyApi, easy bool) *CreatePartitionRequest {
+	this := &CreatePartitionRequest{}
+	v10 := meta.NewPopulatedPartition(r, easy)
+	this.Partition = *v10
+	if r.Intn(10) != 0 {
+		v11 := r.Intn(5)
+		this.Replicas = make([]meta.Replica, v11)
+		for i := 0; i < v11; i++ {
+			v12 := meta.NewPopulatedReplica(r, easy)
+			this.Replicas[i] = *v12
+		}
+	}
 	if !easy && r.Intn(10) != 0 {
 	}
 	return this
 }
 
-func NewPopulatedNode(r randyApi, easy bool) *Node {
-	this := &Node{}
-	this.ID = github_com_tiglabs_baud_proto.NodeID(uint64(r.Uint32()))
-	this.Address = string(randStringApi(r))
-	this.Version = string(randStringApi(r))
-	if r.Intn(10) != 0 {
-		this.RaftAddrs = NewPopulatedRaftAddrs(r, easy)
-	}
-	this.State = NodeState([]int32{0, 1, 2}[r.Intn(3)])
+func NewPopulatedCreatePartitionResponse(r randyApi, easy bool) *CreatePartitionResponse {
+	this := &CreatePartitionResponse{}
+	v13 := meta.NewPopulatedResponseHeader(r, easy)
+	this.ResponseHeader = *v13
+	this.Created = bool(bool(r.Intn(2) == 0))
 	if !easy && r.Intn(10) != 0 {
 	}
 	return this
@@ -1140,9 +1081,9 @@ func randUTF8RuneApi(r randyApi) rune {
 	return rune(ru + 61)
 }
 func randStringApi(r randyApi) string {
-	v10 := r.Intn(100)
-	tmps := make([]rune, v10)
-	for i := 0; i < v10; i++ {
+	v14 := r.Intn(100)
+	tmps := make([]rune, v14)
+	for i := 0; i < v14; i++ {
 		tmps[i] = randUTF8RuneApi(r)
 	}
 	return string(tmps)
@@ -1164,11 +1105,11 @@ func randFieldApi(dAtA []byte, r randyApi, fieldNumber int, wire int) []byte {
 	switch wire {
 	case 0:
 		dAtA = encodeVarintPopulateApi(dAtA, uint64(key))
-		v11 := r.Int63()
+		v15 := r.Int63()
 		if r.Intn(2) == 0 {
-			v11 *= -1
+			v15 *= -1
 		}
-		dAtA = encodeVarintPopulateApi(dAtA, uint64(v11))
+		dAtA = encodeVarintPopulateApi(dAtA, uint64(v15))
 	case 1:
 		dAtA = encodeVarintPopulateApi(dAtA, uint64(key))
 		dAtA = append(dAtA, byte(r.Intn(256)), byte(r.Intn(256)), byte(r.Intn(256)), byte(r.Intn(256)), byte(r.Intn(256)), byte(r.Intn(256)), byte(r.Intn(256)), byte(r.Intn(256)))
@@ -1193,24 +1134,14 @@ func encodeVarintPopulateApi(dAtA []byte, v uint64) []byte {
 	dAtA = append(dAtA, uint8(v))
 	return dAtA
 }
-func (m *ResponseHeader) Size() (n int) {
-	var l int
-	_ = l
-	if m.Error != nil {
-		l = m.Error.Size()
-		n += 1 + l + sovApi(uint64(l))
-	}
-	return n
-}
-
 func (m *UpdateRequest) Size() (n int) {
 	var l int
 	_ = l
-	if m.SpaceID != 0 {
-		n += 1 + sovApi(uint64(m.SpaceID))
+	if m.Space != 0 {
+		n += 1 + sovApi(uint64(m.Space))
 	}
-	if m.SlotID != 0 {
-		n += 1 + sovApi(uint64(m.SlotID))
+	if m.Slot != 0 {
+		n += 1 + sovApi(uint64(m.Slot))
 	}
 	l = len(m.Key)
 	if l > 0 {
@@ -1284,40 +1215,27 @@ func (m *GetResponse) Size() (n int) {
 	return n
 }
 
-func (m *RaftAddrs) Size() (n int) {
+func (m *CreatePartitionRequest) Size() (n int) {
 	var l int
 	_ = l
-	l = len(m.HeartbeatAddr)
-	if l > 0 {
-		n += 1 + l + sovApi(uint64(l))
-	}
-	l = len(m.ReplicateAddr)
-	if l > 0 {
-		n += 1 + l + sovApi(uint64(l))
+	l = m.Partition.Size()
+	n += 1 + l + sovApi(uint64(l))
+	if len(m.Replicas) > 0 {
+		for _, e := range m.Replicas {
+			l = e.Size()
+			n += 1 + l + sovApi(uint64(l))
+		}
 	}
 	return n
 }
 
-func (m *Node) Size() (n int) {
+func (m *CreatePartitionResponse) Size() (n int) {
 	var l int
 	_ = l
-	if m.ID != 0 {
-		n += 1 + sovApi(uint64(m.ID))
-	}
-	l = len(m.Address)
-	if l > 0 {
-		n += 1 + l + sovApi(uint64(l))
-	}
-	l = len(m.Version)
-	if l > 0 {
-		n += 1 + l + sovApi(uint64(l))
-	}
-	if m.RaftAddrs != nil {
-		l = m.RaftAddrs.Size()
-		n += 1 + l + sovApi(uint64(l))
-	}
-	if m.State != 0 {
-		n += 1 + sovApi(uint64(m.State))
+	l = m.ResponseHeader.Size()
+	n += 1 + l + sovApi(uint64(l))
+	if m.Created {
+		n += 2
 	}
 	return n
 }
@@ -1335,23 +1253,13 @@ func sovApi(x uint64) (n int) {
 func sozApi(x uint64) (n int) {
 	return sovApi(uint64((x << 1) ^ uint64((int64(x) >> 63))))
 }
-func (this *ResponseHeader) String() string {
-	if this == nil {
-		return "nil"
-	}
-	s := strings.Join([]string{`&ResponseHeader{`,
-		`Error:` + strings.Replace(fmt.Sprintf("%v", this.Error), "Error", "errorpb.Error", 1) + `,`,
-		`}`,
-	}, "")
-	return s
-}
 func (this *UpdateRequest) String() string {
 	if this == nil {
 		return "nil"
 	}
 	s := strings.Join([]string{`&UpdateRequest{`,
-		`SpaceID:` + fmt.Sprintf("%v", this.SpaceID) + `,`,
-		`SlotID:` + fmt.Sprintf("%v", this.SlotID) + `,`,
+		`Space:` + fmt.Sprintf("%v", this.Space) + `,`,
+		`Slot:` + fmt.Sprintf("%v", this.Slot) + `,`,
 		`Key:` + fmt.Sprintf("%v", this.Key) + `,`,
 		`Value:` + fmt.Sprintf("%v", this.Value) + `,`,
 		`}`,
@@ -1363,7 +1271,7 @@ func (this *UpdateResponse) String() string {
 		return "nil"
 	}
 	s := strings.Join([]string{`&UpdateResponse{`,
-		`ResponseHeader:` + strings.Replace(strings.Replace(this.ResponseHeader.String(), "ResponseHeader", "ResponseHeader", 1), `&`, ``, 1) + `,`,
+		`ResponseHeader:` + strings.Replace(strings.Replace(this.ResponseHeader.String(), "ResponseHeader", "meta.ResponseHeader", 1), `&`, ``, 1) + `,`,
 		`Key:` + fmt.Sprintf("%v", this.Key) + `,`,
 		`}`,
 	}, "")
@@ -1384,7 +1292,7 @@ func (this *DeleteResponse) String() string {
 		return "nil"
 	}
 	s := strings.Join([]string{`&DeleteResponse{`,
-		`ResponseHeader:` + strings.Replace(strings.Replace(this.ResponseHeader.String(), "ResponseHeader", "ResponseHeader", 1), `&`, ``, 1) + `,`,
+		`ResponseHeader:` + strings.Replace(strings.Replace(this.ResponseHeader.String(), "ResponseHeader", "meta.ResponseHeader", 1), `&`, ``, 1) + `,`,
 		`Deleted:` + fmt.Sprintf("%v", this.Deleted) + `,`,
 		`}`,
 	}, "")
@@ -1405,7 +1313,7 @@ func (this *GetResponse) String() string {
 		return "nil"
 	}
 	s := strings.Join([]string{`&GetResponse{`,
-		`ResponseHeader:` + strings.Replace(strings.Replace(this.ResponseHeader.String(), "ResponseHeader", "ResponseHeader", 1), `&`, ``, 1) + `,`,
+		`ResponseHeader:` + strings.Replace(strings.Replace(this.ResponseHeader.String(), "ResponseHeader", "meta.ResponseHeader", 1), `&`, ``, 1) + `,`,
 		`Version:` + fmt.Sprintf("%v", this.Version) + `,`,
 		`Found:` + fmt.Sprintf("%v", this.Found) + `,`,
 		`Source:` + fmt.Sprintf("%v", this.Source) + `,`,
@@ -1413,27 +1321,24 @@ func (this *GetResponse) String() string {
 	}, "")
 	return s
 }
-func (this *RaftAddrs) String() string {
+func (this *CreatePartitionRequest) String() string {
 	if this == nil {
 		return "nil"
 	}
-	s := strings.Join([]string{`&RaftAddrs{`,
-		`HeartbeatAddr:` + fmt.Sprintf("%v", this.HeartbeatAddr) + `,`,
-		`ReplicateAddr:` + fmt.Sprintf("%v", this.ReplicateAddr) + `,`,
+	s := strings.Join([]string{`&CreatePartitionRequest{`,
+		`Partition:` + strings.Replace(strings.Replace(this.Partition.String(), "Partition", "meta.Partition", 1), `&`, ``, 1) + `,`,
+		`Replicas:` + strings.Replace(strings.Replace(fmt.Sprintf("%v", this.Replicas), "Replica", "meta.Replica", 1), `&`, ``, 1) + `,`,
 		`}`,
 	}, "")
 	return s
 }
-func (this *Node) String() string {
+func (this *CreatePartitionResponse) String() string {
 	if this == nil {
 		return "nil"
 	}
-	s := strings.Join([]string{`&Node{`,
-		`ID:` + fmt.Sprintf("%v", this.ID) + `,`,
-		`Address:` + fmt.Sprintf("%v", this.Address) + `,`,
-		`Version:` + fmt.Sprintf("%v", this.Version) + `,`,
-		`RaftAddrs:` + strings.Replace(fmt.Sprintf("%v", this.RaftAddrs), "RaftAddrs", "RaftAddrs", 1) + `,`,
-		`State:` + fmt.Sprintf("%v", this.State) + `,`,
+	s := strings.Join([]string{`&CreatePartitionResponse{`,
+		`ResponseHeader:` + strings.Replace(strings.Replace(this.ResponseHeader.String(), "ResponseHeader", "meta.ResponseHeader", 1), `&`, ``, 1) + `,`,
+		`Created:` + fmt.Sprintf("%v", this.Created) + `,`,
 		`}`,
 	}, "")
 	return s
@@ -1445,89 +1350,6 @@ func valueToStringApi(v interface{}) string {
 	}
 	pv := reflect.Indirect(rv).Interface()
 	return fmt.Sprintf("*%v", pv)
-}
-func (m *ResponseHeader) Unmarshal(dAtA []byte) error {
-	l := len(dAtA)
-	iNdEx := 0
-	for iNdEx < l {
-		preIndex := iNdEx
-		var wire uint64
-		for shift := uint(0); ; shift += 7 {
-			if shift >= 64 {
-				return ErrIntOverflowApi
-			}
-			if iNdEx >= l {
-				return io.ErrUnexpectedEOF
-			}
-			b := dAtA[iNdEx]
-			iNdEx++
-			wire |= (uint64(b) & 0x7F) << shift
-			if b < 0x80 {
-				break
-			}
-		}
-		fieldNum := int32(wire >> 3)
-		wireType := int(wire & 0x7)
-		if wireType == 4 {
-			return fmt.Errorf("proto: ResponseHeader: wiretype end group for non-group")
-		}
-		if fieldNum <= 0 {
-			return fmt.Errorf("proto: ResponseHeader: illegal tag %d (wire type %d)", fieldNum, wire)
-		}
-		switch fieldNum {
-		case 1:
-			if wireType != 2 {
-				return fmt.Errorf("proto: wrong wireType = %d for field Error", wireType)
-			}
-			var msglen int
-			for shift := uint(0); ; shift += 7 {
-				if shift >= 64 {
-					return ErrIntOverflowApi
-				}
-				if iNdEx >= l {
-					return io.ErrUnexpectedEOF
-				}
-				b := dAtA[iNdEx]
-				iNdEx++
-				msglen |= (int(b) & 0x7F) << shift
-				if b < 0x80 {
-					break
-				}
-			}
-			if msglen < 0 {
-				return ErrInvalidLengthApi
-			}
-			postIndex := iNdEx + msglen
-			if postIndex > l {
-				return io.ErrUnexpectedEOF
-			}
-			if m.Error == nil {
-				m.Error = &errorpb.Error{}
-			}
-			if err := m.Error.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
-				return err
-			}
-			iNdEx = postIndex
-		default:
-			iNdEx = preIndex
-			skippy, err := skipApi(dAtA[iNdEx:])
-			if err != nil {
-				return err
-			}
-			if skippy < 0 {
-				return ErrInvalidLengthApi
-			}
-			if (iNdEx + skippy) > l {
-				return io.ErrUnexpectedEOF
-			}
-			iNdEx += skippy
-		}
-	}
-
-	if iNdEx > l {
-		return io.ErrUnexpectedEOF
-	}
-	return nil
 }
 func (m *UpdateRequest) Unmarshal(dAtA []byte) error {
 	l := len(dAtA)
@@ -1560,9 +1382,9 @@ func (m *UpdateRequest) Unmarshal(dAtA []byte) error {
 		switch fieldNum {
 		case 1:
 			if wireType != 0 {
-				return fmt.Errorf("proto: wrong wireType = %d for field SpaceID", wireType)
+				return fmt.Errorf("proto: wrong wireType = %d for field Space", wireType)
 			}
-			m.SpaceID = 0
+			m.Space = 0
 			for shift := uint(0); ; shift += 7 {
 				if shift >= 64 {
 					return ErrIntOverflowApi
@@ -1572,16 +1394,16 @@ func (m *UpdateRequest) Unmarshal(dAtA []byte) error {
 				}
 				b := dAtA[iNdEx]
 				iNdEx++
-				m.SpaceID |= (github_com_tiglabs_baud_proto.SpaceID(b) & 0x7F) << shift
+				m.Space |= (github_com_tiglabs_baud_proto_metapb.SpaceID(b) & 0x7F) << shift
 				if b < 0x80 {
 					break
 				}
 			}
 		case 2:
 			if wireType != 0 {
-				return fmt.Errorf("proto: wrong wireType = %d for field SlotID", wireType)
+				return fmt.Errorf("proto: wrong wireType = %d for field Slot", wireType)
 			}
-			m.SlotID = 0
+			m.Slot = 0
 			for shift := uint(0); ; shift += 7 {
 				if shift >= 64 {
 					return ErrIntOverflowApi
@@ -1591,7 +1413,7 @@ func (m *UpdateRequest) Unmarshal(dAtA []byte) error {
 				}
 				b := dAtA[iNdEx]
 				iNdEx++
-				m.SlotID |= (github_com_tiglabs_baud_proto.SlotID(b) & 0x7F) << shift
+				m.Slot |= (github_com_tiglabs_baud_proto_metapb.SlotID(b) & 0x7F) << shift
 				if b < 0x80 {
 					break
 				}
@@ -2202,7 +2024,7 @@ func (m *GetResponse) Unmarshal(dAtA []byte) error {
 	}
 	return nil
 }
-func (m *RaftAddrs) Unmarshal(dAtA []byte) error {
+func (m *CreatePartitionRequest) Unmarshal(dAtA []byte) error {
 	l := len(dAtA)
 	iNdEx := 0
 	for iNdEx < l {
@@ -2225,200 +2047,15 @@ func (m *RaftAddrs) Unmarshal(dAtA []byte) error {
 		fieldNum := int32(wire >> 3)
 		wireType := int(wire & 0x7)
 		if wireType == 4 {
-			return fmt.Errorf("proto: RaftAddrs: wiretype end group for non-group")
+			return fmt.Errorf("proto: CreatePartitionRequest: wiretype end group for non-group")
 		}
 		if fieldNum <= 0 {
-			return fmt.Errorf("proto: RaftAddrs: illegal tag %d (wire type %d)", fieldNum, wire)
+			return fmt.Errorf("proto: CreatePartitionRequest: illegal tag %d (wire type %d)", fieldNum, wire)
 		}
 		switch fieldNum {
 		case 1:
 			if wireType != 2 {
-				return fmt.Errorf("proto: wrong wireType = %d for field HeartbeatAddr", wireType)
-			}
-			var stringLen uint64
-			for shift := uint(0); ; shift += 7 {
-				if shift >= 64 {
-					return ErrIntOverflowApi
-				}
-				if iNdEx >= l {
-					return io.ErrUnexpectedEOF
-				}
-				b := dAtA[iNdEx]
-				iNdEx++
-				stringLen |= (uint64(b) & 0x7F) << shift
-				if b < 0x80 {
-					break
-				}
-			}
-			intStringLen := int(stringLen)
-			if intStringLen < 0 {
-				return ErrInvalidLengthApi
-			}
-			postIndex := iNdEx + intStringLen
-			if postIndex > l {
-				return io.ErrUnexpectedEOF
-			}
-			m.HeartbeatAddr = string(dAtA[iNdEx:postIndex])
-			iNdEx = postIndex
-		case 2:
-			if wireType != 2 {
-				return fmt.Errorf("proto: wrong wireType = %d for field ReplicateAddr", wireType)
-			}
-			var stringLen uint64
-			for shift := uint(0); ; shift += 7 {
-				if shift >= 64 {
-					return ErrIntOverflowApi
-				}
-				if iNdEx >= l {
-					return io.ErrUnexpectedEOF
-				}
-				b := dAtA[iNdEx]
-				iNdEx++
-				stringLen |= (uint64(b) & 0x7F) << shift
-				if b < 0x80 {
-					break
-				}
-			}
-			intStringLen := int(stringLen)
-			if intStringLen < 0 {
-				return ErrInvalidLengthApi
-			}
-			postIndex := iNdEx + intStringLen
-			if postIndex > l {
-				return io.ErrUnexpectedEOF
-			}
-			m.ReplicateAddr = string(dAtA[iNdEx:postIndex])
-			iNdEx = postIndex
-		default:
-			iNdEx = preIndex
-			skippy, err := skipApi(dAtA[iNdEx:])
-			if err != nil {
-				return err
-			}
-			if skippy < 0 {
-				return ErrInvalidLengthApi
-			}
-			if (iNdEx + skippy) > l {
-				return io.ErrUnexpectedEOF
-			}
-			iNdEx += skippy
-		}
-	}
-
-	if iNdEx > l {
-		return io.ErrUnexpectedEOF
-	}
-	return nil
-}
-func (m *Node) Unmarshal(dAtA []byte) error {
-	l := len(dAtA)
-	iNdEx := 0
-	for iNdEx < l {
-		preIndex := iNdEx
-		var wire uint64
-		for shift := uint(0); ; shift += 7 {
-			if shift >= 64 {
-				return ErrIntOverflowApi
-			}
-			if iNdEx >= l {
-				return io.ErrUnexpectedEOF
-			}
-			b := dAtA[iNdEx]
-			iNdEx++
-			wire |= (uint64(b) & 0x7F) << shift
-			if b < 0x80 {
-				break
-			}
-		}
-		fieldNum := int32(wire >> 3)
-		wireType := int(wire & 0x7)
-		if wireType == 4 {
-			return fmt.Errorf("proto: Node: wiretype end group for non-group")
-		}
-		if fieldNum <= 0 {
-			return fmt.Errorf("proto: Node: illegal tag %d (wire type %d)", fieldNum, wire)
-		}
-		switch fieldNum {
-		case 1:
-			if wireType != 0 {
-				return fmt.Errorf("proto: wrong wireType = %d for field ID", wireType)
-			}
-			m.ID = 0
-			for shift := uint(0); ; shift += 7 {
-				if shift >= 64 {
-					return ErrIntOverflowApi
-				}
-				if iNdEx >= l {
-					return io.ErrUnexpectedEOF
-				}
-				b := dAtA[iNdEx]
-				iNdEx++
-				m.ID |= (github_com_tiglabs_baud_proto.NodeID(b) & 0x7F) << shift
-				if b < 0x80 {
-					break
-				}
-			}
-		case 2:
-			if wireType != 2 {
-				return fmt.Errorf("proto: wrong wireType = %d for field Address", wireType)
-			}
-			var stringLen uint64
-			for shift := uint(0); ; shift += 7 {
-				if shift >= 64 {
-					return ErrIntOverflowApi
-				}
-				if iNdEx >= l {
-					return io.ErrUnexpectedEOF
-				}
-				b := dAtA[iNdEx]
-				iNdEx++
-				stringLen |= (uint64(b) & 0x7F) << shift
-				if b < 0x80 {
-					break
-				}
-			}
-			intStringLen := int(stringLen)
-			if intStringLen < 0 {
-				return ErrInvalidLengthApi
-			}
-			postIndex := iNdEx + intStringLen
-			if postIndex > l {
-				return io.ErrUnexpectedEOF
-			}
-			m.Address = string(dAtA[iNdEx:postIndex])
-			iNdEx = postIndex
-		case 3:
-			if wireType != 2 {
-				return fmt.Errorf("proto: wrong wireType = %d for field Version", wireType)
-			}
-			var stringLen uint64
-			for shift := uint(0); ; shift += 7 {
-				if shift >= 64 {
-					return ErrIntOverflowApi
-				}
-				if iNdEx >= l {
-					return io.ErrUnexpectedEOF
-				}
-				b := dAtA[iNdEx]
-				iNdEx++
-				stringLen |= (uint64(b) & 0x7F) << shift
-				if b < 0x80 {
-					break
-				}
-			}
-			intStringLen := int(stringLen)
-			if intStringLen < 0 {
-				return ErrInvalidLengthApi
-			}
-			postIndex := iNdEx + intStringLen
-			if postIndex > l {
-				return io.ErrUnexpectedEOF
-			}
-			m.Version = string(dAtA[iNdEx:postIndex])
-			iNdEx = postIndex
-		case 4:
-			if wireType != 2 {
-				return fmt.Errorf("proto: wrong wireType = %d for field RaftAddrs", wireType)
+				return fmt.Errorf("proto: wrong wireType = %d for field Partition", wireType)
 			}
 			var msglen int
 			for shift := uint(0); ; shift += 7 {
@@ -2442,18 +2079,15 @@ func (m *Node) Unmarshal(dAtA []byte) error {
 			if postIndex > l {
 				return io.ErrUnexpectedEOF
 			}
-			if m.RaftAddrs == nil {
-				m.RaftAddrs = &RaftAddrs{}
-			}
-			if err := m.RaftAddrs.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+			if err := m.Partition.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
 				return err
 			}
 			iNdEx = postIndex
-		case 5:
-			if wireType != 0 {
-				return fmt.Errorf("proto: wrong wireType = %d for field State", wireType)
+		case 2:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Replicas", wireType)
 			}
-			m.State = 0
+			var msglen int
 			for shift := uint(0); ; shift += 7 {
 				if shift >= 64 {
 					return ErrIntOverflowApi
@@ -2463,11 +2097,123 @@ func (m *Node) Unmarshal(dAtA []byte) error {
 				}
 				b := dAtA[iNdEx]
 				iNdEx++
-				m.State |= (NodeState(b) & 0x7F) << shift
+				msglen |= (int(b) & 0x7F) << shift
 				if b < 0x80 {
 					break
 				}
 			}
+			if msglen < 0 {
+				return ErrInvalidLengthApi
+			}
+			postIndex := iNdEx + msglen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.Replicas = append(m.Replicas, meta.Replica{})
+			if err := m.Replicas[len(m.Replicas)-1].Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		default:
+			iNdEx = preIndex
+			skippy, err := skipApi(dAtA[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if skippy < 0 {
+				return ErrInvalidLengthApi
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			iNdEx += skippy
+		}
+	}
+
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
+}
+func (m *CreatePartitionResponse) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
+	iNdEx := 0
+	for iNdEx < l {
+		preIndex := iNdEx
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowApi
+			}
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := dAtA[iNdEx]
+			iNdEx++
+			wire |= (uint64(b) & 0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: CreatePartitionResponse: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: CreatePartitionResponse: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
+		switch fieldNum {
+		case 1:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field ResponseHeader", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowApi
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				msglen |= (int(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthApi
+			}
+			postIndex := iNdEx + msglen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			if err := m.ResponseHeader.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		case 2:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Created", wireType)
+			}
+			var v int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowApi
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				v |= (int(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			m.Created = bool(v != 0)
 		default:
 			iNdEx = preIndex
 			skippy, err := skipApi(dAtA[iNdEx:])
@@ -2597,51 +2343,50 @@ var (
 func init() { proto.RegisterFile("api.proto", fileDescriptorApi) }
 
 var fileDescriptorApi = []byte{
-	// 731 bytes of a gzipped FileDescriptorProto
-	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0xa4, 0x54, 0xbf, 0x6f, 0xdb, 0x46,
-	0x14, 0xe6, 0x51, 0xbf, 0x9f, 0x2c, 0xd9, 0x3d, 0x74, 0x10, 0x84, 0xe2, 0xa8, 0xb2, 0x35, 0xea,
-	0xb6, 0x28, 0x8d, 0xaa, 0x05, 0x3a, 0xb5, 0x85, 0x04, 0x09, 0x16, 0x6b, 0xc3, 0x2d, 0x4e, 0xb6,
-	0x81, 0x06, 0x08, 0x0c, 0x52, 0x3c, 0xc9, 0x42, 0x14, 0x91, 0x21, 0x4f, 0x06, 0x0c, 0x64, 0xc8,
-	0xe8, 0x31, 0xff, 0x43, 0x10, 0x20, 0x6b, 0xb6, 0x8c, 0xd9, 0xe2, 0xd1, 0x63, 0x26, 0xc2, 0x62,
-	0x96, 0x8c, 0x1e, 0x03, 0x4f, 0x01, 0xef, 0x28, 0x59, 0x5a, 0x9c, 0x38, 0xde, 0xf4, 0x3e, 0x7e,
-	0xef, 0xbb, 0xef, 0xbe, 0x7b, 0x4f, 0x50, 0xb0, 0xbc, 0xa1, 0xe1, 0xf9, 0x2e, 0x77, 0xab, 0xbf,
-	0x0c, 0x86, 0xfc, 0x68, 0x62, 0x1b, 0x3d, 0xf7, 0xe1, 0xe6, 0xc0, 0x1d, 0xb8, 0x9b, 0x02, 0xb6,
-	0x27, 0x7d, 0x51, 0x89, 0x42, 0xfc, 0x4a, 0xe8, 0x25, 0xe6, 0xfb, 0xae, 0xef, 0xd9, 0xb2, 0xd4,
-	0x0d, 0x28, 0x53, 0x16, 0x78, 0xee, 0x38, 0x60, 0x1d, 0x66, 0x39, 0xcc, 0xc7, 0xdf, 0x40, 0x46,
-	0x50, 0x2a, 0xa8, 0x86, 0x36, 0x8a, 0xf5, 0xac, 0xd1, 0x8e, 0x2b, 0x2a, 0x41, 0xfd, 0xb9, 0x0a,
-	0xa5, 0x7d, 0xcf, 0xb1, 0x38, 0xa3, 0xec, 0xd1, 0x84, 0x05, 0x1c, 0xff, 0x0b, 0xf9, 0xc0, 0xb3,
-	0x7a, 0xec, 0x70, 0xe8, 0x88, 0x96, 0x52, 0xf3, 0xf7, 0x28, 0xd4, 0x72, 0xdd, 0x18, 0x33, 0x5b,
-	0x57, 0xa1, 0xb6, 0xbe, 0x60, 0x90, 0x0f, 0x07, 0x23, 0xcb, 0x0e, 0x36, 0x6d, 0x6b, 0xe2, 0x48,
-	0xa3, 0x46, 0x42, 0xa4, 0x39, 0xa1, 0x62, 0x3a, 0x78, 0x1b, 0x72, 0xc1, 0xc8, 0xe5, 0xb1, 0x9e,
-	0x2a, 0xf4, 0xea, 0x51, 0xa8, 0x65, 0xbb, 0x23, 0x97, 0x0b, 0xb9, 0xef, 0x3f, 0x21, 0x27, 0x78,
-	0x34, 0x1b, 0x4b, 0x98, 0x0e, 0xfe, 0x03, 0x52, 0x0f, 0xd8, 0x49, 0x25, 0x55, 0x43, 0x1b, 0x2b,
-	0xcd, 0xf5, 0xab, 0x50, 0xfb, 0xf6, 0xe6, 0xf6, 0x6d, 0x76, 0x42, 0xe3, 0x0e, 0xfc, 0x27, 0x64,
-	0x8e, 0xad, 0xd1, 0x84, 0x55, 0xd2, 0xa2, 0xf5, 0x87, 0xab, 0x50, 0xfb, 0xee, 0xe6, 0xd6, 0x83,
-	0x98, 0x4e, 0x65, 0x97, 0xfe, 0x18, 0xca, 0xb3, 0x98, 0x64, 0xba, 0xf8, 0x57, 0xc8, 0x1e, 0x89,
-	0x84, 0x93, 0x60, 0x57, 0x8d, 0xe5, 0xe0, 0x9b, 0xf9, 0xb3, 0x50, 0x53, 0xce, 0x43, 0x0d, 0xd1,
-	0x84, 0x38, 0x33, 0xaf, 0xde, 0xd6, 0xbc, 0xde, 0x81, 0x52, 0x8b, 0x8d, 0xd8, 0xf5, 0x23, 0x25,
-	0x4a, 0xe8, 0xd6, 0x4a, 0xf7, 0xa1, 0x3c, 0x53, 0xfa, 0xf2, 0x7b, 0x54, 0x20, 0xe7, 0x08, 0x11,
-	0xf9, 0xa2, 0x79, 0x3a, 0x2b, 0xf5, 0x36, 0xc0, 0x16, 0xe3, 0x77, 0x76, 0xf9, 0x12, 0x41, 0x51,
-	0xe8, 0xdc, 0xc9, 0xe3, 0x31, 0xf3, 0x83, 0xa1, 0x3b, 0x16, 0x1e, 0xd3, 0x74, 0x56, 0xe2, 0xaf,
-	0x21, 0xd3, 0x77, 0x27, 0x63, 0x47, 0x0c, 0x51, 0x9e, 0xca, 0x02, 0xff, 0x0d, 0xd9, 0xc0, 0x9d,
-	0xf8, 0xbd, 0x5b, 0x0f, 0x48, 0xd2, 0xa6, 0xff, 0x0f, 0x05, 0x6a, 0xf5, 0x79, 0xc3, 0x71, 0xfc,
-	0x00, 0xaf, 0x43, 0xf9, 0x88, 0x59, 0x3e, 0xb7, 0x99, 0xc5, 0x0f, 0x2d, 0xc7, 0x91, 0xc6, 0x0b,
-	0xb4, 0x34, 0x47, 0x63, 0x5e, 0x4c, 0xf3, 0x99, 0x37, 0x1a, 0xf6, 0x2c, 0xce, 0x24, 0x4d, 0x95,
-	0xb4, 0x39, 0x1a, 0xd3, 0xf4, 0x37, 0x08, 0xd2, 0xbb, 0xae, 0xc3, 0xf0, 0x5f, 0xa0, 0x26, 0x5b,
-	0x99, 0x6e, 0x1a, 0x51, 0xa8, 0xa9, 0x9f, 0xb3, 0x41, 0x71, 0xa7, 0xd9, 0xa2, 0xea, 0xd0, 0x89,
-	0x43, 0x89, 0x4f, 0x61, 0x41, 0x90, 0x1c, 0x34, 0x2b, 0x17, 0xe3, 0x4a, 0xc9, 0x2f, 0xb3, 0xb8,
-	0x7e, 0x04, 0xf0, 0xad, 0xbe, 0xbc, 0x45, 0x20, 0xc2, 0x29, 0xd6, 0xc1, 0x98, 0x5f, 0x95, 0x16,
-	0xfc, 0xf9, 0xad, 0x6b, 0x90, 0x09, 0xb8, 0xc5, 0x59, 0x25, 0x53, 0x43, 0x1b, 0xe5, 0x3a, 0x88,
-	0xa3, 0xbb, 0x31, 0x42, 0xe5, 0x87, 0x9f, 0xfe, 0x81, 0xc2, 0x1c, 0xc3, 0x5f, 0x41, 0xa9, 0xbb,
-	0xd7, 0xd8, 0x6b, 0x1f, 0x9a, 0xbb, 0x07, 0x8d, 0x1d, 0xb3, 0xb5, 0xa6, 0x2c, 0x42, 0xe6, 0x9e,
-	0xd9, 0xd8, 0x59, 0x43, 0xd7, 0xd0, 0xfe, 0x7f, 0x5b, 0xb4, 0xd1, 0x6a, 0xaf, 0xa9, 0xd5, 0xf4,
-	0xe9, 0x33, 0xa2, 0xd4, 0x4f, 0x11, 0xe4, 0xcd, 0x31, 0x67, 0xfe, 0xd8, 0x1a, 0x61, 0x1d, 0x52,
-	0x5b, 0x8c, 0xe3, 0xa2, 0x71, 0x3d, 0x7e, 0xd5, 0x15, 0x63, 0x61, 0x86, 0x74, 0x05, 0xff, 0x0c,
-	0x59, 0xb9, 0xc3, 0xb8, 0x6c, 0x2c, 0xfd, 0xe7, 0x55, 0x57, 0x8d, 0xe5, 0xe5, 0x96, 0x64, 0xb9,
-	0x28, 0xb8, 0x6c, 0x2c, 0xed, 0x5e, 0x75, 0xd5, 0x58, 0xde, 0x20, 0x5d, 0x69, 0x76, 0xce, 0xa6,
-	0x44, 0x39, 0x9f, 0x12, 0xe5, 0xed, 0x94, 0x28, 0x17, 0x53, 0xa2, 0x5c, 0x4e, 0x09, 0xfa, 0x30,
-	0x25, 0xe8, 0x49, 0x44, 0xd0, 0x8b, 0x88, 0xa0, 0x57, 0x11, 0x51, 0x5e, 0x47, 0x44, 0x39, 0x8b,
-	0x08, 0x3a, 0x8f, 0x08, 0xba, 0x88, 0x08, 0x7a, 0x1f, 0x11, 0xe5, 0x32, 0x22, 0xe8, 0xe9, 0x3b,
-	0xa2, 0x74, 0xd0, 0xbd, 0xb4, 0x17, 0x78, 0xb6, 0x9d, 0x15, 0x6f, 0xf6, 0xdb, 0xc7, 0x00, 0x00,
-	0x00, 0xff, 0xff, 0x9b, 0xc2, 0x52, 0x18, 0x11, 0x06, 0x00, 0x00,
+	// 715 bytes of a gzipped FileDescriptorProto
+	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0xac, 0x94, 0xcf, 0x6b, 0xdb, 0x48,
+	0x14, 0xc7, 0x35, 0xb6, 0xec, 0x75, 0x9e, 0x13, 0x3b, 0xcc, 0x2e, 0x89, 0xf1, 0x82, 0x14, 0x74,
+	0x32, 0x49, 0x76, 0xcc, 0x7a, 0x0f, 0xcb, 0x2e, 0xcb, 0x42, 0x1c, 0x3b, 0x89, 0x49, 0xb0, 0x82,
+	0xec, 0x2c, 0xdb, 0x42, 0x09, 0xb2, 0x3d, 0x71, 0x4c, 0x15, 0x4b, 0x95, 0x46, 0x81, 0x5c, 0x4a,
+	0xa1, 0x97, 0x1e, 0x7b, 0xec, 0xa5, 0x50, 0xe8, 0xa5, 0xf7, 0x5e, 0x72, 0xec, 0x31, 0xc7, 0x1c,
+	0x7b, 0x12, 0xb1, 0xfa, 0x0f, 0xf4, 0x58, 0x7c, 0x2a, 0x1e, 0x49, 0xb1, 0xdd, 0x1f, 0x60, 0x9c,
+	0x9e, 0xec, 0xf7, 0xe3, 0xfb, 0xd1, 0xbc, 0x79, 0xef, 0x0d, 0x2c, 0xe8, 0x56, 0x8f, 0x58, 0xb6,
+	0xc9, 0xcc, 0xfc, 0x6f, 0xdd, 0x1e, 0x3b, 0x75, 0x5b, 0xa4, 0x6d, 0x9e, 0x15, 0xbb, 0x66, 0xd7,
+	0x2c, 0x72, 0x77, 0xcb, 0x3d, 0xe1, 0x16, 0x37, 0xf8, 0xbf, 0x30, 0xbd, 0x38, 0x91, 0xce, 0x7a,
+	0x5d, 0x43, 0x6f, 0x39, 0xc5, 0x96, 0xee, 0x76, 0x02, 0x59, 0xf1, 0x8c, 0x32, 0xdd, 0x6a, 0xf1,
+	0x9f, 0x40, 0xa0, 0xbc, 0x8d, 0xc1, 0xd2, 0x91, 0xd5, 0xd1, 0x19, 0xd5, 0xe8, 0x23, 0x97, 0x3a,
+	0x0c, 0xab, 0x90, 0x70, 0x2c, 0xbd, 0x4d, 0x73, 0x68, 0x0d, 0x15, 0x96, 0xca, 0x7f, 0xf9, 0x9e,
+	0x9c, 0x68, 0x8c, 0x1c, 0x43, 0x4f, 0xde, 0x9c, 0x05, 0x4f, 0x78, 0x76, 0xad, 0xa2, 0x05, 0x1c,
+	0xbc, 0x0f, 0xa2, 0x63, 0x98, 0x2c, 0x17, 0xe3, 0xbc, 0x3f, 0x7d, 0x4f, 0x16, 0x1b, 0x86, 0xc9,
+	0x86, 0x9e, 0xbc, 0x31, 0x1b, 0xce, 0x30, 0x59, 0xad, 0xa2, 0x71, 0x08, 0xfe, 0x17, 0xe2, 0x0f,
+	0xe9, 0x45, 0x2e, 0xbe, 0x86, 0x0a, 0x8b, 0xe5, 0xcd, 0xa1, 0x27, 0x17, 0x66, 0x62, 0xec, 0xd3,
+	0x0b, 0x6d, 0x24, 0xc4, 0x15, 0x48, 0x9c, 0xeb, 0x86, 0x4b, 0x73, 0x22, 0x27, 0x90, 0xa1, 0x27,
+	0xaf, 0xcf, 0x44, 0xf8, 0x6f, 0xa4, 0xd2, 0x02, 0xb1, 0xf2, 0x14, 0x41, 0x26, 0xba, 0x35, 0xc7,
+	0x32, 0xfb, 0x0e, 0xc5, 0xbf, 0x43, 0xf2, 0x94, 0xea, 0x1d, 0x6a, 0xf3, 0x7b, 0x4b, 0x97, 0xb2,
+	0x24, 0x0a, 0xed, 0x71, 0x77, 0x39, 0x75, 0xe5, 0xc9, 0xc2, 0xb5, 0x27, 0x23, 0x2d, 0x4c, 0x8c,
+	0x6a, 0x89, 0xcd, 0x59, 0x8b, 0xa2, 0xc2, 0x52, 0x85, 0x1a, 0x74, 0xdc, 0xba, 0x10, 0x88, 0xe6,
+	0x05, 0x3e, 0x80, 0x4c, 0x04, 0x9c, 0xbf, 0xaa, 0x1c, 0xfc, 0xd4, 0xe1, 0x90, 0x0e, 0xaf, 0x2c,
+	0xa5, 0x45, 0xa6, 0x72, 0x00, 0xb0, 0x4b, 0xd9, 0x8f, 0x3a, 0xec, 0x25, 0x82, 0x34, 0xc7, 0xdd,
+	0xe9, 0xa8, 0xe7, 0xd4, 0x76, 0x7a, 0x66, 0x9f, 0x1f, 0x55, 0xd4, 0x22, 0x13, 0xff, 0x02, 0x89,
+	0x13, 0xd3, 0xed, 0x77, 0xf8, 0xa0, 0xa5, 0xb4, 0xc0, 0xc0, 0x3b, 0x90, 0x74, 0x4c, 0xd7, 0x6e,
+	0xcf, 0x3b, 0x3d, 0xa1, 0x5a, 0x79, 0x0c, 0x2b, 0xdb, 0x36, 0xd5, 0x19, 0x3d, 0xd4, 0x6d, 0xd6,
+	0x63, 0x3d, 0xb3, 0x1f, 0x5d, 0x4a, 0x09, 0x16, 0xac, 0xc8, 0x17, 0xd6, 0x01, 0xe4, 0x36, 0x6b,
+	0xa2, 0x84, 0x71, 0x1a, 0x5e, 0x87, 0x94, 0x4d, 0x2d, 0xa3, 0xd7, 0xd6, 0x9d, 0x5c, 0x6c, 0x2d,
+	0x5e, 0x48, 0x97, 0x52, 0x44, 0x0b, 0x1c, 0x65, 0x71, 0x24, 0xd0, 0x6e, 0xe3, 0x7f, 0x8b, 0x2f,
+	0x5e, 0xc9, 0x82, 0x72, 0x02, 0xab, 0x5f, 0x7d, 0xff, 0x4e, 0xb7, 0xd8, 0xe6, 0xb4, 0xdb, 0x86,
+	0x87, 0xe6, 0xfa, 0x4b, 0x04, 0x99, 0x48, 0xde, 0x60, 0x3a, 0x73, 0x1d, 0xbc, 0x0a, 0x3f, 0x6b,
+	0xd5, 0xc6, 0xe1, 0xf1, 0xb6, 0x5a, 0xa9, 0x1e, 0xd7, 0xd5, 0xe6, 0x41, 0x75, 0xab, 0x52, 0xd5,
+	0x96, 0x05, 0xbc, 0x02, 0x78, 0x32, 0x10, 0xfa, 0x11, 0x96, 0xe1, 0xd7, 0xb1, 0xff, 0x70, 0x4b,
+	0x6b, 0xd6, 0x9a, 0x35, 0xb5, 0x5e, 0x57, 0x9b, 0x3b, 0xea, 0x51, 0xbd, 0xb2, 0x1c, 0x9b, 0x26,
+	0xee, 0x57, 0xef, 0x55, 0xff, 0xaf, 0x35, 0x9a, 0x8d, 0xe5, 0x38, 0xce, 0xc3, 0xca, 0x54, 0xa0,
+	0xae, 0x36, 0xc3, 0x98, 0x98, 0x17, 0x9f, 0xbd, 0x96, 0x84, 0xd2, 0x35, 0x82, 0x54, 0xad, 0xcf,
+	0xa8, 0xdd, 0xd7, 0x0d, 0xac, 0x40, 0x7c, 0x97, 0x32, 0x9c, 0x26, 0xe3, 0x19, 0xcd, 0x2f, 0x92,
+	0x89, 0x09, 0x53, 0x04, 0xbc, 0x01, 0xc9, 0x60, 0xed, 0x71, 0x86, 0x4c, 0xbd, 0x9a, 0xf9, 0x2c,
+	0x99, 0x7e, 0x0f, 0x82, 0xe4, 0x60, 0x9b, 0x70, 0x86, 0x4c, 0xed, 0x69, 0x3e, 0x4b, 0xa6, 0xd7,
+	0x4c, 0x11, 0xf0, 0x0e, 0x64, 0xbf, 0x68, 0x09, 0x5e, 0x25, 0xdf, 0x1e, 0x92, 0x7c, 0x8e, 0x7c,
+	0xa7, 0x7b, 0x8a, 0x50, 0xfe, 0xe7, 0x6a, 0x20, 0x09, 0xef, 0x07, 0x92, 0x70, 0x33, 0x90, 0x84,
+	0x8f, 0x03, 0x09, 0x7d, 0x1a, 0x48, 0xe8, 0x89, 0x2f, 0xa1, 0x37, 0xbe, 0x84, 0x2e, 0x7d, 0x49,
+	0x78, 0xe7, 0x4b, 0xc2, 0x95, 0x2f, 0xa1, 0x6b, 0x5f, 0x42, 0x37, 0xbe, 0x84, 0x9e, 0x7f, 0x90,
+	0x84, 0x3d, 0x74, 0x5f, 0xb4, 0x1c, 0xab, 0xd5, 0x4a, 0xf2, 0xa1, 0xfd, 0xe3, 0x73, 0x00, 0x00,
+	0x00, 0xff, 0xff, 0x00, 0xa6, 0xbe, 0xa9, 0x81, 0x06, 0x00, 0x00,
 }

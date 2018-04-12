@@ -3,70 +3,58 @@ package server
 import (
 	"fmt"
 	"sync"
+	"sync/atomic"
 
-	"github.com/tiglabs/baud/proto"
-	"github.com/tiglabs/baud/proto/pspb"
+	"github.com/tiglabs/baud/proto/metapb"
 	"github.com/tiglabs/raft"
 )
 
 type nodeRef struct {
-	node     *pspb.Node
-	refCount int
+	metapb.Node
+	refCount int32
 }
 
 // NodeResolver resolve NodeID to net.Addr addresses
 type NodeResolver struct {
-	sync.RWMutex
-	nodes map[proto.NodeID]*nodeRef
+	nodes *sync.Map
 }
 
 // NewNodeResolver create NodeResolver
 func NewNodeResolver() *NodeResolver {
 	return &NodeResolver{
-		nodes: make(map[proto.NodeID]*nodeRef, 64),
+		nodes: new(sync.Map),
 	}
 }
 
-func (r *NodeResolver) addNode(node *pspb.Node) {
+func (r *NodeResolver) addNode(node *metapb.Node) {
 	if node == nil {
 		return
 	}
 
-	r.Lock()
-	defer r.Unlock()
-
-	if obj, ok := r.nodes[node.ID]; ok {
-		obj.refCount++
-	} else {
-		r.nodes[node.ID] = &nodeRef{node: node, refCount: 1}
-	}
+	ref := new(nodeRef)
+	ref.Node = *node
+	obj, _ := r.nodes.LoadOrStore(node.ID, ref)
+	atomic.AddInt32(&(obj.(*nodeRef).refCount), 1)
 }
 
-func (r *NodeResolver) deleteNode(id proto.NodeID) {
-	r.Lock()
-	defer r.Unlock()
-
-	if obj, ok := r.nodes[id]; ok {
-		obj.refCount--
-		if obj.refCount <= 0 {
-			delete(r.nodes, id)
+func (r *NodeResolver) deleteNode(id metapb.NodeID) {
+	if obj, _ := r.nodes.Load(id); obj != nil {
+		if count := atomic.AddInt32(&(obj.(*nodeRef).refCount), -1); count <= 0 {
+			r.nodes.Delete(id)
 		}
 	}
 }
 
-func (r *NodeResolver) getNode(id proto.NodeID) (*pspb.Node, error) {
-	r.RLock()
-	defer r.RUnlock()
-
-	if obj, ok := r.nodes[id]; ok {
-		return obj.node, nil
+func (r *NodeResolver) getNode(id metapb.NodeID) (*metapb.Node, error) {
+	if obj, _ := r.nodes.Load(id); obj != nil {
+		return &(obj.(*nodeRef).Node), nil
 	}
 	return nil, fmt.Errorf("Cannot get node network information, nodeID=[%d]", id)
 }
 
 // NodeAddress resolve NodeID to net.Addr addresses.
-func (r *NodeResolver) NodeAddress(nodeID proto.NodeID, stype raft.SocketType) (string, error) {
-	node, err := r.getNode(nodeID)
+func (r *NodeResolver) NodeAddress(nodeID uint64, stype raft.SocketType) (string, error) {
+	node, err := r.getNode(metapb.NodeID(nodeID))
 	if err != nil {
 		return "", err
 	}

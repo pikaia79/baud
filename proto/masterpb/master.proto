@@ -1,0 +1,62 @@
+syntax = "proto3";
+
+import "github.com/gogo/protobuf/gogoproto/gogo.proto";
+
+import "github.com/tiglabs/baud/proto/metapb/meta.proto";
+
+option go_package = "masterpb";
+
+option optimize_for = SPEED;
+option (gogoproto.marshaler_all) = true;
+option (gogoproto.sizer_all) = true;
+option (gogoproto.unmarshaler_all) = true;
+option (gogoproto.gostring_all) = true;
+option (gogoproto.equal_all) = true;
+option (gogoproto.verbose_equal_all) = false;
+option (gogoproto.goproto_stringer_all) = false;
+option (gogoproto.stringer_all) =  true;
+option (gogoproto.populate_all) = true;
+option (gogoproto.testgen_all) = false;
+option (gogoproto.benchgen_all) = false;
+option (gogoproto.goproto_getters_all) = false;
+
+
+service MasterRpc {
+    rpc GetRoute(GetRouteRequest) returns (GetRouteResponse) {}
+    rpc Login(LoginRequest) returns (LoginRequest) {}
+    rpc Heartbeat(HeartbeatRequest) returns (HeartbeatResponse) {}
+}
+
+message Route {
+    Partition        partition  = 1 [(gogoproto.nullable) = false, (gogoproto.embed) = true];
+    repeated Replica replicas   = 2 [(gogoproto.nullable) = false];
+}
+
+message GetRouteRequest {
+    uint32 space = 1 [(gogoproto.customname) = "Space", (gogoproto.casttype) = "github.com/tiglabs/baud/proto/metapb.SpaceID"];
+    uint32 slot  = 2 [(gogoproto.customname) = "Slot", (gogoproto.casttype) = "github.com/tiglabs/baud/proto/metapb.SlotID"];
+}
+
+message GetRouteResponse {
+    ResponseHeader header = 1 [(gogoproto.nullable) = false, (gogoproto.embed) = true];
+    repeated Route routes = 2 [(gogoproto.nullable) = false];
+}
+
+message LoginRequest {
+    Node         node = 1 [(gogoproto.nullable) = false, (gogoproto.embed) = true];
+    NodeResource resource = 2 [(gogoproto.nullable) = false, (gogoproto.embed) = true];
+}
+
+message LoginResponse {
+    ResponseHeader header = 1 [(gogoproto.nullable) = false, (gogoproto.embed) = true];
+}
+
+message HeartbeatRequest {
+    uint32            node = 1 [(gogoproto.customname) = "Node", (gogoproto.casttype) = "NodeID"];
+    NodeStatus        status = 2;
+    repeated  Replica replicas = 3 [(gogoproto.nullable) = false];
+}
+
+message HeartbeatResponse {
+    ResponseHeader header = 1 [(gogoproto.nullable) = false, (gogoproto.embed) = true];
+}
