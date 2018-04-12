@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 . ./common.sh
 
+echo $0 "[out_dir [source_dir]]"
+
 #check_protoc_version
 
 PROGRAM=$(basename "$0")
@@ -57,23 +59,28 @@ fi
 
 echo "generate go code..."
 
+gen_out_dir=.
 if [ "$1" ]; then
-    cd $1
+    gen_out_dir=$1
+    mkdir -p $gen_out_dir
+fi
+
+proto_dir=.
+if [ "$2" ]; then
+    proto_dir=$2
 fi
 
 ret=0
-for file in `ls *.proto`
+for file in `ls ${proto_dir}/*.proto`
 do
     base_name=$(basename $file ".proto")"pb"
-    mkdir -p $base_name
-    protoc -I.:${first_gopath}/src:${GOGO_ROOT}:${GOGO_ROOT}/protobuf --gofast_out=plugins=grpc,$GO_OUT_M:$base_name $file || ret=$?
-    cd $base_name
-    sed -i.bak -E 's/import _ \"gogoproto\"//g' *.pb.go
-    sed -i.bak -E 's/import fmt \"fmt\"//g' *.pb.go
-    sed -i.bak -E 's/import io \"io\"//g' *.pb.go
-    sed -i.bak -E 's/import math \"math\"//g' *.pb.go
-    rm -f *.bak
-    goimports -w *.pb.go
-    cd ..
+    protoc -I${proto_dir}:${first_gopath}/src:${GOGO_ROOT}:${GOGO_ROOT}/protobuf --gofast_out=plugins=grpc,$GO_OUT_M:$gen_out_dir $file || ret=$?
+    pb_files=${gen_out_dir}/*.pb.go
+    sed -i.bak -E 's/import _ \"gogoproto\"//g' ${pb_files}
+    sed -i.bak -E 's/import fmt \"fmt\"//g' ${pb_files}
+    sed -i.bak -E 's/import io \"io\"//g' ${pb_files}
+    sed -i.bak -E 's/import math \"math\"//g' ${pb_files}
+    rm -f ${gen_out_dir}/*.bak
+    goimports -w $pb_files
 done
 exit $ret
