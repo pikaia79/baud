@@ -1,0 +1,25 @@
+syntax = "proto3";
+package pspb;
+
+import "gogoproto/gogo.proto";
+import "meta.proto";
+
+option (gogoproto.marshaler_all) = true;
+option (gogoproto.sizer_all) = true;
+option (gogoproto.unmarshaler_all) = true;
+
+
+service PartitionServerRpc {
+    rpc CreateReplica(CreateReplicaRequest) returns (CreateReplicaResponse) {}
+}
+
+message CreateReplicaRequest {
+    metapb.RequestHeader       header          = 1;
+    metapb.Partition           partition       = 2;
+    uint32                     replica_id      = 3;
+    repeated metapb.PartitionServer     partition_servers        = 4;
+}
+
+message CreateReplicaResponse {
+    metapb.ResponseHeader      header         = 1;
+}

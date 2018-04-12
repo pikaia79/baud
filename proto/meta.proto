@@ -1,53 +1,92 @@
 syntax = "proto3";
+package metapb;
 
-import "github.com/gogo/protobuf/gogoproto/gogo.proto";
+import "gogoproto/gogo.proto";
 
-option go_package = "proto";
-
-option optimize_for = SPEED;
 option (gogoproto.marshaler_all) = true;
 option (gogoproto.sizer_all) = true;
 option (gogoproto.unmarshaler_all) = true;
-option (gogoproto.gostring_all) = true;
-option (gogoproto.equal_all) = true;
-option (gogoproto.verbose_equal_all) = false;
-option (gogoproto.goproto_stringer_all) = false;
-option (gogoproto.stringer_all) =  true;
-option (gogoproto.populate_all) = true;
-option (gogoproto.testgen_all) = false;
-option (gogoproto.benchgen_all) = false;
-option (gogoproto.goproto_getters_all) = false;
+
+message RequestHeader {
+}
+
+message ResponseHeader {
+    int32       code                = 1;
+    string      msg                 = 2;
+}
 
 message DB {
-    uint32 id   = 1 [(gogoproto.customname) = "ID", (gogoproto.casttype) = "DBID"];
-    string name = 2;
+    uint32          id      = 1;
+    string          name    = 2;
+}
+
+enum SpaceStatus {
+    SS_Invalid       = 0;
+    // 初始状态，space刚刚创建，分片还不能提供服务
+    SS_Init          = 1;
+    // 准备状态，等待space的初始分片补足三个副本
+    SS_Prepare       = 2;
+    // 正常状态，可以提供完全的服务
+    SS_Running       = 3;
+    // 标记删除，元数据都保留，允许分片参与调度,但不能分裂
+    SS_Delete        = 4;
+    // 正在删除
+    SS_Deleting      = 5;
 }
 
 message Space {
-    uint32 id   = 1 [(gogoproto.customname) = "ID", (gogoproto.casttype) = "SpaceID"];
-    string name = 2;
+    string          type        = 1;  // entity/edge/blob
+    uint32          id      = 2;
+    string          name    = 3;
+    uint32          db_id   = 4;
+    string          db_name = 5;
+    SpaceStatus     status  = 6;
 }
 
 message Partition {
-    uint32    id            = 1 [(gogoproto.customname) = "ID", (gogoproto.casttype) = "PartitionID"];
-	string    entityOrEdge  = 2;
-	uint32    db_id         = 3 [(gogoproto.customname) = "DBID", (gogoproto.casttype) = "DBID"];
-	uint32    space_id      = 4 [(gogoproto.customname) = "SpaceID", (gogoproto.casttype) = "SpaceID"];
-	uint32    start_slot    = 5 [(gogoproto.customname) = "StartSlot", (gogoproto.casttype) = "SlotID"];
-	uint32    end_slot      = 6 [(gogoproto.customname) = "EndSlot", (gogoproto.casttype) = "SlotID"];
-	ReplGroup repl_group    = 7 [(gogoproto.customname) = "ReplGroup"];
+    uint32                  id   = 1;
+	string                  type        = 2;  // entity/edge/blob
+	uint32                  db_id                  = 3;
+	uint32                  space_id               = 4;
+	uint32                  start_slot           = 5;
+	uint32                  end_slot             = 6;
 }
 
-message ReplGroup {
-	uint32   id           = 1 [(gogoproto.customname) = "ID", (gogoproto.casttype) = "GroupID"];
-	repeated Peer peers   = 2;
+enum ReplicaStatue {
+    RS_Invalid = 0;
 }
 
-message Peer {
-    uint32 id    = 1 [(gogoproto.customname) = "ID", (gogoproto.casttype) = "PeerID"];
-    string role  = 2;
-    string zone  = 3;
-    string ip    = 4;
-    uint32 port  = 5 [(gogoproto.casttype) = "int"];
+message Replica {
+    uint32      id = 1;
+    uint32      partition_id = 2;
+    uint32      ps_id       = 3;
+    ReplicaStatue      status   = 4;
+    bool        is_leader  = 5;
 }
 
+enum PSStatus {
+    PS_Invalid   = 0;
+    PS_Initial   = 1;  // first created
+    PS_Login     = 2;  // when new allocated or restarted ps startup
+    PS_Offline   = 3;  // reject any r/w request
+    PS_Logout    = 4;  // wait destroy
+}
+
+message PartitionServer {
+    uint32          id                  = 1;
+    string          zone                = 3;
+    string          ip                  = 4;
+    string          port                = 5;
+}
+
+message ServerResource {
+    int32           cpu     = 1;
+    int32           memory  = 2;
+    int32           disk    = 3;
+}
+
+message Route {
+    Partition                   partition           = 1;
+    repeated PartitionServer    partition_server        = 2;
+    uint32                      leader_ps_id      = 3;
+}
