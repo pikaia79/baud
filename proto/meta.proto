@@ -44,10 +44,11 @@ message Space {
 }
 
 enum PartitionStatus {
-    PA_Invalid  = 0;
-    PA_READWRITE       = 1;
-    PA_READONLY  = 2;
-    PA_SPLITTING  = 3;
+    PA_Invalid      = 0;
+    PA_NOTREAD      = 1;
+    PA_READONLY     = 2;
+    PA_READWRITE    = 3;
+    PA_SPLITTING    = 4;
 }
 
 message Partition {
