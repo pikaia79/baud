@@ -7,6 +7,8 @@ import (
 	"google.golang.org/grpc/reflection"
 	"net"
 	"util/log"
+	"proto/partitionserverpb"
+	//"proto/metapb"
 )
 
 type RpcServer struct {
@@ -56,10 +58,18 @@ func (rs *RpcServer) GetRoute(ctx context.Context, request *masterpb.GetRouteReq
 }
 
 func (rs *RpcServer) PsLogin(ctx context.Context, request *masterpb.PsLoginRequest) (*masterpb.PsLoginRequest, error) {
+	server := request.GetServer()
+	resource := request.GetServerResource()
+	if server == nil || resource == nil {
+		return nil, ErrGrpcParamError
+	}
+
+	//request.Server.Get
+
 	return nil, nil
 }
 
-func (rs *RpcServer) CreateReplica(ctx context.Context, request *masterpb.CreateReplicaRequest) (*masterpb.CreateReplicaResponse, error) {
+func (rs *RpcServer) CreateReplica(ctx context.Context, request *pspb.CreateReplicaRequest) (*pspb.CreateReplicaResponse, error) {
 	return nil, nil
 }
 

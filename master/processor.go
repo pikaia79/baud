@@ -58,7 +58,7 @@ func (p *PartitionCreateProcessor) Run() {
 				return
 			case partitionToCreate := <-ProcessorPartitionCh:
 
-				server := p.serverSelector.SelectTarget(p.cluster.psCache.getAllPartitionServers())
+				server := p.serverSelector.SelectTarget(p.cluster.psCache.getAllServers())
 				if server == nil {
 					log.Error("Do not distribute suitable server")
 					// TODO: calling jdos api to allocate a container asynchronously

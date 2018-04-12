@@ -128,6 +128,8 @@ func (c *Cluster) createSpace(dbName, spaceName, partitionKey, partitionFunc str
 			return nil, err
 		}
 		space.putPartition(partition)
+
+		ProcessorPartitionCh <- partition
 	}
 
 	return space, nil

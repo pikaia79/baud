@@ -73,7 +73,7 @@ func (c *PSConn) callRpc(req interface{}, timeout time.Duration) (resp interface
 	default:
 		cancel()
 		log.Error("invalid grpc request type[%v]", in)
-		return nil, ErrGrpcInvalidReq
+		return nil, ErrInternalError
 	}
 
 	log.Error("grpc invoke return error message[%v]", header.Msg)

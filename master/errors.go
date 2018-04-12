@@ -23,8 +23,9 @@ var (
 	//ErrEntryNotFound		    = errors.New("storage entry not found")
 
 	ErrGrpcInvalidResp          = errors.New("invalid grpc response")
-	ErrGrpcInvalidReq           = errors.New("invalid grpc request")
 	ErrGrpcInvokeFailed			= errors.New("invoke grpc is failed")
+	//ErrGrpcInvalidReq           = errors.New("invalid grpc request")
+	ErrGrpcParamError           = errors.New("grpc param error")
 )
 
 // http response error code and error message definitions

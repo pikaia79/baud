@@ -4,6 +4,7 @@ import (
     "sync"
     "proto/metapb"
     "time"
+    "util"
 )
 
 const (
@@ -16,8 +17,18 @@ type PartitionServer struct {
 
     status        metapb.PSStatus
     lastHeartbeat time.Time
-    replicaCache  *ReplicaCache
+    replicaCache  *ReplicaCache // those replicas belong to different partitions
     propertyLock  sync.RWMutex
+}
+
+func NewPartitionServer(server *metapb.PartitionServer, resource *metapb.ServerResource) *PartitionServer {
+    return &PartitionServer{
+        PartitionServer: server,
+        ServerResource:  resource,
+        status:          metapb.PSStatus_PS_Initial,
+        lastHeartbeat:   time.Now(),
+        replicaCache:    new(ReplicaCache),
+    }
 }
 
 func (p *PartitionServer) isReplicaFull() bool {
@@ -28,20 +39,41 @@ func (p *PartitionServer) isReplicaFull() bool {
 }
 
 type PSCache struct {
-    lock 	sync.RWMutex
-    nodes   map[uint32]*PartitionServer
+    lock         sync.RWMutex
+    id2Servers   map[uint32]*PartitionServer
+    addr2Servers map[string]*PartitionServer  // key is ip:port
 }
 
-func (c *PSCache) getAllPartitionServers() []*PartitionServer {
+func (c *PSCache) getAllServers() []*PartitionServer {
     c.lock.RLock()
     defer c.lock.RUnlock()
 
-    nodes := make([]*PartitionServer, len(c.nodes))
-    for _, ps := range(c.nodes) {
-        nodes = append(nodes, ps)
+    servers := make([]*PartitionServer, len(c.id2Servers))
+    for _, ps := range c.id2Servers {
+        servers = append(servers, ps)
     }
 
-    return nodes
+    return servers
+}
+
+func (c *PSCache) findServerByAddr(addr string) *PartitionServer {
+    c.lock.RLock()
+    defer c.lock.RUnlock()
+
+    ps, ok := c.addr2Servers[addr]
+    if !ok {
+        return nil
+    }
+    return ps
+}
+
+func (c *PSCache) addServer(server *PartitionServer) {
+    c.lock.Lock()
+    defer c.lock.Unlock()
+
+
+    c.id2Servers[server.Id] = server
+    c.addr2Servers[util.BuildAddr(server.Ip, server.Port)] = server
 }
 
 
