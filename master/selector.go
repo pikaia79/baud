@@ -1,14 +1,19 @@
 package master
 
+import (
+	"math/rand"
+	"time"
+)
+
 type Selector interface {
 	SelectTarget(servers []*PartitionServer) *PartitionServer
 }
 
 type IdleSelector struct {
-
 }
 
 func NewIdleSelector() Selector {
+	rand.Seed(time.Now().UnixNano())
 	return &IdleSelector{
 	}
 }
@@ -18,14 +23,20 @@ func (s *IdleSelector) SelectTarget(servers []*PartitionServer) *PartitionServer
 		return nil
 	}
 
-	// TODO: prevent form selecting same one server at many times
-	var result *PartitionServer
-	for _, server := range servers {
+	// prevent form selecting same one server at many times
+	startIdx := rand.Intn(len(servers))
+	for idx := startIdx; idx < len(servers); idx++ {
+		server := servers[idx]
 		if !server.isReplicaFull() {
-			result = server
-			break
+			return server
+		}
+	}
+	for idx := 0; idx < startIdx; idx++ {
+		server := servers[idx]
+		if !server.isReplicaFull() {
+			return server
 		}
 	}
 
-	return result
+	return nil
 }
