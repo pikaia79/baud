@@ -8,6 +8,7 @@ import (
 
 // The following fields are populated at buildtime with -ldflags -X.
 var (
+	AppName     = "unknown"
 	AppVersion  = "unknown"
 	GitRevision = "unknown"
 	User        = "unknown"
@@ -18,6 +19,7 @@ var (
 
 // Info build info
 type Info struct {
+	AppName     string
 	AppVersion  string
 	GitRevision string
 	User        string
@@ -28,8 +30,25 @@ type Info struct {
 	Platform    string
 }
 
-func (b Info) String() string {
-	return fmt.Sprintf(`Version: %v
+// NewInfo create info object
+func NewInfo() *Info {
+	return &Info{
+		AppName:     AppName,
+		AppVersion:  AppVersion,
+		GitRevision: GitRevision,
+		User:        User,
+		BuiltTime:   BuiltTime,
+		Tag:         Tag,
+		Type:        Type,
+		GoVersion:   runtime.Version(),
+		Platform:    fmt.Sprintf("%s %s", runtime.GOOS, runtime.GOARCH),
+	}
+}
+
+func (b *Info) String() string {
+	return fmt.Sprintf(`
+App: %v
+Version: %v
 GitRevision: %v
 User: %v
 Tag: %v
@@ -38,6 +57,7 @@ GoVersion: %v
 Platform: %v
 BuiltTime: %v
 `,
+		b.AppName,
 		b.AppVersion,
 		b.GitRevision,
 		b.User,
@@ -48,17 +68,10 @@ BuiltTime: %v
 		b.BuiltTime)
 }
 
-var info Info
+var info *Info
 
 func init() {
-	info.AppVersion = AppVersion
-	info.GitRevision = GitRevision
-	info.User = User
-	info.BuiltTime = BuiltTime
-	info.Tag = Tag
-	info.Type = Type
-	info.GoVersion = runtime.Version()
-	info.Platform = fmt.Sprintf("%s %s", runtime.GOOS, runtime.GOARCH)
+	info = NewInfo()
 }
 
 // Version returns a multi-line version information
@@ -73,5 +86,5 @@ func IsRelease() bool {
 
 // GetInfo return build info
 func GetInfo() Info {
-	return info
+	return *info
 }

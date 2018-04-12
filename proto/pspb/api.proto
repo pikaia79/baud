@@ -60,3 +60,23 @@ message GetResponse {
     bool           found   = 3;
     bytes          source  = 4 [(gogoproto.casttype) = "github.com/tiglabs/baud/proto.Value"];
 }
+
+message RaftAddrs {
+    string heartbeat_addr = 1;
+    string replicate_addr = 2;
+}
+
+enum NodeState {
+    option (gogoproto.goproto_enum_prefix) = false;
+    STATE_INVALID   = 0;
+    STATE_INITIAL   = 1;
+    STATE_UPGRADE   = 2;
+}
+
+message Node {
+    uint64    id          = 1 [(gogoproto.customname) = "ID", (gogoproto.casttype) = "github.com/tiglabs/baud/proto.NodeID"];
+    string    address     = 2;
+    string    version     = 3;
+    RaftAddrs raft_addrs  = 4;
+    NodeState state       = 5;
+}

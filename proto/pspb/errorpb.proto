@@ -20,11 +20,11 @@ option (gogoproto.goproto_getters_all) = false;
 
 enum ErrorCode {
     option (gogoproto.goproto_enum_prefix) = false;
-    NOTLEADER = 0;
-    NOLEADER = 1;
-    PARTITIONNOTFOUND = 2;
-    KEYEXISTS = 3;
-    KEYNOTEXISTS = 4;
+    ERROR_NOTLEADER = 0;
+    ERROR_NOLEADER = 1;
+    ERROR_PARTITIONNOTFOUND = 2;
+    ERROR_KEYEXISTS = 3;
+    ERROR_KEYNOTEXISTS = 4;
 }
 
 message Error {
