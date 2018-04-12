@@ -3,6 +3,7 @@ package master
 import (
 	//"golang.org/x/net/context"
 	"util/log"
+	"sync"
 )
 
 type Master struct {
@@ -11,6 +12,8 @@ type Master struct {
 	cluster   *Cluster
 	apiServer *ApiServer
 	rpcServer *RpcServer
+
+	wg 		  sync.WaitGroup
 }
 
 func NewServer() *Master {
@@ -26,7 +29,7 @@ func (ms *Master) Start(config *Config) error {
 		return err
 	}
 
-	ms.rpcServer = NewRpcServer()
+	ms.rpcServer = NewRpcServer(config, ms.cluster)
 	if err := ms.rpcServer.Start(); err != nil {
 		log.Error("fail to start rpc server. err:[%v]", err)
 		ms.cluster.Close()

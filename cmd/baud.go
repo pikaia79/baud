@@ -5,13 +5,15 @@ import (
 	"github.com/tiglabs/baud/master"
 	"github.com/tiglabs/baud/partition"
 	"github.com/tiglabs/baud/util/config"
-	"log"
+	"util/log"
 	"net/http"
 	_ "net/http/pprof"
 	"os"
 	"os/signal"
 	"runtime"
 	"syscall"
+	"router"
+	"sync"
 )
 
 const (
@@ -22,6 +24,8 @@ const (
 var (
 	configFile = flag.String("c", "", "config file path")
 	logLevel   = flag.Int("log", 0, "log level, as DebugLevel = 0")
+
+	mainWg sync.WaitGroup
 )
 
 type IServer interface {
@@ -36,6 +40,7 @@ func interceptSignal(s IServer) {
 	go func() {
 		<-sigs
 		s.Shutdown()
+		mainWg.Done()
 		os.Exit(0)
 	}()
 }
@@ -78,4 +83,8 @@ func main() {
 	if err != nil {
 		log.Fatal("Fatal: failed to start the Baud daemon - ", err)
 	}
+
+	log.Info("main waiting")
+	mainWg.Wait()
+	log.Info("main exit")
 }
