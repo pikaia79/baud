@@ -12,7 +12,7 @@ option (gogoproto.unmarshaler_all) = true;
 service MasterRpc {
     rpc GetRoute(GetRouteRequest) returns (GetRouteResponse) {}
 
-    rpc PsLogin(PsLoginRequest) returns (PsLoginRequest) {}
+    rpc PsLogin(PsLoginRequest) returns (PsLoginResponse) {}
     rpc PsHeartbeat(PSHeartbeatRequest) returns (PSHeartbeatResponse) {}
 }
 
