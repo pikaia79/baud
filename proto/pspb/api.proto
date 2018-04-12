@@ -1,7 +1,8 @@
 syntax = "proto3";
 
 import "github.com/gogo/protobuf/gogoproto/gogo.proto";
-import "errorpb.proto";
+
+import "github.com/tiglabs/baud/proto/metapb/meta.proto";
 
 option go_package = "pspb";
 
@@ -23,26 +24,32 @@ service Internal {
     rpc Get(GetRequest) returns (GetResponse) {}
     rpc Update(UpdateRequest) returns (UpdateResponse) {}
     rpc Delete(DeleteRequest) returns (DeleteResponse) {}
+    rpc CreatePartition(CreatePartitionRequest) returns (CreatePartitionResponse) {}
 }
 
-message ResponseHeader {
-    Error error = 1;
+enum ResponseStatus {
+    option (gogoproto.goproto_enum_prefix) = false;
+    RESP_CODE_NOTLEADER         = 0;
+    RESP_CODE_NOLEADER          = 1;
+    RESP_CODE_PARTITIONNOTFOUND = 2;
+    RESP_CODE_KEYEXISTS         = 3;
+    RESP_CODE_KEYNOTEXISTS      = 4;
 }
 
 message UpdateRequest {
-    uint32      space_id = 1 [(gogoproto.customname) = "SpaceID", (gogoproto.casttype) = "github.com/tiglabs/baud/proto.SpaceID"];
-    uint32      slot_id  = 2 [(gogoproto.customname) = "SlotID", (gogoproto.casttype) = "github.com/tiglabs/baud/proto.SlotID"];
-    bytes       key      = 3 [(gogoproto.casttype) = "github.com/tiglabs/baud/proto.Key"];
-    bytes       value    = 4 [(gogoproto.casttype) = "github.com/tiglabs/baud/proto.Value"];
+    uint32      space    = 1 [(gogoproto.customname) = "Space", (gogoproto.casttype) = "github.com/tiglabs/baud/proto/metapb.SpaceID"];
+    uint32      slot     = 2 [(gogoproto.customname) = "Slot", (gogoproto.casttype) = "github.com/tiglabs/baud/proto/metapb.SlotID"];
+    bytes       key      = 3 [(gogoproto.casttype) = "github.com/tiglabs/baud/proto/metapb.Key"];
+    bytes       value    = 4 [(gogoproto.casttype) = "github.com/tiglabs/baud/proto/metapb.Value"];
 }
 
 message UpdateResponse {
     ResponseHeader header = 1 [(gogoproto.nullable) = false, (gogoproto.embed) = true];
-    bytes          key    = 2 [(gogoproto.casttype) = "github.com/tiglabs/baud/proto.Key"];
+    bytes          key    = 2 [(gogoproto.casttype) = "github.com/tiglabs/baud/proto/metapb.Key"];
 }
 
 message DeleteRequest {
-    bytes         key    = 1 [(gogoproto.casttype) = "github.com/tiglabs/baud/proto.Key"];
+    bytes         key    = 1 [(gogoproto.casttype) = "github.com/tiglabs/baud/proto/metapb.Key"];
 }
 
 message DeleteResponse {
@@ -51,32 +58,23 @@ message DeleteResponse {
 }
 
 message GetRequest {
-    bytes         key    = 1 [(gogoproto.casttype) = "github.com/tiglabs/baud/proto.Key"];
+    bytes         key    = 1 [(gogoproto.casttype) = "github.com/tiglabs/baud/proto/metapb.Key"];
 }
 
 message GetResponse {
     ResponseHeader header  = 1 [(gogoproto.nullable) = false, (gogoproto.embed) = true];
     uint64         version = 2;
     bool           found   = 3;
-    bytes          source  = 4 [(gogoproto.casttype) = "github.com/tiglabs/baud/proto.Value"];
+    bytes          source  = 4 [(gogoproto.casttype) = "github.com/tiglabs/baud/proto/metapb.Value"];
 }
 
-message RaftAddrs {
-    string heartbeat_addr = 1;
-    string replicate_addr = 2;
+message CreatePartitionRequest {
+    option (gogoproto.goproto_stringer) = false;
+    Partition        partition = 1 [(gogoproto.nullable) = false, (gogoproto.embed) = true];
+    repeated Replica replicas  = 2 [(gogoproto.nullable) = false];
 }
 
-enum NodeState {
-    option (gogoproto.goproto_enum_prefix) = false;
-    STATE_INVALID   = 0;
-    STATE_INITIAL   = 1;
-    STATE_UPGRADE   = 2;
-}
-
-message Node {
-    uint64    id          = 1 [(gogoproto.customname) = "ID", (gogoproto.casttype) = "github.com/tiglabs/baud/proto.NodeID"];
-    string    address     = 2;
-    string    version     = 3;
-    RaftAddrs raft_addrs  = 4;
-    NodeState state       = 5;
+message CreatePartitionResponse {
+    ResponseHeader header  = 1 [(gogoproto.nullable) = false, (gogoproto.embed) = true];
+    bool           created = 2;
 }
