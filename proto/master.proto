@@ -12,8 +12,9 @@ option (gogoproto.unmarshaler_all) = true;
 service MasterRpc {
     rpc GetRoute(GetRouteRequest) returns (GetRouteResponse) {}
 
-    rpc PsLogin(PsLoginRequest) returns (PsLoginResponse) {}
-    rpc PsHeartbeat(PSHeartbeatRequest) returns (PSHeartbeatResponse) {}
+    rpc PSLogin(PSLoginRequest) returns (PSLoginResponse) {}
+    rpc PSHeartbeat(PSHeartbeatRequest) returns (PSHeartbeatResponse) {}
+    rpc PartitionHeartbeat(PartitionHeartbeatRequest) returns (PartitionHeartbeatResponse) {}
 }
 
 message GetRouteRequest {
@@ -27,13 +28,13 @@ message GetRouteResponse {
     repeated metapb.Route          routes          = 2;
 }
 
-message PsLoginRequest {
+message PSLoginRequest {
     metapb.RequestHeader       header          = 1;
     metapb.PartitionServer     server          = 2;
     metapb.ServerResource      serverResource  = 3;
 }
 
-message PsLoginResponse {
+message PSLoginResponse {
     metapb.ResponseHeader      header          = 1;
     metapb.PartitionServer     server          = 2;
 }
@@ -41,10 +42,21 @@ message PsLoginResponse {
 message PSHeartbeatRequest {
     metapb.RequestHeader       header     = 1;
     uint32              ps_id = 3;
-    metapb.PSStatus            ps_status = 4;
-    repeated  metapb.Replica   replicas = 5;
+//    metapb.PSStatus            ps_status = 4;
+//    repeated  metapb.Replica   replicas = 5;
 }
 
 message PSHeartbeatResponse {
     metapb.ResponseHeader      header         = 1;
+}
+
+message PartitionHeartbeatRequest {
+    metapb.RequestHeader       header     = 1; 
+    metapb.Partition           partition  = 2; 
+    repeated  metapb.Replica   replicas   = 3; 
+    uint32              leader     = 4; 
+}
+
+message PartitionHeartbeatResponse {
+    metapb.ResponseHeader header = 1;
 }
