@@ -58,8 +58,8 @@ func (rs *RpcServer) GetRoute(ctx context.Context, request *masterpb.GetRouteReq
 	return nil, nil
 }
 
-func (rs *RpcServer) PsLogin(ctx context.Context, request *masterpb.PsLoginRequest) (*masterpb.PsLoginResponse, error) {
-	resp := new(masterpb.PsLoginResponse)
+func (rs *RpcServer) PsLogin(ctx context.Context, request *masterpb.PSLoginRequest) (*masterpb.PsLoginResponse, error) {
+	resp := new(masterpb.PSLoginResponse)
 
 	server := request.GetServer()
 	resource := request.GetServerResource()
@@ -105,6 +105,15 @@ func (rs *RpcServer) PsHeartbeat(ctx context.Context, request *masterpb.PSHeartb
 		return resp, nil
 	}
 
+	resp.Header = makeRpcRespHeader(ErrSuc)
+	return resp, nil
+}
+
+func (rs *RpcServer) PartitionHeartbeat(ctx context.Context,
+		request *masterpb.PartitionHeartbeatRequest) (*masterpb.PartitionHeartbeatResponse, error) {
+	resp := new(masterpb.PartitionHeartbeatResponse)
+
+	partition := request.GetPartition()
 	replpbs := request.Replicas
 	if replpbs == nil {
 		resp.Header = makeRpcRespHeader(ErrSuc)
@@ -144,7 +153,8 @@ func (rs *RpcServer) PsHeartbeat(ctx context.Context, request *masterpb.PSHeartb
 		ps.replicaCache.addReplica(replica)
 	}
 
-	return nil, nil
+	resp.Header = makeRpcRespHeader(ErrSuc)
+	return resp, nil
 }
 
 func makeRpcRespHeader(err error) *metapb.ResponseHeader {
