@@ -1,21 +1,21 @@
 package store
 
 import (
-	"github.com/tiglabs/baud/kernel/document"
+	"github.com/tiglabs/baud/kernel/object"
 )
 
 type Store interface {
 	// Insert entity
-	InsertEntity(doc *document.Entity) error
+	InsertEntity(doc *object.Entity) error
 	// Search entity by UID
-	QueryEntity(uid document.UID) (*document.Entity, error)
+	QueryEntity(uid object.UID) (*object.Entity, error)
 	// Delete entity
-	DeleteEntity(uid document.UID) error
+	DeleteEntity(uid object.UID) error
 	// Insert entity
-	InsertEdge(edge *document.Edge) error
+	InsertEdge(edge *object.Edge) error
 	// Search edge by UID
-	QueryEdge(src, dst document.UID) (*document.Edge, error)
+	QueryEdge(src, dst object.UID) (*object.Edge, error)
 	// Delete edge
-	DeleteEdge(src, dst document.UID) error
+	DeleteEdge(src, dst object.UID) error
 	Close()
 }
