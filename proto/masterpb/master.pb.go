@@ -55,8 +55,9 @@ func (*Route) ProtoMessage()               {}
 func (*Route) Descriptor() ([]byte, []int) { return fileDescriptorMaster, []int{0} }
 
 type GetRouteRequest struct {
-	Space github_com_tiglabs_baud_proto_metapb.SpaceID `protobuf:"varint,1,opt,name=space,proto3,casttype=github.com/tiglabs/baud/proto/metapb.SpaceID" json:"space,omitempty"`
-	Slot  github_com_tiglabs_baud_proto_metapb.SlotID  `protobuf:"varint,2,opt,name=slot,proto3,casttype=github.com/tiglabs/baud/proto/metapb.SlotID" json:"slot,omitempty"`
+	meta.RequestHeader `protobuf:"bytes,1,opt,name=header,embedded=header" json:"header"`
+	Space              github_com_tiglabs_baud_proto_metapb.SpaceID `protobuf:"varint,2,opt,name=space,proto3,casttype=github.com/tiglabs/baud/proto/metapb.SpaceID" json:"space,omitempty"`
+	Slot               github_com_tiglabs_baud_proto_metapb.SlotID  `protobuf:"varint,3,opt,name=slot,proto3,casttype=github.com/tiglabs/baud/proto/metapb.SlotID" json:"slot,omitempty"`
 }
 
 func (m *GetRouteRequest) Reset()                    { *m = GetRouteRequest{} }
@@ -73,8 +74,9 @@ func (*GetRouteResponse) ProtoMessage()               {}
 func (*GetRouteResponse) Descriptor() ([]byte, []int) { return fileDescriptorMaster, []int{2} }
 
 type LoginRequest struct {
-	meta.Node         `protobuf:"bytes,1,opt,name=node,embedded=node" json:"node"`
-	meta.NodeResource `protobuf:"bytes,2,opt,name=resource,embedded=resource" json:"resource"`
+	meta.RequestHeader `protobuf:"bytes,1,opt,name=header,embedded=header" json:"header"`
+	meta.Node          `protobuf:"bytes,2,opt,name=node,embedded=node" json:"node"`
+	meta.NodeResource  `protobuf:"bytes,3,opt,name=resource,embedded=resource" json:"resource"`
 }
 
 func (m *LoginRequest) Reset()                    { *m = LoginRequest{} }
@@ -83,6 +85,7 @@ func (*LoginRequest) Descriptor() ([]byte, []int) { return fileDescriptorMaster,
 
 type LoginResponse struct {
 	meta.ResponseHeader `protobuf:"bytes,1,opt,name=header,embedded=header" json:"header"`
+	meta.Node           `protobuf:"bytes,2,opt,name=node,embedded=node" json:"node"`
 }
 
 func (m *LoginResponse) Reset()                    { *m = LoginResponse{} }
@@ -167,6 +170,9 @@ func (this *GetRouteRequest) Equal(that interface{}) bool {
 	} else if this == nil {
 		return false
 	}
+	if !this.RequestHeader.Equal(&that1.RequestHeader) {
+		return false
+	}
 	if this.Space != that1.Space {
 		return false
 	}
@@ -226,6 +232,9 @@ func (this *LoginRequest) Equal(that interface{}) bool {
 	} else if this == nil {
 		return false
 	}
+	if !this.RequestHeader.Equal(&that1.RequestHeader) {
+		return false
+	}
 	if !this.Node.Equal(&that1.Node) {
 		return false
 	}
@@ -254,6 +263,9 @@ func (this *LoginResponse) Equal(that interface{}) bool {
 		return false
 	}
 	if !this.ResponseHeader.Equal(&that1.ResponseHeader) {
+		return false
+	}
+	if !this.Node.Equal(&that1.Node) {
 		return false
 	}
 	return true
@@ -338,8 +350,9 @@ func (this *GetRouteRequest) GoString() string {
 	if this == nil {
 		return "nil"
 	}
-	s := make([]string, 0, 6)
+	s := make([]string, 0, 7)
 	s = append(s, "&masterpb.GetRouteRequest{")
+	s = append(s, "RequestHeader: "+strings.Replace(this.RequestHeader.GoString(), `&`, ``, 1)+",\n")
 	s = append(s, "Space: "+fmt.Sprintf("%#v", this.Space)+",\n")
 	s = append(s, "Slot: "+fmt.Sprintf("%#v", this.Slot)+",\n")
 	s = append(s, "}")
@@ -366,8 +379,9 @@ func (this *LoginRequest) GoString() string {
 	if this == nil {
 		return "nil"
 	}
-	s := make([]string, 0, 6)
+	s := make([]string, 0, 7)
 	s = append(s, "&masterpb.LoginRequest{")
+	s = append(s, "RequestHeader: "+strings.Replace(this.RequestHeader.GoString(), `&`, ``, 1)+",\n")
 	s = append(s, "Node: "+strings.Replace(this.Node.GoString(), `&`, ``, 1)+",\n")
 	s = append(s, "NodeResource: "+strings.Replace(this.NodeResource.GoString(), `&`, ``, 1)+",\n")
 	s = append(s, "}")
@@ -377,9 +391,10 @@ func (this *LoginResponse) GoString() string {
 	if this == nil {
 		return "nil"
 	}
-	s := make([]string, 0, 5)
+	s := make([]string, 0, 6)
 	s = append(s, "&masterpb.LoginResponse{")
 	s = append(s, "ResponseHeader: "+strings.Replace(this.ResponseHeader.GoString(), `&`, ``, 1)+",\n")
+	s = append(s, "Node: "+strings.Replace(this.Node.GoString(), `&`, ``, 1)+",\n")
 	s = append(s, "}")
 	return strings.Join(s, "")
 }
@@ -432,7 +447,7 @@ const _ = grpc.SupportPackageIsVersion4
 
 type MasterRpcClient interface {
 	GetRoute(ctx context.Context, in *GetRouteRequest, opts ...grpc.CallOption) (*GetRouteResponse, error)
-	Login(ctx context.Context, in *LoginRequest, opts ...grpc.CallOption) (*LoginRequest, error)
+	Login(ctx context.Context, in *LoginRequest, opts ...grpc.CallOption) (*LoginResponse, error)
 	Heartbeat(ctx context.Context, in *HeartbeatRequest, opts ...grpc.CallOption) (*HeartbeatResponse, error)
 }
 
@@ -453,8 +468,8 @@ func (c *masterRpcClient) GetRoute(ctx context.Context, in *GetRouteRequest, opt
 	return out, nil
 }
 
-func (c *masterRpcClient) Login(ctx context.Context, in *LoginRequest, opts ...grpc.CallOption) (*LoginRequest, error) {
-	out := new(LoginRequest)
+func (c *masterRpcClient) Login(ctx context.Context, in *LoginRequest, opts ...grpc.CallOption) (*LoginResponse, error) {
+	out := new(LoginResponse)
 	err := grpc.Invoke(ctx, "/MasterRpc/Login", in, out, c.cc, opts...)
 	if err != nil {
 		return nil, err
@@ -475,7 +490,7 @@ func (c *masterRpcClient) Heartbeat(ctx context.Context, in *HeartbeatRequest, o
 
 type MasterRpcServer interface {
 	GetRoute(context.Context, *GetRouteRequest) (*GetRouteResponse, error)
-	Login(context.Context, *LoginRequest) (*LoginRequest, error)
+	Login(context.Context, *LoginRequest) (*LoginResponse, error)
 	Heartbeat(context.Context, *HeartbeatRequest) (*HeartbeatResponse, error)
 }
 
@@ -611,13 +626,21 @@ func (m *GetRouteRequest) MarshalTo(dAtA []byte) (int, error) {
 	_ = i
 	var l int
 	_ = l
+	dAtA[i] = 0xa
+	i++
+	i = encodeVarintMaster(dAtA, i, uint64(m.RequestHeader.Size()))
+	n2, err := m.RequestHeader.MarshalTo(dAtA[i:])
+	if err != nil {
+		return 0, err
+	}
+	i += n2
 	if m.Space != 0 {
-		dAtA[i] = 0x8
+		dAtA[i] = 0x10
 		i++
 		i = encodeVarintMaster(dAtA, i, uint64(m.Space))
 	}
 	if m.Slot != 0 {
-		dAtA[i] = 0x10
+		dAtA[i] = 0x18
 		i++
 		i = encodeVarintMaster(dAtA, i, uint64(m.Slot))
 	}
@@ -642,11 +665,11 @@ func (m *GetRouteResponse) MarshalTo(dAtA []byte) (int, error) {
 	dAtA[i] = 0xa
 	i++
 	i = encodeVarintMaster(dAtA, i, uint64(m.ResponseHeader.Size()))
-	n2, err := m.ResponseHeader.MarshalTo(dAtA[i:])
+	n3, err := m.ResponseHeader.MarshalTo(dAtA[i:])
 	if err != nil {
 		return 0, err
 	}
-	i += n2
+	i += n3
 	if len(m.Routes) > 0 {
 		for _, msg := range m.Routes {
 			dAtA[i] = 0x12
@@ -679,20 +702,28 @@ func (m *LoginRequest) MarshalTo(dAtA []byte) (int, error) {
 	_ = l
 	dAtA[i] = 0xa
 	i++
-	i = encodeVarintMaster(dAtA, i, uint64(m.Node.Size()))
-	n3, err := m.Node.MarshalTo(dAtA[i:])
-	if err != nil {
-		return 0, err
-	}
-	i += n3
-	dAtA[i] = 0x12
-	i++
-	i = encodeVarintMaster(dAtA, i, uint64(m.NodeResource.Size()))
-	n4, err := m.NodeResource.MarshalTo(dAtA[i:])
+	i = encodeVarintMaster(dAtA, i, uint64(m.RequestHeader.Size()))
+	n4, err := m.RequestHeader.MarshalTo(dAtA[i:])
 	if err != nil {
 		return 0, err
 	}
 	i += n4
+	dAtA[i] = 0x12
+	i++
+	i = encodeVarintMaster(dAtA, i, uint64(m.Node.Size()))
+	n5, err := m.Node.MarshalTo(dAtA[i:])
+	if err != nil {
+		return 0, err
+	}
+	i += n5
+	dAtA[i] = 0x1a
+	i++
+	i = encodeVarintMaster(dAtA, i, uint64(m.NodeResource.Size()))
+	n6, err := m.NodeResource.MarshalTo(dAtA[i:])
+	if err != nil {
+		return 0, err
+	}
+	i += n6
 	return i, nil
 }
 
@@ -714,11 +745,19 @@ func (m *LoginResponse) MarshalTo(dAtA []byte) (int, error) {
 	dAtA[i] = 0xa
 	i++
 	i = encodeVarintMaster(dAtA, i, uint64(m.ResponseHeader.Size()))
-	n5, err := m.ResponseHeader.MarshalTo(dAtA[i:])
+	n7, err := m.ResponseHeader.MarshalTo(dAtA[i:])
 	if err != nil {
 		return 0, err
 	}
-	i += n5
+	i += n7
+	dAtA[i] = 0x12
+	i++
+	i = encodeVarintMaster(dAtA, i, uint64(m.Node.Size()))
+	n8, err := m.Node.MarshalTo(dAtA[i:])
+	if err != nil {
+		return 0, err
+	}
+	i += n8
 	return i, nil
 }
 
@@ -780,11 +819,11 @@ func (m *HeartbeatResponse) MarshalTo(dAtA []byte) (int, error) {
 	dAtA[i] = 0xa
 	i++
 	i = encodeVarintMaster(dAtA, i, uint64(m.ResponseHeader.Size()))
-	n6, err := m.ResponseHeader.MarshalTo(dAtA[i:])
+	n9, err := m.ResponseHeader.MarshalTo(dAtA[i:])
 	if err != nil {
 		return 0, err
 	}
-	i += n6
+	i += n9
 	return i, nil
 }
 
@@ -816,6 +855,8 @@ func NewPopulatedRoute(r randyMaster, easy bool) *Route {
 
 func NewPopulatedGetRouteRequest(r randyMaster, easy bool) *GetRouteRequest {
 	this := &GetRouteRequest{}
+	v4 := meta.NewPopulatedRequestHeader(r, easy)
+	this.RequestHeader = *v4
 	this.Space = github_com_tiglabs_baud_proto_metapb.SpaceID(r.Uint32())
 	this.Slot = github_com_tiglabs_baud_proto_metapb.SlotID(r.Uint32())
 	if !easy && r.Intn(10) != 0 {
@@ -825,14 +866,14 @@ func NewPopulatedGetRouteRequest(r randyMaster, easy bool) *GetRouteRequest {
 
 func NewPopulatedGetRouteResponse(r randyMaster, easy bool) *GetRouteResponse {
 	this := &GetRouteResponse{}
-	v4 := meta.NewPopulatedResponseHeader(r, easy)
-	this.ResponseHeader = *v4
+	v5 := meta.NewPopulatedResponseHeader(r, easy)
+	this.ResponseHeader = *v5
 	if r.Intn(10) != 0 {
-		v5 := r.Intn(5)
-		this.Routes = make([]Route, v5)
-		for i := 0; i < v5; i++ {
-			v6 := NewPopulatedRoute(r, easy)
-			this.Routes[i] = *v6
+		v6 := r.Intn(5)
+		this.Routes = make([]Route, v6)
+		for i := 0; i < v6; i++ {
+			v7 := NewPopulatedRoute(r, easy)
+			this.Routes[i] = *v7
 		}
 	}
 	if !easy && r.Intn(10) != 0 {
@@ -842,10 +883,12 @@ func NewPopulatedGetRouteResponse(r randyMaster, easy bool) *GetRouteResponse {
 
 func NewPopulatedLoginRequest(r randyMaster, easy bool) *LoginRequest {
 	this := &LoginRequest{}
-	v7 := meta.NewPopulatedNode(r, easy)
-	this.Node = *v7
-	v8 := meta.NewPopulatedNodeResource(r, easy)
-	this.NodeResource = *v8
+	v8 := meta.NewPopulatedRequestHeader(r, easy)
+	this.RequestHeader = *v8
+	v9 := meta.NewPopulatedNode(r, easy)
+	this.Node = *v9
+	v10 := meta.NewPopulatedNodeResource(r, easy)
+	this.NodeResource = *v10
 	if !easy && r.Intn(10) != 0 {
 	}
 	return this
@@ -853,8 +896,10 @@ func NewPopulatedLoginRequest(r randyMaster, easy bool) *LoginRequest {
 
 func NewPopulatedLoginResponse(r randyMaster, easy bool) *LoginResponse {
 	this := &LoginResponse{}
-	v9 := meta.NewPopulatedResponseHeader(r, easy)
-	this.ResponseHeader = *v9
+	v11 := meta.NewPopulatedResponseHeader(r, easy)
+	this.ResponseHeader = *v11
+	v12 := meta.NewPopulatedNode(r, easy)
+	this.Node = *v12
 	if !easy && r.Intn(10) != 0 {
 	}
 	return this
@@ -865,11 +910,11 @@ func NewPopulatedHeartbeatRequest(r randyMaster, easy bool) *HeartbeatRequest {
 	this.Node = NodeID(r.Uint32())
 	this.Status = meta.NodeStatus([]int32{0, 1, 2, 3, 4, 5}[r.Intn(6)])
 	if r.Intn(10) != 0 {
-		v10 := r.Intn(5)
-		this.Replicas = make([]meta.Replica, v10)
-		for i := 0; i < v10; i++ {
-			v11 := meta.NewPopulatedReplica(r, easy)
-			this.Replicas[i] = *v11
+		v13 := r.Intn(5)
+		this.Replicas = make([]meta.Replica, v13)
+		for i := 0; i < v13; i++ {
+			v14 := meta.NewPopulatedReplica(r, easy)
+			this.Replicas[i] = *v14
 		}
 	}
 	if !easy && r.Intn(10) != 0 {
@@ -879,8 +924,8 @@ func NewPopulatedHeartbeatRequest(r randyMaster, easy bool) *HeartbeatRequest {
 
 func NewPopulatedHeartbeatResponse(r randyMaster, easy bool) *HeartbeatResponse {
 	this := &HeartbeatResponse{}
-	v12 := meta.NewPopulatedResponseHeader(r, easy)
-	this.ResponseHeader = *v12
+	v15 := meta.NewPopulatedResponseHeader(r, easy)
+	this.ResponseHeader = *v15
 	if !easy && r.Intn(10) != 0 {
 	}
 	return this
@@ -905,9 +950,9 @@ func randUTF8RuneMaster(r randyMaster) rune {
 	return rune(ru + 61)
 }
 func randStringMaster(r randyMaster) string {
-	v13 := r.Intn(100)
-	tmps := make([]rune, v13)
-	for i := 0; i < v13; i++ {
+	v16 := r.Intn(100)
+	tmps := make([]rune, v16)
+	for i := 0; i < v16; i++ {
 		tmps[i] = randUTF8RuneMaster(r)
 	}
 	return string(tmps)
@@ -929,11 +974,11 @@ func randFieldMaster(dAtA []byte, r randyMaster, fieldNumber int, wire int) []by
 	switch wire {
 	case 0:
 		dAtA = encodeVarintPopulateMaster(dAtA, uint64(key))
-		v14 := r.Int63()
+		v17 := r.Int63()
 		if r.Intn(2) == 0 {
-			v14 *= -1
+			v17 *= -1
 		}
-		dAtA = encodeVarintPopulateMaster(dAtA, uint64(v14))
+		dAtA = encodeVarintPopulateMaster(dAtA, uint64(v17))
 	case 1:
 		dAtA = encodeVarintPopulateMaster(dAtA, uint64(key))
 		dAtA = append(dAtA, byte(r.Intn(256)), byte(r.Intn(256)), byte(r.Intn(256)), byte(r.Intn(256)), byte(r.Intn(256)), byte(r.Intn(256)), byte(r.Intn(256)), byte(r.Intn(256)))
@@ -975,6 +1020,8 @@ func (m *Route) Size() (n int) {
 func (m *GetRouteRequest) Size() (n int) {
 	var l int
 	_ = l
+	l = m.RequestHeader.Size()
+	n += 1 + l + sovMaster(uint64(l))
 	if m.Space != 0 {
 		n += 1 + sovMaster(uint64(m.Space))
 	}
@@ -1001,6 +1048,8 @@ func (m *GetRouteResponse) Size() (n int) {
 func (m *LoginRequest) Size() (n int) {
 	var l int
 	_ = l
+	l = m.RequestHeader.Size()
+	n += 1 + l + sovMaster(uint64(l))
 	l = m.Node.Size()
 	n += 1 + l + sovMaster(uint64(l))
 	l = m.NodeResource.Size()
@@ -1012,6 +1061,8 @@ func (m *LoginResponse) Size() (n int) {
 	var l int
 	_ = l
 	l = m.ResponseHeader.Size()
+	n += 1 + l + sovMaster(uint64(l))
+	l = m.Node.Size()
 	n += 1 + l + sovMaster(uint64(l))
 	return n
 }
@@ -1071,6 +1122,7 @@ func (this *GetRouteRequest) String() string {
 		return "nil"
 	}
 	s := strings.Join([]string{`&GetRouteRequest{`,
+		`RequestHeader:` + strings.Replace(strings.Replace(this.RequestHeader.String(), "RequestHeader", "meta.RequestHeader", 1), `&`, ``, 1) + `,`,
 		`Space:` + fmt.Sprintf("%v", this.Space) + `,`,
 		`Slot:` + fmt.Sprintf("%v", this.Slot) + `,`,
 		`}`,
@@ -1093,6 +1145,7 @@ func (this *LoginRequest) String() string {
 		return "nil"
 	}
 	s := strings.Join([]string{`&LoginRequest{`,
+		`RequestHeader:` + strings.Replace(strings.Replace(this.RequestHeader.String(), "RequestHeader", "meta.RequestHeader", 1), `&`, ``, 1) + `,`,
 		`Node:` + strings.Replace(strings.Replace(this.Node.String(), "Node", "meta.Node", 1), `&`, ``, 1) + `,`,
 		`NodeResource:` + strings.Replace(strings.Replace(this.NodeResource.String(), "NodeResource", "meta.NodeResource", 1), `&`, ``, 1) + `,`,
 		`}`,
@@ -1105,6 +1158,7 @@ func (this *LoginResponse) String() string {
 	}
 	s := strings.Join([]string{`&LoginResponse{`,
 		`ResponseHeader:` + strings.Replace(strings.Replace(this.ResponseHeader.String(), "ResponseHeader", "meta.ResponseHeader", 1), `&`, ``, 1) + `,`,
+		`Node:` + strings.Replace(strings.Replace(this.Node.String(), "Node", "meta.Node", 1), `&`, ``, 1) + `,`,
 		`}`,
 	}, "")
 	return s
@@ -1280,6 +1334,36 @@ func (m *GetRouteRequest) Unmarshal(dAtA []byte) error {
 		}
 		switch fieldNum {
 		case 1:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field RequestHeader", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMaster
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				msglen |= (int(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthMaster
+			}
+			postIndex := iNdEx + msglen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			if err := m.RequestHeader.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		case 2:
 			if wireType != 0 {
 				return fmt.Errorf("proto: wrong wireType = %d for field Space", wireType)
 			}
@@ -1298,7 +1382,7 @@ func (m *GetRouteRequest) Unmarshal(dAtA []byte) error {
 					break
 				}
 			}
-		case 2:
+		case 3:
 			if wireType != 0 {
 				return fmt.Errorf("proto: wrong wireType = %d for field Slot", wireType)
 			}
@@ -1480,6 +1564,36 @@ func (m *LoginRequest) Unmarshal(dAtA []byte) error {
 		switch fieldNum {
 		case 1:
 			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field RequestHeader", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMaster
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				msglen |= (int(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthMaster
+			}
+			postIndex := iNdEx + msglen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			if err := m.RequestHeader.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		case 2:
+			if wireType != 2 {
 				return fmt.Errorf("proto: wrong wireType = %d for field Node", wireType)
 			}
 			var msglen int
@@ -1508,7 +1622,7 @@ func (m *LoginRequest) Unmarshal(dAtA []byte) error {
 				return err
 			}
 			iNdEx = postIndex
-		case 2:
+		case 3:
 			if wireType != 2 {
 				return fmt.Errorf("proto: wrong wireType = %d for field NodeResource", wireType)
 			}
@@ -1615,6 +1729,36 @@ func (m *LoginResponse) Unmarshal(dAtA []byte) error {
 				return io.ErrUnexpectedEOF
 			}
 			if err := m.ResponseHeader.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		case 2:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Node", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMaster
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				msglen |= (int(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthMaster
+			}
+			postIndex := iNdEx + msglen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			if err := m.Node.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
 				return err
 			}
 			iNdEx = postIndex
@@ -1946,41 +2090,42 @@ var (
 func init() { proto.RegisterFile("master.proto", fileDescriptorMaster) }
 
 var fileDescriptorMaster = []byte{
-	// 562 bytes of a gzipped FileDescriptorProto
-	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0x9c, 0x54, 0x3f, 0x6f, 0xdb, 0x3e,
-	0x10, 0x15, 0x13, 0x5b, 0x70, 0xe8, 0xf8, 0x97, 0x98, 0x93, 0xe1, 0x81, 0x0a, 0x94, 0x1f, 0xda,
-	0xa0, 0x7f, 0x68, 0x44, 0x29, 0x50, 0x74, 0x2b, 0x84, 0xa0, 0x75, 0xd0, 0xbf, 0x90, 0xb7, 0x6e,
-	0x94, 0xcd, 0xca, 0x42, 0x6d, 0x53, 0x15, 0xa9, 0xbd, 0x7b, 0x97, 0x7e, 0x81, 0xee, 0xdd, 0xba,
-	0x76, 0xec, 0xe8, 0x31, 0x63, 0x27, 0x21, 0x56, 0xbf, 0x40, 0xc7, 0xc2, 0x53, 0xa1, 0xb3, 0xe4,
-	0x28, 0xee, 0xd0, 0x20, 0x13, 0xcd, 0xbb, 0x77, 0xef, 0xde, 0x3d, 0x9e, 0x85, 0x77, 0xa7, 0x5c,
-	0x69, 0x11, 0xb3, 0x28, 0x96, 0x5a, 0x76, 0xef, 0x07, 0xa1, 0x1e, 0x27, 0x3e, 0x1b, 0xca, 0x69,
-	0x2f, 0x90, 0x81, 0xec, 0x41, 0xd8, 0x4f, 0xde, 0xc2, 0x0d, 0x2e, 0xf0, 0xab, 0x80, 0xf7, 0x2a,
-	0x70, 0x1d, 0x06, 0x13, 0xee, 0xab, 0x9e, 0xcf, 0x93, 0xd1, 0xaa, 0xac, 0x37, 0x15, 0x9a, 0x47,
-	0x3e, 0x1c, 0xab, 0x02, 0x3b, 0xc0, 0x75, 0x4f, 0x26, 0x5a, 0x10, 0x07, 0xef, 0x44, 0x3c, 0xd6,
-	0xa1, 0x0e, 0xe5, 0xac, 0x83, 0x0e, 0xd0, 0x51, 0xd3, 0xc1, 0xec, 0x75, 0x19, 0x71, 0x1b, 0xf3,
-	0xd4, 0x32, 0xce, 0x53, 0x0b, 0x79, 0x97, 0x30, 0x72, 0x07, 0x37, 0x62, 0x11, 0x4d, 0xc2, 0x21,
-	0x57, 0x9d, 0xad, 0x83, 0xed, 0xa3, 0xa6, 0xd3, 0x60, 0xde, 0x2a, 0xe0, 0xd6, 0xf2, 0x02, 0x6f,
-	0x9d, 0xb7, 0xbf, 0x22, 0xbc, 0xf7, 0x54, 0x68, 0x68, 0xe6, 0x89, 0xf7, 0x89, 0x50, 0x9a, 0xbc,
-	0xc2, 0x75, 0x15, 0xf1, 0xa1, 0x80, 0x7e, 0x2d, 0xf7, 0x51, 0x96, 0x5a, 0xf5, 0x41, 0x1e, 0x58,
-	0xa6, 0xd6, 0xbd, 0xeb, 0x4c, 0xc2, 0x00, 0x7d, 0x76, 0xea, 0xad, 0x78, 0xc8, 0x33, 0x5c, 0x53,
-	0x13, 0xa9, 0x3b, 0x5b, 0xc0, 0xf7, 0x30, 0x4b, 0xad, 0xda, 0x60, 0x22, 0xf5, 0x32, 0xb5, 0xee,
-	0x5e, 0x8f, 0x6e, 0x22, 0xf5, 0xd9, 0xa9, 0x07, 0x24, 0xf6, 0x3b, 0xbc, 0x7f, 0x29, 0x58, 0x45,
-	0x72, 0xa6, 0x04, 0x39, 0xc6, 0xe6, 0x58, 0xf0, 0x91, 0x88, 0x0b, 0x8b, 0xf6, 0x58, 0x99, 0xea,
-	0x43, 0xb8, 0xe2, 0x53, 0x01, 0x24, 0xff, 0x63, 0x33, 0xce, 0x39, 0x4a, 0x8b, 0x4c, 0x06, 0x94,
-	0x85, 0x41, 0x45, 0xce, 0x1e, 0xe3, 0xdd, 0xe7, 0x32, 0x08, 0x67, 0xa5, 0x35, 0x87, 0xb8, 0x36,
-	0x93, 0x23, 0x51, 0xb4, 0xa9, 0xb3, 0x97, 0x72, 0x24, 0x2a, 0xe4, 0x90, 0x24, 0x27, 0xb9, 0xff,
-	0x4a, 0x26, 0xf1, 0x50, 0xc0, 0xc8, 0x4d, 0xa7, 0x05, 0x40, 0xaf, 0x08, 0x56, 0x0a, 0xd6, 0x40,
-	0xdb, 0xc5, 0xad, 0xa2, 0xd3, 0x8d, 0x67, 0xb2, 0x3f, 0x22, 0xbc, 0xdf, 0x17, 0x3c, 0xd6, 0xbe,
-	0xe0, 0xba, 0x94, 0x7c, 0xab, 0x22, 0xb9, 0xe5, 0x92, 0xdc, 0xfc, 0x5c, 0xcc, 0x32, 0xb5, 0xcc,
-	0xfc, 0xcc, 0x7d, 0x05, 0xd5, 0x87, 0xd8, 0x54, 0x9a, 0xeb, 0x44, 0x81, 0xe6, 0xff, 0x9c, 0x26,
-	0x68, 0x1e, 0x40, 0xc8, 0x2b, 0x52, 0x57, 0x56, 0x6b, 0xfb, 0x1f, 0xab, 0xf5, 0x04, 0xb7, 0x2b,
-	0x62, 0x6e, 0x3c, 0x95, 0xf3, 0x19, 0xe1, 0x9d, 0x17, 0xf0, 0xe7, 0xf3, 0xa2, 0x21, 0x39, 0xc6,
-	0x8d, 0xf2, 0xf9, 0xc9, 0x3e, 0xdb, 0x58, 0xdd, 0x6e, 0x9b, 0x6d, 0xee, 0x86, 0x6d, 0x90, 0xdb,
-	0xb8, 0x0e, 0xd6, 0x92, 0x16, 0xab, 0x3e, 0x66, 0xf7, 0xea, 0xd5, 0x36, 0xc8, 0x03, 0xbc, 0xb3,
-	0x56, 0x4c, 0xda, 0x6c, 0xd3, 0xca, 0x2e, 0x61, 0x7f, 0x0d, 0x64, 0x1b, 0xee, 0xe3, 0xf9, 0x82,
-	0x1a, 0x3f, 0x16, 0xd4, 0xb8, 0x58, 0x50, 0xe3, 0xd7, 0x82, 0xa2, 0xdf, 0x0b, 0x8a, 0x3e, 0x64,
-	0x14, 0x7d, 0xc9, 0x28, 0xfa, 0x96, 0x51, 0xe3, 0x7b, 0x46, 0x8d, 0x79, 0x46, 0xd1, 0x79, 0x46,
-	0xd1, 0x45, 0x46, 0xd1, 0xa7, 0x9f, 0xd4, 0xe8, 0xa3, 0x37, 0x8d, 0xd5, 0x17, 0x25, 0xf2, 0x7d,
-	0x13, 0xb6, 0xfd, 0xe4, 0x4f, 0x00, 0x00, 0x00, 0xff, 0xff, 0xd3, 0x28, 0x47, 0x87, 0x64, 0x04,
-	0x00, 0x00,
+	// 580 bytes of a gzipped FileDescriptorProto
+	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0x9c, 0x54, 0x3d, 0x8f, 0xda, 0x4c,
+	0x10, 0xf6, 0x1e, 0x60, 0xc1, 0x72, 0x70, 0xb0, 0x15, 0xa2, 0x58, 0x23, 0xdf, 0xab, 0x57, 0x28,
+	0x1f, 0x4b, 0xce, 0x17, 0x29, 0x4a, 0x17, 0xa1, 0x53, 0xc2, 0x29, 0x9f, 0x32, 0x5d, 0x3a, 0x1b,
+	0x36, 0x3e, 0x2b, 0xc0, 0x3a, 0xf6, 0xba, 0x4f, 0x9f, 0x26, 0x75, 0x8a, 0xd4, 0xf9, 0x09, 0x29,
+	0x53, 0x52, 0x5e, 0x99, 0xca, 0x3a, 0x3b, 0x7f, 0x20, 0x65, 0x44, 0x15, 0x79, 0x6c, 0x38, 0x1f,
+	0x51, 0x14, 0x44, 0x65, 0xef, 0xcc, 0x33, 0x1f, 0xcf, 0x33, 0xb3, 0x8b, 0x0f, 0xe7, 0x56, 0x20,
+	0xb9, 0xcf, 0x3c, 0x5f, 0x48, 0xd1, 0xbd, 0xeb, 0xb8, 0xf2, 0x22, 0xb4, 0xd9, 0x44, 0xcc, 0x07,
+	0x8e, 0x70, 0xc4, 0x00, 0xcc, 0x76, 0xf8, 0x06, 0x4e, 0x70, 0x80, 0xbf, 0x1c, 0x3e, 0x28, 0xc0,
+	0xa5, 0xeb, 0xcc, 0x2c, 0x3b, 0x18, 0xd8, 0x56, 0x38, 0xcd, 0xc2, 0x06, 0x73, 0x2e, 0x2d, 0xcf,
+	0x86, 0x4f, 0x16, 0xa0, 0x3b, 0xb8, 0x62, 0x8a, 0x50, 0x72, 0x62, 0xe0, 0x9a, 0x67, 0xf9, 0xd2,
+	0x95, 0xae, 0x58, 0x74, 0x50, 0x0f, 0xf5, 0xeb, 0x06, 0x66, 0xaf, 0xd6, 0x96, 0x61, 0x75, 0x19,
+	0x69, 0xca, 0x65, 0xa4, 0x21, 0xf3, 0x1a, 0x46, 0x6e, 0xe1, 0xaa, 0xcf, 0xbd, 0x99, 0x3b, 0xb1,
+	0x82, 0xce, 0x41, 0xaf, 0xd4, 0xaf, 0x1b, 0x55, 0x66, 0x66, 0x86, 0x61, 0x39, 0x0d, 0x30, 0x37,
+	0x7e, 0x3d, 0x46, 0xf8, 0xe8, 0x09, 0x97, 0x50, 0xcc, 0xe4, 0xef, 0x42, 0x1e, 0x48, 0x72, 0x0f,
+	0xab, 0x17, 0xdc, 0x9a, 0x72, 0x3f, 0x2f, 0xd8, 0x64, 0xb9, 0x67, 0x04, 0xd6, 0x42, 0xd1, 0x1c,
+	0x47, 0x5e, 0xe2, 0x4a, 0xe0, 0x59, 0x13, 0xde, 0x39, 0xe8, 0xa1, 0x7e, 0x63, 0xf8, 0x30, 0x89,
+	0xb4, 0xca, 0x38, 0x35, 0xac, 0x22, 0xed, 0xce, 0x2e, 0xdc, 0x19, 0xa0, 0xcf, 0xcf, 0xcc, 0x2c,
+	0x0f, 0x79, 0x8a, 0xcb, 0xc1, 0x4c, 0xc8, 0x4e, 0x09, 0xf2, 0x3d, 0x48, 0x22, 0xad, 0x3c, 0x9e,
+	0x09, 0xb9, 0x8a, 0xb4, 0xdb, 0xbb, 0xa5, 0x9b, 0x09, 0x79, 0x7e, 0x66, 0x42, 0x12, 0xfd, 0x2d,
+	0x6e, 0x5d, 0x53, 0x0c, 0x3c, 0xb1, 0x08, 0x38, 0x39, 0xd9, 0xe2, 0x78, 0xc4, 0xd6, 0xae, 0xbf,
+	0x92, 0xfc, 0x0f, 0xab, 0x7e, 0x9a, 0x63, 0x2d, 0xaa, 0xca, 0x20, 0x65, 0x2e, 0x69, 0xee, 0xd3,
+	0x3f, 0x21, 0x7c, 0xf8, 0x4c, 0x38, 0xee, 0x62, 0x7f, 0x35, 0x8f, 0x71, 0x79, 0x21, 0xa6, 0x99,
+	0x98, 0x75, 0xa3, 0xc2, 0x5e, 0x88, 0x29, 0x2f, 0xc0, 0xc0, 0x49, 0x4e, 0xd3, 0x21, 0x07, 0x22,
+	0xf4, 0x27, 0x1c, 0x54, 0xaa, 0x1b, 0x0d, 0x00, 0x9a, 0xb9, 0xb1, 0x10, 0xb0, 0x01, 0xea, 0x0e,
+	0x6e, 0xe4, 0xbd, 0xed, 0x2f, 0xc3, 0x2e, 0xdd, 0xe9, 0x1f, 0x10, 0x6e, 0x8d, 0xb8, 0xe5, 0x4b,
+	0x9b, 0x5b, 0x72, 0xad, 0xc4, 0xff, 0x79, 0x24, 0x82, 0xa1, 0x92, 0x74, 0xa8, 0x69, 0xf0, 0x2a,
+	0xd2, 0xd4, 0xf4, 0x9b, 0xce, 0x0b, 0xa8, 0x1d, 0x63, 0x35, 0x90, 0x96, 0x0c, 0x03, 0xa8, 0xd1,
+	0x34, 0xea, 0x50, 0x63, 0x0c, 0x26, 0x33, 0x77, 0xdd, 0x58, 0xf2, 0xd2, 0x3f, 0x96, 0xfc, 0x31,
+	0x6e, 0x17, 0x9a, 0xd9, 0x9b, 0xba, 0xf1, 0x19, 0xe1, 0xda, 0x73, 0x78, 0x06, 0x4c, 0x6f, 0x42,
+	0x4e, 0x70, 0x75, 0xbd, 0x56, 0xa4, 0xc5, 0xb6, 0x2e, 0x51, 0xb7, 0xcd, 0xb6, 0x77, 0x4e, 0x57,
+	0x48, 0x1f, 0x57, 0x40, 0x7f, 0xd2, 0x60, 0xc5, 0x1d, 0xe9, 0x36, 0xd9, 0x8d, 0xb1, 0xe8, 0x0a,
+	0xb9, 0x8f, 0x6b, 0x9b, 0x96, 0x49, 0x9b, 0x6d, 0x6b, 0xd9, 0x25, 0xec, 0x0f, 0x46, 0xba, 0x32,
+	0x7c, 0xb4, 0x8c, 0xa9, 0xf2, 0x3d, 0xa6, 0xca, 0x55, 0x4c, 0x95, 0x9f, 0x31, 0x45, 0xbf, 0x62,
+	0x8a, 0xde, 0x27, 0x14, 0x7d, 0x49, 0x28, 0xfa, 0x9a, 0x50, 0xe5, 0x5b, 0x42, 0x95, 0x65, 0x42,
+	0xd1, 0x65, 0x42, 0xd1, 0x55, 0x42, 0xd1, 0xc7, 0x1f, 0x54, 0x19, 0xa1, 0xd7, 0xd5, 0xec, 0x71,
+	0xf3, 0x6c, 0x5b, 0x85, 0x6b, 0x74, 0xfa, 0x3b, 0x00, 0x00, 0xff, 0xff, 0xaa, 0xd1, 0xb3, 0x03,
+	0xef, 0x04, 0x00, 0x00,
 }

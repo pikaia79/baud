@@ -19,6 +19,7 @@ option (gogoproto.benchgen_all) = false;
 option (gogoproto.goproto_getters_all) = false;
 
 message RequestHeader {
+    uint32 cluster_id         = 1;
 }
 
 message ResponseHeader {
@@ -57,12 +58,21 @@ message Space {
     SpaceStatus status  = 6;
 }
 
+enum PartitionStatus {
+    PA_Invalid      = 0;
+    PA_NOTREAD      = 1;
+    PA_READONLY     = 2;
+    PA_READWRITE    = 3;
+    PA_SPLITTING    = 4;
+}
+
 message Partition {
-    uint32  id         = 1 [(gogoproto.customname) = "ID", (gogoproto.casttype) = "PartitionID"];
-	uint32  db         = 2 [(gogoproto.customname) = "DB", (gogoproto.casttype) = "DBID"];
-	uint32  space      = 3 [(gogoproto.customname) = "Space", (gogoproto.casttype) = "SpaceID"];
-	uint32  start_slot = 4 [(gogoproto.customname) = "StartSlot", (gogoproto.casttype) = "SlotID"];
-	uint32  end_slot   = 5 [(gogoproto.customname) = "EndSlot", (gogoproto.casttype) = "SlotID"];
+    uint32           id         = 1 [(gogoproto.customname) = "ID", (gogoproto.casttype) = "PartitionID"];
+    uint32           db         = 2 [(gogoproto.customname) = "DB", (gogoproto.casttype) = "DBID"];
+    uint32           space      = 3 [(gogoproto.customname) = "Space", (gogoproto.casttype) = "SpaceID"];
+    uint32           start_slot = 4 [(gogoproto.customname) = "StartSlot", (gogoproto.casttype) = "SlotID"];
+    uint32           end_slot   = 5 [(gogoproto.customname) = "EndSlot", (gogoproto.casttype) = "SlotID"];
+    PartitionStatus  status     = 6;
 }
 
 enum ReplicaStatus {
