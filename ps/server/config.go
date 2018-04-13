@@ -1,11 +1,11 @@
 package server
 
 import (
+	"errors"
 	"fmt"
 	"strconv"
 
-	"github.com/pkg/errors"
-	"github.com/tiglabs/baud/proto"
+	"github.com/tiglabs/baud/proto/metapb"
 	"github.com/tiglabs/baud/util/bytes"
 	"github.com/tiglabs/baud/util/config"
 	"github.com/tiglabs/baud/util/json"
@@ -19,7 +19,7 @@ type Config struct {
 	AppVersion string
 	RPCPort    int
 	DataPath   string
-	NodeID     proto.NodeID
+	NodeID     metapb.NodeID
 
 	LogDir    string
 	LogModule string
@@ -63,8 +63,8 @@ func LoadConfig(conf *config.Config) (*Config, error) {
 		multierr.Append(errors.New("data.path not specified"))
 	}
 	if nodeID := conf.GetString("node.id"); nodeID == "" {
-		if id, err := strconv.ParseUint(nodeID, 10, 64); err == nil {
-			c.NodeID = id
+		if id, err := strconv.ParseUint(nodeID, 10, 32); err == nil {
+			c.NodeID = metapb.NodeID(id)
 		}
 	}
 

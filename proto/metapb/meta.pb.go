@@ -14,21 +14,21 @@
 		Space
 		Partition
 		Replica
-		PartitionServer
-		ServerResource
-		Route
+		Node
+		RaftAddrs
+		NodeResource
 */
 package metapb
 
-import (
-	"fmt"
-	"io"
-	"math"
+import proto "github.com/gogo/protobuf/proto"
+import fmt "fmt"
+import math "math"
+import _ "github.com/gogo/protobuf/gogoproto"
 
-	proto "github.com/golang/protobuf/proto"
+import strings "strings"
+import reflect "reflect"
 
-	_ "github.com/gogo/protobuf/gogoproto"
-)
+import io "io"
 
 // Reference imports to suppress errors if they are not otherwise used.
 var _ = proto.Marshal
@@ -39,22 +39,17 @@ var _ = math.Inf
 // is compatible with the proto package it is being compiled against.
 // A compilation error at this line likely means your copy of the
 // proto package needs to be updated.
-const _ = proto.ProtoPackageIsVersion2 // please upgrade the proto package
+const _ = proto.GoGoProtoPackageIsVersion2 // please upgrade the proto package
 
 type SpaceStatus int32
 
 const (
-	SpaceStatus_SS_Invalid SpaceStatus = 0
-	// 初始状态，space刚刚创建，分片还不能提供服务
-	SpaceStatus_SS_Init SpaceStatus = 1
-	// 准备状态，等待space的初始分片补足三个副本
-	SpaceStatus_SS_Prepare SpaceStatus = 2
-	// 正常状态，可以提供完全的服务
-	SpaceStatus_SS_Running SpaceStatus = 3
-	// 标记删除，元数据都保留，允许分片参与调度,但不能分裂
-	SpaceStatus_SS_Delete SpaceStatus = 4
-	// 正在删除
-	SpaceStatus_SS_Deleting SpaceStatus = 5
+	SS_Invalid  SpaceStatus = 0
+	SS_Init     SpaceStatus = 1
+	SS_Prepare  SpaceStatus = 2
+	SS_Running  SpaceStatus = 3
+	SS_Delete   SpaceStatus = 4
+	SS_Deleting SpaceStatus = 5
 )
 
 var SpaceStatus_name = map[int32]string{
@@ -79,387 +74,639 @@ func (x SpaceStatus) String() string {
 }
 func (SpaceStatus) EnumDescriptor() ([]byte, []int) { return fileDescriptorMeta, []int{0} }
 
-type ReplicaStatue int32
+type SpaceType int32
 
 const (
-	ReplicaStatue_RS_Invalid ReplicaStatue = 0
+	ST_ENTITY SpaceType = 0
+	ST_EDGE   SpaceType = 1
+	ST_BLOB   SpaceType = 2
 )
 
-var ReplicaStatue_name = map[int32]string{
+var SpaceType_name = map[int32]string{
+	0: "ST_ENTITY",
+	1: "ST_EDGE",
+	2: "ST_BLOB",
+}
+var SpaceType_value = map[string]int32{
+	"ST_ENTITY": 0,
+	"ST_EDGE":   1,
+	"ST_BLOB":   2,
+}
+
+func (x SpaceType) String() string {
+	return proto.EnumName(SpaceType_name, int32(x))
+}
+func (SpaceType) EnumDescriptor() ([]byte, []int) { return fileDescriptorMeta, []int{1} }
+
+type PartitionStatus int32
+
+const (
+	PartitionStatus_PA_Invalid   PartitionStatus = 0
+	PartitionStatus_PA_NOTREAD   PartitionStatus = 1
+	PartitionStatus_PA_READONLY  PartitionStatus = 2
+	PartitionStatus_PA_READWRITE PartitionStatus = 3
+	PartitionStatus_PA_SPLITTING PartitionStatus = 4
+)
+
+var PartitionStatus_name = map[int32]string{
+	0: "PA_Invalid",
+	1: "PA_NOTREAD",
+	2: "PA_READONLY",
+	3: "PA_READWRITE",
+	4: "PA_SPLITTING",
+}
+var PartitionStatus_value = map[string]int32{
+	"PA_Invalid":   0,
+	"PA_NOTREAD":   1,
+	"PA_READONLY":  2,
+	"PA_READWRITE": 3,
+	"PA_SPLITTING": 4,
+}
+
+func (x PartitionStatus) String() string {
+	return proto.EnumName(PartitionStatus_name, int32(x))
+}
+func (PartitionStatus) EnumDescriptor() ([]byte, []int) { return fileDescriptorMeta, []int{2} }
+
+type ReplicaStatus int32
+
+const (
+	RS_Invalid ReplicaStatus = 0
+)
+
+var ReplicaStatus_name = map[int32]string{
 	0: "RS_Invalid",
 }
-var ReplicaStatue_value = map[string]int32{
+var ReplicaStatus_value = map[string]int32{
 	"RS_Invalid": 0,
 }
 
-func (x ReplicaStatue) String() string {
-	return proto.EnumName(ReplicaStatue_name, int32(x))
+func (x ReplicaStatus) String() string {
+	return proto.EnumName(ReplicaStatus_name, int32(x))
 }
-func (ReplicaStatue) EnumDescriptor() ([]byte, []int) { return fileDescriptorMeta, []int{1} }
+func (ReplicaStatus) EnumDescriptor() ([]byte, []int) { return fileDescriptorMeta, []int{3} }
 
-type PSStatus int32
+type NodeStatus int32
 
 const (
-	PSStatus_PS_Invalid PSStatus = 0
-	PSStatus_PS_Initial PSStatus = 1
-	PSStatus_PS_Login   PSStatus = 2
-	PSStatus_PS_Offline PSStatus = 3
-	PSStatus_PS_Logout  PSStatus = 4
+	NS_INVALID NodeStatus = 0
+	NS_INITIAL NodeStatus = 1
+	NS_LOGIN   NodeStatus = 2
+	NS_OFFLINE NodeStatus = 3
+	NS_LOGOUT  NodeStatus = 4
+	NS_UPGRADE NodeStatus = 5
 )
 
-var PSStatus_name = map[int32]string{
-	0: "PS_Invalid",
-	1: "PS_Initial",
-	2: "PS_Login",
-	3: "PS_Offline",
-	4: "PS_Logout",
+var NodeStatus_name = map[int32]string{
+	0: "NS_INVALID",
+	1: "NS_INITIAL",
+	2: "NS_LOGIN",
+	3: "NS_OFFLINE",
+	4: "NS_LOGOUT",
+	5: "NS_UPGRADE",
 }
-var PSStatus_value = map[string]int32{
-	"PS_Invalid": 0,
-	"PS_Initial": 1,
-	"PS_Login":   2,
-	"PS_Offline": 3,
-	"PS_Logout":  4,
+var NodeStatus_value = map[string]int32{
+	"NS_INVALID": 0,
+	"NS_INITIAL": 1,
+	"NS_LOGIN":   2,
+	"NS_OFFLINE": 3,
+	"NS_LOGOUT":  4,
+	"NS_UPGRADE": 5,
 }
 
-func (x PSStatus) String() string {
-	return proto.EnumName(PSStatus_name, int32(x))
+func (x NodeStatus) String() string {
+	return proto.EnumName(NodeStatus_name, int32(x))
 }
-func (PSStatus) EnumDescriptor() ([]byte, []int) { return fileDescriptorMeta, []int{2} }
+func (NodeStatus) EnumDescriptor() ([]byte, []int) { return fileDescriptorMeta, []int{4} }
 
 type RequestHeader struct {
+	ClusterId uint32 `protobuf:"varint,1,opt,name=cluster_id,json=clusterId,proto3" json:"cluster_id,omitempty"`
 }
 
 func (m *RequestHeader) Reset()                    { *m = RequestHeader{} }
-func (m *RequestHeader) String() string            { return proto.CompactTextString(m) }
 func (*RequestHeader) ProtoMessage()               {}
 func (*RequestHeader) Descriptor() ([]byte, []int) { return fileDescriptorMeta, []int{0} }
 
 type ResponseHeader struct {
-	Code int32  `protobuf:"varint,1,opt,name=code,proto3" json:"code,omitempty"`
-	Msg  string `protobuf:"bytes,2,opt,name=msg,proto3" json:"msg,omitempty"`
+	Code    int16  `protobuf:"varint,1,opt,name=code,proto3,casttype=int16" json:"code,omitempty"`
+	Message string `protobuf:"bytes,2,opt,name=message,proto3" json:"message,omitempty"`
 }
 
 func (m *ResponseHeader) Reset()                    { *m = ResponseHeader{} }
-func (m *ResponseHeader) String() string            { return proto.CompactTextString(m) }
 func (*ResponseHeader) ProtoMessage()               {}
 func (*ResponseHeader) Descriptor() ([]byte, []int) { return fileDescriptorMeta, []int{1} }
 
-func (m *ResponseHeader) GetCode() int32 {
-	if m != nil {
-		return m.Code
-	}
-	return 0
-}
-
-func (m *ResponseHeader) GetMsg() string {
-	if m != nil {
-		return m.Msg
-	}
-	return ""
-}
-
 type DB struct {
-	Id   uint32 `protobuf:"varint,1,opt,name=id,proto3" json:"id,omitempty"`
+	ID   DBID   `protobuf:"varint,1,opt,name=id,proto3,casttype=DBID" json:"id,omitempty"`
 	Name string `protobuf:"bytes,2,opt,name=name,proto3" json:"name,omitempty"`
 }
 
 func (m *DB) Reset()                    { *m = DB{} }
-func (m *DB) String() string            { return proto.CompactTextString(m) }
 func (*DB) ProtoMessage()               {}
 func (*DB) Descriptor() ([]byte, []int) { return fileDescriptorMeta, []int{2} }
 
-func (m *DB) GetId() uint32 {
-	if m != nil {
-		return m.Id
-	}
-	return 0
-}
-
-func (m *DB) GetName() string {
-	if m != nil {
-		return m.Name
-	}
-	return ""
-}
-
 type Space struct {
-	Type   string      `protobuf:"bytes,1,opt,name=type,proto3" json:"type,omitempty"`
-	Id     uint32      `protobuf:"varint,2,opt,name=id,proto3" json:"id,omitempty"`
-	Name   string      `protobuf:"bytes,3,opt,name=name,proto3" json:"name,omitempty"`
-	DbId   uint32      `protobuf:"varint,4,opt,name=db_id,json=dbId,proto3" json:"db_id,omitempty"`
-	DbName string      `protobuf:"bytes,5,opt,name=db_name,json=dbName,proto3" json:"db_name,omitempty"`
-	Status SpaceStatus `protobuf:"varint,6,opt,name=status,proto3,enum=metapb.SpaceStatus" json:"status,omitempty"`
+	ID     SpaceID     `protobuf:"varint,1,opt,name=id,proto3,casttype=SpaceID" json:"id,omitempty"`
+	DB     DBID        `protobuf:"varint,2,opt,name=db,proto3,casttype=DBID" json:"db,omitempty"`
+	DbName string      `protobuf:"bytes,3,opt,name=db_name,json=dbName,proto3" json:"db_name,omitempty"`
+	Name   string      `protobuf:"bytes,4,opt,name=name,proto3" json:"name,omitempty"`
+	Type   SpaceType   `protobuf:"varint,5,opt,name=type,proto3,enum=SpaceType" json:"type,omitempty"`
+	Status SpaceStatus `protobuf:"varint,6,opt,name=status,proto3,enum=SpaceStatus" json:"status,omitempty"`
 }
 
 func (m *Space) Reset()                    { *m = Space{} }
-func (m *Space) String() string            { return proto.CompactTextString(m) }
 func (*Space) ProtoMessage()               {}
 func (*Space) Descriptor() ([]byte, []int) { return fileDescriptorMeta, []int{3} }
 
-func (m *Space) GetType() string {
-	if m != nil {
-		return m.Type
-	}
-	return ""
-}
-
-func (m *Space) GetId() uint32 {
-	if m != nil {
-		return m.Id
-	}
-	return 0
-}
-
-func (m *Space) GetName() string {
-	if m != nil {
-		return m.Name
-	}
-	return ""
-}
-
-func (m *Space) GetDbId() uint32 {
-	if m != nil {
-		return m.DbId
-	}
-	return 0
-}
-
-func (m *Space) GetDbName() string {
-	if m != nil {
-		return m.DbName
-	}
-	return ""
-}
-
-func (m *Space) GetStatus() SpaceStatus {
-	if m != nil {
-		return m.Status
-	}
-	return SpaceStatus_SS_Invalid
-}
-
 type Partition struct {
-	Id        uint32 `protobuf:"varint,1,opt,name=id,proto3" json:"id,omitempty"`
-	Type      string `protobuf:"bytes,2,opt,name=type,proto3" json:"type,omitempty"`
-	DbId      uint32 `protobuf:"varint,3,opt,name=db_id,json=dbId,proto3" json:"db_id,omitempty"`
-	SpaceId   uint32 `protobuf:"varint,4,opt,name=space_id,json=spaceId,proto3" json:"space_id,omitempty"`
-	StartSlot uint32 `protobuf:"varint,5,opt,name=start_slot,json=startSlot,proto3" json:"start_slot,omitempty"`
-	EndSlot   uint32 `protobuf:"varint,6,opt,name=end_slot,json=endSlot,proto3" json:"end_slot,omitempty"`
+	ID        PartitionID     `protobuf:"varint,1,opt,name=id,proto3,casttype=PartitionID" json:"id,omitempty"`
+	DB        DBID            `protobuf:"varint,2,opt,name=db,proto3,casttype=DBID" json:"db,omitempty"`
+	Space     SpaceID         `protobuf:"varint,3,opt,name=space,proto3,casttype=SpaceID" json:"space,omitempty"`
+	StartSlot SlotID          `protobuf:"varint,4,opt,name=start_slot,json=startSlot,proto3,casttype=SlotID" json:"start_slot,omitempty"`
+	EndSlot   SlotID          `protobuf:"varint,5,opt,name=end_slot,json=endSlot,proto3,casttype=SlotID" json:"end_slot,omitempty"`
+	Status    PartitionStatus `protobuf:"varint,6,opt,name=status,proto3,enum=PartitionStatus" json:"status,omitempty"`
 }
 
 func (m *Partition) Reset()                    { *m = Partition{} }
-func (m *Partition) String() string            { return proto.CompactTextString(m) }
 func (*Partition) ProtoMessage()               {}
 func (*Partition) Descriptor() ([]byte, []int) { return fileDescriptorMeta, []int{4} }
 
-func (m *Partition) GetId() uint32 {
-	if m != nil {
-		return m.Id
-	}
-	return 0
-}
-
-func (m *Partition) GetType() string {
-	if m != nil {
-		return m.Type
-	}
-	return ""
-}
-
-func (m *Partition) GetDbId() uint32 {
-	if m != nil {
-		return m.DbId
-	}
-	return 0
-}
-
-func (m *Partition) GetSpaceId() uint32 {
-	if m != nil {
-		return m.SpaceId
-	}
-	return 0
-}
-
-func (m *Partition) GetStartSlot() uint32 {
-	if m != nil {
-		return m.StartSlot
-	}
-	return 0
-}
-
-func (m *Partition) GetEndSlot() uint32 {
-	if m != nil {
-		return m.EndSlot
-	}
-	return 0
-}
-
 type Replica struct {
-	Id          uint32        `protobuf:"varint,1,opt,name=id,proto3" json:"id,omitempty"`
-	PartitionId uint32        `protobuf:"varint,2,opt,name=partition_id,json=partitionId,proto3" json:"partition_id,omitempty"`
-	PsId        uint32        `protobuf:"varint,3,opt,name=ps_id,json=psId,proto3" json:"ps_id,omitempty"`
-	Status      ReplicaStatue `protobuf:"varint,4,opt,name=status,proto3,enum=metapb.ReplicaStatue" json:"status,omitempty"`
-	IsLeader    bool          `protobuf:"varint,5,opt,name=is_leader,json=isLeader,proto3" json:"is_leader,omitempty"`
+	ID        ReplicaID     `protobuf:"varint,1,opt,name=id,proto3,casttype=ReplicaID" json:"id,omitempty"`
+	Partition PartitionID   `protobuf:"varint,2,opt,name=partition,proto3,casttype=PartitionID" json:"partition,omitempty"`
+	Node      *Node         `protobuf:"bytes,3,opt,name=node" json:"node,omitempty"`
+	IsLeader  bool          `protobuf:"varint,4,opt,name=is_leader,json=isLeader,proto3" json:"is_leader,omitempty"`
+	Status    ReplicaStatus `protobuf:"varint,5,opt,name=status,proto3,enum=ReplicaStatus" json:"status,omitempty"`
 }
 
 func (m *Replica) Reset()                    { *m = Replica{} }
-func (m *Replica) String() string            { return proto.CompactTextString(m) }
 func (*Replica) ProtoMessage()               {}
 func (*Replica) Descriptor() ([]byte, []int) { return fileDescriptorMeta, []int{5} }
 
-func (m *Replica) GetId() uint32 {
-	if m != nil {
-		return m.Id
-	}
-	return 0
+type Node struct {
+	ID        NodeID `protobuf:"varint,1,opt,name=id,proto3,casttype=NodeID" json:"id,omitempty"`
+	Ip        string `protobuf:"bytes,2,opt,name=ip,proto3" json:"ip,omitempty"`
+	Port      int    `protobuf:"varint,3,opt,name=port,proto3,casttype=int" json:"port,omitempty"`
+	Zone      string `protobuf:"bytes,4,opt,name=zone,proto3" json:"zone,omitempty"`
+	Version   string `protobuf:"bytes,5,opt,name=version,proto3" json:"version,omitempty"`
+	RaftAddrs `protobuf:"bytes,6,opt,name=raft_addrs,json=raftAddrs,embedded=raft_addrs" json:"raft_addrs"`
+	State     NodeStatus `protobuf:"varint,7,opt,name=state,proto3,enum=NodeStatus" json:"state,omitempty"`
 }
 
-func (m *Replica) GetPartitionId() uint32 {
-	if m != nil {
-		return m.PartitionId
-	}
-	return 0
+func (m *Node) Reset()                    { *m = Node{} }
+func (*Node) ProtoMessage()               {}
+func (*Node) Descriptor() ([]byte, []int) { return fileDescriptorMeta, []int{6} }
+
+type RaftAddrs struct {
+	HeartbeatAddr string `protobuf:"bytes,1,opt,name=heartbeat_addr,json=heartbeatAddr,proto3" json:"heartbeat_addr,omitempty"`
+	ReplicateAddr string `protobuf:"bytes,2,opt,name=replicate_addr,json=replicateAddr,proto3" json:"replicate_addr,omitempty"`
 }
 
-func (m *Replica) GetPsId() uint32 {
-	if m != nil {
-		return m.PsId
-	}
-	return 0
-}
+func (m *RaftAddrs) Reset()                    { *m = RaftAddrs{} }
+func (*RaftAddrs) ProtoMessage()               {}
+func (*RaftAddrs) Descriptor() ([]byte, []int) { return fileDescriptorMeta, []int{7} }
 
-func (m *Replica) GetStatus() ReplicaStatue {
-	if m != nil {
-		return m.Status
-	}
-	return ReplicaStatue_RS_Invalid
-}
-
-func (m *Replica) GetIsLeader() bool {
-	if m != nil {
-		return m.IsLeader
-	}
-	return false
-}
-
-type PartitionServer struct {
-	Id   uint32 `protobuf:"varint,1,opt,name=id,proto3" json:"id,omitempty"`
-	Zone string `protobuf:"bytes,3,opt,name=zone,proto3" json:"zone,omitempty"`
-	Ip   string `protobuf:"bytes,4,opt,name=ip,proto3" json:"ip,omitempty"`
-	Port string `protobuf:"bytes,5,opt,name=port,proto3" json:"port,omitempty"`
-}
-
-func (m *PartitionServer) Reset()                    { *m = PartitionServer{} }
-func (m *PartitionServer) String() string            { return proto.CompactTextString(m) }
-func (*PartitionServer) ProtoMessage()               {}
-func (*PartitionServer) Descriptor() ([]byte, []int) { return fileDescriptorMeta, []int{6} }
-
-func (m *PartitionServer) GetId() uint32 {
-	if m != nil {
-		return m.Id
-	}
-	return 0
-}
-
-func (m *PartitionServer) GetZone() string {
-	if m != nil {
-		return m.Zone
-	}
-	return ""
-}
-
-func (m *PartitionServer) GetIp() string {
-	if m != nil {
-		return m.Ip
-	}
-	return ""
-}
-
-func (m *PartitionServer) GetPort() string {
-	if m != nil {
-		return m.Port
-	}
-	return ""
-}
-
-type ServerResource struct {
+type NodeResource struct {
 	Cpu    int32 `protobuf:"varint,1,opt,name=cpu,proto3" json:"cpu,omitempty"`
 	Memory int32 `protobuf:"varint,2,opt,name=memory,proto3" json:"memory,omitempty"`
 	Disk   int32 `protobuf:"varint,3,opt,name=disk,proto3" json:"disk,omitempty"`
 }
 
-func (m *ServerResource) Reset()                    { *m = ServerResource{} }
-func (m *ServerResource) String() string            { return proto.CompactTextString(m) }
-func (*ServerResource) ProtoMessage()               {}
-func (*ServerResource) Descriptor() ([]byte, []int) { return fileDescriptorMeta, []int{7} }
-
-func (m *ServerResource) GetCpu() int32 {
-	if m != nil {
-		return m.Cpu
-	}
-	return 0
-}
-
-func (m *ServerResource) GetMemory() int32 {
-	if m != nil {
-		return m.Memory
-	}
-	return 0
-}
-
-func (m *ServerResource) GetDisk() int32 {
-	if m != nil {
-		return m.Disk
-	}
-	return 0
-}
-
-type Route struct {
-	Partition       *Partition         `protobuf:"bytes,1,opt,name=partition" json:"partition,omitempty"`
-	PartitionServer []*PartitionServer `protobuf:"bytes,2,rep,name=partition_server,json=partitionServer" json:"partition_server,omitempty"`
-	LeaderPsId      uint32             `protobuf:"varint,3,opt,name=leader_ps_id,json=leaderPsId,proto3" json:"leader_ps_id,omitempty"`
-}
-
-func (m *Route) Reset()                    { *m = Route{} }
-func (m *Route) String() string            { return proto.CompactTextString(m) }
-func (*Route) ProtoMessage()               {}
-func (*Route) Descriptor() ([]byte, []int) { return fileDescriptorMeta, []int{8} }
-
-func (m *Route) GetPartition() *Partition {
-	if m != nil {
-		return m.Partition
-	}
-	return nil
-}
-
-func (m *Route) GetPartitionServer() []*PartitionServer {
-	if m != nil {
-		return m.PartitionServer
-	}
-	return nil
-}
-
-func (m *Route) GetLeaderPsId() uint32 {
-	if m != nil {
-		return m.LeaderPsId
-	}
-	return 0
-}
+func (m *NodeResource) Reset()                    { *m = NodeResource{} }
+func (*NodeResource) ProtoMessage()               {}
+func (*NodeResource) Descriptor() ([]byte, []int) { return fileDescriptorMeta, []int{8} }
 
 func init() {
-	proto.RegisterType((*RequestHeader)(nil), "metapb.RequestHeader")
-	proto.RegisterType((*ResponseHeader)(nil), "metapb.ResponseHeader")
-	proto.RegisterType((*DB)(nil), "metapb.DB")
-	proto.RegisterType((*Space)(nil), "metapb.Space")
-	proto.RegisterType((*Partition)(nil), "metapb.Partition")
-	proto.RegisterType((*Replica)(nil), "metapb.Replica")
-	proto.RegisterType((*PartitionServer)(nil), "metapb.PartitionServer")
-	proto.RegisterType((*ServerResource)(nil), "metapb.ServerResource")
-	proto.RegisterType((*Route)(nil), "metapb.Route")
-	proto.RegisterEnum("metapb.SpaceStatus", SpaceStatus_name, SpaceStatus_value)
-	proto.RegisterEnum("metapb.ReplicaStatue", ReplicaStatue_name, ReplicaStatue_value)
-	proto.RegisterEnum("metapb.PSStatus", PSStatus_name, PSStatus_value)
+	proto.RegisterType((*RequestHeader)(nil), "RequestHeader")
+	proto.RegisterType((*ResponseHeader)(nil), "ResponseHeader")
+	proto.RegisterType((*DB)(nil), "DB")
+	proto.RegisterType((*Space)(nil), "Space")
+	proto.RegisterType((*Partition)(nil), "Partition")
+	proto.RegisterType((*Replica)(nil), "Replica")
+	proto.RegisterType((*Node)(nil), "Node")
+	proto.RegisterType((*RaftAddrs)(nil), "RaftAddrs")
+	proto.RegisterType((*NodeResource)(nil), "NodeResource")
+	proto.RegisterEnum("SpaceStatus", SpaceStatus_name, SpaceStatus_value)
+	proto.RegisterEnum("SpaceType", SpaceType_name, SpaceType_value)
+	proto.RegisterEnum("PartitionStatus", PartitionStatus_name, PartitionStatus_value)
+	proto.RegisterEnum("ReplicaStatus", ReplicaStatus_name, ReplicaStatus_value)
+	proto.RegisterEnum("NodeStatus", NodeStatus_name, NodeStatus_value)
+}
+func (this *RequestHeader) Equal(that interface{}) bool {
+	if that == nil {
+		return this == nil
+	}
+
+	that1, ok := that.(*RequestHeader)
+	if !ok {
+		that2, ok := that.(RequestHeader)
+		if ok {
+			that1 = &that2
+		} else {
+			return false
+		}
+	}
+	if that1 == nil {
+		return this == nil
+	} else if this == nil {
+		return false
+	}
+	if this.ClusterId != that1.ClusterId {
+		return false
+	}
+	return true
+}
+func (this *ResponseHeader) Equal(that interface{}) bool {
+	if that == nil {
+		return this == nil
+	}
+
+	that1, ok := that.(*ResponseHeader)
+	if !ok {
+		that2, ok := that.(ResponseHeader)
+		if ok {
+			that1 = &that2
+		} else {
+			return false
+		}
+	}
+	if that1 == nil {
+		return this == nil
+	} else if this == nil {
+		return false
+	}
+	if this.Code != that1.Code {
+		return false
+	}
+	if this.Message != that1.Message {
+		return false
+	}
+	return true
+}
+func (this *DB) Equal(that interface{}) bool {
+	if that == nil {
+		return this == nil
+	}
+
+	that1, ok := that.(*DB)
+	if !ok {
+		that2, ok := that.(DB)
+		if ok {
+			that1 = &that2
+		} else {
+			return false
+		}
+	}
+	if that1 == nil {
+		return this == nil
+	} else if this == nil {
+		return false
+	}
+	if this.ID != that1.ID {
+		return false
+	}
+	if this.Name != that1.Name {
+		return false
+	}
+	return true
+}
+func (this *Space) Equal(that interface{}) bool {
+	if that == nil {
+		return this == nil
+	}
+
+	that1, ok := that.(*Space)
+	if !ok {
+		that2, ok := that.(Space)
+		if ok {
+			that1 = &that2
+		} else {
+			return false
+		}
+	}
+	if that1 == nil {
+		return this == nil
+	} else if this == nil {
+		return false
+	}
+	if this.ID != that1.ID {
+		return false
+	}
+	if this.DB != that1.DB {
+		return false
+	}
+	if this.DbName != that1.DbName {
+		return false
+	}
+	if this.Name != that1.Name {
+		return false
+	}
+	if this.Type != that1.Type {
+		return false
+	}
+	if this.Status != that1.Status {
+		return false
+	}
+	return true
+}
+func (this *Partition) Equal(that interface{}) bool {
+	if that == nil {
+		return this == nil
+	}
+
+	that1, ok := that.(*Partition)
+	if !ok {
+		that2, ok := that.(Partition)
+		if ok {
+			that1 = &that2
+		} else {
+			return false
+		}
+	}
+	if that1 == nil {
+		return this == nil
+	} else if this == nil {
+		return false
+	}
+	if this.ID != that1.ID {
+		return false
+	}
+	if this.DB != that1.DB {
+		return false
+	}
+	if this.Space != that1.Space {
+		return false
+	}
+	if this.StartSlot != that1.StartSlot {
+		return false
+	}
+	if this.EndSlot != that1.EndSlot {
+		return false
+	}
+	if this.Status != that1.Status {
+		return false
+	}
+	return true
+}
+func (this *Replica) Equal(that interface{}) bool {
+	if that == nil {
+		return this == nil
+	}
+
+	that1, ok := that.(*Replica)
+	if !ok {
+		that2, ok := that.(Replica)
+		if ok {
+			that1 = &that2
+		} else {
+			return false
+		}
+	}
+	if that1 == nil {
+		return this == nil
+	} else if this == nil {
+		return false
+	}
+	if this.ID != that1.ID {
+		return false
+	}
+	if this.Partition != that1.Partition {
+		return false
+	}
+	if !this.Node.Equal(that1.Node) {
+		return false
+	}
+	if this.IsLeader != that1.IsLeader {
+		return false
+	}
+	if this.Status != that1.Status {
+		return false
+	}
+	return true
+}
+func (this *Node) Equal(that interface{}) bool {
+	if that == nil {
+		return this == nil
+	}
+
+	that1, ok := that.(*Node)
+	if !ok {
+		that2, ok := that.(Node)
+		if ok {
+			that1 = &that2
+		} else {
+			return false
+		}
+	}
+	if that1 == nil {
+		return this == nil
+	} else if this == nil {
+		return false
+	}
+	if this.ID != that1.ID {
+		return false
+	}
+	if this.Ip != that1.Ip {
+		return false
+	}
+	if this.Port != that1.Port {
+		return false
+	}
+	if this.Zone != that1.Zone {
+		return false
+	}
+	if this.Version != that1.Version {
+		return false
+	}
+	if !this.RaftAddrs.Equal(&that1.RaftAddrs) {
+		return false
+	}
+	if this.State != that1.State {
+		return false
+	}
+	return true
+}
+func (this *RaftAddrs) Equal(that interface{}) bool {
+	if that == nil {
+		return this == nil
+	}
+
+	that1, ok := that.(*RaftAddrs)
+	if !ok {
+		that2, ok := that.(RaftAddrs)
+		if ok {
+			that1 = &that2
+		} else {
+			return false
+		}
+	}
+	if that1 == nil {
+		return this == nil
+	} else if this == nil {
+		return false
+	}
+	if this.HeartbeatAddr != that1.HeartbeatAddr {
+		return false
+	}
+	if this.ReplicateAddr != that1.ReplicateAddr {
+		return false
+	}
+	return true
+}
+func (this *NodeResource) Equal(that interface{}) bool {
+	if that == nil {
+		return this == nil
+	}
+
+	that1, ok := that.(*NodeResource)
+	if !ok {
+		that2, ok := that.(NodeResource)
+		if ok {
+			that1 = &that2
+		} else {
+			return false
+		}
+	}
+	if that1 == nil {
+		return this == nil
+	} else if this == nil {
+		return false
+	}
+	if this.Cpu != that1.Cpu {
+		return false
+	}
+	if this.Memory != that1.Memory {
+		return false
+	}
+	if this.Disk != that1.Disk {
+		return false
+	}
+	return true
+}
+func (this *RequestHeader) GoString() string {
+	if this == nil {
+		return "nil"
+	}
+	s := make([]string, 0, 5)
+	s = append(s, "&metapb.RequestHeader{")
+	s = append(s, "ClusterId: "+fmt.Sprintf("%#v", this.ClusterId)+",\n")
+	s = append(s, "}")
+	return strings.Join(s, "")
+}
+func (this *ResponseHeader) GoString() string {
+	if this == nil {
+		return "nil"
+	}
+	s := make([]string, 0, 6)
+	s = append(s, "&metapb.ResponseHeader{")
+	s = append(s, "Code: "+fmt.Sprintf("%#v", this.Code)+",\n")
+	s = append(s, "Message: "+fmt.Sprintf("%#v", this.Message)+",\n")
+	s = append(s, "}")
+	return strings.Join(s, "")
+}
+func (this *DB) GoString() string {
+	if this == nil {
+		return "nil"
+	}
+	s := make([]string, 0, 6)
+	s = append(s, "&metapb.DB{")
+	s = append(s, "ID: "+fmt.Sprintf("%#v", this.ID)+",\n")
+	s = append(s, "Name: "+fmt.Sprintf("%#v", this.Name)+",\n")
+	s = append(s, "}")
+	return strings.Join(s, "")
+}
+func (this *Space) GoString() string {
+	if this == nil {
+		return "nil"
+	}
+	s := make([]string, 0, 10)
+	s = append(s, "&metapb.Space{")
+	s = append(s, "ID: "+fmt.Sprintf("%#v", this.ID)+",\n")
+	s = append(s, "DB: "+fmt.Sprintf("%#v", this.DB)+",\n")
+	s = append(s, "DbName: "+fmt.Sprintf("%#v", this.DbName)+",\n")
+	s = append(s, "Name: "+fmt.Sprintf("%#v", this.Name)+",\n")
+	s = append(s, "Type: "+fmt.Sprintf("%#v", this.Type)+",\n")
+	s = append(s, "Status: "+fmt.Sprintf("%#v", this.Status)+",\n")
+	s = append(s, "}")
+	return strings.Join(s, "")
+}
+func (this *Partition) GoString() string {
+	if this == nil {
+		return "nil"
+	}
+	s := make([]string, 0, 10)
+	s = append(s, "&metapb.Partition{")
+	s = append(s, "ID: "+fmt.Sprintf("%#v", this.ID)+",\n")
+	s = append(s, "DB: "+fmt.Sprintf("%#v", this.DB)+",\n")
+	s = append(s, "Space: "+fmt.Sprintf("%#v", this.Space)+",\n")
+	s = append(s, "StartSlot: "+fmt.Sprintf("%#v", this.StartSlot)+",\n")
+	s = append(s, "EndSlot: "+fmt.Sprintf("%#v", this.EndSlot)+",\n")
+	s = append(s, "Status: "+fmt.Sprintf("%#v", this.Status)+",\n")
+	s = append(s, "}")
+	return strings.Join(s, "")
+}
+func (this *Replica) GoString() string {
+	if this == nil {
+		return "nil"
+	}
+	s := make([]string, 0, 9)
+	s = append(s, "&metapb.Replica{")
+	s = append(s, "ID: "+fmt.Sprintf("%#v", this.ID)+",\n")
+	s = append(s, "Partition: "+fmt.Sprintf("%#v", this.Partition)+",\n")
+	if this.Node != nil {
+		s = append(s, "Node: "+fmt.Sprintf("%#v", this.Node)+",\n")
+	}
+	s = append(s, "IsLeader: "+fmt.Sprintf("%#v", this.IsLeader)+",\n")
+	s = append(s, "Status: "+fmt.Sprintf("%#v", this.Status)+",\n")
+	s = append(s, "}")
+	return strings.Join(s, "")
+}
+func (this *Node) GoString() string {
+	if this == nil {
+		return "nil"
+	}
+	s := make([]string, 0, 11)
+	s = append(s, "&metapb.Node{")
+	s = append(s, "ID: "+fmt.Sprintf("%#v", this.ID)+",\n")
+	s = append(s, "Ip: "+fmt.Sprintf("%#v", this.Ip)+",\n")
+	s = append(s, "Port: "+fmt.Sprintf("%#v", this.Port)+",\n")
+	s = append(s, "Zone: "+fmt.Sprintf("%#v", this.Zone)+",\n")
+	s = append(s, "Version: "+fmt.Sprintf("%#v", this.Version)+",\n")
+	s = append(s, "RaftAddrs: "+strings.Replace(this.RaftAddrs.GoString(), `&`, ``, 1)+",\n")
+	s = append(s, "State: "+fmt.Sprintf("%#v", this.State)+",\n")
+	s = append(s, "}")
+	return strings.Join(s, "")
+}
+func (this *RaftAddrs) GoString() string {
+	if this == nil {
+		return "nil"
+	}
+	s := make([]string, 0, 6)
+	s = append(s, "&metapb.RaftAddrs{")
+	s = append(s, "HeartbeatAddr: "+fmt.Sprintf("%#v", this.HeartbeatAddr)+",\n")
+	s = append(s, "ReplicateAddr: "+fmt.Sprintf("%#v", this.ReplicateAddr)+",\n")
+	s = append(s, "}")
+	return strings.Join(s, "")
+}
+func (this *NodeResource) GoString() string {
+	if this == nil {
+		return "nil"
+	}
+	s := make([]string, 0, 7)
+	s = append(s, "&metapb.NodeResource{")
+	s = append(s, "Cpu: "+fmt.Sprintf("%#v", this.Cpu)+",\n")
+	s = append(s, "Memory: "+fmt.Sprintf("%#v", this.Memory)+",\n")
+	s = append(s, "Disk: "+fmt.Sprintf("%#v", this.Disk)+",\n")
+	s = append(s, "}")
+	return strings.Join(s, "")
+}
+func valueToGoStringMeta(v interface{}, typ string) string {
+	rv := reflect.ValueOf(v)
+	if rv.IsNil() {
+		return "nil"
+	}
+	pv := reflect.Indirect(rv).Interface()
+	return fmt.Sprintf("func(v %v) *%v { return &v } ( %#v )", typ, typ, pv)
 }
 func (m *RequestHeader) Marshal() (dAtA []byte, err error) {
 	size := m.Size()
@@ -476,6 +723,11 @@ func (m *RequestHeader) MarshalTo(dAtA []byte) (int, error) {
 	_ = i
 	var l int
 	_ = l
+	if m.ClusterId != 0 {
+		dAtA[i] = 0x8
+		i++
+		i = encodeVarintMeta(dAtA, i, uint64(m.ClusterId))
+	}
 	return i, nil
 }
 
@@ -499,11 +751,11 @@ func (m *ResponseHeader) MarshalTo(dAtA []byte) (int, error) {
 		i++
 		i = encodeVarintMeta(dAtA, i, uint64(m.Code))
 	}
-	if len(m.Msg) > 0 {
+	if len(m.Message) > 0 {
 		dAtA[i] = 0x12
 		i++
-		i = encodeVarintMeta(dAtA, i, uint64(len(m.Msg)))
-		i += copy(dAtA[i:], m.Msg)
+		i = encodeVarintMeta(dAtA, i, uint64(len(m.Message)))
+		i += copy(dAtA[i:], m.Message)
 	}
 	return i, nil
 }
@@ -523,10 +775,10 @@ func (m *DB) MarshalTo(dAtA []byte) (int, error) {
 	_ = i
 	var l int
 	_ = l
-	if m.Id != 0 {
+	if m.ID != 0 {
 		dAtA[i] = 0x8
 		i++
-		i = encodeVarintMeta(dAtA, i, uint64(m.Id))
+		i = encodeVarintMeta(dAtA, i, uint64(m.ID))
 	}
 	if len(m.Name) > 0 {
 		dAtA[i] = 0x12
@@ -552,33 +804,32 @@ func (m *Space) MarshalTo(dAtA []byte) (int, error) {
 	_ = i
 	var l int
 	_ = l
-	if len(m.Type) > 0 {
-		dAtA[i] = 0xa
+	if m.ID != 0 {
+		dAtA[i] = 0x8
 		i++
-		i = encodeVarintMeta(dAtA, i, uint64(len(m.Type)))
-		i += copy(dAtA[i:], m.Type)
+		i = encodeVarintMeta(dAtA, i, uint64(m.ID))
 	}
-	if m.Id != 0 {
+	if m.DB != 0 {
 		dAtA[i] = 0x10
 		i++
-		i = encodeVarintMeta(dAtA, i, uint64(m.Id))
+		i = encodeVarintMeta(dAtA, i, uint64(m.DB))
+	}
+	if len(m.DbName) > 0 {
+		dAtA[i] = 0x1a
+		i++
+		i = encodeVarintMeta(dAtA, i, uint64(len(m.DbName)))
+		i += copy(dAtA[i:], m.DbName)
 	}
 	if len(m.Name) > 0 {
-		dAtA[i] = 0x1a
+		dAtA[i] = 0x22
 		i++
 		i = encodeVarintMeta(dAtA, i, uint64(len(m.Name)))
 		i += copy(dAtA[i:], m.Name)
 	}
-	if m.DbId != 0 {
-		dAtA[i] = 0x20
+	if m.Type != 0 {
+		dAtA[i] = 0x28
 		i++
-		i = encodeVarintMeta(dAtA, i, uint64(m.DbId))
-	}
-	if len(m.DbName) > 0 {
-		dAtA[i] = 0x2a
-		i++
-		i = encodeVarintMeta(dAtA, i, uint64(len(m.DbName)))
-		i += copy(dAtA[i:], m.DbName)
+		i = encodeVarintMeta(dAtA, i, uint64(m.Type))
 	}
 	if m.Status != 0 {
 		dAtA[i] = 0x30
@@ -603,36 +854,35 @@ func (m *Partition) MarshalTo(dAtA []byte) (int, error) {
 	_ = i
 	var l int
 	_ = l
-	if m.Id != 0 {
+	if m.ID != 0 {
 		dAtA[i] = 0x8
 		i++
-		i = encodeVarintMeta(dAtA, i, uint64(m.Id))
+		i = encodeVarintMeta(dAtA, i, uint64(m.ID))
 	}
-	if len(m.Type) > 0 {
-		dAtA[i] = 0x12
+	if m.DB != 0 {
+		dAtA[i] = 0x10
 		i++
-		i = encodeVarintMeta(dAtA, i, uint64(len(m.Type)))
-		i += copy(dAtA[i:], m.Type)
+		i = encodeVarintMeta(dAtA, i, uint64(m.DB))
 	}
-	if m.DbId != 0 {
+	if m.Space != 0 {
 		dAtA[i] = 0x18
 		i++
-		i = encodeVarintMeta(dAtA, i, uint64(m.DbId))
-	}
-	if m.SpaceId != 0 {
-		dAtA[i] = 0x20
-		i++
-		i = encodeVarintMeta(dAtA, i, uint64(m.SpaceId))
+		i = encodeVarintMeta(dAtA, i, uint64(m.Space))
 	}
 	if m.StartSlot != 0 {
-		dAtA[i] = 0x28
+		dAtA[i] = 0x20
 		i++
 		i = encodeVarintMeta(dAtA, i, uint64(m.StartSlot))
 	}
 	if m.EndSlot != 0 {
-		dAtA[i] = 0x30
+		dAtA[i] = 0x28
 		i++
 		i = encodeVarintMeta(dAtA, i, uint64(m.EndSlot))
+	}
+	if m.Status != 0 {
+		dAtA[i] = 0x30
+		i++
+		i = encodeVarintMeta(dAtA, i, uint64(m.Status))
 	}
 	return i, nil
 }
@@ -652,28 +902,28 @@ func (m *Replica) MarshalTo(dAtA []byte) (int, error) {
 	_ = i
 	var l int
 	_ = l
-	if m.Id != 0 {
+	if m.ID != 0 {
 		dAtA[i] = 0x8
 		i++
-		i = encodeVarintMeta(dAtA, i, uint64(m.Id))
+		i = encodeVarintMeta(dAtA, i, uint64(m.ID))
 	}
-	if m.PartitionId != 0 {
+	if m.Partition != 0 {
 		dAtA[i] = 0x10
 		i++
-		i = encodeVarintMeta(dAtA, i, uint64(m.PartitionId))
+		i = encodeVarintMeta(dAtA, i, uint64(m.Partition))
 	}
-	if m.PsId != 0 {
-		dAtA[i] = 0x18
+	if m.Node != nil {
+		dAtA[i] = 0x1a
 		i++
-		i = encodeVarintMeta(dAtA, i, uint64(m.PsId))
-	}
-	if m.Status != 0 {
-		dAtA[i] = 0x20
-		i++
-		i = encodeVarintMeta(dAtA, i, uint64(m.Status))
+		i = encodeVarintMeta(dAtA, i, uint64(m.Node.Size()))
+		n1, err := m.Node.MarshalTo(dAtA[i:])
+		if err != nil {
+			return 0, err
+		}
+		i += n1
 	}
 	if m.IsLeader {
-		dAtA[i] = 0x28
+		dAtA[i] = 0x20
 		i++
 		if m.IsLeader {
 			dAtA[i] = 1
@@ -682,10 +932,15 @@ func (m *Replica) MarshalTo(dAtA []byte) (int, error) {
 		}
 		i++
 	}
+	if m.Status != 0 {
+		dAtA[i] = 0x28
+		i++
+		i = encodeVarintMeta(dAtA, i, uint64(m.Status))
+	}
 	return i, nil
 }
 
-func (m *PartitionServer) Marshal() (dAtA []byte, err error) {
+func (m *Node) Marshal() (dAtA []byte, err error) {
 	size := m.Size()
 	dAtA = make([]byte, size)
 	n, err := m.MarshalTo(dAtA)
@@ -695,38 +950,56 @@ func (m *PartitionServer) Marshal() (dAtA []byte, err error) {
 	return dAtA[:n], nil
 }
 
-func (m *PartitionServer) MarshalTo(dAtA []byte) (int, error) {
+func (m *Node) MarshalTo(dAtA []byte) (int, error) {
 	var i int
 	_ = i
 	var l int
 	_ = l
-	if m.Id != 0 {
+	if m.ID != 0 {
 		dAtA[i] = 0x8
 		i++
-		i = encodeVarintMeta(dAtA, i, uint64(m.Id))
-	}
-	if len(m.Zone) > 0 {
-		dAtA[i] = 0x1a
-		i++
-		i = encodeVarintMeta(dAtA, i, uint64(len(m.Zone)))
-		i += copy(dAtA[i:], m.Zone)
+		i = encodeVarintMeta(dAtA, i, uint64(m.ID))
 	}
 	if len(m.Ip) > 0 {
-		dAtA[i] = 0x22
+		dAtA[i] = 0x12
 		i++
 		i = encodeVarintMeta(dAtA, i, uint64(len(m.Ip)))
 		i += copy(dAtA[i:], m.Ip)
 	}
-	if len(m.Port) > 0 {
+	if m.Port != 0 {
+		dAtA[i] = 0x18
+		i++
+		i = encodeVarintMeta(dAtA, i, uint64(m.Port))
+	}
+	if len(m.Zone) > 0 {
+		dAtA[i] = 0x22
+		i++
+		i = encodeVarintMeta(dAtA, i, uint64(len(m.Zone)))
+		i += copy(dAtA[i:], m.Zone)
+	}
+	if len(m.Version) > 0 {
 		dAtA[i] = 0x2a
 		i++
-		i = encodeVarintMeta(dAtA, i, uint64(len(m.Port)))
-		i += copy(dAtA[i:], m.Port)
+		i = encodeVarintMeta(dAtA, i, uint64(len(m.Version)))
+		i += copy(dAtA[i:], m.Version)
+	}
+	dAtA[i] = 0x32
+	i++
+	i = encodeVarintMeta(dAtA, i, uint64(m.RaftAddrs.Size()))
+	n2, err := m.RaftAddrs.MarshalTo(dAtA[i:])
+	if err != nil {
+		return 0, err
+	}
+	i += n2
+	if m.State != 0 {
+		dAtA[i] = 0x38
+		i++
+		i = encodeVarintMeta(dAtA, i, uint64(m.State))
 	}
 	return i, nil
 }
 
-func (m *ServerResource) Marshal() (dAtA []byte, err error) {
+func (m *RaftAddrs) Marshal() (dAtA []byte, err error) {
 	size := m.Size()
 	dAtA = make([]byte, size)
 	n, err := m.MarshalTo(dAtA)
@@ -736,7 +1009,37 @@ func (m *ServerResource) Marshal() (dAtA []byte, err error) {
 	return dAtA[:n], nil
 }
 
-func (m *ServerResource) MarshalTo(dAtA []byte) (int, error) {
+func (m *RaftAddrs) MarshalTo(dAtA []byte) (int, error) {
+	var i int
+	_ = i
+	var l int
+	_ = l
+	if len(m.HeartbeatAddr) > 0 {
+		dAtA[i] = 0xa
+		i++
+		i = encodeVarintMeta(dAtA, i, uint64(len(m.HeartbeatAddr)))
+		i += copy(dAtA[i:], m.HeartbeatAddr)
+	}
+	if len(m.ReplicateAddr) > 0 {
+		dAtA[i] = 0x12
+		i++
+		i = encodeVarintMeta(dAtA, i, uint64(len(m.ReplicateAddr)))
+		i += copy(dAtA[i:], m.ReplicateAddr)
+	}
+	return i, nil
+}
+
+func (m *NodeResource) Marshal() (dAtA []byte, err error) {
+	size := m.Size()
+	dAtA = make([]byte, size)
+	n, err := m.MarshalTo(dAtA)
+	if err != nil {
+		return nil, err
+	}
+	return dAtA[:n], nil
+}
+
+func (m *NodeResource) MarshalTo(dAtA []byte) (int, error) {
 	var i int
 	_ = i
 	var l int
@@ -759,51 +1062,6 @@ func (m *ServerResource) MarshalTo(dAtA []byte) (int, error) {
 	return i, nil
 }
 
-func (m *Route) Marshal() (dAtA []byte, err error) {
-	size := m.Size()
-	dAtA = make([]byte, size)
-	n, err := m.MarshalTo(dAtA)
-	if err != nil {
-		return nil, err
-	}
-	return dAtA[:n], nil
-}
-
-func (m *Route) MarshalTo(dAtA []byte) (int, error) {
-	var i int
-	_ = i
-	var l int
-	_ = l
-	if m.Partition != nil {
-		dAtA[i] = 0xa
-		i++
-		i = encodeVarintMeta(dAtA, i, uint64(m.Partition.Size()))
-		n1, err := m.Partition.MarshalTo(dAtA[i:])
-		if err != nil {
-			return 0, err
-		}
-		i += n1
-	}
-	if len(m.PartitionServer) > 0 {
-		for _, msg := range m.PartitionServer {
-			dAtA[i] = 0x12
-			i++
-			i = encodeVarintMeta(dAtA, i, uint64(msg.Size()))
-			n, err := msg.MarshalTo(dAtA[i:])
-			if err != nil {
-				return 0, err
-			}
-			i += n
-		}
-	}
-	if m.LeaderPsId != 0 {
-		dAtA[i] = 0x18
-		i++
-		i = encodeVarintMeta(dAtA, i, uint64(m.LeaderPsId))
-	}
-	return i, nil
-}
-
 func encodeVarintMeta(dAtA []byte, offset int, v uint64) int {
 	for v >= 1<<7 {
 		dAtA[offset] = uint8(v&0x7f | 0x80)
@@ -813,9 +1071,199 @@ func encodeVarintMeta(dAtA []byte, offset int, v uint64) int {
 	dAtA[offset] = uint8(v)
 	return offset + 1
 }
+func NewPopulatedRequestHeader(r randyMeta, easy bool) *RequestHeader {
+	this := &RequestHeader{}
+	this.ClusterId = uint32(r.Uint32())
+	if !easy && r.Intn(10) != 0 {
+	}
+	return this
+}
+
+func NewPopulatedResponseHeader(r randyMeta, easy bool) *ResponseHeader {
+	this := &ResponseHeader{}
+	this.Code = int16(r.Int31())
+	if r.Intn(2) == 0 {
+		this.Code *= -1
+	}
+	this.Message = string(randStringMeta(r))
+	if !easy && r.Intn(10) != 0 {
+	}
+	return this
+}
+
+func NewPopulatedDB(r randyMeta, easy bool) *DB {
+	this := &DB{}
+	this.ID = DBID(r.Uint32())
+	this.Name = string(randStringMeta(r))
+	if !easy && r.Intn(10) != 0 {
+	}
+	return this
+}
+
+func NewPopulatedSpace(r randyMeta, easy bool) *Space {
+	this := &Space{}
+	this.ID = SpaceID(r.Uint32())
+	this.DB = DBID(r.Uint32())
+	this.DbName = string(randStringMeta(r))
+	this.Name = string(randStringMeta(r))
+	this.Type = SpaceType([]int32{0, 1, 2}[r.Intn(3)])
+	this.Status = SpaceStatus([]int32{0, 1, 2, 3, 4, 5}[r.Intn(6)])
+	if !easy && r.Intn(10) != 0 {
+	}
+	return this
+}
+
+func NewPopulatedPartition(r randyMeta, easy bool) *Partition {
+	this := &Partition{}
+	this.ID = PartitionID(r.Uint32())
+	this.DB = DBID(r.Uint32())
+	this.Space = SpaceID(r.Uint32())
+	this.StartSlot = SlotID(r.Uint32())
+	this.EndSlot = SlotID(r.Uint32())
+	this.Status = PartitionStatus([]int32{0, 1, 2, 3, 4}[r.Intn(5)])
+	if !easy && r.Intn(10) != 0 {
+	}
+	return this
+}
+
+func NewPopulatedReplica(r randyMeta, easy bool) *Replica {
+	this := &Replica{}
+	this.ID = ReplicaID(r.Uint32())
+	this.Partition = PartitionID(r.Uint32())
+	if r.Intn(10) != 0 {
+		this.Node = NewPopulatedNode(r, easy)
+	}
+	this.IsLeader = bool(bool(r.Intn(2) == 0))
+	this.Status = ReplicaStatus([]int32{0}[r.Intn(1)])
+	if !easy && r.Intn(10) != 0 {
+	}
+	return this
+}
+
+func NewPopulatedNode(r randyMeta, easy bool) *Node {
+	this := &Node{}
+	this.ID = NodeID(r.Uint32())
+	this.Ip = string(randStringMeta(r))
+	this.Port = int(r.Int31())
+	if r.Intn(2) == 0 {
+		this.Port *= -1
+	}
+	this.Zone = string(randStringMeta(r))
+	this.Version = string(randStringMeta(r))
+	v1 := NewPopulatedRaftAddrs(r, easy)
+	this.RaftAddrs = *v1
+	this.State = NodeStatus([]int32{0, 1, 2, 3, 4, 5}[r.Intn(6)])
+	if !easy && r.Intn(10) != 0 {
+	}
+	return this
+}
+
+func NewPopulatedRaftAddrs(r randyMeta, easy bool) *RaftAddrs {
+	this := &RaftAddrs{}
+	this.HeartbeatAddr = string(randStringMeta(r))
+	this.ReplicateAddr = string(randStringMeta(r))
+	if !easy && r.Intn(10) != 0 {
+	}
+	return this
+}
+
+func NewPopulatedNodeResource(r randyMeta, easy bool) *NodeResource {
+	this := &NodeResource{}
+	this.Cpu = int32(r.Int31())
+	if r.Intn(2) == 0 {
+		this.Cpu *= -1
+	}
+	this.Memory = int32(r.Int31())
+	if r.Intn(2) == 0 {
+		this.Memory *= -1
+	}
+	this.Disk = int32(r.Int31())
+	if r.Intn(2) == 0 {
+		this.Disk *= -1
+	}
+	if !easy && r.Intn(10) != 0 {
+	}
+	return this
+}
+
+type randyMeta interface {
+	Float32() float32
+	Float64() float64
+	Int63() int64
+	Int31() int32
+	Uint32() uint32
+	Intn(n int) int
+}
+
+func randUTF8RuneMeta(r randyMeta) rune {
+	ru := r.Intn(62)
+	if ru < 10 {
+		return rune(ru + 48)
+	} else if ru < 36 {
+		return rune(ru + 55)
+	}
+	return rune(ru + 61)
+}
+func randStringMeta(r randyMeta) string {
+	v2 := r.Intn(100)
+	tmps := make([]rune, v2)
+	for i := 0; i < v2; i++ {
+		tmps[i] = randUTF8RuneMeta(r)
+	}
+	return string(tmps)
+}
+func randUnrecognizedMeta(r randyMeta, maxFieldNumber int) (dAtA []byte) {
+	l := r.Intn(5)
+	for i := 0; i < l; i++ {
+		wire := r.Intn(4)
+		if wire == 3 {
+			wire = 5
+		}
+		fieldNumber := maxFieldNumber + r.Intn(100)
+		dAtA = randFieldMeta(dAtA, r, fieldNumber, wire)
+	}
+	return dAtA
+}
+func randFieldMeta(dAtA []byte, r randyMeta, fieldNumber int, wire int) []byte {
+	key := uint32(fieldNumber)<<3 | uint32(wire)
+	switch wire {
+	case 0:
+		dAtA = encodeVarintPopulateMeta(dAtA, uint64(key))
+		v3 := r.Int63()
+		if r.Intn(2) == 0 {
+			v3 *= -1
+		}
+		dAtA = encodeVarintPopulateMeta(dAtA, uint64(v3))
+	case 1:
+		dAtA = encodeVarintPopulateMeta(dAtA, uint64(key))
+		dAtA = append(dAtA, byte(r.Intn(256)), byte(r.Intn(256)), byte(r.Intn(256)), byte(r.Intn(256)), byte(r.Intn(256)), byte(r.Intn(256)), byte(r.Intn(256)), byte(r.Intn(256)))
+	case 2:
+		dAtA = encodeVarintPopulateMeta(dAtA, uint64(key))
+		ll := r.Intn(100)
+		dAtA = encodeVarintPopulateMeta(dAtA, uint64(ll))
+		for j := 0; j < ll; j++ {
+			dAtA = append(dAtA, byte(r.Intn(256)))
+		}
+	default:
+		dAtA = encodeVarintPopulateMeta(dAtA, uint64(key))
+		dAtA = append(dAtA, byte(r.Intn(256)), byte(r.Intn(256)), byte(r.Intn(256)), byte(r.Intn(256)))
+	}
+	return dAtA
+}
+func encodeVarintPopulateMeta(dAtA []byte, v uint64) []byte {
+	for v >= 1<<7 {
+		dAtA = append(dAtA, uint8(uint64(v)&0x7f|0x80))
+		v >>= 7
+	}
+	dAtA = append(dAtA, uint8(v))
+	return dAtA
+}
 func (m *RequestHeader) Size() (n int) {
 	var l int
 	_ = l
+	if m.ClusterId != 0 {
+		n += 1 + sovMeta(uint64(m.ClusterId))
+	}
 	return n
 }
 
@@ -825,7 +1273,7 @@ func (m *ResponseHeader) Size() (n int) {
 	if m.Code != 0 {
 		n += 1 + sovMeta(uint64(m.Code))
 	}
-	l = len(m.Msg)
+	l = len(m.Message)
 	if l > 0 {
 		n += 1 + l + sovMeta(uint64(l))
 	}
@@ -835,8 +1283,8 @@ func (m *ResponseHeader) Size() (n int) {
 func (m *DB) Size() (n int) {
 	var l int
 	_ = l
-	if m.Id != 0 {
-		n += 1 + sovMeta(uint64(m.Id))
+	if m.ID != 0 {
+		n += 1 + sovMeta(uint64(m.ID))
 	}
 	l = len(m.Name)
 	if l > 0 {
@@ -848,23 +1296,22 @@ func (m *DB) Size() (n int) {
 func (m *Space) Size() (n int) {
 	var l int
 	_ = l
-	l = len(m.Type)
+	if m.ID != 0 {
+		n += 1 + sovMeta(uint64(m.ID))
+	}
+	if m.DB != 0 {
+		n += 1 + sovMeta(uint64(m.DB))
+	}
+	l = len(m.DbName)
 	if l > 0 {
 		n += 1 + l + sovMeta(uint64(l))
-	}
-	if m.Id != 0 {
-		n += 1 + sovMeta(uint64(m.Id))
 	}
 	l = len(m.Name)
 	if l > 0 {
 		n += 1 + l + sovMeta(uint64(l))
 	}
-	if m.DbId != 0 {
-		n += 1 + sovMeta(uint64(m.DbId))
-	}
-	l = len(m.DbName)
-	if l > 0 {
-		n += 1 + l + sovMeta(uint64(l))
+	if m.Type != 0 {
+		n += 1 + sovMeta(uint64(m.Type))
 	}
 	if m.Status != 0 {
 		n += 1 + sovMeta(uint64(m.Status))
@@ -875,18 +1322,14 @@ func (m *Space) Size() (n int) {
 func (m *Partition) Size() (n int) {
 	var l int
 	_ = l
-	if m.Id != 0 {
-		n += 1 + sovMeta(uint64(m.Id))
+	if m.ID != 0 {
+		n += 1 + sovMeta(uint64(m.ID))
 	}
-	l = len(m.Type)
-	if l > 0 {
-		n += 1 + l + sovMeta(uint64(l))
+	if m.DB != 0 {
+		n += 1 + sovMeta(uint64(m.DB))
 	}
-	if m.DbId != 0 {
-		n += 1 + sovMeta(uint64(m.DbId))
-	}
-	if m.SpaceId != 0 {
-		n += 1 + sovMeta(uint64(m.SpaceId))
+	if m.Space != 0 {
+		n += 1 + sovMeta(uint64(m.Space))
 	}
 	if m.StartSlot != 0 {
 		n += 1 + sovMeta(uint64(m.StartSlot))
@@ -894,52 +1337,78 @@ func (m *Partition) Size() (n int) {
 	if m.EndSlot != 0 {
 		n += 1 + sovMeta(uint64(m.EndSlot))
 	}
+	if m.Status != 0 {
+		n += 1 + sovMeta(uint64(m.Status))
+	}
 	return n
 }
 
 func (m *Replica) Size() (n int) {
 	var l int
 	_ = l
-	if m.Id != 0 {
-		n += 1 + sovMeta(uint64(m.Id))
+	if m.ID != 0 {
+		n += 1 + sovMeta(uint64(m.ID))
 	}
-	if m.PartitionId != 0 {
-		n += 1 + sovMeta(uint64(m.PartitionId))
+	if m.Partition != 0 {
+		n += 1 + sovMeta(uint64(m.Partition))
 	}
-	if m.PsId != 0 {
-		n += 1 + sovMeta(uint64(m.PsId))
-	}
-	if m.Status != 0 {
-		n += 1 + sovMeta(uint64(m.Status))
+	if m.Node != nil {
+		l = m.Node.Size()
+		n += 1 + l + sovMeta(uint64(l))
 	}
 	if m.IsLeader {
 		n += 2
 	}
+	if m.Status != 0 {
+		n += 1 + sovMeta(uint64(m.Status))
+	}
 	return n
 }
 
-func (m *PartitionServer) Size() (n int) {
+func (m *Node) Size() (n int) {
 	var l int
 	_ = l
-	if m.Id != 0 {
-		n += 1 + sovMeta(uint64(m.Id))
-	}
-	l = len(m.Zone)
-	if l > 0 {
-		n += 1 + l + sovMeta(uint64(l))
+	if m.ID != 0 {
+		n += 1 + sovMeta(uint64(m.ID))
 	}
 	l = len(m.Ip)
 	if l > 0 {
 		n += 1 + l + sovMeta(uint64(l))
 	}
-	l = len(m.Port)
+	if m.Port != 0 {
+		n += 1 + sovMeta(uint64(m.Port))
+	}
+	l = len(m.Zone)
+	if l > 0 {
+		n += 1 + l + sovMeta(uint64(l))
+	}
+	l = len(m.Version)
+	if l > 0 {
+		n += 1 + l + sovMeta(uint64(l))
+	}
+	l = m.RaftAddrs.Size()
+	n += 1 + l + sovMeta(uint64(l))
+	if m.State != 0 {
+		n += 1 + sovMeta(uint64(m.State))
+	}
+	return n
+}
+
+func (m *RaftAddrs) Size() (n int) {
+	var l int
+	_ = l
+	l = len(m.HeartbeatAddr)
+	if l > 0 {
+		n += 1 + l + sovMeta(uint64(l))
+	}
+	l = len(m.ReplicateAddr)
 	if l > 0 {
 		n += 1 + l + sovMeta(uint64(l))
 	}
 	return n
 }
 
-func (m *ServerResource) Size() (n int) {
+func (m *NodeResource) Size() (n int) {
 	var l int
 	_ = l
 	if m.Cpu != 0 {
@@ -950,25 +1419,6 @@ func (m *ServerResource) Size() (n int) {
 	}
 	if m.Disk != 0 {
 		n += 1 + sovMeta(uint64(m.Disk))
-	}
-	return n
-}
-
-func (m *Route) Size() (n int) {
-	var l int
-	_ = l
-	if m.Partition != nil {
-		l = m.Partition.Size()
-		n += 1 + l + sovMeta(uint64(l))
-	}
-	if len(m.PartitionServer) > 0 {
-		for _, e := range m.PartitionServer {
-			l = e.Size()
-			n += 1 + l + sovMeta(uint64(l))
-		}
-	}
-	if m.LeaderPsId != 0 {
-		n += 1 + sovMeta(uint64(m.LeaderPsId))
 	}
 	return n
 }
@@ -985,6 +1435,129 @@ func sovMeta(x uint64) (n int) {
 }
 func sozMeta(x uint64) (n int) {
 	return sovMeta(uint64((x << 1) ^ uint64((int64(x) >> 63))))
+}
+func (this *RequestHeader) String() string {
+	if this == nil {
+		return "nil"
+	}
+	s := strings.Join([]string{`&RequestHeader{`,
+		`ClusterId:` + fmt.Sprintf("%v", this.ClusterId) + `,`,
+		`}`,
+	}, "")
+	return s
+}
+func (this *ResponseHeader) String() string {
+	if this == nil {
+		return "nil"
+	}
+	s := strings.Join([]string{`&ResponseHeader{`,
+		`Code:` + fmt.Sprintf("%v", this.Code) + `,`,
+		`Message:` + fmt.Sprintf("%v", this.Message) + `,`,
+		`}`,
+	}, "")
+	return s
+}
+func (this *DB) String() string {
+	if this == nil {
+		return "nil"
+	}
+	s := strings.Join([]string{`&DB{`,
+		`ID:` + fmt.Sprintf("%v", this.ID) + `,`,
+		`Name:` + fmt.Sprintf("%v", this.Name) + `,`,
+		`}`,
+	}, "")
+	return s
+}
+func (this *Space) String() string {
+	if this == nil {
+		return "nil"
+	}
+	s := strings.Join([]string{`&Space{`,
+		`ID:` + fmt.Sprintf("%v", this.ID) + `,`,
+		`DB:` + fmt.Sprintf("%v", this.DB) + `,`,
+		`DbName:` + fmt.Sprintf("%v", this.DbName) + `,`,
+		`Name:` + fmt.Sprintf("%v", this.Name) + `,`,
+		`Type:` + fmt.Sprintf("%v", this.Type) + `,`,
+		`Status:` + fmt.Sprintf("%v", this.Status) + `,`,
+		`}`,
+	}, "")
+	return s
+}
+func (this *Partition) String() string {
+	if this == nil {
+		return "nil"
+	}
+	s := strings.Join([]string{`&Partition{`,
+		`ID:` + fmt.Sprintf("%v", this.ID) + `,`,
+		`DB:` + fmt.Sprintf("%v", this.DB) + `,`,
+		`Space:` + fmt.Sprintf("%v", this.Space) + `,`,
+		`StartSlot:` + fmt.Sprintf("%v", this.StartSlot) + `,`,
+		`EndSlot:` + fmt.Sprintf("%v", this.EndSlot) + `,`,
+		`Status:` + fmt.Sprintf("%v", this.Status) + `,`,
+		`}`,
+	}, "")
+	return s
+}
+func (this *Replica) String() string {
+	if this == nil {
+		return "nil"
+	}
+	s := strings.Join([]string{`&Replica{`,
+		`ID:` + fmt.Sprintf("%v", this.ID) + `,`,
+		`Partition:` + fmt.Sprintf("%v", this.Partition) + `,`,
+		`Node:` + strings.Replace(fmt.Sprintf("%v", this.Node), "Node", "Node", 1) + `,`,
+		`IsLeader:` + fmt.Sprintf("%v", this.IsLeader) + `,`,
+		`Status:` + fmt.Sprintf("%v", this.Status) + `,`,
+		`}`,
+	}, "")
+	return s
+}
+func (this *Node) String() string {
+	if this == nil {
+		return "nil"
+	}
+	s := strings.Join([]string{`&Node{`,
+		`ID:` + fmt.Sprintf("%v", this.ID) + `,`,
+		`Ip:` + fmt.Sprintf("%v", this.Ip) + `,`,
+		`Port:` + fmt.Sprintf("%v", this.Port) + `,`,
+		`Zone:` + fmt.Sprintf("%v", this.Zone) + `,`,
+		`Version:` + fmt.Sprintf("%v", this.Version) + `,`,
+		`RaftAddrs:` + strings.Replace(strings.Replace(this.RaftAddrs.String(), "RaftAddrs", "RaftAddrs", 1), `&`, ``, 1) + `,`,
+		`State:` + fmt.Sprintf("%v", this.State) + `,`,
+		`}`,
+	}, "")
+	return s
+}
+func (this *RaftAddrs) String() string {
+	if this == nil {
+		return "nil"
+	}
+	s := strings.Join([]string{`&RaftAddrs{`,
+		`HeartbeatAddr:` + fmt.Sprintf("%v", this.HeartbeatAddr) + `,`,
+		`ReplicateAddr:` + fmt.Sprintf("%v", this.ReplicateAddr) + `,`,
+		`}`,
+	}, "")
+	return s
+}
+func (this *NodeResource) String() string {
+	if this == nil {
+		return "nil"
+	}
+	s := strings.Join([]string{`&NodeResource{`,
+		`Cpu:` + fmt.Sprintf("%v", this.Cpu) + `,`,
+		`Memory:` + fmt.Sprintf("%v", this.Memory) + `,`,
+		`Disk:` + fmt.Sprintf("%v", this.Disk) + `,`,
+		`}`,
+	}, "")
+	return s
+}
+func valueToStringMeta(v interface{}) string {
+	rv := reflect.ValueOf(v)
+	if rv.IsNil() {
+		return "nil"
+	}
+	pv := reflect.Indirect(rv).Interface()
+	return fmt.Sprintf("*%v", pv)
 }
 func (m *RequestHeader) Unmarshal(dAtA []byte) error {
 	l := len(dAtA)
@@ -1015,6 +1588,25 @@ func (m *RequestHeader) Unmarshal(dAtA []byte) error {
 			return fmt.Errorf("proto: RequestHeader: illegal tag %d (wire type %d)", fieldNum, wire)
 		}
 		switch fieldNum {
+		case 1:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field ClusterId", wireType)
+			}
+			m.ClusterId = 0
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMeta
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				m.ClusterId |= (uint32(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
 		default:
 			iNdEx = preIndex
 			skippy, err := skipMeta(dAtA[iNdEx:])
@@ -1079,14 +1671,14 @@ func (m *ResponseHeader) Unmarshal(dAtA []byte) error {
 				}
 				b := dAtA[iNdEx]
 				iNdEx++
-				m.Code |= (int32(b) & 0x7F) << shift
+				m.Code |= (int16(b) & 0x7F) << shift
 				if b < 0x80 {
 					break
 				}
 			}
 		case 2:
 			if wireType != 2 {
-				return fmt.Errorf("proto: wrong wireType = %d for field Msg", wireType)
+				return fmt.Errorf("proto: wrong wireType = %d for field Message", wireType)
 			}
 			var stringLen uint64
 			for shift := uint(0); ; shift += 7 {
@@ -1111,7 +1703,7 @@ func (m *ResponseHeader) Unmarshal(dAtA []byte) error {
 			if postIndex > l {
 				return io.ErrUnexpectedEOF
 			}
-			m.Msg = string(dAtA[iNdEx:postIndex])
+			m.Message = string(dAtA[iNdEx:postIndex])
 			iNdEx = postIndex
 		default:
 			iNdEx = preIndex
@@ -1165,9 +1757,9 @@ func (m *DB) Unmarshal(dAtA []byte) error {
 		switch fieldNum {
 		case 1:
 			if wireType != 0 {
-				return fmt.Errorf("proto: wrong wireType = %d for field Id", wireType)
+				return fmt.Errorf("proto: wrong wireType = %d for field ID", wireType)
 			}
-			m.Id = 0
+			m.ID = 0
 			for shift := uint(0); ; shift += 7 {
 				if shift >= 64 {
 					return ErrIntOverflowMeta
@@ -1177,7 +1769,7 @@ func (m *DB) Unmarshal(dAtA []byte) error {
 				}
 				b := dAtA[iNdEx]
 				iNdEx++
-				m.Id |= (uint32(b) & 0x7F) << shift
+				m.ID |= (DBID(b) & 0x7F) << shift
 				if b < 0x80 {
 					break
 				}
@@ -1262,10 +1854,10 @@ func (m *Space) Unmarshal(dAtA []byte) error {
 		}
 		switch fieldNum {
 		case 1:
-			if wireType != 2 {
-				return fmt.Errorf("proto: wrong wireType = %d for field Type", wireType)
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field ID", wireType)
 			}
-			var stringLen uint64
+			m.ID = 0
 			for shift := uint(0); ; shift += 7 {
 				if shift >= 64 {
 					return ErrIntOverflowMeta
@@ -1275,26 +1867,16 @@ func (m *Space) Unmarshal(dAtA []byte) error {
 				}
 				b := dAtA[iNdEx]
 				iNdEx++
-				stringLen |= (uint64(b) & 0x7F) << shift
+				m.ID |= (SpaceID(b) & 0x7F) << shift
 				if b < 0x80 {
 					break
 				}
 			}
-			intStringLen := int(stringLen)
-			if intStringLen < 0 {
-				return ErrInvalidLengthMeta
-			}
-			postIndex := iNdEx + intStringLen
-			if postIndex > l {
-				return io.ErrUnexpectedEOF
-			}
-			m.Type = string(dAtA[iNdEx:postIndex])
-			iNdEx = postIndex
 		case 2:
 			if wireType != 0 {
-				return fmt.Errorf("proto: wrong wireType = %d for field Id", wireType)
+				return fmt.Errorf("proto: wrong wireType = %d for field DB", wireType)
 			}
-			m.Id = 0
+			m.DB = 0
 			for shift := uint(0); ; shift += 7 {
 				if shift >= 64 {
 					return ErrIntOverflowMeta
@@ -1304,60 +1886,12 @@ func (m *Space) Unmarshal(dAtA []byte) error {
 				}
 				b := dAtA[iNdEx]
 				iNdEx++
-				m.Id |= (uint32(b) & 0x7F) << shift
+				m.DB |= (DBID(b) & 0x7F) << shift
 				if b < 0x80 {
 					break
 				}
 			}
 		case 3:
-			if wireType != 2 {
-				return fmt.Errorf("proto: wrong wireType = %d for field Name", wireType)
-			}
-			var stringLen uint64
-			for shift := uint(0); ; shift += 7 {
-				if shift >= 64 {
-					return ErrIntOverflowMeta
-				}
-				if iNdEx >= l {
-					return io.ErrUnexpectedEOF
-				}
-				b := dAtA[iNdEx]
-				iNdEx++
-				stringLen |= (uint64(b) & 0x7F) << shift
-				if b < 0x80 {
-					break
-				}
-			}
-			intStringLen := int(stringLen)
-			if intStringLen < 0 {
-				return ErrInvalidLengthMeta
-			}
-			postIndex := iNdEx + intStringLen
-			if postIndex > l {
-				return io.ErrUnexpectedEOF
-			}
-			m.Name = string(dAtA[iNdEx:postIndex])
-			iNdEx = postIndex
-		case 4:
-			if wireType != 0 {
-				return fmt.Errorf("proto: wrong wireType = %d for field DbId", wireType)
-			}
-			m.DbId = 0
-			for shift := uint(0); ; shift += 7 {
-				if shift >= 64 {
-					return ErrIntOverflowMeta
-				}
-				if iNdEx >= l {
-					return io.ErrUnexpectedEOF
-				}
-				b := dAtA[iNdEx]
-				iNdEx++
-				m.DbId |= (uint32(b) & 0x7F) << shift
-				if b < 0x80 {
-					break
-				}
-			}
-		case 5:
 			if wireType != 2 {
 				return fmt.Errorf("proto: wrong wireType = %d for field DbName", wireType)
 			}
@@ -1386,6 +1920,54 @@ func (m *Space) Unmarshal(dAtA []byte) error {
 			}
 			m.DbName = string(dAtA[iNdEx:postIndex])
 			iNdEx = postIndex
+		case 4:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Name", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMeta
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= (uint64(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthMeta
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.Name = string(dAtA[iNdEx:postIndex])
+			iNdEx = postIndex
+		case 5:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Type", wireType)
+			}
+			m.Type = 0
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMeta
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				m.Type |= (SpaceType(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
 		case 6:
 			if wireType != 0 {
 				return fmt.Errorf("proto: wrong wireType = %d for field Status", wireType)
@@ -1457,9 +2039,9 @@ func (m *Partition) Unmarshal(dAtA []byte) error {
 		switch fieldNum {
 		case 1:
 			if wireType != 0 {
-				return fmt.Errorf("proto: wrong wireType = %d for field Id", wireType)
+				return fmt.Errorf("proto: wrong wireType = %d for field ID", wireType)
 			}
-			m.Id = 0
+			m.ID = 0
 			for shift := uint(0); ; shift += 7 {
 				if shift >= 64 {
 					return ErrIntOverflowMeta
@@ -1469,16 +2051,16 @@ func (m *Partition) Unmarshal(dAtA []byte) error {
 				}
 				b := dAtA[iNdEx]
 				iNdEx++
-				m.Id |= (uint32(b) & 0x7F) << shift
+				m.ID |= (PartitionID(b) & 0x7F) << shift
 				if b < 0x80 {
 					break
 				}
 			}
 		case 2:
-			if wireType != 2 {
-				return fmt.Errorf("proto: wrong wireType = %d for field Type", wireType)
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field DB", wireType)
 			}
-			var stringLen uint64
+			m.DB = 0
 			for shift := uint(0); ; shift += 7 {
 				if shift >= 64 {
 					return ErrIntOverflowMeta
@@ -1488,26 +2070,16 @@ func (m *Partition) Unmarshal(dAtA []byte) error {
 				}
 				b := dAtA[iNdEx]
 				iNdEx++
-				stringLen |= (uint64(b) & 0x7F) << shift
+				m.DB |= (DBID(b) & 0x7F) << shift
 				if b < 0x80 {
 					break
 				}
 			}
-			intStringLen := int(stringLen)
-			if intStringLen < 0 {
-				return ErrInvalidLengthMeta
-			}
-			postIndex := iNdEx + intStringLen
-			if postIndex > l {
-				return io.ErrUnexpectedEOF
-			}
-			m.Type = string(dAtA[iNdEx:postIndex])
-			iNdEx = postIndex
 		case 3:
 			if wireType != 0 {
-				return fmt.Errorf("proto: wrong wireType = %d for field DbId", wireType)
+				return fmt.Errorf("proto: wrong wireType = %d for field Space", wireType)
 			}
-			m.DbId = 0
+			m.Space = 0
 			for shift := uint(0); ; shift += 7 {
 				if shift >= 64 {
 					return ErrIntOverflowMeta
@@ -1517,31 +2089,12 @@ func (m *Partition) Unmarshal(dAtA []byte) error {
 				}
 				b := dAtA[iNdEx]
 				iNdEx++
-				m.DbId |= (uint32(b) & 0x7F) << shift
+				m.Space |= (SpaceID(b) & 0x7F) << shift
 				if b < 0x80 {
 					break
 				}
 			}
 		case 4:
-			if wireType != 0 {
-				return fmt.Errorf("proto: wrong wireType = %d for field SpaceId", wireType)
-			}
-			m.SpaceId = 0
-			for shift := uint(0); ; shift += 7 {
-				if shift >= 64 {
-					return ErrIntOverflowMeta
-				}
-				if iNdEx >= l {
-					return io.ErrUnexpectedEOF
-				}
-				b := dAtA[iNdEx]
-				iNdEx++
-				m.SpaceId |= (uint32(b) & 0x7F) << shift
-				if b < 0x80 {
-					break
-				}
-			}
-		case 5:
 			if wireType != 0 {
 				return fmt.Errorf("proto: wrong wireType = %d for field StartSlot", wireType)
 			}
@@ -1555,12 +2108,12 @@ func (m *Partition) Unmarshal(dAtA []byte) error {
 				}
 				b := dAtA[iNdEx]
 				iNdEx++
-				m.StartSlot |= (uint32(b) & 0x7F) << shift
+				m.StartSlot |= (SlotID(b) & 0x7F) << shift
 				if b < 0x80 {
 					break
 				}
 			}
-		case 6:
+		case 5:
 			if wireType != 0 {
 				return fmt.Errorf("proto: wrong wireType = %d for field EndSlot", wireType)
 			}
@@ -1574,7 +2127,26 @@ func (m *Partition) Unmarshal(dAtA []byte) error {
 				}
 				b := dAtA[iNdEx]
 				iNdEx++
-				m.EndSlot |= (uint32(b) & 0x7F) << shift
+				m.EndSlot |= (SlotID(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+		case 6:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Status", wireType)
+			}
+			m.Status = 0
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMeta
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				m.Status |= (PartitionStatus(b) & 0x7F) << shift
 				if b < 0x80 {
 					break
 				}
@@ -1631,9 +2203,9 @@ func (m *Replica) Unmarshal(dAtA []byte) error {
 		switch fieldNum {
 		case 1:
 			if wireType != 0 {
-				return fmt.Errorf("proto: wrong wireType = %d for field Id", wireType)
+				return fmt.Errorf("proto: wrong wireType = %d for field ID", wireType)
 			}
-			m.Id = 0
+			m.ID = 0
 			for shift := uint(0); ; shift += 7 {
 				if shift >= 64 {
 					return ErrIntOverflowMeta
@@ -1643,16 +2215,16 @@ func (m *Replica) Unmarshal(dAtA []byte) error {
 				}
 				b := dAtA[iNdEx]
 				iNdEx++
-				m.Id |= (uint32(b) & 0x7F) << shift
+				m.ID |= (ReplicaID(b) & 0x7F) << shift
 				if b < 0x80 {
 					break
 				}
 			}
 		case 2:
 			if wireType != 0 {
-				return fmt.Errorf("proto: wrong wireType = %d for field PartitionId", wireType)
+				return fmt.Errorf("proto: wrong wireType = %d for field Partition", wireType)
 			}
-			m.PartitionId = 0
+			m.Partition = 0
 			for shift := uint(0); ; shift += 7 {
 				if shift >= 64 {
 					return ErrIntOverflowMeta
@@ -1662,16 +2234,16 @@ func (m *Replica) Unmarshal(dAtA []byte) error {
 				}
 				b := dAtA[iNdEx]
 				iNdEx++
-				m.PartitionId |= (uint32(b) & 0x7F) << shift
+				m.Partition |= (PartitionID(b) & 0x7F) << shift
 				if b < 0x80 {
 					break
 				}
 			}
 		case 3:
-			if wireType != 0 {
-				return fmt.Errorf("proto: wrong wireType = %d for field PsId", wireType)
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Node", wireType)
 			}
-			m.PsId = 0
+			var msglen int
 			for shift := uint(0); ; shift += 7 {
 				if shift >= 64 {
 					return ErrIntOverflowMeta
@@ -1681,31 +2253,26 @@ func (m *Replica) Unmarshal(dAtA []byte) error {
 				}
 				b := dAtA[iNdEx]
 				iNdEx++
-				m.PsId |= (uint32(b) & 0x7F) << shift
+				msglen |= (int(b) & 0x7F) << shift
 				if b < 0x80 {
 					break
 				}
 			}
+			if msglen < 0 {
+				return ErrInvalidLengthMeta
+			}
+			postIndex := iNdEx + msglen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			if m.Node == nil {
+				m.Node = &Node{}
+			}
+			if err := m.Node.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
 		case 4:
-			if wireType != 0 {
-				return fmt.Errorf("proto: wrong wireType = %d for field Status", wireType)
-			}
-			m.Status = 0
-			for shift := uint(0); ; shift += 7 {
-				if shift >= 64 {
-					return ErrIntOverflowMeta
-				}
-				if iNdEx >= l {
-					return io.ErrUnexpectedEOF
-				}
-				b := dAtA[iNdEx]
-				iNdEx++
-				m.Status |= (ReplicaStatue(b) & 0x7F) << shift
-				if b < 0x80 {
-					break
-				}
-			}
-		case 5:
 			if wireType != 0 {
 				return fmt.Errorf("proto: wrong wireType = %d for field IsLeader", wireType)
 			}
@@ -1725,6 +2292,25 @@ func (m *Replica) Unmarshal(dAtA []byte) error {
 				}
 			}
 			m.IsLeader = bool(v != 0)
+		case 5:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Status", wireType)
+			}
+			m.Status = 0
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMeta
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				m.Status |= (ReplicaStatus(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
 		default:
 			iNdEx = preIndex
 			skippy, err := skipMeta(dAtA[iNdEx:])
@@ -1746,7 +2332,7 @@ func (m *Replica) Unmarshal(dAtA []byte) error {
 	}
 	return nil
 }
-func (m *PartitionServer) Unmarshal(dAtA []byte) error {
+func (m *Node) Unmarshal(dAtA []byte) error {
 	l := len(dAtA)
 	iNdEx := 0
 	for iNdEx < l {
@@ -1769,17 +2355,17 @@ func (m *PartitionServer) Unmarshal(dAtA []byte) error {
 		fieldNum := int32(wire >> 3)
 		wireType := int(wire & 0x7)
 		if wireType == 4 {
-			return fmt.Errorf("proto: PartitionServer: wiretype end group for non-group")
+			return fmt.Errorf("proto: Node: wiretype end group for non-group")
 		}
 		if fieldNum <= 0 {
-			return fmt.Errorf("proto: PartitionServer: illegal tag %d (wire type %d)", fieldNum, wire)
+			return fmt.Errorf("proto: Node: illegal tag %d (wire type %d)", fieldNum, wire)
 		}
 		switch fieldNum {
 		case 1:
 			if wireType != 0 {
-				return fmt.Errorf("proto: wrong wireType = %d for field Id", wireType)
+				return fmt.Errorf("proto: wrong wireType = %d for field ID", wireType)
 			}
-			m.Id = 0
+			m.ID = 0
 			for shift := uint(0); ; shift += 7 {
 				if shift >= 64 {
 					return ErrIntOverflowMeta
@@ -1789,41 +2375,12 @@ func (m *PartitionServer) Unmarshal(dAtA []byte) error {
 				}
 				b := dAtA[iNdEx]
 				iNdEx++
-				m.Id |= (uint32(b) & 0x7F) << shift
+				m.ID |= (NodeID(b) & 0x7F) << shift
 				if b < 0x80 {
 					break
 				}
 			}
-		case 3:
-			if wireType != 2 {
-				return fmt.Errorf("proto: wrong wireType = %d for field Zone", wireType)
-			}
-			var stringLen uint64
-			for shift := uint(0); ; shift += 7 {
-				if shift >= 64 {
-					return ErrIntOverflowMeta
-				}
-				if iNdEx >= l {
-					return io.ErrUnexpectedEOF
-				}
-				b := dAtA[iNdEx]
-				iNdEx++
-				stringLen |= (uint64(b) & 0x7F) << shift
-				if b < 0x80 {
-					break
-				}
-			}
-			intStringLen := int(stringLen)
-			if intStringLen < 0 {
-				return ErrInvalidLengthMeta
-			}
-			postIndex := iNdEx + intStringLen
-			if postIndex > l {
-				return io.ErrUnexpectedEOF
-			}
-			m.Zone = string(dAtA[iNdEx:postIndex])
-			iNdEx = postIndex
-		case 4:
+		case 2:
 			if wireType != 2 {
 				return fmt.Errorf("proto: wrong wireType = %d for field Ip", wireType)
 			}
@@ -1852,9 +2409,28 @@ func (m *PartitionServer) Unmarshal(dAtA []byte) error {
 			}
 			m.Ip = string(dAtA[iNdEx:postIndex])
 			iNdEx = postIndex
-		case 5:
-			if wireType != 2 {
+		case 3:
+			if wireType != 0 {
 				return fmt.Errorf("proto: wrong wireType = %d for field Port", wireType)
+			}
+			m.Port = 0
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMeta
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				m.Port |= (int(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+		case 4:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Zone", wireType)
 			}
 			var stringLen uint64
 			for shift := uint(0); ; shift += 7 {
@@ -1879,8 +2455,86 @@ func (m *PartitionServer) Unmarshal(dAtA []byte) error {
 			if postIndex > l {
 				return io.ErrUnexpectedEOF
 			}
-			m.Port = string(dAtA[iNdEx:postIndex])
+			m.Zone = string(dAtA[iNdEx:postIndex])
 			iNdEx = postIndex
+		case 5:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Version", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMeta
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= (uint64(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthMeta
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.Version = string(dAtA[iNdEx:postIndex])
+			iNdEx = postIndex
+		case 6:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field RaftAddrs", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMeta
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				msglen |= (int(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthMeta
+			}
+			postIndex := iNdEx + msglen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			if err := m.RaftAddrs.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		case 7:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field State", wireType)
+			}
+			m.State = 0
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMeta
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				m.State |= (NodeStatus(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
 		default:
 			iNdEx = preIndex
 			skippy, err := skipMeta(dAtA[iNdEx:])
@@ -1902,7 +2556,7 @@ func (m *PartitionServer) Unmarshal(dAtA []byte) error {
 	}
 	return nil
 }
-func (m *ServerResource) Unmarshal(dAtA []byte) error {
+func (m *RaftAddrs) Unmarshal(dAtA []byte) error {
 	l := len(dAtA)
 	iNdEx := 0
 	for iNdEx < l {
@@ -1925,10 +2579,118 @@ func (m *ServerResource) Unmarshal(dAtA []byte) error {
 		fieldNum := int32(wire >> 3)
 		wireType := int(wire & 0x7)
 		if wireType == 4 {
-			return fmt.Errorf("proto: ServerResource: wiretype end group for non-group")
+			return fmt.Errorf("proto: RaftAddrs: wiretype end group for non-group")
 		}
 		if fieldNum <= 0 {
-			return fmt.Errorf("proto: ServerResource: illegal tag %d (wire type %d)", fieldNum, wire)
+			return fmt.Errorf("proto: RaftAddrs: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
+		switch fieldNum {
+		case 1:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field HeartbeatAddr", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMeta
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= (uint64(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthMeta
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.HeartbeatAddr = string(dAtA[iNdEx:postIndex])
+			iNdEx = postIndex
+		case 2:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field ReplicateAddr", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMeta
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= (uint64(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthMeta
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.ReplicateAddr = string(dAtA[iNdEx:postIndex])
+			iNdEx = postIndex
+		default:
+			iNdEx = preIndex
+			skippy, err := skipMeta(dAtA[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if skippy < 0 {
+				return ErrInvalidLengthMeta
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			iNdEx += skippy
+		}
+	}
+
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
+}
+func (m *NodeResource) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
+	iNdEx := 0
+	for iNdEx < l {
+		preIndex := iNdEx
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowMeta
+			}
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := dAtA[iNdEx]
+			iNdEx++
+			wire |= (uint64(b) & 0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: NodeResource: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: NodeResource: illegal tag %d (wire type %d)", fieldNum, wire)
 		}
 		switch fieldNum {
 		case 1:
@@ -1984,139 +2746,6 @@ func (m *ServerResource) Unmarshal(dAtA []byte) error {
 				b := dAtA[iNdEx]
 				iNdEx++
 				m.Disk |= (int32(b) & 0x7F) << shift
-				if b < 0x80 {
-					break
-				}
-			}
-		default:
-			iNdEx = preIndex
-			skippy, err := skipMeta(dAtA[iNdEx:])
-			if err != nil {
-				return err
-			}
-			if skippy < 0 {
-				return ErrInvalidLengthMeta
-			}
-			if (iNdEx + skippy) > l {
-				return io.ErrUnexpectedEOF
-			}
-			iNdEx += skippy
-		}
-	}
-
-	if iNdEx > l {
-		return io.ErrUnexpectedEOF
-	}
-	return nil
-}
-func (m *Route) Unmarshal(dAtA []byte) error {
-	l := len(dAtA)
-	iNdEx := 0
-	for iNdEx < l {
-		preIndex := iNdEx
-		var wire uint64
-		for shift := uint(0); ; shift += 7 {
-			if shift >= 64 {
-				return ErrIntOverflowMeta
-			}
-			if iNdEx >= l {
-				return io.ErrUnexpectedEOF
-			}
-			b := dAtA[iNdEx]
-			iNdEx++
-			wire |= (uint64(b) & 0x7F) << shift
-			if b < 0x80 {
-				break
-			}
-		}
-		fieldNum := int32(wire >> 3)
-		wireType := int(wire & 0x7)
-		if wireType == 4 {
-			return fmt.Errorf("proto: Route: wiretype end group for non-group")
-		}
-		if fieldNum <= 0 {
-			return fmt.Errorf("proto: Route: illegal tag %d (wire type %d)", fieldNum, wire)
-		}
-		switch fieldNum {
-		case 1:
-			if wireType != 2 {
-				return fmt.Errorf("proto: wrong wireType = %d for field Partition", wireType)
-			}
-			var msglen int
-			for shift := uint(0); ; shift += 7 {
-				if shift >= 64 {
-					return ErrIntOverflowMeta
-				}
-				if iNdEx >= l {
-					return io.ErrUnexpectedEOF
-				}
-				b := dAtA[iNdEx]
-				iNdEx++
-				msglen |= (int(b) & 0x7F) << shift
-				if b < 0x80 {
-					break
-				}
-			}
-			if msglen < 0 {
-				return ErrInvalidLengthMeta
-			}
-			postIndex := iNdEx + msglen
-			if postIndex > l {
-				return io.ErrUnexpectedEOF
-			}
-			if m.Partition == nil {
-				m.Partition = &Partition{}
-			}
-			if err := m.Partition.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
-				return err
-			}
-			iNdEx = postIndex
-		case 2:
-			if wireType != 2 {
-				return fmt.Errorf("proto: wrong wireType = %d for field PartitionServer", wireType)
-			}
-			var msglen int
-			for shift := uint(0); ; shift += 7 {
-				if shift >= 64 {
-					return ErrIntOverflowMeta
-				}
-				if iNdEx >= l {
-					return io.ErrUnexpectedEOF
-				}
-				b := dAtA[iNdEx]
-				iNdEx++
-				msglen |= (int(b) & 0x7F) << shift
-				if b < 0x80 {
-					break
-				}
-			}
-			if msglen < 0 {
-				return ErrInvalidLengthMeta
-			}
-			postIndex := iNdEx + msglen
-			if postIndex > l {
-				return io.ErrUnexpectedEOF
-			}
-			m.PartitionServer = append(m.PartitionServer, &PartitionServer{})
-			if err := m.PartitionServer[len(m.PartitionServer)-1].Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
-				return err
-			}
-			iNdEx = postIndex
-		case 3:
-			if wireType != 0 {
-				return fmt.Errorf("proto: wrong wireType = %d for field LeaderPsId", wireType)
-			}
-			m.LeaderPsId = 0
-			for shift := uint(0); ; shift += 7 {
-				if shift >= 64 {
-					return ErrIntOverflowMeta
-				}
-				if iNdEx >= l {
-					return io.ErrUnexpectedEOF
-				}
-				b := dAtA[iNdEx]
-				iNdEx++
-				m.LeaderPsId |= (uint32(b) & 0x7F) << shift
 				if b < 0x80 {
 					break
 				}
@@ -2250,46 +2879,68 @@ var (
 func init() { proto.RegisterFile("meta.proto", fileDescriptorMeta) }
 
 var fileDescriptorMeta = []byte{
-	// 649 bytes of a gzipped FileDescriptorProto
-	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0x6c, 0x54, 0xd1, 0x6e, 0xd3, 0x3c,
-	0x14, 0x5e, 0xd2, 0xa6, 0x6d, 0x4e, 0xd7, 0x36, 0xbf, 0xf7, 0xc3, 0x0a, 0x88, 0x52, 0x72, 0x55,
-	0x0d, 0xb1, 0x49, 0x43, 0xe2, 0x01, 0xa6, 0x5d, 0x50, 0x69, 0x1a, 0x95, 0x73, 0x81, 0xb8, 0x8a,
-	0xd2, 0xda, 0xab, 0x0c, 0x69, 0x6c, 0x62, 0x67, 0xd2, 0x78, 0x12, 0x40, 0x82, 0xe7, 0xe1, 0x92,
-	0x47, 0x40, 0xe3, 0x45, 0x90, 0x4f, 0xd2, 0x34, 0x62, 0xbb, 0xfb, 0xce, 0x39, 0x9f, 0x3f, 0x7f,
-	0xf9, 0x7c, 0x14, 0x80, 0x0d, 0x37, 0xc9, 0xb1, 0xca, 0xa5, 0x91, 0xa4, 0x63, 0xb1, 0x5a, 0x3e,
-	0xfe, 0x7f, 0x2d, 0xd7, 0x12, 0x5b, 0x27, 0x16, 0x95, 0xd3, 0x70, 0x04, 0x03, 0xca, 0x3f, 0x15,
-	0x5c, 0x9b, 0x37, 0x3c, 0x61, 0x3c, 0x0f, 0x5f, 0xc3, 0x90, 0x72, 0xad, 0x64, 0xa6, 0x79, 0xd9,
-	0x21, 0x04, 0xda, 0x2b, 0xc9, 0xf8, 0xd8, 0x99, 0x3a, 0x33, 0x8f, 0x22, 0x26, 0x01, 0xb4, 0x36,
-	0x7a, 0x3d, 0x76, 0xa7, 0xce, 0xcc, 0xa7, 0x16, 0x86, 0x33, 0x70, 0xcf, 0xcf, 0xc8, 0x10, 0x5c,
-	0xc1, 0x90, 0x39, 0xa0, 0xae, 0x60, 0xf6, 0x6c, 0x96, 0x6c, 0x78, 0x45, 0x44, 0x1c, 0x7e, 0x73,
-	0xc0, 0x8b, 0x54, 0xb2, 0xe2, 0x76, 0x6a, 0x6e, 0x54, 0xa9, 0xec, 0x53, 0xc4, 0x95, 0x82, 0x7b,
-	0x47, 0xa1, 0xb5, 0x53, 0x20, 0x07, 0xe0, 0xb1, 0x65, 0x2c, 0xd8, 0xb8, 0x8d, 0xb4, 0x36, 0x5b,
-	0xce, 0x19, 0x39, 0x84, 0x2e, 0x5b, 0xc6, 0xc8, 0xf5, 0x90, 0xdb, 0x61, 0xcb, 0x4b, 0xcb, 0x7e,
-	0x01, 0x1d, 0x6d, 0x12, 0x53, 0xe8, 0x71, 0x67, 0xea, 0xcc, 0x86, 0xa7, 0x07, 0xc7, 0x65, 0x22,
-	0xc7, 0x68, 0x22, 0xc2, 0x11, 0xad, 0x28, 0xe1, 0x57, 0x07, 0xfc, 0x45, 0x92, 0x1b, 0x61, 0x84,
-	0xcc, 0xee, 0xfb, 0x1c, 0x34, 0xec, 0x36, 0x0c, 0xd7, 0x66, 0x5a, 0x0d, 0x33, 0x8f, 0xa0, 0xa7,
-	0xad, 0xfa, 0xce, 0x64, 0x17, 0xeb, 0x39, 0x23, 0x4f, 0x01, 0xb4, 0x49, 0x72, 0x13, 0xeb, 0x54,
-	0x1a, 0xb4, 0x3a, 0xa0, 0x3e, 0x76, 0xa2, 0x54, 0x1a, 0x7b, 0x92, 0x67, 0xac, 0x1c, 0x76, 0xca,
-	0x93, 0x3c, 0x63, 0x76, 0x14, 0x7e, 0x77, 0xa0, 0x4b, 0xb9, 0x4a, 0xc5, 0x2a, 0xb9, 0xe3, 0xec,
-	0x39, 0xec, 0xab, 0xad, 0xed, 0xb8, 0x0e, 0xb0, 0x5f, 0xf7, 0xe6, 0xcc, 0x1a, 0x55, 0xba, 0x61,
-	0x54, 0xe9, 0x39, 0x23, 0x2f, 0xeb, 0x70, 0xda, 0x18, 0xce, 0x83, 0x6d, 0x38, 0xd5, 0x45, 0x18,
-	0x0f, 0xdf, 0xc6, 0x43, 0x9e, 0x80, 0x2f, 0x74, 0x9c, 0xe2, 0x62, 0xa0, 0xf7, 0x1e, 0xed, 0x09,
-	0x7d, 0x51, 0xae, 0xce, 0x7b, 0x18, 0xd5, 0xd1, 0x45, 0x3c, 0xbf, 0xe6, 0xf9, 0x7d, 0x01, 0x7e,
-	0x96, 0x59, 0xfd, 0x9a, 0x16, 0x23, 0x47, 0xe1, 0xf5, 0x3e, 0x75, 0x85, 0xb2, 0x1c, 0x25, 0x73,
-	0x53, 0xbd, 0x22, 0xe2, 0xf0, 0x12, 0x86, 0xa5, 0x22, 0xe5, 0x5a, 0x16, 0xf9, 0x0a, 0x37, 0x70,
-	0xa5, 0x8a, 0x6a, 0x29, 0x2d, 0x24, 0x0f, 0xa1, 0xb3, 0xe1, 0x1b, 0x99, 0xdf, 0xe0, 0xc7, 0x7b,
-	0xb4, 0xaa, 0xac, 0x1e, 0x13, 0xfa, 0x23, 0xde, 0xe9, 0x51, 0xc4, 0xe1, 0x0f, 0x07, 0x3c, 0x2a,
-	0x0b, 0xc3, 0xc9, 0x09, 0xf8, 0x75, 0x48, 0xa8, 0xd6, 0x3f, 0xfd, 0x6f, 0x9b, 0x41, 0xfd, 0x35,
-	0x74, 0xc7, 0x21, 0x67, 0x10, 0xec, 0x92, 0xd6, 0x68, 0x6a, 0xec, 0x4e, 0x5b, 0xb3, 0xfe, 0xe9,
-	0xe1, 0x9d, 0x73, 0x95, 0xe7, 0x91, 0xfa, 0x27, 0x96, 0x29, 0xec, 0x97, 0x19, 0xc6, 0xcd, 0x17,
-	0x81, 0xb2, 0xb7, 0xd0, 0x73, 0x76, 0xf4, 0x01, 0xfa, 0x8d, 0xf5, 0x24, 0x43, 0x80, 0x28, 0x8a,
-	0xe7, 0xd9, 0x75, 0x92, 0x0a, 0x16, 0xec, 0x91, 0x3e, 0x74, 0xb1, 0x16, 0x26, 0x70, 0xaa, 0xe1,
-	0x22, 0xe7, 0x2a, 0xc9, 0x79, 0xe0, 0x56, 0x35, 0x2d, 0xb2, 0x4c, 0x64, 0xeb, 0xa0, 0x45, 0x06,
-	0xe0, 0x47, 0x51, 0x7c, 0xce, 0x53, 0x6e, 0x78, 0xd0, 0x26, 0x23, 0xe8, 0x6f, 0x4b, 0x3b, 0xf7,
-	0x8e, 0x9e, 0xd9, 0x7f, 0x40, 0xe3, 0xb5, 0xad, 0x00, 0x6d, 0xdc, 0x76, 0xf4, 0x0e, 0x7a, 0x8b,
-	0x68, 0xe7, 0x64, 0xd1, 0x74, 0xb2, 0xad, 0x85, 0x11, 0x49, 0x1a, 0x38, 0x64, 0xdf, 0x72, 0xe3,
-	0x0b, 0xb9, 0x16, 0x59, 0x69, 0x65, 0x11, 0xc5, 0x6f, 0xaf, 0xae, 0x52, 0x91, 0xf1, 0xd2, 0x4a,
-	0x39, 0x95, 0x85, 0x09, 0xda, 0x67, 0xc1, 0xcf, 0xdb, 0x89, 0xf3, 0xeb, 0x76, 0xe2, 0xfc, 0xbe,
-	0x9d, 0x38, 0x5f, 0xfe, 0x4c, 0xf6, 0x96, 0x1d, 0xfc, 0x2d, 0xbd, 0xfa, 0x1b, 0x00, 0x00, 0xff,
-	0xff, 0x7e, 0x7c, 0x41, 0x82, 0xc2, 0x04, 0x00, 0x00,
+	// 1006 bytes of a gzipped FileDescriptorProto
+	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0x8c, 0x55, 0x4f, 0x8f, 0xdb, 0xc4,
+	0x1b, 0x8e, 0xbd, 0x76, 0xb2, 0x7e, 0xb3, 0x49, 0xfd, 0x9b, 0x1f, 0xd0, 0xd0, 0x82, 0xb3, 0x0d,
+	0x14, 0xad, 0x56, 0x22, 0x85, 0xad, 0x54, 0xa1, 0x1e, 0x90, 0x62, 0x39, 0xdd, 0x5a, 0x8a, 0x9c,
+	0x68, 0xec, 0x82, 0x96, 0x8b, 0xe5, 0xc4, 0xb3, 0x5b, 0x8b, 0xc4, 0x36, 0xf6, 0xa4, 0xd2, 0x72,
+	0xe2, 0xc8, 0x11, 0xf1, 0x15, 0xb8, 0xf0, 0x11, 0xb8, 0x20, 0x71, 0x5c, 0x71, 0xea, 0x11, 0x09,
+	0x29, 0xea, 0x86, 0x2f, 0xc0, 0x11, 0xed, 0x09, 0xcd, 0x9f, 0x78, 0xa3, 0x9c, 0x38, 0x65, 0xde,
+	0xe7, 0xfd, 0xfb, 0x3c, 0x7e, 0x67, 0x02, 0xb0, 0x20, 0x34, 0xea, 0xe7, 0x45, 0x46, 0xb3, 0x7b,
+	0x1f, 0x5f, 0x24, 0xf4, 0xe5, 0x72, 0xda, 0x9f, 0x65, 0x8b, 0x47, 0x17, 0xd9, 0x45, 0xf6, 0x88,
+	0xc3, 0xd3, 0xe5, 0x39, 0xb7, 0xb8, 0xc1, 0x4f, 0x22, 0xbc, 0xd7, 0x87, 0x16, 0x26, 0xdf, 0x2c,
+	0x49, 0x49, 0x9f, 0x93, 0x28, 0x26, 0x05, 0x7a, 0x1f, 0x60, 0x36, 0x5f, 0x96, 0x94, 0x14, 0x61,
+	0x12, 0x77, 0x94, 0x43, 0xe5, 0xa8, 0x85, 0x0d, 0x89, 0xb8, 0x71, 0xcf, 0x85, 0x36, 0x26, 0x65,
+	0x9e, 0xa5, 0x25, 0xa9, 0x12, 0xb4, 0x59, 0x16, 0x13, 0x1e, 0xaa, 0xdb, 0xc6, 0xcd, 0xaa, 0xab,
+	0x27, 0x29, 0xfd, 0xf4, 0x09, 0xe6, 0x30, 0xea, 0x40, 0x63, 0x41, 0xca, 0x32, 0xba, 0x20, 0x1d,
+	0xf5, 0x50, 0x39, 0x32, 0xf0, 0xc6, 0xec, 0x7d, 0x06, 0xaa, 0x63, 0x23, 0x0b, 0xd4, 0x4d, 0x1f,
+	0xbb, 0xbd, 0x5e, 0x75, 0x55, 0xd7, 0xb9, 0x59, 0x75, 0x35, 0xc7, 0x76, 0x1d, 0xac, 0x26, 0x31,
+	0x42, 0xa0, 0xa5, 0xd1, 0x62, 0x93, 0xcc, 0xcf, 0xbd, 0x5f, 0x15, 0xd0, 0xfd, 0x3c, 0x9a, 0x11,
+	0xf4, 0x60, 0x2b, 0xfb, 0x7f, 0x55, 0x76, 0x83, 0x3b, 0x65, 0x01, 0x0b, 0xd4, 0x78, 0xca, 0xd3,
+	0x65, 0x03, 0xc7, 0xbe, 0x6d, 0x10, 0x4f, 0xd1, 0x5d, 0x68, 0xc4, 0xd3, 0x90, 0xf7, 0xd8, 0xe3,
+	0x3d, 0xea, 0xf1, 0xd4, 0x8b, 0x16, 0xa4, 0xea, 0xac, 0xdd, 0x76, 0x46, 0x16, 0x68, 0xf4, 0x32,
+	0x27, 0x1d, 0xfd, 0x50, 0x39, 0x6a, 0x9f, 0x40, 0x9f, 0x37, 0x0a, 0x2e, 0x73, 0x82, 0x39, 0x8e,
+	0x3e, 0x84, 0x7a, 0x49, 0x23, 0xba, 0x2c, 0x3b, 0x75, 0x1e, 0x71, 0x20, 0x22, 0x7c, 0x8e, 0x61,
+	0xe9, 0xeb, 0xfd, 0xa8, 0x82, 0x31, 0x89, 0x0a, 0x9a, 0xd0, 0x24, 0x4b, 0xd1, 0xc3, 0x2d, 0x0e,
+	0x6f, 0x57, 0x1c, 0x9a, 0x55, 0xc0, 0x7f, 0xe4, 0x71, 0x0c, 0x7a, 0xc9, 0x7a, 0x71, 0x16, 0x2d,
+	0xfb, 0xad, 0xf5, 0xaa, 0x2b, 0x44, 0xda, 0x16, 0x44, 0x84, 0xa0, 0x27, 0x00, 0x25, 0x8d, 0x0a,
+	0x1a, 0x96, 0xf3, 0x8c, 0x72, 0x82, 0x2d, 0xfb, 0xee, 0x7a, 0xd5, 0x35, 0x7c, 0x86, 0xfa, 0xf3,
+	0x8c, 0xde, 0xac, 0xba, 0x75, 0xf6, 0xeb, 0x3a, 0xd8, 0x28, 0x37, 0x20, 0xfa, 0x04, 0xf6, 0x49,
+	0x1a, 0x8b, 0x2c, 0xbd, 0x1a, 0xb8, 0x31, 0x4c, 0xe3, 0x9d, 0x9c, 0x06, 0x11, 0x10, 0x3a, 0xda,
+	0x11, 0xc4, 0xec, 0x57, 0xbc, 0x76, 0x44, 0xf9, 0x5d, 0x81, 0x06, 0x26, 0xf9, 0x3c, 0x99, 0x45,
+	0xe8, 0x83, 0x2d, 0x49, 0xfe, 0x5f, 0x49, 0x62, 0x48, 0xb7, 0x14, 0xe4, 0x29, 0x18, 0xf9, 0xa6,
+	0x96, 0xd4, 0xe5, 0x3d, 0xc6, 0xa1, 0x6a, 0xb0, 0xab, 0xe2, 0x6d, 0x38, 0x7a, 0x17, 0xb4, 0x94,
+	0x2d, 0x2d, 0xd3, 0xaa, 0x79, 0xa2, 0xf7, 0xbd, 0x2c, 0x26, 0x98, 0x43, 0xe8, 0x3e, 0x18, 0x49,
+	0x19, 0xce, 0xf9, 0x72, 0x73, 0x69, 0xf6, 0xf1, 0x7e, 0x52, 0x8e, 0xc4, 0xb2, 0x7f, 0x54, 0xd1,
+	0x11, 0x1b, 0xd0, 0xee, 0xcb, 0x99, 0x76, 0xc8, 0xfc, 0xa9, 0x80, 0xc6, 0x6a, 0xa2, 0xc3, 0x2d,
+	0x26, 0x66, 0xc5, 0xa4, 0xce, 0x7c, 0x92, 0x46, 0x1b, 0xd4, 0x24, 0x97, 0xeb, 0xad, 0x26, 0x39,
+	0xba, 0x0f, 0x5a, 0x9e, 0x15, 0x94, 0x8f, 0xa6, 0xdb, 0x8d, 0x9b, 0x55, 0x77, 0x2f, 0x49, 0x29,
+	0xe6, 0x20, 0xdb, 0xc9, 0x6f, 0xb3, 0xb4, 0xda, 0x49, 0x76, 0x66, 0x37, 0xec, 0x15, 0x29, 0x4a,
+	0xa6, 0x82, 0x2e, 0x6e, 0x98, 0x34, 0xd1, 0x63, 0x80, 0x22, 0x3a, 0xa7, 0x61, 0x14, 0xc7, 0x85,
+	0xf8, 0x00, 0xcd, 0x13, 0xe8, 0xe3, 0xe8, 0x9c, 0x0e, 0x18, 0x62, 0xef, 0x5f, 0xad, 0xba, 0xb5,
+	0xd7, 0xab, 0xae, 0x82, 0x8d, 0x62, 0x03, 0xa2, 0x07, 0xa0, 0x33, 0x12, 0xa4, 0xd3, 0xe0, 0x0c,
+	0x9b, 0x5c, 0x1b, 0x49, 0x4f, 0x78, 0x7a, 0x67, 0x60, 0x54, 0x45, 0xd0, 0x43, 0x68, 0xbf, 0x24,
+	0x51, 0x41, 0xa7, 0x24, 0x12, 0x9d, 0x38, 0x5b, 0x03, 0xb7, 0x2a, 0x94, 0xc5, 0xb1, 0xb0, 0x42,
+	0x48, 0x45, 0x89, 0x08, 0x13, 0x94, 0x5b, 0x15, 0xca, 0xc2, 0x7a, 0x23, 0x38, 0xe0, 0xdf, 0x82,
+	0x94, 0xd9, 0xb2, 0x98, 0x11, 0x64, 0xc2, 0xde, 0x2c, 0x5f, 0x8a, 0xc7, 0x05, 0xb3, 0x23, 0x7a,
+	0x07, 0xea, 0x0b, 0xb2, 0xc8, 0x8a, 0x4b, 0x5e, 0x40, 0xc7, 0xd2, 0x62, 0xd2, 0xc4, 0x49, 0xf9,
+	0xb5, 0xd0, 0x0d, 0xf3, 0xf3, 0x71, 0x0e, 0xcd, 0xad, 0xfb, 0x87, 0xda, 0x00, 0xbe, 0x1f, 0xba,
+	0xe9, 0xab, 0x68, 0x9e, 0xc4, 0x66, 0x0d, 0x35, 0xa1, 0xc1, 0xed, 0x84, 0x9a, 0x8a, 0x74, 0x4e,
+	0x0a, 0x92, 0x47, 0x05, 0x31, 0x55, 0x69, 0xe3, 0x65, 0x9a, 0x26, 0xe9, 0x85, 0xb9, 0x87, 0x5a,
+	0x60, 0xf8, 0x7e, 0xe8, 0x90, 0x39, 0xa1, 0xc4, 0xd4, 0xd0, 0x1d, 0x68, 0x6e, 0x4c, 0xe6, 0xd7,
+	0xef, 0x69, 0xdf, 0xff, 0x64, 0xd5, 0x8e, 0x9f, 0x82, 0x51, 0xbd, 0x09, 0x3c, 0x25, 0x08, 0x87,
+	0x5e, 0xe0, 0x06, 0x67, 0xb2, 0x5d, 0x10, 0x0e, 0x9d, 0xd3, 0xa1, 0xa9, 0x48, 0xc3, 0x1e, 0x8d,
+	0x6d, 0x53, 0x95, 0xb9, 0xe7, 0x70, 0x67, 0xe7, 0x72, 0xb0, 0x21, 0x26, 0x83, 0xad, 0x89, 0x85,
+	0xed, 0x8d, 0x03, 0x3c, 0x1c, 0x38, 0xa6, 0xc2, 0xa6, 0x98, 0x0c, 0x42, 0x66, 0x8c, 0xbd, 0xd1,
+	0x99, 0xa9, 0x22, 0x13, 0x0e, 0x24, 0xf0, 0x25, 0x76, 0x83, 0xa1, 0xb9, 0x27, 0x11, 0x7f, 0x32,
+	0x72, 0x83, 0xc0, 0xf5, 0x4e, 0x4d, 0xed, 0xf8, 0x21, 0x7b, 0xf3, 0xb7, 0xb6, 0x96, 0x55, 0xc5,
+	0x5b, 0xba, 0xc8, 0x71, 0x32, 0x80, 0xdb, 0x4f, 0xcf, 0x62, 0x3c, 0x3f, 0x74, 0xbd, 0x2f, 0x06,
+	0x23, 0xd7, 0x11, 0x93, 0x70, 0xdb, 0x0d, 0xdc, 0xc1, 0xc8, 0x54, 0xd0, 0x01, 0xec, 0x7b, 0x7e,
+	0x38, 0x1a, 0x9f, 0xba, 0x9e, 0x10, 0xcf, 0xf3, 0xc3, 0xf1, 0xb3, 0x67, 0x23, 0xd7, 0x1b, 0x0a,
+	0xf1, 0x84, 0x77, 0xfc, 0x22, 0x30, 0x35, 0xe9, 0x7e, 0x31, 0x39, 0xc5, 0x03, 0x67, 0xb8, 0xd1,
+	0xce, 0xfe, 0xfc, 0xea, 0xda, 0xaa, 0xfd, 0x71, 0x6d, 0xd5, 0xde, 0x5c, 0x5b, 0xb5, 0xbf, 0xaf,
+	0x2d, 0xe5, 0x9f, 0x6b, 0x4b, 0xf9, 0x6e, 0x6d, 0x29, 0x3f, 0xaf, 0x2d, 0xe5, 0x97, 0xb5, 0x55,
+	0xfb, 0x6d, 0x6d, 0xd5, 0xae, 0xd6, 0x96, 0xf2, 0x7a, 0x6d, 0x29, 0x6f, 0xd6, 0x96, 0xf2, 0xc3,
+	0x5f, 0x56, 0xed, 0xb9, 0xf2, 0x55, 0x9d, 0xfd, 0xfd, 0xe5, 0xd3, 0x69, 0x9d, 0xff, 0xa5, 0x3d,
+	0xfe, 0x37, 0x00, 0x00, 0xff, 0xff, 0xc0, 0xd3, 0x13, 0xd9, 0x0f, 0x07, 0x00, 0x00,
 }
