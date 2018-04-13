@@ -118,16 +118,17 @@ based on the async replication between dest and source.
 
 Several PS nodes form a raft group, partitionserver group (PSG). And one PSG usualy serves a partition - a part of entity or edge space. 
 
-### Inside a partition
+### Kernel - inside a partition
 
-for entity partition, UID -> Document; 
-for edge partition, (UID1, UID2) -> Document;
+* storage
 
-on-disk document store, based on bolt or other store engines
+for entity partition, (UID, fieldID) -> a single or multiple packed values of the field
 
-in-memory indexing, based on our own data structures
+for edge partition, (<UID1, UID2>, fieldID) -> ...
 
 * search 
+
+TODO：in-memory indexing, based on our own data structures
 
 
 ### Key Operations
