@@ -5,6 +5,7 @@ import (
     "proto/metapb"
     "time"
     "util"
+    "util/log"
 )
 
 const (
@@ -38,6 +39,32 @@ func (p *PartitionServer) isReplicaFull() bool {
     return p.replicaCache.count() == DEFAULT_REPLICA_LIMIT_PER_PS
 }
 
+func (p *PartitionServer) changeStatus(newStatus metapb.PSStatus) {
+    p.propertyLock.Lock()
+    defer p.propertyLock.Unlock()
+
+    oldStatus := p.status
+
+    var isConfusing bool
+    switch newStatus {
+    case metapb.PSStatus_PS_Login:
+        if oldStatus != metapb.PSStatus_PS_Initial {
+            isConfusing = true
+        }
+    case metapb.PSStatus_PS_Offline:
+    case metapb.PSStatus_PS_Logout:
+    default:
+        log.Error("can not change to the new ps status[%v]", newStatus)
+        return
+    }
+
+    if !isConfusing {
+        p.status = newStatus
+    } else {
+        log.Error("can not change ps[%v] status from [%v] to [%v]", p.Id, oldStatus, newStatus)
+    }
+}
+
 type PSCache struct {
     lock         sync.RWMutex
     id2Servers   map[uint32]*PartitionServer
@@ -61,6 +88,17 @@ func (c *PSCache) findServerByAddr(addr string) *PartitionServer {
     defer c.lock.RUnlock()
 
     ps, ok := c.addr2Servers[addr]
+    if !ok {
+        return nil
+    }
+    return ps
+}
+
+func (c *PSCache) findServerById(psId uint32) *PartitionServer {
+    c.lock.RLock()
+    defer c.lock.RUnlock()
+
+    ps, ok := c.id2Servers[psId]
     if !ok {
         return nil
     }

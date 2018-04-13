@@ -83,6 +83,7 @@ func (p *PartitionCreateProcessor) Run() {
 							partitionToCreate.Partition, err)
 						break
 					}
+					// new replica created do persistent when ps sent heartbeat up
 				}
 			}
 		}

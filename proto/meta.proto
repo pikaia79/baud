@@ -76,9 +76,9 @@ message Replica {
 enum PSStatus {
     PS_Invalid   = 0;
     PS_Initial   = 1;  // first created
-    PS_Login     = 2;  // when new allocated or restarted ps startup
-    PS_Offline   = 3;  // reject any r/w request
-    PS_Logout    = 4;  // wait destroy
+    PS_Login     = 2;  // working normally when new allocated or restarted ps startup and finish to PsLogin
+    PS_Offline   = 3;  // reject CreateReplica request when ps failure occurrence, may be transfer replicas to other ps
+    PS_Logout    = 4;  // finish to transfer all replicas and wait to destroy
 }
 
 message PartitionServer {

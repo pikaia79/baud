@@ -85,9 +85,48 @@ func (g *ReplicaGroup) getAllServers() []*PartitionServer {
 	return servers
 }
 
+func (g *ReplicaGroup) addReplica(replica *Replica, server *PartitionServer) {
+	g.lock.Lock()
+	defer g.lock.RUnlock()
+
+	g.replicas[replica.GetId()] = replica
+	g.servers[replica.GetId()] = server
+}
+
+func (g *ReplicaGroup) findReplicaById(replicaId uint32) *Replica {
+	g.lock.RLock()
+	defer g.lock.RUnlock()
+
+	r, ok := g.replicas[replicaId]
+	if !ok {
+		return nil
+	}
+
+	return r
+}
+
+func (g *ReplicaGroup) count() int {
+	g.lock.RLock()
+	defer g.lock.RUnlock()
+
+	return len(g.replicas)
+}
+
 type PartitionCache struct {
 	lock  		 sync.RWMutex
 	partitions   map[uint32]*Partition
+}
+
+func (c *PartitionCache) findPartitionById(partitionId uint32) *Partition {
+	c.lock.RLock()
+	defer c.lock.RUnlock()
+
+	p, ok := c.partitions[partitionId]
+	if !ok {
+		return nil
+	}
+
+	return p
 }
 
 type PartitionItem struct {
