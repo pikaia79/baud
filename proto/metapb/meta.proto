@@ -66,37 +66,26 @@ enum PartitionStatus {
     PA_SPLITTING    = 4;
 }
 
+message PartitionEpoch {
+    // Conf change version, auto increment when add or remove peer
+    uint64 conf_version	= 1;
+    // Partition version, auto increment when split or merge
+    uint64 version     = 2;
+}
+
 message Partition {
     uint32           id         = 1 [(gogoproto.customname) = "ID", (gogoproto.casttype) = "PartitionID"];
     uint32           db         = 2 [(gogoproto.customname) = "DB", (gogoproto.casttype) = "DBID"];
     uint32           space      = 3 [(gogoproto.customname) = "Space", (gogoproto.casttype) = "SpaceID"];
     uint32           start_slot = 4 [(gogoproto.customname) = "StartSlot", (gogoproto.casttype) = "SlotID"];
     uint32           end_slot   = 5 [(gogoproto.customname) = "EndSlot", (gogoproto.casttype) = "SlotID"];
-    PartitionStatus  status     = 6;
-}
-
-enum ReplicaStatus {
-    option (gogoproto.goproto_enum_prefix) = false;
-    RS_Invalid = 0;
+    repeated Replica replicas   = 6 [(gogoproto.nullable) = false];
+    PartitionStatus  status     = 7;
 }
 
 message Replica {
     uint32        id        = 1 [(gogoproto.customname) = "ID", (gogoproto.casttype) = "ReplicaID"];
-    uint32        partition = 2 [(gogoproto.customname) = "Partition", (gogoproto.casttype) = "PartitionID"];
-    Node          node      = 3;
-    bool          is_leader = 4;
-    ReplicaStatus status    = 5;
-
-}
-
-enum NodeStatus {
-    option (gogoproto.goproto_enum_prefix) = false;
-    NS_INVALID   = 0;
-    NS_INITIAL   = 1;
-    NS_LOGIN     = 2;
-    NS_OFFLINE   = 3;
-    NS_LOGOUT    = 4;
-    NS_UPGRADE   = 5;
+    uint32        nodeID    = 2 [(gogoproto.customname) = "NodeID", (gogoproto.casttype) = "NodeID"];
 }
 
 message Node {
@@ -104,18 +93,11 @@ message Node {
     string    ip         = 2;
     int32     port       = 3 [(gogoproto.casttype) = "int"];
     string    zone       = 4;
-    string    version    = 5;
+    uint32    version    = 5;
     RaftAddrs raft_addrs = 6 [(gogoproto.nullable) = false, (gogoproto.embed) = true];
-    NodeStatus state     = 7;
 }
 
 message RaftAddrs {
     string heartbeat_addr = 1;
     string replicate_addr = 2;
-}
-
-message NodeResource {
-    int32   cpu     = 1;
-    int32   memory  = 2;
-    int32   disk    = 3;
 }
