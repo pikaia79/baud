@@ -20,61 +20,33 @@ option (gogoproto.testgen_all) = false;
 option (gogoproto.benchgen_all) = false;
 option (gogoproto.goproto_getters_all) = false;
 
-service Internal {
-    rpc Get(GetRequest) returns (GetResponse) {}
-    rpc Update(UpdateRequest) returns (UpdateResponse) {}
-    rpc Delete(DeleteRequest) returns (DeleteResponse) {}
-    rpc CreatePartition(CreatePartitionRequest) returns (CreatePartitionResponse) {}
+service ApiGrpc {
+    rpc Index (IndexRequest) returns (IndexResponse) {}
 }
 
-enum ResponseStatus {
-    option (gogoproto.goproto_enum_prefix) = false;
-    RESP_CODE_NOTLEADER         = 0;
-    RESP_CODE_NOLEADER          = 1;
-    RESP_CODE_PARTITIONNOTFOUND = 2;
-    RESP_CODE_KEYEXISTS         = 3;
-    RESP_CODE_KEYNOTEXISTS      = 4;
+enum RequestContentType {
+    JSON = 0;
 }
 
-message UpdateRequest {
-    uint32      space    = 1 [(gogoproto.customname) = "Space", (gogoproto.casttype) = "github.com/tiglabs/baud/proto/metapb.SpaceID"];
-    uint32      slot     = 2 [(gogoproto.customname) = "Slot", (gogoproto.casttype) = "github.com/tiglabs/baud/proto/metapb.SlotID"];
-    bytes       key      = 3 [(gogoproto.casttype) = "github.com/tiglabs/baud/proto/metapb.Key"];
-    bytes       value    = 4 [(gogoproto.casttype) = "github.com/tiglabs/baud/proto/metapb.Value"];
+enum WriteResult {
+    CREATED = 0;
+    UPDATED = 1;
+    DELETED = 2;
 }
 
-message UpdateResponse {
+message ActionRequestHeader {
+    uint32  space_id      = 1 [(gogoproto.customname) = "SpaceID", (gogoproto.casttype) = "SpaceID"];
+    uint32  partition_id  = 2 [(gogoproto.customname) = "PartitionID", (gogoproto.casttype) = "PartitionID"];
+}
+
+message IndexRequest {
+    ActionRequestHeader header      = 1 [(gogoproto.nullable) = false, (gogoproto.embed) = true];
+    bytes               source      = 2;
+    RequestContentType  content_ype = 3;
+}
+
+message IndexResponse {
     ResponseHeader header = 1 [(gogoproto.nullable) = false, (gogoproto.embed) = true];
-    bytes          key    = 2 [(gogoproto.casttype) = "github.com/tiglabs/baud/proto/metapb.Key"];
-}
-
-message DeleteRequest {
-    bytes         key    = 1 [(gogoproto.casttype) = "github.com/tiglabs/baud/proto/metapb.Key"];
-}
-
-message DeleteResponse {
-    ResponseHeader header  = 1 [(gogoproto.nullable) = false, (gogoproto.embed) = true];
-    bool           deleted = 2;
-}
-
-message GetRequest {
-    bytes         key    = 1 [(gogoproto.casttype) = "github.com/tiglabs/baud/proto/metapb.Key"];
-}
-
-message GetResponse {
-    ResponseHeader header  = 1 [(gogoproto.nullable) = false, (gogoproto.embed) = true];
-    uint64         version = 2;
-    bool           found   = 3;
-    bytes          source  = 4 [(gogoproto.casttype) = "github.com/tiglabs/baud/proto/metapb.Value"];
-}
-
-message CreatePartitionRequest {
-    option (gogoproto.goproto_stringer) = false;
-    Partition        partition = 1 [(gogoproto.nullable) = false, (gogoproto.embed) = true];
-    repeated Replica replicas  = 2 [(gogoproto.nullable) = false];
-}
-
-message CreatePartitionResponse {
-    ResponseHeader header  = 1 [(gogoproto.nullable) = false, (gogoproto.embed) = true];
-    bool           created = 2;
+    string         id     = 2;
+    WriteResult    result = 3;
 }
