@@ -15,11 +15,13 @@ import (
 
 // Config ps server config
 type Config struct {
-	AppName    string
-	AppVersion string
-	RPCPort    int
-	DataPath   string
-	NodeID     metapb.NodeID
+	AppName      string
+	AppVersion   string
+	RPCPort      int
+	AdminPort    int
+	MasterServer string
+	NodeID       metapb.NodeID
+	DataPath     string
 
 	LogDir    string
 	LogModule string
@@ -53,11 +55,22 @@ func LoadConfig(conf *config.Config) (*Config, error) {
 	if c.AppVersion = conf.GetString("app.version"); c.AppVersion == "" {
 		multierr.Append(errors.New("app.version not specified"))
 	}
+
 	if rpcPort := conf.GetString("rpc.port"); rpcPort != "" {
 		c.RPCPort, _ = strconv.Atoi(rpcPort)
 	}
-	if c.RPCPort < 0 {
+	if c.RPCPort <= 0 {
 		multierr.Append(errors.New("rpc.port not specified"))
+	}
+	if adminPort := conf.GetString("admin.port"); adminPort != "" {
+		c.AdminPort, _ = strconv.Atoi(adminPort)
+	}
+	if c.AdminPort <= 0 {
+		multierr.Append(errors.New("admin.port not specified"))
+	}
+
+	if c.MasterServer = conf.GetString("master.server"); c.MasterServer == "" {
+		multierr.Append(errors.New("master.server not specified"))
 	}
 	if c.DataPath = conf.GetString("data.path"); c.DataPath == "" {
 		multierr.Append(errors.New("data.path not specified"))
