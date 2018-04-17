@@ -140,10 +140,11 @@ type PostingList struct {
     numOfPostings int
 }
 
+//each posting is 128 bit
 type Posting struct {
-    uid UID
-    offsetAndLength uint32
-    frequency uint32
+    slotID uint32
+    autoIncrID uint64
+    location uint32
 }
 
 type PostingChunk struct {
@@ -151,7 +152,6 @@ type PostingChunk struct {
     capx int
     size int
 }
-
 
 ### Key Operations
 
