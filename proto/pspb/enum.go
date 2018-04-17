@@ -10,4 +10,5 @@ const (
 	ActionRESPCODEKEYEXISTS                       = 3
 	ActionRESPCODEKEYNOTEXISTS                    = 4
 	ActionRESPCODEOK                              = 200
+	ActionRESPCODETIMEOUT                         = 504
 )

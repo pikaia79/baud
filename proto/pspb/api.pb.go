@@ -9,8 +9,18 @@
 
 	It has these top-level messages:
 		ActionRequestHeader
+		BulkRequest
+		BulkResponse
+		BulkItemRequest
+		BulkItemResponse
 		IndexRequest
 		IndexResponse
+		UpdateRequest
+		UpdateResponse
+		DeleteRequest
+		DeleteResponse
+		GetRequest
+		GetResponse
 */
 package pspb
 
@@ -59,64 +69,210 @@ func (x RequestContentType) String() string {
 }
 func (RequestContentType) EnumDescriptor() ([]byte, []int) { return fileDescriptorApi, []int{0} }
 
+type OpType int32
+
+const (
+	// Index the source. If there an existing document with the id, it will be replaced.
+	OpType_INDEX OpType = 0
+	// Creates the resource. Simply adds it to the index, if there is an existing document with the id, then it won't be removed.
+	OpType_CREATE OpType = 1
+	// Updates a document
+	OpType_UPDATE OpType = 2
+	// Deletes a document
+	OpType_DELETE OpType = 3
+)
+
+var OpType_name = map[int32]string{
+	0: "INDEX",
+	1: "CREATE",
+	2: "UPDATE",
+	3: "DELETE",
+}
+var OpType_value = map[string]int32{
+	"INDEX":  0,
+	"CREATE": 1,
+	"UPDATE": 2,
+	"DELETE": 3,
+}
+
+func (x OpType) String() string {
+	return proto.EnumName(OpType_name, int32(x))
+}
+func (OpType) EnumDescriptor() ([]byte, []int) { return fileDescriptorApi, []int{1} }
+
 type WriteResult int32
 
 const (
-	WriteResult_CREATED WriteResult = 0
-	WriteResult_UPDATED WriteResult = 1
-	WriteResult_DELETED WriteResult = 2
+	WriteResult_CREATED   WriteResult = 0
+	WriteResult_UPDATED   WriteResult = 1
+	WriteResult_DELETED   WriteResult = 2
+	WriteResult_NOT_FOUND WriteResult = 3
+	WriteResult_NOOP      WriteResult = 4
 )
 
 var WriteResult_name = map[int32]string{
 	0: "CREATED",
 	1: "UPDATED",
 	2: "DELETED",
+	3: "NOT_FOUND",
+	4: "NOOP",
 }
 var WriteResult_value = map[string]int32{
-	"CREATED": 0,
-	"UPDATED": 1,
-	"DELETED": 2,
+	"CREATED":   0,
+	"UPDATED":   1,
+	"DELETED":   2,
+	"NOT_FOUND": 3,
+	"NOOP":      4,
 }
 
 func (x WriteResult) String() string {
 	return proto.EnumName(WriteResult_name, int32(x))
 }
-func (WriteResult) EnumDescriptor() ([]byte, []int) { return fileDescriptorApi, []int{1} }
+func (WriteResult) EnumDescriptor() ([]byte, []int) { return fileDescriptorApi, []int{2} }
 
 type ActionRequestHeader struct {
-	SpaceID     SpaceID     `protobuf:"varint,1,opt,name=space_id,json=spaceId,proto3,casttype=SpaceID" json:"space_id,omitempty"`
-	PartitionID PartitionID `protobuf:"varint,2,opt,name=partition_id,json=partitionId,proto3,casttype=PartitionID" json:"partition_id,omitempty"`
+	SpaceID     SpaceID            `protobuf:"varint,1,opt,name=space_id,json=spaceId,proto3,casttype=SpaceID" json:"space_id,omitempty"`
+	PartitionID PartitionID        `protobuf:"varint,2,opt,name=partition_id,json=partitionId,proto3,casttype=PartitionID" json:"partition_id,omitempty"`
+	Timeout     string             `protobuf:"bytes,3,opt,name=timeout,proto3" json:"timeout,omitempty"`
+	ContentYpe  RequestContentType `protobuf:"varint,4,opt,name=content_ype,json=contentYpe,proto3,enum=RequestContentType" json:"content_ype,omitempty"`
+	ReqId       string             `protobuf:"bytes,5,opt,name=req_id,json=reqId,proto3" json:"req_id,omitempty"`
 }
 
 func (m *ActionRequestHeader) Reset()                    { *m = ActionRequestHeader{} }
 func (*ActionRequestHeader) ProtoMessage()               {}
 func (*ActionRequestHeader) Descriptor() ([]byte, []int) { return fileDescriptorApi, []int{0} }
 
-type IndexRequest struct {
+type BulkRequest struct {
 	ActionRequestHeader `protobuf:"bytes,1,opt,name=header,embedded=header" json:"header"`
-	Source              []byte             `protobuf:"bytes,2,opt,name=source,proto3" json:"source,omitempty"`
-	ContentYpe          RequestContentType `protobuf:"varint,3,opt,name=content_ype,json=contentYpe,proto3,enum=RequestContentType" json:"content_ype,omitempty"`
+	Requests            []BulkItemRequest `protobuf:"bytes,2,rep,name=requests" json:"requests"`
+}
+
+func (m *BulkRequest) Reset()                    { *m = BulkRequest{} }
+func (*BulkRequest) ProtoMessage()               {}
+func (*BulkRequest) Descriptor() ([]byte, []int) { return fileDescriptorApi, []int{1} }
+
+type BulkResponse struct {
+	meta.ResponseHeader `protobuf:"bytes,1,opt,name=header,embedded=header" json:"header"`
+	Responses           []BulkItemResponse `protobuf:"bytes,2,rep,name=responses" json:"responses"`
+}
+
+func (m *BulkResponse) Reset()                    { *m = BulkResponse{} }
+func (*BulkResponse) ProtoMessage()               {}
+func (*BulkResponse) Descriptor() ([]byte, []int) { return fileDescriptorApi, []int{2} }
+
+type BulkItemRequest struct {
+	OpType OpType         `protobuf:"varint,1,opt,name=op_type,json=opType,proto3,enum=OpType" json:"op_type,omitempty"`
+	Index  *IndexRequest  `protobuf:"bytes,2,opt,name=index" json:"index,omitempty"`
+	Update *UpdateRequest `protobuf:"bytes,3,opt,name=update" json:"update,omitempty"`
+	Delete *DeleteRequest `protobuf:"bytes,4,opt,name=delete" json:"delete,omitempty"`
+}
+
+func (m *BulkItemRequest) Reset()                    { *m = BulkItemRequest{} }
+func (*BulkItemRequest) ProtoMessage()               {}
+func (*BulkItemRequest) Descriptor() ([]byte, []int) { return fileDescriptorApi, []int{3} }
+
+type BulkItemResponse struct {
+	OpType OpType          `protobuf:"varint,1,opt,name=op_type,json=opType,proto3,enum=OpType" json:"op_type,omitempty"`
+	Index  *IndexResponse  `protobuf:"bytes,2,opt,name=index" json:"index,omitempty"`
+	Update *UpdateResponse `protobuf:"bytes,3,opt,name=update" json:"update,omitempty"`
+	Delete *DeleteResponse `protobuf:"bytes,4,opt,name=delete" json:"delete,omitempty"`
+}
+
+func (m *BulkItemResponse) Reset()                    { *m = BulkItemResponse{} }
+func (*BulkItemResponse) ProtoMessage()               {}
+func (*BulkItemResponse) Descriptor() ([]byte, []int) { return fileDescriptorApi, []int{4} }
+
+type IndexRequest struct {
+	OpType OpType `protobuf:"varint,1,opt,name=op_type,json=opType,proto3,enum=OpType" json:"op_type,omitempty"`
+	Source []byte `protobuf:"bytes,2,opt,name=source,proto3" json:"source,omitempty"`
 }
 
 func (m *IndexRequest) Reset()                    { *m = IndexRequest{} }
 func (*IndexRequest) ProtoMessage()               {}
-func (*IndexRequest) Descriptor() ([]byte, []int) { return fileDescriptorApi, []int{1} }
+func (*IndexRequest) Descriptor() ([]byte, []int) { return fileDescriptorApi, []int{5} }
 
 type IndexResponse struct {
-	meta.ResponseHeader `protobuf:"bytes,1,opt,name=header,embedded=header" json:"header"`
-	Id                  string      `protobuf:"bytes,2,opt,name=id,proto3" json:"id,omitempty"`
-	Result              WriteResult `protobuf:"varint,3,opt,name=result,proto3,enum=WriteResult" json:"result,omitempty"`
+	Id     string      `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	Result WriteResult `protobuf:"varint,2,opt,name=result,proto3,enum=WriteResult" json:"result,omitempty"`
 }
 
 func (m *IndexResponse) Reset()                    { *m = IndexResponse{} }
 func (*IndexResponse) ProtoMessage()               {}
-func (*IndexResponse) Descriptor() ([]byte, []int) { return fileDescriptorApi, []int{2} }
+func (*IndexResponse) Descriptor() ([]byte, []int) { return fileDescriptorApi, []int{6} }
+
+type UpdateRequest struct {
+	Id          string `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	Doc         []byte `protobuf:"bytes,2,opt,name=doc,proto3" json:"doc,omitempty"`
+	DocAsUpsert bool   `protobuf:"varint,3,opt,name=doc_as_upsert,json=docAsUpsert,proto3" json:"doc_as_upsert,omitempty"`
+}
+
+func (m *UpdateRequest) Reset()                    { *m = UpdateRequest{} }
+func (*UpdateRequest) ProtoMessage()               {}
+func (*UpdateRequest) Descriptor() ([]byte, []int) { return fileDescriptorApi, []int{7} }
+
+type UpdateResponse struct {
+	Id     string      `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	Result WriteResult `protobuf:"varint,2,opt,name=result,proto3,enum=WriteResult" json:"result,omitempty"`
+}
+
+func (m *UpdateResponse) Reset()                    { *m = UpdateResponse{} }
+func (*UpdateResponse) ProtoMessage()               {}
+func (*UpdateResponse) Descriptor() ([]byte, []int) { return fileDescriptorApi, []int{8} }
+
+type DeleteRequest struct {
+	Id string `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+}
+
+func (m *DeleteRequest) Reset()                    { *m = DeleteRequest{} }
+func (*DeleteRequest) ProtoMessage()               {}
+func (*DeleteRequest) Descriptor() ([]byte, []int) { return fileDescriptorApi, []int{9} }
+
+type DeleteResponse struct {
+	Id     string      `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	Result WriteResult `protobuf:"varint,2,opt,name=result,proto3,enum=WriteResult" json:"result,omitempty"`
+}
+
+func (m *DeleteResponse) Reset()                    { *m = DeleteResponse{} }
+func (*DeleteResponse) ProtoMessage()               {}
+func (*DeleteResponse) Descriptor() ([]byte, []int) { return fileDescriptorApi, []int{10} }
+
+type GetRequest struct {
+	ActionRequestHeader `protobuf:"bytes,1,opt,name=header,embedded=header" json:"header"`
+	Id                  string   `protobuf:"bytes,2,opt,name=id,proto3" json:"id,omitempty"`
+	StoredFields        []string `protobuf:"bytes,3,rep,name=stored_fields,json=storedFields" json:"stored_fields,omitempty"`
+}
+
+func (m *GetRequest) Reset()                    { *m = GetRequest{} }
+func (*GetRequest) ProtoMessage()               {}
+func (*GetRequest) Descriptor() ([]byte, []int) { return fileDescriptorApi, []int{11} }
+
+type GetResponse struct {
+	meta.ResponseHeader `protobuf:"bytes,1,opt,name=header,embedded=header" json:"header"`
+	Id                  string `protobuf:"bytes,2,opt,name=id,proto3" json:"id,omitempty"`
+	Found               bool   `protobuf:"varint,3,opt,name=found,proto3" json:"found,omitempty"`
+	Fields              []byte `protobuf:"bytes,4,opt,name=fields,proto3" json:"fields,omitempty"`
+}
+
+func (m *GetResponse) Reset()                    { *m = GetResponse{} }
+func (*GetResponse) ProtoMessage()               {}
+func (*GetResponse) Descriptor() ([]byte, []int) { return fileDescriptorApi, []int{12} }
 
 func init() {
 	proto.RegisterType((*ActionRequestHeader)(nil), "ActionRequestHeader")
+	proto.RegisterType((*BulkRequest)(nil), "BulkRequest")
+	proto.RegisterType((*BulkResponse)(nil), "BulkResponse")
+	proto.RegisterType((*BulkItemRequest)(nil), "BulkItemRequest")
+	proto.RegisterType((*BulkItemResponse)(nil), "BulkItemResponse")
 	proto.RegisterType((*IndexRequest)(nil), "IndexRequest")
 	proto.RegisterType((*IndexResponse)(nil), "IndexResponse")
+	proto.RegisterType((*UpdateRequest)(nil), "UpdateRequest")
+	proto.RegisterType((*UpdateResponse)(nil), "UpdateResponse")
+	proto.RegisterType((*DeleteRequest)(nil), "DeleteRequest")
+	proto.RegisterType((*DeleteResponse)(nil), "DeleteResponse")
+	proto.RegisterType((*GetRequest)(nil), "GetRequest")
+	proto.RegisterType((*GetResponse)(nil), "GetResponse")
 	proto.RegisterEnum("RequestContentType", RequestContentType_name, RequestContentType_value)
+	proto.RegisterEnum("OpType", OpType_name, OpType_value)
 	proto.RegisterEnum("WriteResult", WriteResult_name, WriteResult_value)
 }
 func (this *ActionRequestHeader) Equal(that interface{}) bool {
@@ -144,6 +300,145 @@ func (this *ActionRequestHeader) Equal(that interface{}) bool {
 	if this.PartitionID != that1.PartitionID {
 		return false
 	}
+	if this.Timeout != that1.Timeout {
+		return false
+	}
+	if this.ContentYpe != that1.ContentYpe {
+		return false
+	}
+	if this.ReqId != that1.ReqId {
+		return false
+	}
+	return true
+}
+func (this *BulkRequest) Equal(that interface{}) bool {
+	if that == nil {
+		return this == nil
+	}
+
+	that1, ok := that.(*BulkRequest)
+	if !ok {
+		that2, ok := that.(BulkRequest)
+		if ok {
+			that1 = &that2
+		} else {
+			return false
+		}
+	}
+	if that1 == nil {
+		return this == nil
+	} else if this == nil {
+		return false
+	}
+	if !this.ActionRequestHeader.Equal(&that1.ActionRequestHeader) {
+		return false
+	}
+	if len(this.Requests) != len(that1.Requests) {
+		return false
+	}
+	for i := range this.Requests {
+		if !this.Requests[i].Equal(&that1.Requests[i]) {
+			return false
+		}
+	}
+	return true
+}
+func (this *BulkResponse) Equal(that interface{}) bool {
+	if that == nil {
+		return this == nil
+	}
+
+	that1, ok := that.(*BulkResponse)
+	if !ok {
+		that2, ok := that.(BulkResponse)
+		if ok {
+			that1 = &that2
+		} else {
+			return false
+		}
+	}
+	if that1 == nil {
+		return this == nil
+	} else if this == nil {
+		return false
+	}
+	if !this.ResponseHeader.Equal(&that1.ResponseHeader) {
+		return false
+	}
+	if len(this.Responses) != len(that1.Responses) {
+		return false
+	}
+	for i := range this.Responses {
+		if !this.Responses[i].Equal(&that1.Responses[i]) {
+			return false
+		}
+	}
+	return true
+}
+func (this *BulkItemRequest) Equal(that interface{}) bool {
+	if that == nil {
+		return this == nil
+	}
+
+	that1, ok := that.(*BulkItemRequest)
+	if !ok {
+		that2, ok := that.(BulkItemRequest)
+		if ok {
+			that1 = &that2
+		} else {
+			return false
+		}
+	}
+	if that1 == nil {
+		return this == nil
+	} else if this == nil {
+		return false
+	}
+	if this.OpType != that1.OpType {
+		return false
+	}
+	if !this.Index.Equal(that1.Index) {
+		return false
+	}
+	if !this.Update.Equal(that1.Update) {
+		return false
+	}
+	if !this.Delete.Equal(that1.Delete) {
+		return false
+	}
+	return true
+}
+func (this *BulkItemResponse) Equal(that interface{}) bool {
+	if that == nil {
+		return this == nil
+	}
+
+	that1, ok := that.(*BulkItemResponse)
+	if !ok {
+		that2, ok := that.(BulkItemResponse)
+		if ok {
+			that1 = &that2
+		} else {
+			return false
+		}
+	}
+	if that1 == nil {
+		return this == nil
+	} else if this == nil {
+		return false
+	}
+	if this.OpType != that1.OpType {
+		return false
+	}
+	if !this.Index.Equal(that1.Index) {
+		return false
+	}
+	if !this.Update.Equal(that1.Update) {
+		return false
+	}
+	if !this.Delete.Equal(that1.Delete) {
+		return false
+	}
 	return true
 }
 func (this *IndexRequest) Equal(that interface{}) bool {
@@ -165,13 +460,10 @@ func (this *IndexRequest) Equal(that interface{}) bool {
 	} else if this == nil {
 		return false
 	}
-	if !this.ActionRequestHeader.Equal(&that1.ActionRequestHeader) {
+	if this.OpType != that1.OpType {
 		return false
 	}
 	if !bytes.Equal(this.Source, that1.Source) {
-		return false
-	}
-	if this.ContentYpe != that1.ContentYpe {
 		return false
 	}
 	return true
@@ -195,7 +487,61 @@ func (this *IndexResponse) Equal(that interface{}) bool {
 	} else if this == nil {
 		return false
 	}
-	if !this.ResponseHeader.Equal(&that1.ResponseHeader) {
+	if this.Id != that1.Id {
+		return false
+	}
+	if this.Result != that1.Result {
+		return false
+	}
+	return true
+}
+func (this *UpdateRequest) Equal(that interface{}) bool {
+	if that == nil {
+		return this == nil
+	}
+
+	that1, ok := that.(*UpdateRequest)
+	if !ok {
+		that2, ok := that.(UpdateRequest)
+		if ok {
+			that1 = &that2
+		} else {
+			return false
+		}
+	}
+	if that1 == nil {
+		return this == nil
+	} else if this == nil {
+		return false
+	}
+	if this.Id != that1.Id {
+		return false
+	}
+	if !bytes.Equal(this.Doc, that1.Doc) {
+		return false
+	}
+	if this.DocAsUpsert != that1.DocAsUpsert {
+		return false
+	}
+	return true
+}
+func (this *UpdateResponse) Equal(that interface{}) bool {
+	if that == nil {
+		return this == nil
+	}
+
+	that1, ok := that.(*UpdateResponse)
+	if !ok {
+		that2, ok := that.(UpdateResponse)
+		if ok {
+			that1 = &that2
+		} else {
+			return false
+		}
+	}
+	if that1 == nil {
+		return this == nil
+	} else if this == nil {
 		return false
 	}
 	if this.Id != that1.Id {
@@ -206,14 +552,208 @@ func (this *IndexResponse) Equal(that interface{}) bool {
 	}
 	return true
 }
+func (this *DeleteRequest) Equal(that interface{}) bool {
+	if that == nil {
+		return this == nil
+	}
+
+	that1, ok := that.(*DeleteRequest)
+	if !ok {
+		that2, ok := that.(DeleteRequest)
+		if ok {
+			that1 = &that2
+		} else {
+			return false
+		}
+	}
+	if that1 == nil {
+		return this == nil
+	} else if this == nil {
+		return false
+	}
+	if this.Id != that1.Id {
+		return false
+	}
+	return true
+}
+func (this *DeleteResponse) Equal(that interface{}) bool {
+	if that == nil {
+		return this == nil
+	}
+
+	that1, ok := that.(*DeleteResponse)
+	if !ok {
+		that2, ok := that.(DeleteResponse)
+		if ok {
+			that1 = &that2
+		} else {
+			return false
+		}
+	}
+	if that1 == nil {
+		return this == nil
+	} else if this == nil {
+		return false
+	}
+	if this.Id != that1.Id {
+		return false
+	}
+	if this.Result != that1.Result {
+		return false
+	}
+	return true
+}
+func (this *GetRequest) Equal(that interface{}) bool {
+	if that == nil {
+		return this == nil
+	}
+
+	that1, ok := that.(*GetRequest)
+	if !ok {
+		that2, ok := that.(GetRequest)
+		if ok {
+			that1 = &that2
+		} else {
+			return false
+		}
+	}
+	if that1 == nil {
+		return this == nil
+	} else if this == nil {
+		return false
+	}
+	if !this.ActionRequestHeader.Equal(&that1.ActionRequestHeader) {
+		return false
+	}
+	if this.Id != that1.Id {
+		return false
+	}
+	if len(this.StoredFields) != len(that1.StoredFields) {
+		return false
+	}
+	for i := range this.StoredFields {
+		if this.StoredFields[i] != that1.StoredFields[i] {
+			return false
+		}
+	}
+	return true
+}
+func (this *GetResponse) Equal(that interface{}) bool {
+	if that == nil {
+		return this == nil
+	}
+
+	that1, ok := that.(*GetResponse)
+	if !ok {
+		that2, ok := that.(GetResponse)
+		if ok {
+			that1 = &that2
+		} else {
+			return false
+		}
+	}
+	if that1 == nil {
+		return this == nil
+	} else if this == nil {
+		return false
+	}
+	if !this.ResponseHeader.Equal(&that1.ResponseHeader) {
+		return false
+	}
+	if this.Id != that1.Id {
+		return false
+	}
+	if this.Found != that1.Found {
+		return false
+	}
+	if !bytes.Equal(this.Fields, that1.Fields) {
+		return false
+	}
+	return true
+}
 func (this *ActionRequestHeader) GoString() string {
 	if this == nil {
 		return "nil"
 	}
-	s := make([]string, 0, 6)
+	s := make([]string, 0, 9)
 	s = append(s, "&pspb.ActionRequestHeader{")
 	s = append(s, "SpaceID: "+fmt.Sprintf("%#v", this.SpaceID)+",\n")
 	s = append(s, "PartitionID: "+fmt.Sprintf("%#v", this.PartitionID)+",\n")
+	s = append(s, "Timeout: "+fmt.Sprintf("%#v", this.Timeout)+",\n")
+	s = append(s, "ContentYpe: "+fmt.Sprintf("%#v", this.ContentYpe)+",\n")
+	s = append(s, "ReqId: "+fmt.Sprintf("%#v", this.ReqId)+",\n")
+	s = append(s, "}")
+	return strings.Join(s, "")
+}
+func (this *BulkRequest) GoString() string {
+	if this == nil {
+		return "nil"
+	}
+	s := make([]string, 0, 6)
+	s = append(s, "&pspb.BulkRequest{")
+	s = append(s, "ActionRequestHeader: "+strings.Replace(this.ActionRequestHeader.GoString(), `&`, ``, 1)+",\n")
+	if this.Requests != nil {
+		vs := make([]*BulkItemRequest, len(this.Requests))
+		for i := range vs {
+			vs[i] = &this.Requests[i]
+		}
+		s = append(s, "Requests: "+fmt.Sprintf("%#v", vs)+",\n")
+	}
+	s = append(s, "}")
+	return strings.Join(s, "")
+}
+func (this *BulkResponse) GoString() string {
+	if this == nil {
+		return "nil"
+	}
+	s := make([]string, 0, 6)
+	s = append(s, "&pspb.BulkResponse{")
+	s = append(s, "ResponseHeader: "+strings.Replace(this.ResponseHeader.GoString(), `&`, ``, 1)+",\n")
+	if this.Responses != nil {
+		vs := make([]*BulkItemResponse, len(this.Responses))
+		for i := range vs {
+			vs[i] = &this.Responses[i]
+		}
+		s = append(s, "Responses: "+fmt.Sprintf("%#v", vs)+",\n")
+	}
+	s = append(s, "}")
+	return strings.Join(s, "")
+}
+func (this *BulkItemRequest) GoString() string {
+	if this == nil {
+		return "nil"
+	}
+	s := make([]string, 0, 8)
+	s = append(s, "&pspb.BulkItemRequest{")
+	s = append(s, "OpType: "+fmt.Sprintf("%#v", this.OpType)+",\n")
+	if this.Index != nil {
+		s = append(s, "Index: "+fmt.Sprintf("%#v", this.Index)+",\n")
+	}
+	if this.Update != nil {
+		s = append(s, "Update: "+fmt.Sprintf("%#v", this.Update)+",\n")
+	}
+	if this.Delete != nil {
+		s = append(s, "Delete: "+fmt.Sprintf("%#v", this.Delete)+",\n")
+	}
+	s = append(s, "}")
+	return strings.Join(s, "")
+}
+func (this *BulkItemResponse) GoString() string {
+	if this == nil {
+		return "nil"
+	}
+	s := make([]string, 0, 8)
+	s = append(s, "&pspb.BulkItemResponse{")
+	s = append(s, "OpType: "+fmt.Sprintf("%#v", this.OpType)+",\n")
+	if this.Index != nil {
+		s = append(s, "Index: "+fmt.Sprintf("%#v", this.Index)+",\n")
+	}
+	if this.Update != nil {
+		s = append(s, "Update: "+fmt.Sprintf("%#v", this.Update)+",\n")
+	}
+	if this.Delete != nil {
+		s = append(s, "Delete: "+fmt.Sprintf("%#v", this.Delete)+",\n")
+	}
 	s = append(s, "}")
 	return strings.Join(s, "")
 }
@@ -221,11 +761,10 @@ func (this *IndexRequest) GoString() string {
 	if this == nil {
 		return "nil"
 	}
-	s := make([]string, 0, 7)
+	s := make([]string, 0, 6)
 	s = append(s, "&pspb.IndexRequest{")
-	s = append(s, "ActionRequestHeader: "+strings.Replace(this.ActionRequestHeader.GoString(), `&`, ``, 1)+",\n")
+	s = append(s, "OpType: "+fmt.Sprintf("%#v", this.OpType)+",\n")
 	s = append(s, "Source: "+fmt.Sprintf("%#v", this.Source)+",\n")
-	s = append(s, "ContentYpe: "+fmt.Sprintf("%#v", this.ContentYpe)+",\n")
 	s = append(s, "}")
 	return strings.Join(s, "")
 }
@@ -233,11 +772,79 @@ func (this *IndexResponse) GoString() string {
 	if this == nil {
 		return "nil"
 	}
-	s := make([]string, 0, 7)
+	s := make([]string, 0, 6)
 	s = append(s, "&pspb.IndexResponse{")
-	s = append(s, "ResponseHeader: "+strings.Replace(this.ResponseHeader.GoString(), `&`, ``, 1)+",\n")
 	s = append(s, "Id: "+fmt.Sprintf("%#v", this.Id)+",\n")
 	s = append(s, "Result: "+fmt.Sprintf("%#v", this.Result)+",\n")
+	s = append(s, "}")
+	return strings.Join(s, "")
+}
+func (this *UpdateRequest) GoString() string {
+	if this == nil {
+		return "nil"
+	}
+	s := make([]string, 0, 7)
+	s = append(s, "&pspb.UpdateRequest{")
+	s = append(s, "Id: "+fmt.Sprintf("%#v", this.Id)+",\n")
+	s = append(s, "Doc: "+fmt.Sprintf("%#v", this.Doc)+",\n")
+	s = append(s, "DocAsUpsert: "+fmt.Sprintf("%#v", this.DocAsUpsert)+",\n")
+	s = append(s, "}")
+	return strings.Join(s, "")
+}
+func (this *UpdateResponse) GoString() string {
+	if this == nil {
+		return "nil"
+	}
+	s := make([]string, 0, 6)
+	s = append(s, "&pspb.UpdateResponse{")
+	s = append(s, "Id: "+fmt.Sprintf("%#v", this.Id)+",\n")
+	s = append(s, "Result: "+fmt.Sprintf("%#v", this.Result)+",\n")
+	s = append(s, "}")
+	return strings.Join(s, "")
+}
+func (this *DeleteRequest) GoString() string {
+	if this == nil {
+		return "nil"
+	}
+	s := make([]string, 0, 5)
+	s = append(s, "&pspb.DeleteRequest{")
+	s = append(s, "Id: "+fmt.Sprintf("%#v", this.Id)+",\n")
+	s = append(s, "}")
+	return strings.Join(s, "")
+}
+func (this *DeleteResponse) GoString() string {
+	if this == nil {
+		return "nil"
+	}
+	s := make([]string, 0, 6)
+	s = append(s, "&pspb.DeleteResponse{")
+	s = append(s, "Id: "+fmt.Sprintf("%#v", this.Id)+",\n")
+	s = append(s, "Result: "+fmt.Sprintf("%#v", this.Result)+",\n")
+	s = append(s, "}")
+	return strings.Join(s, "")
+}
+func (this *GetRequest) GoString() string {
+	if this == nil {
+		return "nil"
+	}
+	s := make([]string, 0, 7)
+	s = append(s, "&pspb.GetRequest{")
+	s = append(s, "ActionRequestHeader: "+strings.Replace(this.ActionRequestHeader.GoString(), `&`, ``, 1)+",\n")
+	s = append(s, "Id: "+fmt.Sprintf("%#v", this.Id)+",\n")
+	s = append(s, "StoredFields: "+fmt.Sprintf("%#v", this.StoredFields)+",\n")
+	s = append(s, "}")
+	return strings.Join(s, "")
+}
+func (this *GetResponse) GoString() string {
+	if this == nil {
+		return "nil"
+	}
+	s := make([]string, 0, 8)
+	s = append(s, "&pspb.GetResponse{")
+	s = append(s, "ResponseHeader: "+strings.Replace(this.ResponseHeader.GoString(), `&`, ``, 1)+",\n")
+	s = append(s, "Id: "+fmt.Sprintf("%#v", this.Id)+",\n")
+	s = append(s, "Found: "+fmt.Sprintf("%#v", this.Found)+",\n")
+	s = append(s, "Fields: "+fmt.Sprintf("%#v", this.Fields)+",\n")
 	s = append(s, "}")
 	return strings.Join(s, "")
 }
@@ -261,7 +868,8 @@ const _ = grpc.SupportPackageIsVersion4
 // Client API for ApiGrpc service
 
 type ApiGrpcClient interface {
-	Index(ctx context.Context, in *IndexRequest, opts ...grpc.CallOption) (*IndexResponse, error)
+	Get(ctx context.Context, in *GetRequest, opts ...grpc.CallOption) (*GetResponse, error)
+	BulkWrite(ctx context.Context, in *BulkRequest, opts ...grpc.CallOption) (*BulkResponse, error)
 }
 
 type apiGrpcClient struct {
@@ -272,9 +880,18 @@ func NewApiGrpcClient(cc *grpc.ClientConn) ApiGrpcClient {
 	return &apiGrpcClient{cc}
 }
 
-func (c *apiGrpcClient) Index(ctx context.Context, in *IndexRequest, opts ...grpc.CallOption) (*IndexResponse, error) {
-	out := new(IndexResponse)
-	err := grpc.Invoke(ctx, "/ApiGrpc/Index", in, out, c.cc, opts...)
+func (c *apiGrpcClient) Get(ctx context.Context, in *GetRequest, opts ...grpc.CallOption) (*GetResponse, error) {
+	out := new(GetResponse)
+	err := grpc.Invoke(ctx, "/ApiGrpc/Get", in, out, c.cc, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *apiGrpcClient) BulkWrite(ctx context.Context, in *BulkRequest, opts ...grpc.CallOption) (*BulkResponse, error) {
+	out := new(BulkResponse)
+	err := grpc.Invoke(ctx, "/ApiGrpc/BulkWrite", in, out, c.cc, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -284,27 +901,46 @@ func (c *apiGrpcClient) Index(ctx context.Context, in *IndexRequest, opts ...grp
 // Server API for ApiGrpc service
 
 type ApiGrpcServer interface {
-	Index(context.Context, *IndexRequest) (*IndexResponse, error)
+	Get(context.Context, *GetRequest) (*GetResponse, error)
+	BulkWrite(context.Context, *BulkRequest) (*BulkResponse, error)
 }
 
 func RegisterApiGrpcServer(s *grpc.Server, srv ApiGrpcServer) {
 	s.RegisterService(&_ApiGrpc_serviceDesc, srv)
 }
 
-func _ApiGrpc_Index_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(IndexRequest)
+func _ApiGrpc_Get_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(ApiGrpcServer).Index(ctx, in)
+		return srv.(ApiGrpcServer).Get(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: "/ApiGrpc/Index",
+		FullMethod: "/ApiGrpc/Get",
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(ApiGrpcServer).Index(ctx, req.(*IndexRequest))
+		return srv.(ApiGrpcServer).Get(ctx, req.(*GetRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _ApiGrpc_BulkWrite_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(BulkRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ApiGrpcServer).BulkWrite(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/ApiGrpc/BulkWrite",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ApiGrpcServer).BulkWrite(ctx, req.(*BulkRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -314,8 +950,12 @@ var _ApiGrpc_serviceDesc = grpc.ServiceDesc{
 	HandlerType: (*ApiGrpcServer)(nil),
 	Methods: []grpc.MethodDesc{
 		{
-			MethodName: "Index",
-			Handler:    _ApiGrpc_Index_Handler,
+			MethodName: "Get",
+			Handler:    _ApiGrpc_Get_Handler,
+		},
+		{
+			MethodName: "BulkWrite",
+			Handler:    _ApiGrpc_BulkWrite_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},
@@ -347,6 +987,205 @@ func (m *ActionRequestHeader) MarshalTo(dAtA []byte) (int, error) {
 		i++
 		i = encodeVarintApi(dAtA, i, uint64(m.PartitionID))
 	}
+	if len(m.Timeout) > 0 {
+		dAtA[i] = 0x1a
+		i++
+		i = encodeVarintApi(dAtA, i, uint64(len(m.Timeout)))
+		i += copy(dAtA[i:], m.Timeout)
+	}
+	if m.ContentYpe != 0 {
+		dAtA[i] = 0x20
+		i++
+		i = encodeVarintApi(dAtA, i, uint64(m.ContentYpe))
+	}
+	if len(m.ReqId) > 0 {
+		dAtA[i] = 0x2a
+		i++
+		i = encodeVarintApi(dAtA, i, uint64(len(m.ReqId)))
+		i += copy(dAtA[i:], m.ReqId)
+	}
+	return i, nil
+}
+
+func (m *BulkRequest) Marshal() (dAtA []byte, err error) {
+	size := m.Size()
+	dAtA = make([]byte, size)
+	n, err := m.MarshalTo(dAtA)
+	if err != nil {
+		return nil, err
+	}
+	return dAtA[:n], nil
+}
+
+func (m *BulkRequest) MarshalTo(dAtA []byte) (int, error) {
+	var i int
+	_ = i
+	var l int
+	_ = l
+	dAtA[i] = 0xa
+	i++
+	i = encodeVarintApi(dAtA, i, uint64(m.ActionRequestHeader.Size()))
+	n1, err := m.ActionRequestHeader.MarshalTo(dAtA[i:])
+	if err != nil {
+		return 0, err
+	}
+	i += n1
+	if len(m.Requests) > 0 {
+		for _, msg := range m.Requests {
+			dAtA[i] = 0x12
+			i++
+			i = encodeVarintApi(dAtA, i, uint64(msg.Size()))
+			n, err := msg.MarshalTo(dAtA[i:])
+			if err != nil {
+				return 0, err
+			}
+			i += n
+		}
+	}
+	return i, nil
+}
+
+func (m *BulkResponse) Marshal() (dAtA []byte, err error) {
+	size := m.Size()
+	dAtA = make([]byte, size)
+	n, err := m.MarshalTo(dAtA)
+	if err != nil {
+		return nil, err
+	}
+	return dAtA[:n], nil
+}
+
+func (m *BulkResponse) MarshalTo(dAtA []byte) (int, error) {
+	var i int
+	_ = i
+	var l int
+	_ = l
+	dAtA[i] = 0xa
+	i++
+	i = encodeVarintApi(dAtA, i, uint64(m.ResponseHeader.Size()))
+	n2, err := m.ResponseHeader.MarshalTo(dAtA[i:])
+	if err != nil {
+		return 0, err
+	}
+	i += n2
+	if len(m.Responses) > 0 {
+		for _, msg := range m.Responses {
+			dAtA[i] = 0x12
+			i++
+			i = encodeVarintApi(dAtA, i, uint64(msg.Size()))
+			n, err := msg.MarshalTo(dAtA[i:])
+			if err != nil {
+				return 0, err
+			}
+			i += n
+		}
+	}
+	return i, nil
+}
+
+func (m *BulkItemRequest) Marshal() (dAtA []byte, err error) {
+	size := m.Size()
+	dAtA = make([]byte, size)
+	n, err := m.MarshalTo(dAtA)
+	if err != nil {
+		return nil, err
+	}
+	return dAtA[:n], nil
+}
+
+func (m *BulkItemRequest) MarshalTo(dAtA []byte) (int, error) {
+	var i int
+	_ = i
+	var l int
+	_ = l
+	if m.OpType != 0 {
+		dAtA[i] = 0x8
+		i++
+		i = encodeVarintApi(dAtA, i, uint64(m.OpType))
+	}
+	if m.Index != nil {
+		dAtA[i] = 0x12
+		i++
+		i = encodeVarintApi(dAtA, i, uint64(m.Index.Size()))
+		n3, err := m.Index.MarshalTo(dAtA[i:])
+		if err != nil {
+			return 0, err
+		}
+		i += n3
+	}
+	if m.Update != nil {
+		dAtA[i] = 0x1a
+		i++
+		i = encodeVarintApi(dAtA, i, uint64(m.Update.Size()))
+		n4, err := m.Update.MarshalTo(dAtA[i:])
+		if err != nil {
+			return 0, err
+		}
+		i += n4
+	}
+	if m.Delete != nil {
+		dAtA[i] = 0x22
+		i++
+		i = encodeVarintApi(dAtA, i, uint64(m.Delete.Size()))
+		n5, err := m.Delete.MarshalTo(dAtA[i:])
+		if err != nil {
+			return 0, err
+		}
+		i += n5
+	}
+	return i, nil
+}
+
+func (m *BulkItemResponse) Marshal() (dAtA []byte, err error) {
+	size := m.Size()
+	dAtA = make([]byte, size)
+	n, err := m.MarshalTo(dAtA)
+	if err != nil {
+		return nil, err
+	}
+	return dAtA[:n], nil
+}
+
+func (m *BulkItemResponse) MarshalTo(dAtA []byte) (int, error) {
+	var i int
+	_ = i
+	var l int
+	_ = l
+	if m.OpType != 0 {
+		dAtA[i] = 0x8
+		i++
+		i = encodeVarintApi(dAtA, i, uint64(m.OpType))
+	}
+	if m.Index != nil {
+		dAtA[i] = 0x12
+		i++
+		i = encodeVarintApi(dAtA, i, uint64(m.Index.Size()))
+		n6, err := m.Index.MarshalTo(dAtA[i:])
+		if err != nil {
+			return 0, err
+		}
+		i += n6
+	}
+	if m.Update != nil {
+		dAtA[i] = 0x1a
+		i++
+		i = encodeVarintApi(dAtA, i, uint64(m.Update.Size()))
+		n7, err := m.Update.MarshalTo(dAtA[i:])
+		if err != nil {
+			return 0, err
+		}
+		i += n7
+	}
+	if m.Delete != nil {
+		dAtA[i] = 0x22
+		i++
+		i = encodeVarintApi(dAtA, i, uint64(m.Delete.Size()))
+		n8, err := m.Delete.MarshalTo(dAtA[i:])
+		if err != nil {
+			return 0, err
+		}
+		i += n8
+	}
 	return i, nil
 }
 
@@ -365,24 +1204,16 @@ func (m *IndexRequest) MarshalTo(dAtA []byte) (int, error) {
 	_ = i
 	var l int
 	_ = l
-	dAtA[i] = 0xa
-	i++
-	i = encodeVarintApi(dAtA, i, uint64(m.ActionRequestHeader.Size()))
-	n1, err := m.ActionRequestHeader.MarshalTo(dAtA[i:])
-	if err != nil {
-		return 0, err
+	if m.OpType != 0 {
+		dAtA[i] = 0x8
+		i++
+		i = encodeVarintApi(dAtA, i, uint64(m.OpType))
 	}
-	i += n1
 	if len(m.Source) > 0 {
 		dAtA[i] = 0x12
 		i++
 		i = encodeVarintApi(dAtA, i, uint64(len(m.Source)))
 		i += copy(dAtA[i:], m.Source)
-	}
-	if m.ContentYpe != 0 {
-		dAtA[i] = 0x18
-		i++
-		i = encodeVarintApi(dAtA, i, uint64(m.ContentYpe))
 	}
 	return i, nil
 }
@@ -402,24 +1233,233 @@ func (m *IndexResponse) MarshalTo(dAtA []byte) (int, error) {
 	_ = i
 	var l int
 	_ = l
+	if len(m.Id) > 0 {
+		dAtA[i] = 0xa
+		i++
+		i = encodeVarintApi(dAtA, i, uint64(len(m.Id)))
+		i += copy(dAtA[i:], m.Id)
+	}
+	if m.Result != 0 {
+		dAtA[i] = 0x10
+		i++
+		i = encodeVarintApi(dAtA, i, uint64(m.Result))
+	}
+	return i, nil
+}
+
+func (m *UpdateRequest) Marshal() (dAtA []byte, err error) {
+	size := m.Size()
+	dAtA = make([]byte, size)
+	n, err := m.MarshalTo(dAtA)
+	if err != nil {
+		return nil, err
+	}
+	return dAtA[:n], nil
+}
+
+func (m *UpdateRequest) MarshalTo(dAtA []byte) (int, error) {
+	var i int
+	_ = i
+	var l int
+	_ = l
+	if len(m.Id) > 0 {
+		dAtA[i] = 0xa
+		i++
+		i = encodeVarintApi(dAtA, i, uint64(len(m.Id)))
+		i += copy(dAtA[i:], m.Id)
+	}
+	if len(m.Doc) > 0 {
+		dAtA[i] = 0x12
+		i++
+		i = encodeVarintApi(dAtA, i, uint64(len(m.Doc)))
+		i += copy(dAtA[i:], m.Doc)
+	}
+	if m.DocAsUpsert {
+		dAtA[i] = 0x18
+		i++
+		if m.DocAsUpsert {
+			dAtA[i] = 1
+		} else {
+			dAtA[i] = 0
+		}
+		i++
+	}
+	return i, nil
+}
+
+func (m *UpdateResponse) Marshal() (dAtA []byte, err error) {
+	size := m.Size()
+	dAtA = make([]byte, size)
+	n, err := m.MarshalTo(dAtA)
+	if err != nil {
+		return nil, err
+	}
+	return dAtA[:n], nil
+}
+
+func (m *UpdateResponse) MarshalTo(dAtA []byte) (int, error) {
+	var i int
+	_ = i
+	var l int
+	_ = l
+	if len(m.Id) > 0 {
+		dAtA[i] = 0xa
+		i++
+		i = encodeVarintApi(dAtA, i, uint64(len(m.Id)))
+		i += copy(dAtA[i:], m.Id)
+	}
+	if m.Result != 0 {
+		dAtA[i] = 0x10
+		i++
+		i = encodeVarintApi(dAtA, i, uint64(m.Result))
+	}
+	return i, nil
+}
+
+func (m *DeleteRequest) Marshal() (dAtA []byte, err error) {
+	size := m.Size()
+	dAtA = make([]byte, size)
+	n, err := m.MarshalTo(dAtA)
+	if err != nil {
+		return nil, err
+	}
+	return dAtA[:n], nil
+}
+
+func (m *DeleteRequest) MarshalTo(dAtA []byte) (int, error) {
+	var i int
+	_ = i
+	var l int
+	_ = l
+	if len(m.Id) > 0 {
+		dAtA[i] = 0xa
+		i++
+		i = encodeVarintApi(dAtA, i, uint64(len(m.Id)))
+		i += copy(dAtA[i:], m.Id)
+	}
+	return i, nil
+}
+
+func (m *DeleteResponse) Marshal() (dAtA []byte, err error) {
+	size := m.Size()
+	dAtA = make([]byte, size)
+	n, err := m.MarshalTo(dAtA)
+	if err != nil {
+		return nil, err
+	}
+	return dAtA[:n], nil
+}
+
+func (m *DeleteResponse) MarshalTo(dAtA []byte) (int, error) {
+	var i int
+	_ = i
+	var l int
+	_ = l
+	if len(m.Id) > 0 {
+		dAtA[i] = 0xa
+		i++
+		i = encodeVarintApi(dAtA, i, uint64(len(m.Id)))
+		i += copy(dAtA[i:], m.Id)
+	}
+	if m.Result != 0 {
+		dAtA[i] = 0x10
+		i++
+		i = encodeVarintApi(dAtA, i, uint64(m.Result))
+	}
+	return i, nil
+}
+
+func (m *GetRequest) Marshal() (dAtA []byte, err error) {
+	size := m.Size()
+	dAtA = make([]byte, size)
+	n, err := m.MarshalTo(dAtA)
+	if err != nil {
+		return nil, err
+	}
+	return dAtA[:n], nil
+}
+
+func (m *GetRequest) MarshalTo(dAtA []byte) (int, error) {
+	var i int
+	_ = i
+	var l int
+	_ = l
 	dAtA[i] = 0xa
 	i++
-	i = encodeVarintApi(dAtA, i, uint64(m.ResponseHeader.Size()))
-	n2, err := m.ResponseHeader.MarshalTo(dAtA[i:])
+	i = encodeVarintApi(dAtA, i, uint64(m.ActionRequestHeader.Size()))
+	n9, err := m.ActionRequestHeader.MarshalTo(dAtA[i:])
 	if err != nil {
 		return 0, err
 	}
-	i += n2
+	i += n9
 	if len(m.Id) > 0 {
 		dAtA[i] = 0x12
 		i++
 		i = encodeVarintApi(dAtA, i, uint64(len(m.Id)))
 		i += copy(dAtA[i:], m.Id)
 	}
-	if m.Result != 0 {
+	if len(m.StoredFields) > 0 {
+		for _, s := range m.StoredFields {
+			dAtA[i] = 0x1a
+			i++
+			l = len(s)
+			for l >= 1<<7 {
+				dAtA[i] = uint8(uint64(l)&0x7f | 0x80)
+				l >>= 7
+				i++
+			}
+			dAtA[i] = uint8(l)
+			i++
+			i += copy(dAtA[i:], s)
+		}
+	}
+	return i, nil
+}
+
+func (m *GetResponse) Marshal() (dAtA []byte, err error) {
+	size := m.Size()
+	dAtA = make([]byte, size)
+	n, err := m.MarshalTo(dAtA)
+	if err != nil {
+		return nil, err
+	}
+	return dAtA[:n], nil
+}
+
+func (m *GetResponse) MarshalTo(dAtA []byte) (int, error) {
+	var i int
+	_ = i
+	var l int
+	_ = l
+	dAtA[i] = 0xa
+	i++
+	i = encodeVarintApi(dAtA, i, uint64(m.ResponseHeader.Size()))
+	n10, err := m.ResponseHeader.MarshalTo(dAtA[i:])
+	if err != nil {
+		return 0, err
+	}
+	i += n10
+	if len(m.Id) > 0 {
+		dAtA[i] = 0x12
+		i++
+		i = encodeVarintApi(dAtA, i, uint64(len(m.Id)))
+		i += copy(dAtA[i:], m.Id)
+	}
+	if m.Found {
 		dAtA[i] = 0x18
 		i++
-		i = encodeVarintApi(dAtA, i, uint64(m.Result))
+		if m.Found {
+			dAtA[i] = 1
+		} else {
+			dAtA[i] = 0
+		}
+		i++
+	}
+	if len(m.Fields) > 0 {
+		dAtA[i] = 0x22
+		i++
+		i = encodeVarintApi(dAtA, i, uint64(len(m.Fields)))
+		i += copy(dAtA[i:], m.Fields)
 	}
 	return i, nil
 }
@@ -437,21 +1477,88 @@ func NewPopulatedActionRequestHeader(r randyApi, easy bool) *ActionRequestHeader
 	this := &ActionRequestHeader{}
 	this.SpaceID = SpaceID(r.Uint32())
 	this.PartitionID = PartitionID(r.Uint32())
+	this.Timeout = string(randStringApi(r))
+	this.ContentYpe = RequestContentType([]int32{0}[r.Intn(1)])
+	this.ReqId = string(randStringApi(r))
 	if !easy && r.Intn(10) != 0 {
+	}
+	return this
+}
+
+func NewPopulatedBulkRequest(r randyApi, easy bool) *BulkRequest {
+	this := &BulkRequest{}
+	v1 := NewPopulatedActionRequestHeader(r, easy)
+	this.ActionRequestHeader = *v1
+	if r.Intn(10) != 0 {
+		v2 := r.Intn(5)
+		this.Requests = make([]BulkItemRequest, v2)
+		for i := 0; i < v2; i++ {
+			v3 := NewPopulatedBulkItemRequest(r, easy)
+			this.Requests[i] = *v3
+		}
+	}
+	if !easy && r.Intn(10) != 0 {
+	}
+	return this
+}
+
+func NewPopulatedBulkResponse(r randyApi, easy bool) *BulkResponse {
+	this := &BulkResponse{}
+	v4 := meta.NewPopulatedResponseHeader(r, easy)
+	this.ResponseHeader = *v4
+	if r.Intn(10) != 0 {
+		v5 := r.Intn(5)
+		this.Responses = make([]BulkItemResponse, v5)
+		for i := 0; i < v5; i++ {
+			v6 := NewPopulatedBulkItemResponse(r, easy)
+			this.Responses[i] = *v6
+		}
+	}
+	if !easy && r.Intn(10) != 0 {
+	}
+	return this
+}
+
+func NewPopulatedBulkItemRequest(r randyApi, easy bool) *BulkItemRequest {
+	this := &BulkItemRequest{}
+	fieldNum := r.Intn(4)
+	switch fieldNum {
+	case 0:
+		this.OpType = OpType([]int32{0, 1, 2, 3}[r.Intn(4)])
+	case 1:
+		this.Index = NewPopulatedIndexRequest(r, easy)
+	case 2:
+		this.Update = NewPopulatedUpdateRequest(r, easy)
+	case 3:
+		this.Delete = NewPopulatedDeleteRequest(r, easy)
+	}
+	return this
+}
+
+func NewPopulatedBulkItemResponse(r randyApi, easy bool) *BulkItemResponse {
+	this := &BulkItemResponse{}
+	fieldNum := r.Intn(4)
+	switch fieldNum {
+	case 0:
+		this.OpType = OpType([]int32{0, 1, 2, 3}[r.Intn(4)])
+	case 1:
+		this.Index = NewPopulatedIndexResponse(r, easy)
+	case 2:
+		this.Update = NewPopulatedUpdateResponse(r, easy)
+	case 3:
+		this.Delete = NewPopulatedDeleteResponse(r, easy)
 	}
 	return this
 }
 
 func NewPopulatedIndexRequest(r randyApi, easy bool) *IndexRequest {
 	this := &IndexRequest{}
-	v1 := NewPopulatedActionRequestHeader(r, easy)
-	this.ActionRequestHeader = *v1
-	v2 := r.Intn(100)
-	this.Source = make([]byte, v2)
-	for i := 0; i < v2; i++ {
+	this.OpType = OpType([]int32{0, 1, 2, 3}[r.Intn(4)])
+	v7 := r.Intn(100)
+	this.Source = make([]byte, v7)
+	for i := 0; i < v7; i++ {
 		this.Source[i] = byte(r.Intn(256))
 	}
-	this.ContentYpe = RequestContentType([]int32{0}[r.Intn(1)])
 	if !easy && r.Intn(10) != 0 {
 	}
 	return this
@@ -459,10 +1566,79 @@ func NewPopulatedIndexRequest(r randyApi, easy bool) *IndexRequest {
 
 func NewPopulatedIndexResponse(r randyApi, easy bool) *IndexResponse {
 	this := &IndexResponse{}
-	v3 := meta.NewPopulatedResponseHeader(r, easy)
-	this.ResponseHeader = *v3
 	this.Id = string(randStringApi(r))
-	this.Result = WriteResult([]int32{0, 1, 2}[r.Intn(3)])
+	this.Result = WriteResult([]int32{0, 1, 2, 3, 4}[r.Intn(5)])
+	if !easy && r.Intn(10) != 0 {
+	}
+	return this
+}
+
+func NewPopulatedUpdateRequest(r randyApi, easy bool) *UpdateRequest {
+	this := &UpdateRequest{}
+	this.Id = string(randStringApi(r))
+	v8 := r.Intn(100)
+	this.Doc = make([]byte, v8)
+	for i := 0; i < v8; i++ {
+		this.Doc[i] = byte(r.Intn(256))
+	}
+	this.DocAsUpsert = bool(bool(r.Intn(2) == 0))
+	if !easy && r.Intn(10) != 0 {
+	}
+	return this
+}
+
+func NewPopulatedUpdateResponse(r randyApi, easy bool) *UpdateResponse {
+	this := &UpdateResponse{}
+	this.Id = string(randStringApi(r))
+	this.Result = WriteResult([]int32{0, 1, 2, 3, 4}[r.Intn(5)])
+	if !easy && r.Intn(10) != 0 {
+	}
+	return this
+}
+
+func NewPopulatedDeleteRequest(r randyApi, easy bool) *DeleteRequest {
+	this := &DeleteRequest{}
+	this.Id = string(randStringApi(r))
+	if !easy && r.Intn(10) != 0 {
+	}
+	return this
+}
+
+func NewPopulatedDeleteResponse(r randyApi, easy bool) *DeleteResponse {
+	this := &DeleteResponse{}
+	this.Id = string(randStringApi(r))
+	this.Result = WriteResult([]int32{0, 1, 2, 3, 4}[r.Intn(5)])
+	if !easy && r.Intn(10) != 0 {
+	}
+	return this
+}
+
+func NewPopulatedGetRequest(r randyApi, easy bool) *GetRequest {
+	this := &GetRequest{}
+	v9 := NewPopulatedActionRequestHeader(r, easy)
+	this.ActionRequestHeader = *v9
+	this.Id = string(randStringApi(r))
+	v10 := r.Intn(10)
+	this.StoredFields = make([]string, v10)
+	for i := 0; i < v10; i++ {
+		this.StoredFields[i] = string(randStringApi(r))
+	}
+	if !easy && r.Intn(10) != 0 {
+	}
+	return this
+}
+
+func NewPopulatedGetResponse(r randyApi, easy bool) *GetResponse {
+	this := &GetResponse{}
+	v11 := meta.NewPopulatedResponseHeader(r, easy)
+	this.ResponseHeader = *v11
+	this.Id = string(randStringApi(r))
+	this.Found = bool(bool(r.Intn(2) == 0))
+	v12 := r.Intn(100)
+	this.Fields = make([]byte, v12)
+	for i := 0; i < v12; i++ {
+		this.Fields[i] = byte(r.Intn(256))
+	}
 	if !easy && r.Intn(10) != 0 {
 	}
 	return this
@@ -487,9 +1663,9 @@ func randUTF8RuneApi(r randyApi) rune {
 	return rune(ru + 61)
 }
 func randStringApi(r randyApi) string {
-	v4 := r.Intn(100)
-	tmps := make([]rune, v4)
-	for i := 0; i < v4; i++ {
+	v13 := r.Intn(100)
+	tmps := make([]rune, v13)
+	for i := 0; i < v13; i++ {
 		tmps[i] = randUTF8RuneApi(r)
 	}
 	return string(tmps)
@@ -511,11 +1687,11 @@ func randFieldApi(dAtA []byte, r randyApi, fieldNumber int, wire int) []byte {
 	switch wire {
 	case 0:
 		dAtA = encodeVarintPopulateApi(dAtA, uint64(key))
-		v5 := r.Int63()
+		v14 := r.Int63()
 		if r.Intn(2) == 0 {
-			v5 *= -1
+			v14 *= -1
 		}
-		dAtA = encodeVarintPopulateApi(dAtA, uint64(v5))
+		dAtA = encodeVarintPopulateApi(dAtA, uint64(v14))
 	case 1:
 		dAtA = encodeVarintPopulateApi(dAtA, uint64(key))
 		dAtA = append(dAtA, byte(r.Intn(256)), byte(r.Intn(256)), byte(r.Intn(256)), byte(r.Intn(256)), byte(r.Intn(256)), byte(r.Intn(256)), byte(r.Intn(256)), byte(r.Intn(256)))
@@ -549,25 +1725,188 @@ func (m *ActionRequestHeader) Size() (n int) {
 	if m.PartitionID != 0 {
 		n += 1 + sovApi(uint64(m.PartitionID))
 	}
-	return n
-}
-
-func (m *IndexRequest) Size() (n int) {
-	var l int
-	_ = l
-	l = m.ActionRequestHeader.Size()
-	n += 1 + l + sovApi(uint64(l))
-	l = len(m.Source)
+	l = len(m.Timeout)
 	if l > 0 {
 		n += 1 + l + sovApi(uint64(l))
 	}
 	if m.ContentYpe != 0 {
 		n += 1 + sovApi(uint64(m.ContentYpe))
 	}
+	l = len(m.ReqId)
+	if l > 0 {
+		n += 1 + l + sovApi(uint64(l))
+	}
+	return n
+}
+
+func (m *BulkRequest) Size() (n int) {
+	var l int
+	_ = l
+	l = m.ActionRequestHeader.Size()
+	n += 1 + l + sovApi(uint64(l))
+	if len(m.Requests) > 0 {
+		for _, e := range m.Requests {
+			l = e.Size()
+			n += 1 + l + sovApi(uint64(l))
+		}
+	}
+	return n
+}
+
+func (m *BulkResponse) Size() (n int) {
+	var l int
+	_ = l
+	l = m.ResponseHeader.Size()
+	n += 1 + l + sovApi(uint64(l))
+	if len(m.Responses) > 0 {
+		for _, e := range m.Responses {
+			l = e.Size()
+			n += 1 + l + sovApi(uint64(l))
+		}
+	}
+	return n
+}
+
+func (m *BulkItemRequest) Size() (n int) {
+	var l int
+	_ = l
+	if m.OpType != 0 {
+		n += 1 + sovApi(uint64(m.OpType))
+	}
+	if m.Index != nil {
+		l = m.Index.Size()
+		n += 1 + l + sovApi(uint64(l))
+	}
+	if m.Update != nil {
+		l = m.Update.Size()
+		n += 1 + l + sovApi(uint64(l))
+	}
+	if m.Delete != nil {
+		l = m.Delete.Size()
+		n += 1 + l + sovApi(uint64(l))
+	}
+	return n
+}
+
+func (m *BulkItemResponse) Size() (n int) {
+	var l int
+	_ = l
+	if m.OpType != 0 {
+		n += 1 + sovApi(uint64(m.OpType))
+	}
+	if m.Index != nil {
+		l = m.Index.Size()
+		n += 1 + l + sovApi(uint64(l))
+	}
+	if m.Update != nil {
+		l = m.Update.Size()
+		n += 1 + l + sovApi(uint64(l))
+	}
+	if m.Delete != nil {
+		l = m.Delete.Size()
+		n += 1 + l + sovApi(uint64(l))
+	}
+	return n
+}
+
+func (m *IndexRequest) Size() (n int) {
+	var l int
+	_ = l
+	if m.OpType != 0 {
+		n += 1 + sovApi(uint64(m.OpType))
+	}
+	l = len(m.Source)
+	if l > 0 {
+		n += 1 + l + sovApi(uint64(l))
+	}
 	return n
 }
 
 func (m *IndexResponse) Size() (n int) {
+	var l int
+	_ = l
+	l = len(m.Id)
+	if l > 0 {
+		n += 1 + l + sovApi(uint64(l))
+	}
+	if m.Result != 0 {
+		n += 1 + sovApi(uint64(m.Result))
+	}
+	return n
+}
+
+func (m *UpdateRequest) Size() (n int) {
+	var l int
+	_ = l
+	l = len(m.Id)
+	if l > 0 {
+		n += 1 + l + sovApi(uint64(l))
+	}
+	l = len(m.Doc)
+	if l > 0 {
+		n += 1 + l + sovApi(uint64(l))
+	}
+	if m.DocAsUpsert {
+		n += 2
+	}
+	return n
+}
+
+func (m *UpdateResponse) Size() (n int) {
+	var l int
+	_ = l
+	l = len(m.Id)
+	if l > 0 {
+		n += 1 + l + sovApi(uint64(l))
+	}
+	if m.Result != 0 {
+		n += 1 + sovApi(uint64(m.Result))
+	}
+	return n
+}
+
+func (m *DeleteRequest) Size() (n int) {
+	var l int
+	_ = l
+	l = len(m.Id)
+	if l > 0 {
+		n += 1 + l + sovApi(uint64(l))
+	}
+	return n
+}
+
+func (m *DeleteResponse) Size() (n int) {
+	var l int
+	_ = l
+	l = len(m.Id)
+	if l > 0 {
+		n += 1 + l + sovApi(uint64(l))
+	}
+	if m.Result != 0 {
+		n += 1 + sovApi(uint64(m.Result))
+	}
+	return n
+}
+
+func (m *GetRequest) Size() (n int) {
+	var l int
+	_ = l
+	l = m.ActionRequestHeader.Size()
+	n += 1 + l + sovApi(uint64(l))
+	l = len(m.Id)
+	if l > 0 {
+		n += 1 + l + sovApi(uint64(l))
+	}
+	if len(m.StoredFields) > 0 {
+		for _, s := range m.StoredFields {
+			l = len(s)
+			n += 1 + l + sovApi(uint64(l))
+		}
+	}
+	return n
+}
+
+func (m *GetResponse) Size() (n int) {
 	var l int
 	_ = l
 	l = m.ResponseHeader.Size()
@@ -576,8 +1915,12 @@ func (m *IndexResponse) Size() (n int) {
 	if l > 0 {
 		n += 1 + l + sovApi(uint64(l))
 	}
-	if m.Result != 0 {
-		n += 1 + sovApi(uint64(m.Result))
+	if m.Found {
+		n += 2
+	}
+	l = len(m.Fields)
+	if l > 0 {
+		n += 1 + l + sovApi(uint64(l))
 	}
 	return n
 }
@@ -602,6 +1945,57 @@ func (this *ActionRequestHeader) String() string {
 	s := strings.Join([]string{`&ActionRequestHeader{`,
 		`SpaceID:` + fmt.Sprintf("%v", this.SpaceID) + `,`,
 		`PartitionID:` + fmt.Sprintf("%v", this.PartitionID) + `,`,
+		`Timeout:` + fmt.Sprintf("%v", this.Timeout) + `,`,
+		`ContentYpe:` + fmt.Sprintf("%v", this.ContentYpe) + `,`,
+		`ReqId:` + fmt.Sprintf("%v", this.ReqId) + `,`,
+		`}`,
+	}, "")
+	return s
+}
+func (this *BulkRequest) String() string {
+	if this == nil {
+		return "nil"
+	}
+	s := strings.Join([]string{`&BulkRequest{`,
+		`ActionRequestHeader:` + strings.Replace(strings.Replace(this.ActionRequestHeader.String(), "ActionRequestHeader", "ActionRequestHeader", 1), `&`, ``, 1) + `,`,
+		`Requests:` + strings.Replace(strings.Replace(fmt.Sprintf("%v", this.Requests), "BulkItemRequest", "BulkItemRequest", 1), `&`, ``, 1) + `,`,
+		`}`,
+	}, "")
+	return s
+}
+func (this *BulkResponse) String() string {
+	if this == nil {
+		return "nil"
+	}
+	s := strings.Join([]string{`&BulkResponse{`,
+		`ResponseHeader:` + strings.Replace(strings.Replace(this.ResponseHeader.String(), "ResponseHeader", "meta.ResponseHeader", 1), `&`, ``, 1) + `,`,
+		`Responses:` + strings.Replace(strings.Replace(fmt.Sprintf("%v", this.Responses), "BulkItemResponse", "BulkItemResponse", 1), `&`, ``, 1) + `,`,
+		`}`,
+	}, "")
+	return s
+}
+func (this *BulkItemRequest) String() string {
+	if this == nil {
+		return "nil"
+	}
+	s := strings.Join([]string{`&BulkItemRequest{`,
+		`OpType:` + fmt.Sprintf("%v", this.OpType) + `,`,
+		`Index:` + strings.Replace(fmt.Sprintf("%v", this.Index), "IndexRequest", "IndexRequest", 1) + `,`,
+		`Update:` + strings.Replace(fmt.Sprintf("%v", this.Update), "UpdateRequest", "UpdateRequest", 1) + `,`,
+		`Delete:` + strings.Replace(fmt.Sprintf("%v", this.Delete), "DeleteRequest", "DeleteRequest", 1) + `,`,
+		`}`,
+	}, "")
+	return s
+}
+func (this *BulkItemResponse) String() string {
+	if this == nil {
+		return "nil"
+	}
+	s := strings.Join([]string{`&BulkItemResponse{`,
+		`OpType:` + fmt.Sprintf("%v", this.OpType) + `,`,
+		`Index:` + strings.Replace(fmt.Sprintf("%v", this.Index), "IndexResponse", "IndexResponse", 1) + `,`,
+		`Update:` + strings.Replace(fmt.Sprintf("%v", this.Update), "UpdateResponse", "UpdateResponse", 1) + `,`,
+		`Delete:` + strings.Replace(fmt.Sprintf("%v", this.Delete), "DeleteResponse", "DeleteResponse", 1) + `,`,
 		`}`,
 	}, "")
 	return s
@@ -611,9 +2005,8 @@ func (this *IndexRequest) String() string {
 		return "nil"
 	}
 	s := strings.Join([]string{`&IndexRequest{`,
-		`ActionRequestHeader:` + strings.Replace(strings.Replace(this.ActionRequestHeader.String(), "ActionRequestHeader", "ActionRequestHeader", 1), `&`, ``, 1) + `,`,
+		`OpType:` + fmt.Sprintf("%v", this.OpType) + `,`,
 		`Source:` + fmt.Sprintf("%v", this.Source) + `,`,
-		`ContentYpe:` + fmt.Sprintf("%v", this.ContentYpe) + `,`,
 		`}`,
 	}, "")
 	return s
@@ -623,9 +2016,77 @@ func (this *IndexResponse) String() string {
 		return "nil"
 	}
 	s := strings.Join([]string{`&IndexResponse{`,
-		`ResponseHeader:` + strings.Replace(strings.Replace(this.ResponseHeader.String(), "ResponseHeader", "meta.ResponseHeader", 1), `&`, ``, 1) + `,`,
 		`Id:` + fmt.Sprintf("%v", this.Id) + `,`,
 		`Result:` + fmt.Sprintf("%v", this.Result) + `,`,
+		`}`,
+	}, "")
+	return s
+}
+func (this *UpdateRequest) String() string {
+	if this == nil {
+		return "nil"
+	}
+	s := strings.Join([]string{`&UpdateRequest{`,
+		`Id:` + fmt.Sprintf("%v", this.Id) + `,`,
+		`Doc:` + fmt.Sprintf("%v", this.Doc) + `,`,
+		`DocAsUpsert:` + fmt.Sprintf("%v", this.DocAsUpsert) + `,`,
+		`}`,
+	}, "")
+	return s
+}
+func (this *UpdateResponse) String() string {
+	if this == nil {
+		return "nil"
+	}
+	s := strings.Join([]string{`&UpdateResponse{`,
+		`Id:` + fmt.Sprintf("%v", this.Id) + `,`,
+		`Result:` + fmt.Sprintf("%v", this.Result) + `,`,
+		`}`,
+	}, "")
+	return s
+}
+func (this *DeleteRequest) String() string {
+	if this == nil {
+		return "nil"
+	}
+	s := strings.Join([]string{`&DeleteRequest{`,
+		`Id:` + fmt.Sprintf("%v", this.Id) + `,`,
+		`}`,
+	}, "")
+	return s
+}
+func (this *DeleteResponse) String() string {
+	if this == nil {
+		return "nil"
+	}
+	s := strings.Join([]string{`&DeleteResponse{`,
+		`Id:` + fmt.Sprintf("%v", this.Id) + `,`,
+		`Result:` + fmt.Sprintf("%v", this.Result) + `,`,
+		`}`,
+	}, "")
+	return s
+}
+func (this *GetRequest) String() string {
+	if this == nil {
+		return "nil"
+	}
+	s := strings.Join([]string{`&GetRequest{`,
+		`ActionRequestHeader:` + strings.Replace(strings.Replace(this.ActionRequestHeader.String(), "ActionRequestHeader", "ActionRequestHeader", 1), `&`, ``, 1) + `,`,
+		`Id:` + fmt.Sprintf("%v", this.Id) + `,`,
+		`StoredFields:` + fmt.Sprintf("%v", this.StoredFields) + `,`,
+		`}`,
+	}, "")
+	return s
+}
+func (this *GetResponse) String() string {
+	if this == nil {
+		return "nil"
+	}
+	s := strings.Join([]string{`&GetResponse{`,
+		`ResponseHeader:` + strings.Replace(strings.Replace(this.ResponseHeader.String(), "ResponseHeader", "meta.ResponseHeader", 1), `&`, ``, 1) + `,`,
+		`Id:` + fmt.Sprintf("%v", this.Id) + `,`,
+		`Found:` + fmt.Sprintf("%v", this.Found) + `,`,
+		`Fields:` + fmt.Sprintf("%v", this.Fields) + `,`,
 		`}`,
 	}, "")
 	return s
@@ -637,6 +2098,68 @@ func valueToStringApi(v interface{}) string {
 	}
 	pv := reflect.Indirect(rv).Interface()
 	return fmt.Sprintf("*%v", pv)
+}
+func (this *BulkItemRequest) GetValue() interface{} {
+	if this.OpType != nil {
+		return this.OpType
+	}
+	if this.Index != nil {
+		return this.Index
+	}
+	if this.Update != nil {
+		return this.Update
+	}
+	if this.Delete != nil {
+		return this.Delete
+	}
+	return nil
+}
+
+func (this *BulkItemRequest) SetValue(value interface{}) bool {
+	switch vt := value.(type) {
+	case OpType:
+		this.OpType = vt
+	case *IndexRequest:
+		this.Index = vt
+	case *UpdateRequest:
+		this.Update = vt
+	case *DeleteRequest:
+		this.Delete = vt
+	default:
+		return false
+	}
+	return true
+}
+func (this *BulkItemResponse) GetValue() interface{} {
+	if this.OpType != nil {
+		return this.OpType
+	}
+	if this.Index != nil {
+		return this.Index
+	}
+	if this.Update != nil {
+		return this.Update
+	}
+	if this.Delete != nil {
+		return this.Delete
+	}
+	return nil
+}
+
+func (this *BulkItemResponse) SetValue(value interface{}) bool {
+	switch vt := value.(type) {
+	case OpType:
+		this.OpType = vt
+	case *IndexResponse:
+		this.Index = vt
+	case *UpdateResponse:
+		this.Update = vt
+	case *DeleteResponse:
+		this.Delete = vt
+	default:
+		return false
+	}
+	return true
 }
 func (m *ActionRequestHeader) Unmarshal(dAtA []byte) error {
 	l := len(dAtA)
@@ -705,6 +2228,641 @@ func (m *ActionRequestHeader) Unmarshal(dAtA []byte) error {
 					break
 				}
 			}
+		case 3:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Timeout", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowApi
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= (uint64(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthApi
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.Timeout = string(dAtA[iNdEx:postIndex])
+			iNdEx = postIndex
+		case 4:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field ContentYpe", wireType)
+			}
+			m.ContentYpe = 0
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowApi
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				m.ContentYpe |= (RequestContentType(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+		case 5:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field ReqId", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowApi
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= (uint64(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthApi
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.ReqId = string(dAtA[iNdEx:postIndex])
+			iNdEx = postIndex
+		default:
+			iNdEx = preIndex
+			skippy, err := skipApi(dAtA[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if skippy < 0 {
+				return ErrInvalidLengthApi
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			iNdEx += skippy
+		}
+	}
+
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
+}
+func (m *BulkRequest) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
+	iNdEx := 0
+	for iNdEx < l {
+		preIndex := iNdEx
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowApi
+			}
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := dAtA[iNdEx]
+			iNdEx++
+			wire |= (uint64(b) & 0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: BulkRequest: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: BulkRequest: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
+		switch fieldNum {
+		case 1:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field ActionRequestHeader", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowApi
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				msglen |= (int(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthApi
+			}
+			postIndex := iNdEx + msglen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			if err := m.ActionRequestHeader.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		case 2:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Requests", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowApi
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				msglen |= (int(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthApi
+			}
+			postIndex := iNdEx + msglen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.Requests = append(m.Requests, BulkItemRequest{})
+			if err := m.Requests[len(m.Requests)-1].Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		default:
+			iNdEx = preIndex
+			skippy, err := skipApi(dAtA[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if skippy < 0 {
+				return ErrInvalidLengthApi
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			iNdEx += skippy
+		}
+	}
+
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
+}
+func (m *BulkResponse) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
+	iNdEx := 0
+	for iNdEx < l {
+		preIndex := iNdEx
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowApi
+			}
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := dAtA[iNdEx]
+			iNdEx++
+			wire |= (uint64(b) & 0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: BulkResponse: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: BulkResponse: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
+		switch fieldNum {
+		case 1:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field ResponseHeader", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowApi
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				msglen |= (int(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthApi
+			}
+			postIndex := iNdEx + msglen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			if err := m.ResponseHeader.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		case 2:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Responses", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowApi
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				msglen |= (int(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthApi
+			}
+			postIndex := iNdEx + msglen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.Responses = append(m.Responses, BulkItemResponse{})
+			if err := m.Responses[len(m.Responses)-1].Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		default:
+			iNdEx = preIndex
+			skippy, err := skipApi(dAtA[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if skippy < 0 {
+				return ErrInvalidLengthApi
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			iNdEx += skippy
+		}
+	}
+
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
+}
+func (m *BulkItemRequest) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
+	iNdEx := 0
+	for iNdEx < l {
+		preIndex := iNdEx
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowApi
+			}
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := dAtA[iNdEx]
+			iNdEx++
+			wire |= (uint64(b) & 0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: BulkItemRequest: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: BulkItemRequest: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
+		switch fieldNum {
+		case 1:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field OpType", wireType)
+			}
+			m.OpType = 0
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowApi
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				m.OpType |= (OpType(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+		case 2:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Index", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowApi
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				msglen |= (int(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthApi
+			}
+			postIndex := iNdEx + msglen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			if m.Index == nil {
+				m.Index = &IndexRequest{}
+			}
+			if err := m.Index.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		case 3:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Update", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowApi
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				msglen |= (int(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthApi
+			}
+			postIndex := iNdEx + msglen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			if m.Update == nil {
+				m.Update = &UpdateRequest{}
+			}
+			if err := m.Update.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		case 4:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Delete", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowApi
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				msglen |= (int(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthApi
+			}
+			postIndex := iNdEx + msglen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			if m.Delete == nil {
+				m.Delete = &DeleteRequest{}
+			}
+			if err := m.Delete.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		default:
+			iNdEx = preIndex
+			skippy, err := skipApi(dAtA[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if skippy < 0 {
+				return ErrInvalidLengthApi
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			iNdEx += skippy
+		}
+	}
+
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
+}
+func (m *BulkItemResponse) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
+	iNdEx := 0
+	for iNdEx < l {
+		preIndex := iNdEx
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowApi
+			}
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := dAtA[iNdEx]
+			iNdEx++
+			wire |= (uint64(b) & 0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: BulkItemResponse: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: BulkItemResponse: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
+		switch fieldNum {
+		case 1:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field OpType", wireType)
+			}
+			m.OpType = 0
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowApi
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				m.OpType |= (OpType(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+		case 2:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Index", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowApi
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				msglen |= (int(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthApi
+			}
+			postIndex := iNdEx + msglen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			if m.Index == nil {
+				m.Index = &IndexResponse{}
+			}
+			if err := m.Index.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		case 3:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Update", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowApi
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				msglen |= (int(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthApi
+			}
+			postIndex := iNdEx + msglen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			if m.Update == nil {
+				m.Update = &UpdateResponse{}
+			}
+			if err := m.Update.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		case 4:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Delete", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowApi
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				msglen |= (int(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthApi
+			}
+			postIndex := iNdEx + msglen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			if m.Delete == nil {
+				m.Delete = &DeleteResponse{}
+			}
+			if err := m.Delete.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
 		default:
 			iNdEx = preIndex
 			skippy, err := skipApi(dAtA[iNdEx:])
@@ -756,10 +2914,10 @@ func (m *IndexRequest) Unmarshal(dAtA []byte) error {
 		}
 		switch fieldNum {
 		case 1:
-			if wireType != 2 {
-				return fmt.Errorf("proto: wrong wireType = %d for field ActionRequestHeader", wireType)
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field OpType", wireType)
 			}
-			var msglen int
+			m.OpType = 0
 			for shift := uint(0); ; shift += 7 {
 				if shift >= 64 {
 					return ErrIntOverflowApi
@@ -769,22 +2927,11 @@ func (m *IndexRequest) Unmarshal(dAtA []byte) error {
 				}
 				b := dAtA[iNdEx]
 				iNdEx++
-				msglen |= (int(b) & 0x7F) << shift
+				m.OpType |= (OpType(b) & 0x7F) << shift
 				if b < 0x80 {
 					break
 				}
 			}
-			if msglen < 0 {
-				return ErrInvalidLengthApi
-			}
-			postIndex := iNdEx + msglen
-			if postIndex > l {
-				return io.ErrUnexpectedEOF
-			}
-			if err := m.ActionRequestHeader.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
-				return err
-			}
-			iNdEx = postIndex
 		case 2:
 			if wireType != 2 {
 				return fmt.Errorf("proto: wrong wireType = %d for field Source", wireType)
@@ -816,25 +2963,6 @@ func (m *IndexRequest) Unmarshal(dAtA []byte) error {
 				m.Source = []byte{}
 			}
 			iNdEx = postIndex
-		case 3:
-			if wireType != 0 {
-				return fmt.Errorf("proto: wrong wireType = %d for field ContentYpe", wireType)
-			}
-			m.ContentYpe = 0
-			for shift := uint(0); ; shift += 7 {
-				if shift >= 64 {
-					return ErrIntOverflowApi
-				}
-				if iNdEx >= l {
-					return io.ErrUnexpectedEOF
-				}
-				b := dAtA[iNdEx]
-				iNdEx++
-				m.ContentYpe |= (RequestContentType(b) & 0x7F) << shift
-				if b < 0x80 {
-					break
-				}
-			}
 		default:
 			iNdEx = preIndex
 			skippy, err := skipApi(dAtA[iNdEx:])
@@ -883,6 +3011,647 @@ func (m *IndexResponse) Unmarshal(dAtA []byte) error {
 		}
 		if fieldNum <= 0 {
 			return fmt.Errorf("proto: IndexResponse: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
+		switch fieldNum {
+		case 1:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Id", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowApi
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= (uint64(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthApi
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.Id = string(dAtA[iNdEx:postIndex])
+			iNdEx = postIndex
+		case 2:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Result", wireType)
+			}
+			m.Result = 0
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowApi
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				m.Result |= (WriteResult(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+		default:
+			iNdEx = preIndex
+			skippy, err := skipApi(dAtA[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if skippy < 0 {
+				return ErrInvalidLengthApi
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			iNdEx += skippy
+		}
+	}
+
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
+}
+func (m *UpdateRequest) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
+	iNdEx := 0
+	for iNdEx < l {
+		preIndex := iNdEx
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowApi
+			}
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := dAtA[iNdEx]
+			iNdEx++
+			wire |= (uint64(b) & 0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: UpdateRequest: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: UpdateRequest: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
+		switch fieldNum {
+		case 1:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Id", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowApi
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= (uint64(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthApi
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.Id = string(dAtA[iNdEx:postIndex])
+			iNdEx = postIndex
+		case 2:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Doc", wireType)
+			}
+			var byteLen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowApi
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				byteLen |= (int(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if byteLen < 0 {
+				return ErrInvalidLengthApi
+			}
+			postIndex := iNdEx + byteLen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.Doc = append(m.Doc[:0], dAtA[iNdEx:postIndex]...)
+			if m.Doc == nil {
+				m.Doc = []byte{}
+			}
+			iNdEx = postIndex
+		case 3:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field DocAsUpsert", wireType)
+			}
+			var v int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowApi
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				v |= (int(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			m.DocAsUpsert = bool(v != 0)
+		default:
+			iNdEx = preIndex
+			skippy, err := skipApi(dAtA[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if skippy < 0 {
+				return ErrInvalidLengthApi
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			iNdEx += skippy
+		}
+	}
+
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
+}
+func (m *UpdateResponse) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
+	iNdEx := 0
+	for iNdEx < l {
+		preIndex := iNdEx
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowApi
+			}
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := dAtA[iNdEx]
+			iNdEx++
+			wire |= (uint64(b) & 0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: UpdateResponse: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: UpdateResponse: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
+		switch fieldNum {
+		case 1:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Id", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowApi
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= (uint64(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthApi
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.Id = string(dAtA[iNdEx:postIndex])
+			iNdEx = postIndex
+		case 2:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Result", wireType)
+			}
+			m.Result = 0
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowApi
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				m.Result |= (WriteResult(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+		default:
+			iNdEx = preIndex
+			skippy, err := skipApi(dAtA[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if skippy < 0 {
+				return ErrInvalidLengthApi
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			iNdEx += skippy
+		}
+	}
+
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
+}
+func (m *DeleteRequest) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
+	iNdEx := 0
+	for iNdEx < l {
+		preIndex := iNdEx
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowApi
+			}
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := dAtA[iNdEx]
+			iNdEx++
+			wire |= (uint64(b) & 0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: DeleteRequest: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: DeleteRequest: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
+		switch fieldNum {
+		case 1:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Id", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowApi
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= (uint64(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthApi
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.Id = string(dAtA[iNdEx:postIndex])
+			iNdEx = postIndex
+		default:
+			iNdEx = preIndex
+			skippy, err := skipApi(dAtA[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if skippy < 0 {
+				return ErrInvalidLengthApi
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			iNdEx += skippy
+		}
+	}
+
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
+}
+func (m *DeleteResponse) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
+	iNdEx := 0
+	for iNdEx < l {
+		preIndex := iNdEx
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowApi
+			}
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := dAtA[iNdEx]
+			iNdEx++
+			wire |= (uint64(b) & 0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: DeleteResponse: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: DeleteResponse: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
+		switch fieldNum {
+		case 1:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Id", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowApi
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= (uint64(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthApi
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.Id = string(dAtA[iNdEx:postIndex])
+			iNdEx = postIndex
+		case 2:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Result", wireType)
+			}
+			m.Result = 0
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowApi
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				m.Result |= (WriteResult(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+		default:
+			iNdEx = preIndex
+			skippy, err := skipApi(dAtA[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if skippy < 0 {
+				return ErrInvalidLengthApi
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			iNdEx += skippy
+		}
+	}
+
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
+}
+func (m *GetRequest) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
+	iNdEx := 0
+	for iNdEx < l {
+		preIndex := iNdEx
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowApi
+			}
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := dAtA[iNdEx]
+			iNdEx++
+			wire |= (uint64(b) & 0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: GetRequest: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: GetRequest: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
+		switch fieldNum {
+		case 1:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field ActionRequestHeader", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowApi
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				msglen |= (int(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthApi
+			}
+			postIndex := iNdEx + msglen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			if err := m.ActionRequestHeader.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		case 2:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Id", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowApi
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= (uint64(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthApi
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.Id = string(dAtA[iNdEx:postIndex])
+			iNdEx = postIndex
+		case 3:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field StoredFields", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowApi
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= (uint64(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthApi
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.StoredFields = append(m.StoredFields, string(dAtA[iNdEx:postIndex]))
+			iNdEx = postIndex
+		default:
+			iNdEx = preIndex
+			skippy, err := skipApi(dAtA[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if skippy < 0 {
+				return ErrInvalidLengthApi
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			iNdEx += skippy
+		}
+	}
+
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
+}
+func (m *GetResponse) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
+	iNdEx := 0
+	for iNdEx < l {
+		preIndex := iNdEx
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowApi
+			}
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := dAtA[iNdEx]
+			iNdEx++
+			wire |= (uint64(b) & 0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: GetResponse: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: GetResponse: illegal tag %d (wire type %d)", fieldNum, wire)
 		}
 		switch fieldNum {
 		case 1:
@@ -946,9 +3715,9 @@ func (m *IndexResponse) Unmarshal(dAtA []byte) error {
 			iNdEx = postIndex
 		case 3:
 			if wireType != 0 {
-				return fmt.Errorf("proto: wrong wireType = %d for field Result", wireType)
+				return fmt.Errorf("proto: wrong wireType = %d for field Found", wireType)
 			}
-			m.Result = 0
+			var v int
 			for shift := uint(0); ; shift += 7 {
 				if shift >= 64 {
 					return ErrIntOverflowApi
@@ -958,11 +3727,43 @@ func (m *IndexResponse) Unmarshal(dAtA []byte) error {
 				}
 				b := dAtA[iNdEx]
 				iNdEx++
-				m.Result |= (WriteResult(b) & 0x7F) << shift
+				v |= (int(b) & 0x7F) << shift
 				if b < 0x80 {
 					break
 				}
 			}
+			m.Found = bool(v != 0)
+		case 4:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Fields", wireType)
+			}
+			var byteLen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowApi
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				byteLen |= (int(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if byteLen < 0 {
+				return ErrInvalidLengthApi
+			}
+			postIndex := iNdEx + byteLen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.Fields = append(m.Fields[:0], dAtA[iNdEx:postIndex]...)
+			if m.Fields == nil {
+				m.Fields = []byte{}
+			}
+			iNdEx = postIndex
 		default:
 			iNdEx = preIndex
 			skippy, err := skipApi(dAtA[iNdEx:])
@@ -1092,36 +3893,63 @@ var (
 func init() { proto.RegisterFile("api.proto", fileDescriptorApi) }
 
 var fileDescriptorApi = []byte{
-	// 481 bytes of a gzipped FileDescriptorProto
-	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0x74, 0x92, 0x3f, 0x6f, 0x13, 0x31,
-	0x18, 0xc6, 0xed, 0x50, 0x92, 0xf4, 0xbd, 0x24, 0x54, 0x2e, 0xaa, 0xaa, 0x0e, 0x4e, 0x15, 0x31,
-	0x44, 0x95, 0xb8, 0x53, 0xd3, 0x8a, 0x89, 0x25, 0x69, 0x22, 0x1a, 0x84, 0xa0, 0x72, 0x8b, 0x10,
-	0x2c, 0xd5, 0xfd, 0x31, 0xe9, 0x49, 0xed, 0xd9, 0xdc, 0xf9, 0xa4, 0x76, 0x63, 0x67, 0x61, 0xe0,
-	0x43, 0xf0, 0x11, 0x18, 0x19, 0x33, 0x76, 0x64, 0x8a, 0x7a, 0xe6, 0x0b, 0x30, 0x22, 0x26, 0x74,
-	0x8e, 0x0b, 0xe1, 0x4f, 0xa7, 0xf3, 0xf3, 0xbc, 0xcf, 0x63, 0xfd, 0xfc, 0xea, 0x60, 0xd9, 0x97,
-	0xb1, 0x2b, 0x53, 0xa1, 0xc4, 0xc6, 0xfd, 0x49, 0xac, 0x4e, 0xf2, 0xc0, 0x0d, 0xc5, 0x99, 0x37,
-	0x11, 0x13, 0xe1, 0x19, 0x3b, 0xc8, 0x5f, 0x1b, 0x65, 0x84, 0x39, 0xd9, 0xb8, 0xb7, 0x10, 0x57,
-	0xf1, 0xe4, 0xd4, 0x0f, 0x32, 0x2f, 0xf0, 0xf3, 0x68, 0x5e, 0xf3, 0xce, 0xb8, 0xf2, 0x65, 0x60,
-	0x3e, 0xf3, 0x42, 0xe7, 0x1d, 0x86, 0xd5, 0x7e, 0xa8, 0x62, 0x91, 0x30, 0xfe, 0x26, 0xe7, 0x99,
-	0xda, 0xe7, 0x7e, 0xc4, 0x53, 0xb2, 0x0d, 0xf5, 0x4c, 0xfa, 0x21, 0x3f, 0x8e, 0xa3, 0x75, 0xbc,
-	0x89, 0xbb, 0xcd, 0xc1, 0x9a, 0x9e, 0xb5, 0x6b, 0x87, 0xa5, 0x37, 0x1e, 0xfe, 0xf8, 0x7d, 0x64,
-	0x35, 0x93, 0x1b, 0x47, 0xa4, 0x0f, 0x0d, 0xe9, 0xa7, 0x2a, 0x2e, 0x2f, 0x2b, 0x6b, 0x15, 0x53,
-	0xa3, 0x7a, 0xd6, 0x76, 0x0e, 0xae, 0x7d, 0x53, 0x5d, 0x94, 0xcc, 0xf9, 0xd5, 0x19, 0x47, 0x9d,
-	0x0f, 0x18, 0x1a, 0xe3, 0x24, 0xe2, 0xe7, 0x16, 0x86, 0x3c, 0x80, 0xea, 0x89, 0x01, 0x32, 0x10,
-	0x4e, 0xef, 0xae, 0xfb, 0x1f, 0xd8, 0x41, 0x7d, 0x3a, 0x6b, 0xa3, 0xcb, 0x59, 0x1b, 0x33, 0x9b,
-	0x26, 0x6b, 0x50, 0xcd, 0x44, 0x9e, 0x86, 0xdc, 0x50, 0x34, 0x98, 0x55, 0x64, 0x17, 0x9c, 0x50,
-	0x24, 0x8a, 0x27, 0xea, 0xf8, 0x42, 0xf2, 0xf5, 0x5b, 0x9b, 0xb8, 0xdb, 0xea, 0xad, 0xba, 0xf6,
-	0xba, 0xbd, 0xf9, 0xe8, 0xe8, 0x42, 0x72, 0x06, 0x36, 0xf7, 0x52, 0xf2, 0xce, 0x39, 0x34, 0x2d,
-	0x55, 0x26, 0x45, 0x92, 0x71, 0xb2, 0xfd, 0x17, 0xd6, 0x1d, 0xf7, 0x7a, 0x74, 0x23, 0x51, 0x0b,
-	0x2a, 0x76, 0x27, 0xcb, 0xac, 0x12, 0x47, 0xe4, 0x1e, 0x54, 0x53, 0x9e, 0xe5, 0xa7, 0xca, 0x42,
-	0x34, 0xdc, 0x17, 0x69, 0xac, 0x38, 0x33, 0x1e, 0xb3, 0xb3, 0x2d, 0x0a, 0xe4, 0x5f, 0x36, 0x52,
-	0x87, 0xa5, 0xc7, 0x87, 0xcf, 0x9e, 0xae, 0xa0, 0xad, 0x5d, 0x70, 0x16, 0x6a, 0xc4, 0x81, 0xda,
-	0x1e, 0x1b, 0xf5, 0x8f, 0x46, 0xc3, 0x15, 0x54, 0x8a, 0xe7, 0x07, 0x43, 0x23, 0x70, 0x29, 0x86,
-	0xa3, 0x27, 0xa3, 0x52, 0x54, 0x7a, 0x3b, 0x50, 0xeb, 0xcb, 0xf8, 0x51, 0x2a, 0x43, 0xd2, 0x85,
-	0xdb, 0xe6, 0x69, 0xa4, 0xe9, 0x2e, 0x2e, 0x7e, 0xa3, 0xe5, 0xfe, 0xf1, 0xe2, 0x0e, 0x1a, 0x3c,
-	0x9c, 0x16, 0x14, 0x7d, 0x29, 0x28, 0xba, 0x2a, 0x28, 0xfa, 0x56, 0x50, 0xfc, 0xbd, 0xa0, 0xf8,
-	0xad, 0xa6, 0xf8, 0xa3, 0xa6, 0xf8, 0x93, 0xa6, 0xe8, 0xb3, 0xa6, 0x68, 0xaa, 0x29, 0xbe, 0xd4,
-	0x14, 0x5f, 0x69, 0x8a, 0xdf, 0x7f, 0xa5, 0x68, 0x1f, 0xbf, 0x5a, 0x92, 0x99, 0x0c, 0x82, 0xaa,
-	0xf9, 0xdd, 0x76, 0x7e, 0x06, 0x00, 0x00, 0xff, 0xff, 0x64, 0xd0, 0xb4, 0xf9, 0xdb, 0x02, 0x00,
-	0x00,
+	// 917 bytes of a gzipped FileDescriptorProto
+	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0xa4, 0x95, 0x3d, 0x6f, 0xdb, 0x46,
+	0x18, 0xc7, 0x79, 0x92, 0xac, 0x97, 0x87, 0x92, 0xcc, 0x5e, 0xd2, 0x40, 0xf0, 0x40, 0x09, 0x4c,
+	0xd0, 0x08, 0x06, 0x4a, 0x21, 0xea, 0x1b, 0x10, 0x74, 0x91, 0x42, 0xd9, 0x56, 0xd1, 0x4a, 0x06,
+	0x63, 0xa1, 0x4d, 0x17, 0x81, 0x12, 0xcf, 0x0e, 0x51, 0x59, 0xa4, 0xc9, 0x23, 0xd0, 0x2c, 0x4d,
+	0x87, 0x7e, 0x80, 0x8e, 0x1d, 0x33, 0x76, 0xea, 0xd0, 0xa9, 0x63, 0x47, 0x8f, 0x19, 0x3b, 0x19,
+	0x11, 0xfb, 0x05, 0x8a, 0x4e, 0x45, 0xa7, 0xe2, 0x5e, 0x28, 0x53, 0x4a, 0x0b, 0x04, 0xee, 0xa4,
+	0x7b, 0xee, 0xf9, 0xff, 0xef, 0xf9, 0xf1, 0xb9, 0x17, 0x41, 0xc5, 0x09, 0x3c, 0x33, 0x08, 0x7d,
+	0xea, 0xef, 0xbd, 0x7b, 0xe6, 0xd1, 0xa7, 0xf1, 0xcc, 0x9c, 0xfb, 0xe7, 0x9d, 0x33, 0xff, 0xcc,
+	0xef, 0xf0, 0xe9, 0x59, 0x7c, 0xca, 0x23, 0x1e, 0xf0, 0x91, 0x94, 0x77, 0x32, 0x72, 0xea, 0x9d,
+	0x2d, 0x9c, 0x59, 0xd4, 0x99, 0x39, 0xb1, 0x2b, 0x6c, 0x9d, 0x73, 0x42, 0x9d, 0x60, 0xc6, 0x7f,
+	0x84, 0xc1, 0xf8, 0x13, 0xc1, 0xad, 0xde, 0x9c, 0x7a, 0xfe, 0xd2, 0x26, 0x17, 0x31, 0x89, 0xe8,
+	0x11, 0x71, 0x5c, 0x12, 0xe2, 0x07, 0x50, 0x8e, 0x02, 0x67, 0x4e, 0xa6, 0x9e, 0xdb, 0x40, 0x2d,
+	0xd4, 0xae, 0xf5, 0xef, 0x24, 0x57, 0xcd, 0xd2, 0x63, 0x36, 0x37, 0xb4, 0xfe, 0xbe, 0x1e, 0xda,
+	0x25, 0xae, 0x1b, 0xba, 0xb8, 0x07, 0xd5, 0xc0, 0x09, 0xa9, 0xc7, 0x16, 0x63, 0xb6, 0x1c, 0xb7,
+	0xe9, 0xc9, 0x55, 0x53, 0x3d, 0x4e, 0xe7, 0xb9, 0x35, 0x1b, 0xda, 0xea, 0xda, 0x33, 0x74, 0x71,
+	0x03, 0x4a, 0xd4, 0x3b, 0x27, 0x7e, 0x4c, 0x1b, 0xf9, 0x16, 0x6a, 0x57, 0xec, 0x34, 0xc4, 0xef,
+	0x83, 0x3a, 0xf7, 0x97, 0x94, 0x2c, 0xe9, 0xf4, 0x59, 0x40, 0x1a, 0x85, 0x16, 0x6a, 0xd7, 0xbb,
+	0xb7, 0x4c, 0x09, 0xfd, 0x48, 0xa4, 0x4e, 0x9e, 0x05, 0xc4, 0x06, 0xa9, 0x7b, 0x12, 0x10, 0xfc,
+	0x36, 0x14, 0x43, 0x72, 0xc1, 0x60, 0x76, 0xf8, 0x72, 0x3b, 0x21, 0xb9, 0x18, 0xba, 0xc6, 0x73,
+	0x50, 0xfb, 0xf1, 0xe2, 0x2b, 0x69, 0xc6, 0x1f, 0x42, 0xf1, 0x29, 0xff, 0x6a, 0xfe, 0xa5, 0x6a,
+	0xf7, 0xb6, 0xf9, 0x2f, 0x1d, 0xe9, 0x97, 0x2f, 0xaf, 0x9a, 0xca, 0xcb, 0xab, 0x26, 0xb2, 0xa5,
+	0x1a, 0x77, 0xa1, 0x1c, 0x0a, 0x49, 0xd4, 0xc8, 0xb5, 0xf2, 0x6d, 0xb5, 0xab, 0x99, 0x6c, 0xdd,
+	0x21, 0x25, 0xe7, 0xd2, 0xdb, 0x2f, 0x30, 0x97, 0xbd, 0xd6, 0x3d, 0x2c, 0xfc, 0xf0, 0xa2, 0xa9,
+	0x18, 0xdf, 0x40, 0x55, 0x00, 0x44, 0x81, 0xbf, 0x8c, 0x08, 0x7e, 0xb0, 0x45, 0xb0, 0x6b, 0xa6,
+	0xa9, 0xff, 0x2c, 0xfe, 0x01, 0x54, 0x42, 0xa9, 0x49, 0xab, 0xbf, 0x95, 0xa9, 0x2e, 0x32, 0xb2,
+	0xfc, 0xb5, 0x52, 0xd6, 0xff, 0x09, 0xc1, 0xee, 0x16, 0x29, 0x6e, 0x41, 0xc9, 0x0f, 0xa6, 0x94,
+	0x75, 0x17, 0xf1, 0xee, 0x96, 0xcc, 0x71, 0xc0, 0x3b, 0x5a, 0xf4, 0xf9, 0x2f, 0xbe, 0x0b, 0x3b,
+	0xde, 0xd2, 0x25, 0x5f, 0xf3, 0x9d, 0x55, 0xbb, 0x35, 0x73, 0xc8, 0x22, 0xe9, 0xb7, 0x45, 0x0e,
+	0xbf, 0x03, 0xc5, 0x38, 0x70, 0x1d, 0x4a, 0xf8, 0x0e, 0xaa, 0xdd, 0xba, 0x39, 0xe1, 0x61, 0x2a,
+	0x93, 0x59, 0xa6, 0x73, 0xc9, 0x82, 0x50, 0xb1, 0x97, 0x4c, 0x67, 0xf1, 0x70, 0xad, 0x13, 0xd9,
+	0x87, 0x85, 0xcb, 0x17, 0x4d, 0x64, 0xfc, 0x8c, 0x40, 0xdb, 0xfe, 0xb8, 0x37, 0x20, 0xbe, 0xb7,
+	0x49, 0x5c, 0x4f, 0x89, 0xc5, 0x02, 0x29, 0xf2, 0xfd, 0x2d, 0xe4, 0xdd, 0x35, 0xb2, 0xd4, 0xa5,
+	0xcc, 0xf7, 0xb7, 0x98, 0x77, 0xd7, 0xcc, 0xa9, 0x70, 0x03, 0xfa, 0x08, 0xaa, 0xd9, 0x0e, 0xbd,
+	0x01, 0xef, 0x1d, 0x28, 0x46, 0x7e, 0x1c, 0xce, 0x09, 0x07, 0xae, 0xda, 0x32, 0x32, 0x06, 0x50,
+	0xdb, 0x20, 0xc7, 0x75, 0xc8, 0xc9, 0x8b, 0x59, 0xb1, 0x73, 0x9e, 0x8b, 0xef, 0xb1, 0x83, 0x1e,
+	0xc5, 0x0b, 0xca, 0x8d, 0xf5, 0x6e, 0xd5, 0xfc, 0x3c, 0xf4, 0x38, 0x58, 0xbc, 0xa0, 0xb6, 0xcc,
+	0x19, 0x13, 0xa8, 0x6d, 0x6c, 0xc6, 0x6b, 0xcb, 0x68, 0x90, 0x77, 0xfd, 0xb9, 0x2c, 0xce, 0x86,
+	0xd8, 0x80, 0x9a, 0xeb, 0xcf, 0xa7, 0x4e, 0x34, 0x8d, 0x83, 0x88, 0x84, 0xe2, 0x5e, 0x96, 0x6d,
+	0xd5, 0xf5, 0xe7, 0xbd, 0x68, 0xc2, 0xa7, 0x8c, 0x03, 0xa8, 0x6f, 0x36, 0xec, 0x86, 0x78, 0x4d,
+	0xa8, 0x6d, 0x9c, 0x81, 0xed, 0x65, 0x58, 0xa1, 0xcd, 0x86, 0xdf, 0xb0, 0xd0, 0x73, 0x80, 0x43,
+	0x42, 0xff, 0xef, 0xf5, 0x17, 0xb5, 0x73, 0xeb, 0xda, 0x77, 0xa1, 0x16, 0x51, 0x3f, 0x24, 0xee,
+	0xf4, 0xd4, 0x23, 0x0b, 0x37, 0x6a, 0xe4, 0x5b, 0xf9, 0x76, 0xc5, 0xae, 0x8a, 0xc9, 0x03, 0x3e,
+	0x27, 0xef, 0xdf, 0x77, 0x08, 0x54, 0x4e, 0x70, 0xf3, 0xfb, 0xbf, 0x5d, 0xfd, 0x36, 0xec, 0x9c,
+	0xfa, 0xf1, 0xd2, 0x95, 0x1b, 0x24, 0x02, 0x76, 0xa0, 0x24, 0x4c, 0x41, 0x1c, 0xa8, 0xd3, 0x0c,
+	0xc6, 0xbe, 0x0e, 0xf8, 0xf5, 0x07, 0x14, 0x97, 0xa1, 0xf0, 0xc9, 0xe3, 0xf1, 0x48, 0x53, 0xf6,
+	0x3f, 0x82, 0xa2, 0x38, 0xa0, 0xb8, 0x02, 0x3b, 0xc3, 0x91, 0x35, 0xf8, 0x42, 0x53, 0x30, 0x40,
+	0xf1, 0x91, 0x3d, 0xe8, 0x9d, 0x0c, 0x34, 0xc4, 0xc6, 0x93, 0x63, 0x8b, 0x8d, 0x73, 0x6c, 0x6c,
+	0x0d, 0x3e, 0x1d, 0x9c, 0x0c, 0xb4, 0xfc, 0xfe, 0x67, 0xa0, 0x66, 0xfa, 0x8e, 0x55, 0x28, 0x09,
+	0x8b, 0xa5, 0x29, 0x2c, 0x10, 0x1e, 0x4b, 0x43, 0x2c, 0x10, 0x26, 0x4b, 0xcb, 0xe1, 0x1a, 0x54,
+	0x46, 0xe3, 0x93, 0xe9, 0xc1, 0x78, 0x32, 0xb2, 0xb4, 0x3c, 0xe3, 0x18, 0x8d, 0xc7, 0xc7, 0x5a,
+	0xa1, 0xfb, 0x04, 0x4a, 0xbd, 0xc0, 0x3b, 0x0c, 0x03, 0x76, 0x1e, 0xf3, 0x87, 0x84, 0x62, 0xd5,
+	0xbc, 0xde, 0xc0, 0xbd, 0xaa, 0x99, 0xe9, 0xa5, 0xa1, 0xe0, 0x7d, 0xa8, 0xb0, 0xb7, 0x82, 0x13,
+	0xe0, 0xaa, 0x99, 0x79, 0xea, 0xf7, 0x6a, 0x66, 0xf6, 0xdd, 0x35, 0x94, 0xfe, 0xc7, 0x97, 0x2b,
+	0x5d, 0xf9, 0x6d, 0xa5, 0x2b, 0xaf, 0x56, 0xba, 0xf2, 0xc7, 0x4a, 0x47, 0x7f, 0xad, 0x74, 0xf4,
+	0x6d, 0xa2, 0xa3, 0x1f, 0x13, 0x1d, 0xfd, 0x92, 0xe8, 0xca, 0xaf, 0x89, 0xae, 0x5c, 0x26, 0x3a,
+	0x7a, 0x99, 0xe8, 0xe8, 0x55, 0xa2, 0xa3, 0xef, 0x7f, 0xd7, 0x95, 0x23, 0xf4, 0x65, 0x21, 0x88,
+	0x82, 0xd9, 0xac, 0xc8, 0xff, 0x44, 0xdf, 0xfb, 0x27, 0x00, 0x00, 0xff, 0xff, 0x63, 0x50, 0x87,
+	0x90, 0xb1, 0x07, 0x00, 0x00,
 }
