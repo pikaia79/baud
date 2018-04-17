@@ -7,7 +7,9 @@ import (
 )
 
 type DocumentMapping struct {
+	// Default true
 	Enabled bool                           `json:enabled`
+	// Default false
 	Dynamic bool                           `json:"dynamic"`
 	Properties map[string]*DocumentMapping `json:"properties,omitempty"`
 	Fields []*FieldMapping                 `json:"fields,omitempty"`
