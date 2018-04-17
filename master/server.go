@@ -45,8 +45,7 @@ func (ms *Master) Start(config *Config) error {
 		return err
 	}
 
-	ms.createProcessor = NewPartitionCreateProcessor(ms.cluster)
-	ms.createProcessor.Run()
+	ProcessorStart(ms.cluster)
 
 	return nil
 }
@@ -61,7 +60,5 @@ func (ms *Master) Shutdown() {
 	if ms.cluster != nil {
 		ms.cluster.Close()
 	}
-	if ms.createProcessor != nil {
-		ms.createProcessor.Stop()
-	}
+	ProcessorStop()
 }

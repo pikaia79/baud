@@ -129,7 +129,9 @@ func (c *Cluster) createSpace(dbName, spaceName, partitionKey, partitionFunc str
 		}
 		space.putPartition(partition)
 
-		ProcessorPartitionCh <- partition
+		if err := PushProcessorEvent(partition); err != nil {
+			return
+		}
 	}
 
 	return space, nil
