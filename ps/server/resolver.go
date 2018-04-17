@@ -10,7 +10,7 @@ import (
 )
 
 type nodeRef struct {
-	metapb.Node
+	metapb.RaftAddrs
 	refCount int32
 }
 
@@ -32,7 +32,7 @@ func (r *NodeResolver) addNode(node *metapb.Node) {
 	}
 
 	ref := new(nodeRef)
-	ref.Node = *node
+	ref.RaftAddrs = node.RaftAddrs
 	obj, _ := r.nodes.LoadOrStore(node.ID, ref)
 	atomic.AddInt32(&(obj.(*nodeRef).refCount), 1)
 }
@@ -45,9 +45,9 @@ func (r *NodeResolver) deleteNode(id metapb.NodeID) {
 	}
 }
 
-func (r *NodeResolver) getNode(id metapb.NodeID) (*metapb.Node, error) {
+func (r *NodeResolver) getNode(id metapb.NodeID) (*nodeRef, error) {
 	if obj, _ := r.nodes.Load(id); obj != nil {
-		return &(obj.(*nodeRef).Node), nil
+		return obj.(*nodeRef), nil
 	}
 	return nil, fmt.Errorf("Cannot get node network information, nodeID=[%d]", id)
 }

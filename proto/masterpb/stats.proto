@@ -8,7 +8,7 @@ option optimize_for = SPEED;
 option (gogoproto.marshaler_all) = true;
 option (gogoproto.sizer_all) = true;
 option (gogoproto.unmarshaler_all) = true;
-option (gogoproto.gostring_all) = true;
+option (gogoproto.gostring_all) = false;
 option (gogoproto.equal_all) = true;
 option (gogoproto.verbose_equal_all) = false;
 option (gogoproto.goproto_stringer_all) = false;
@@ -34,7 +34,7 @@ message RaftStatus {
 }
 
 message RaftFollowerStatus {
-    uint32 nodeID       = 1 [(gogoproto.customname) = "NodeID", (gogoproto.casttype) = "NodeID"];
+    uint32 nodeID       = 1 [(gogoproto.customname) = "NodeID", (gogoproto.casttype) = "github.com/tiglabs/baud/proto/metapb.NodeID"];
     uint64 match        = 2;
     uint64 commit       = 3;
     uint64 next         = 4;

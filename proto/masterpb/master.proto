@@ -11,7 +11,7 @@ option optimize_for = SPEED;
 option (gogoproto.marshaler_all) = true;
 option (gogoproto.sizer_all) = true;
 option (gogoproto.unmarshaler_all) = true;
-option (gogoproto.gostring_all) = true;
+option (gogoproto.gostring_all) = false;
 option (gogoproto.equal_all) = true;
 option (gogoproto.verbose_equal_all) = false;
 option (gogoproto.goproto_stringer_all) = false;
@@ -20,7 +20,6 @@ option (gogoproto.populate_all) = true;
 option (gogoproto.testgen_all) = false;
 option (gogoproto.benchgen_all) = false;
 option (gogoproto.goproto_getters_all) = false;
-
 
 service MasterRpc {
     rpc GetRoute(GetRouteRequest)       returns (GetRouteResponse) {}
@@ -45,14 +44,14 @@ message GetRouteResponse {
 
 message PSRegisterRequest {
     RequestHeader header       = 1 [(gogoproto.nullable) = false, (gogoproto.embed) = true];
-    uint32        nodeID       = 2 [(gogoproto.customname) = "NodeID", (gogoproto.casttype) = "NodeID"];
+    uint32        nodeID       = 2 [(gogoproto.customname) = "NodeID", (gogoproto.casttype) = "github.com/tiglabs/baud/proto/metapb.NodeID"];
     string        ip           = 3;
     RuntimeInfo   runtime_info = 4 [(gogoproto.nullable) = false, (gogoproto.embed) = true];
 }
 
 message PSRegisterResponse {
     ResponseHeader     header     = 1 [(gogoproto.nullable) = false, (gogoproto.embed) = true];
-    uint32             nodeID     = 2 [(gogoproto.customname) = "NodeID", (gogoproto.casttype) = "NodeID"];
+    uint32             nodeID     = 2 [(gogoproto.customname) = "NodeID", (gogoproto.casttype) = "github.com/tiglabs/baud/proto/metapb.NodeID"];
     PSConfig           config     = 3 [(gogoproto.nullable) = false, (gogoproto.embed) = true];
     repeated Partition partitions = 4 [(gogoproto.nullable) = false];
 }
@@ -71,7 +70,7 @@ message PSConfig {
 
 message PSHeartbeatRequest {
     RequestHeader          header     = 1 [(gogoproto.nullable) = false, (gogoproto.embed) = true];
-    uint32                 nodeID     = 2 [(gogoproto.customname) = "NodeID", (gogoproto.casttype) = "NodeID"];
+    uint32                 nodeID     = 2 [(gogoproto.customname) = "NodeID", (gogoproto.casttype) = "github.com/tiglabs/baud/proto/metapb.NodeID"];
     repeated PartitionInfo partitions = 3 [(gogoproto.nullable) = false];
     NodeSysStats           sys_stats  = 4 [(gogoproto.nullable) = false];
 }
@@ -81,7 +80,7 @@ message PSHeartbeatResponse {
 }
 
 message PartitionInfo {
-    uint32           id          = 1 [(gogoproto.customname) = "ID", (gogoproto.casttype) = "PartitionID"];
+    uint32           id          = 1 [(gogoproto.customname) = "ID", (gogoproto.casttype) = "github.com/tiglabs/baud/proto/metapb.PartitionID"];
     bool             is_leader   = 2;
     PartitionStatus  status      = 3;
     PartitionEpoch   epoch       = 4 [(gogoproto.nullable) = false];

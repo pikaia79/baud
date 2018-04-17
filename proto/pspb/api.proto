@@ -10,7 +10,7 @@ option optimize_for = SPEED;
 option (gogoproto.marshaler_all) = true;
 option (gogoproto.sizer_all) = true;
 option (gogoproto.unmarshaler_all) = true;
-option (gogoproto.gostring_all) = true;
+option (gogoproto.gostring_all) = false;
 option (gogoproto.equal_all) = true;
 option (gogoproto.verbose_equal_all) = false;
 option (gogoproto.goproto_stringer_all) = false;
@@ -49,8 +49,8 @@ enum WriteResult {
 }
 
 message ActionRequestHeader {
-    uint32  space_id                = 1 [(gogoproto.customname) = "SpaceID", (gogoproto.casttype) = "SpaceID"];
-    uint32  partition_id            = 2 [(gogoproto.customname) = "PartitionID", (gogoproto.casttype) = "PartitionID"];
+    uint32  space_id                = 1 [(gogoproto.customname) = "SpaceID", (gogoproto.casttype) = "github.com/tiglabs/baud/proto/metapb.SpaceID"];
+    uint32  partition_id            = 2 [(gogoproto.customname) = "PartitionID", (gogoproto.casttype) = "github.com/tiglabs/baud/proto/metapb.PartitionID"];
     string  timeout                 = 3;
     RequestContentType  content_ype = 4;
     string  req_id                  = 5;
@@ -100,7 +100,7 @@ message IndexResponse {
 }
 
 message UpdateRequest {
-    string    id            = 1;
+    DocID     id            = 1 [(gogoproto.nullable) = false, (gogoproto.casttype) = "github.com/tiglabs/baud/proto/metapb.DocID"];
     bytes     doc           = 2;
     bool      doc_as_upsert = 3;
 }
@@ -111,7 +111,7 @@ message UpdateResponse {
 }
 
 message DeleteRequest {
-    string  id = 1;
+    DocID id = 1 [(gogoproto.nullable) = false, (gogoproto.casttype) = "github.com/tiglabs/baud/proto/metapb.DocID"];
 }
 
 message DeleteResponse {
@@ -123,7 +123,7 @@ message GetRequest {
     option (gogoproto.goproto_stringer) = false;
 
     ActionRequestHeader header    = 1 [(gogoproto.nullable) = false, (gogoproto.embed) = true];
-    string              id        = 2;
+    DocID               id        = 2 [(gogoproto.nullable) = false, (gogoproto.casttype) = "github.com/tiglabs/baud/proto/metapb.DocID"];
     repeated string stored_fields = 3;
 }
 

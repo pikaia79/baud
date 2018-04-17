@@ -10,7 +10,7 @@ option optimize_for = SPEED;
 option (gogoproto.marshaler_all) = true;
 option (gogoproto.sizer_all) = true;
 option (gogoproto.unmarshaler_all) = true;
-option (gogoproto.gostring_all) = true;
+option (gogoproto.gostring_all) = false;
 option (gogoproto.equal_all) = true;
 option (gogoproto.verbose_equal_all) = false;
 option (gogoproto.goproto_stringer_all) = false;
@@ -36,7 +36,7 @@ message CreatePartitionResponse {
 
 message DeletePartitionRequest {
     RequestHeader   header    = 1 [(gogoproto.nullable) = false, (gogoproto.embed) = true];
-    uint32          id        = 2 [(gogoproto.customname) = "ID", (gogoproto.casttype) = "PartitionID"];
+    uint32          id        = 2 [(gogoproto.customname) = "ID", (gogoproto.casttype) = "github.com/tiglabs/baud/proto/metapb.PartitionID"];
 }
 
 message DeletePartitionResponse {
