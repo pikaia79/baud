@@ -34,7 +34,7 @@ router
 
 conainer-native - baud runs on Kubernetes clusters
 
-### partitioning
+### partitioning & replication
 
 db -> entity or edge space -> partition -> slot
 
@@ -42,15 +42,20 @@ partition = slot id range
 
 3 or more partitionservers form a replication group by means of raft. 
 
-partition re-sharding is implemented through async filtered replication. 
-
 multiple partitions of different spaces of the same db could be co-located on the same ps repl group.
+
+### re-sharding
+
+CFS is used for partition snapshot and log backup. 
+
+And we also leverage it to do partition re-sharding. 
 
 ### scalability guarantee
 
 One Baud cluster can host one to thousands of databases; 
 one DB can host one to millions of spaces;
 one space can host one to billions of objects;
+
 
 ## Master
 
@@ -95,9 +100,11 @@ foreach partition among the space, select a destination PS raft group (PSRG) to 
 
 1, select two PSRG as the destinations
 
-2, call the two raft leaders to setup async filtered replication with the original to-be-splitted partition leader
+2, notify the source partition leader to do streaming backup of WALs
 
-3, replicate
+2, call the two dest partition leaders to load the snapshot of the source partition and then consume the WAL stream from CFS
+
+3, stop the source partition raft group
 
 4, cutover
 
@@ -105,9 +112,6 @@ foreach partition among the space, select a destination PS raft group (PSRG) to 
 
 the reverse process of split
 
-* Migrate a Partition
-
-based on the async replication between dest and source. 
 
 * PS metrics reporting
 
@@ -126,9 +130,27 @@ for entity partition, (UID, fieldID) -> a single or multiple packed values of th
 
 for edge partition, (<UID1, UID2>, fieldID) -> ...
 
-* search 
+* indexing 
 
-TODO：in-memory indexing, based on our own data structures
+foreach field, an in-memory B-Tree as the Dictionary, and the leaf values are the pointers to PostingLists. 
+
+type PostingList struct {
+    chunks []*PostingChunk
+    numOfChunks int
+    numOfPostings int
+}
+
+type Posting struct {
+    uid UID
+    offsetAndLength uint32
+    frequency uint32
+}
+
+type PostingChunk struct {
+    postingArray []Posting
+    capx int
+    size int
+}
 
 
 ### Key Operations
