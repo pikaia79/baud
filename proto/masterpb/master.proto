@@ -1,0 +1,90 @@
+syntax = "proto3";
+
+import "github.com/gogo/protobuf/gogoproto/gogo.proto";
+
+import "github.com/tiglabs/baud/proto/metapb/meta.proto";
+import "stats.proto";
+
+option go_package = "masterpb";
+
+option optimize_for = SPEED;
+option (gogoproto.marshaler_all) = true;
+option (gogoproto.sizer_all) = true;
+option (gogoproto.unmarshaler_all) = true;
+option (gogoproto.gostring_all) = true;
+option (gogoproto.equal_all) = true;
+option (gogoproto.verbose_equal_all) = false;
+option (gogoproto.goproto_stringer_all) = false;
+option (gogoproto.stringer_all) =  true;
+option (gogoproto.populate_all) = true;
+option (gogoproto.testgen_all) = false;
+option (gogoproto.benchgen_all) = false;
+option (gogoproto.goproto_getters_all) = false;
+
+
+service MasterRpc {
+    rpc GetRoute(GetRouteRequest)       returns (GetRouteResponse) {}
+    rpc PSRegister(PSRegisterRequest)   returns (PSRegisterResponse) {}
+    rpc PSHeartbeat(PSHeartbeatRequest) returns (PSHeartbeatResponse) {}
+}
+
+message Route {
+    Partition        partition  = 1 [(gogoproto.nullable) = false, (gogoproto.embed) = true];
+}
+
+message GetRouteRequest {
+    RequestHeader header = 1 [(gogoproto.nullable) = false, (gogoproto.embed) = true];
+    uint32        space  = 2 [(gogoproto.customname) = "Space", (gogoproto.casttype) = "github.com/tiglabs/baud/proto/metapb.SpaceID"];
+    uint32        slot   = 3 [(gogoproto.customname) = "Slot", (gogoproto.casttype) = "github.com/tiglabs/baud/proto/metapb.SlotID"];
+}
+
+message GetRouteResponse {
+    ResponseHeader header = 1 [(gogoproto.nullable) = false, (gogoproto.embed) = true];
+    repeated Route routes = 2 [(gogoproto.nullable) = false];
+}
+
+message PSRegisterRequest {
+    RequestHeader header       = 1 [(gogoproto.nullable) = false, (gogoproto.embed) = true];
+    uint32        nodeID       = 2 [(gogoproto.customname) = "NodeID", (gogoproto.casttype) = "NodeID"];
+    string        ip           = 3;
+    RuntimeInfo   runtime_info = 4 [(gogoproto.nullable) = false, (gogoproto.embed) = true];
+}
+
+message PSRegisterResponse {
+    ResponseHeader     header     = 1 [(gogoproto.nullable) = false, (gogoproto.embed) = true];
+    uint32             nodeID     = 2 [(gogoproto.customname) = "NodeID", (gogoproto.casttype) = "NodeID"];
+    PSConfig           config     = 3 [(gogoproto.nullable) = false, (gogoproto.embed) = true];
+    repeated Partition partitions = 4 [(gogoproto.nullable) = false];
+}
+
+message PSConfig {
+    uint32 rpc_port                  = 1 [(gogoproto.customname) = "RPCPort", (gogoproto.casttype) = "int"];
+    uint32 admin_port                = 2 [(gogoproto.casttype) = "int"];
+    uint32 heartbeat_interval        = 3 [(gogoproto.casttype) = "int"];
+    uint32 raft_heartbeat_port       = 4 [(gogoproto.casttype) = "int"];
+    uint32 raft_replicate_port       = 5 [(gogoproto.casttype) = "int"];
+    uint32 raft_heartbeat_interval   = 6 [(gogoproto.casttype) = "int"];
+    uint64 raft_retain_logs          = 7;
+    uint32 raft_replica_concurrency  = 8 [(gogoproto.casttype) = "int"];
+    uint32 raft_snapshot_concurrency = 9 [(gogoproto.casttype) = "int"];
+}
+
+message PSHeartbeatRequest {
+    RequestHeader          header     = 1 [(gogoproto.nullable) = false, (gogoproto.embed) = true];
+    uint32                 nodeID     = 2 [(gogoproto.customname) = "NodeID", (gogoproto.casttype) = "NodeID"];
+    repeated PartitionInfo partitions = 3 [(gogoproto.nullable) = false];
+    NodeSysStats           sys_stats  = 4 [(gogoproto.nullable) = false];
+}
+
+message PSHeartbeatResponse {
+    ResponseHeader     header     = 1 [(gogoproto.nullable) = false, (gogoproto.embed) = true];
+}
+
+message PartitionInfo {
+    uint32           id          = 1 [(gogoproto.customname) = "ID", (gogoproto.casttype) = "PartitionID"];
+    bool             is_leader   = 2;
+    PartitionStatus  status      = 3;
+    PartitionEpoch   epoch       = 4 [(gogoproto.nullable) = false];
+    RaftStatus       raft_status = 5;
+    PartitionStats   statistics  = 6 [(gogoproto.nullable) = false];
+}

@@ -1,0 +1,103 @@
+syntax = "proto3";
+
+import "github.com/gogo/protobuf/gogoproto/gogo.proto";
+
+option go_package = "metapb";
+
+option optimize_for = SPEED;
+option (gogoproto.marshaler_all) = true;
+option (gogoproto.sizer_all) = true;
+option (gogoproto.unmarshaler_all) = true;
+option (gogoproto.gostring_all) = true;
+option (gogoproto.equal_all) = true;
+option (gogoproto.verbose_equal_all) = false;
+option (gogoproto.goproto_stringer_all) = false;
+option (gogoproto.stringer_all) =  true;
+option (gogoproto.populate_all) = true;
+option (gogoproto.testgen_all) = false;
+option (gogoproto.benchgen_all) = false;
+option (gogoproto.goproto_getters_all) = false;
+
+message RequestHeader {
+    uint32 cluster_id         = 1;
+}
+
+message ResponseHeader {
+    int32   code     = 1 [(gogoproto.casttype) = "int16"];
+    string  message  = 2;
+}
+
+message DB {
+    uint32 id   = 1 [(gogoproto.customname) = "ID", (gogoproto.casttype) = "DBID"];
+    string name = 2;
+}
+
+enum SpaceStatus {
+    option (gogoproto.goproto_enum_prefix) = false;
+    SS_Invalid  = 0;
+    SS_Init     = 1;
+    SS_Prepare  = 2;
+    SS_Running  = 3;
+    SS_Delete   = 4;
+    SS_Deleting = 5;
+}
+
+enum SpaceType {
+    option (gogoproto.goproto_enum_prefix) = false;
+    ST_ENTITY = 0;
+    ST_EDGE   = 1;
+    ST_BLOB   = 2;
+}
+
+message Space {
+    uint32      id      = 1 [(gogoproto.customname) = "ID", (gogoproto.casttype) = "SpaceID"];
+    uint32      db      = 2 [(gogoproto.customname) = "DB", (gogoproto.casttype) = "DBID"];
+    string      db_name = 3;
+    string      name    = 4;
+    SpaceType   type    = 5;
+    SpaceStatus status  = 6;
+}
+
+enum PartitionStatus {
+    PA_Invalid      = 0;
+    PA_NOTREAD      = 1;
+    PA_READONLY     = 2;
+    PA_READWRITE    = 3;
+    PA_SPLITTING    = 4;
+}
+
+message PartitionEpoch {
+    // Conf change version, auto increment when add or remove peer
+    uint64 conf_version	= 1;
+    // Partition version, auto increment when split or merge
+    uint64 version     = 2;
+}
+
+message Partition {
+    uint32           id         = 1 [(gogoproto.customname) = "ID", (gogoproto.casttype) = "PartitionID"];
+    uint32           db         = 2 [(gogoproto.customname) = "DB", (gogoproto.casttype) = "DBID"];
+    uint32           space      = 3 [(gogoproto.customname) = "Space", (gogoproto.casttype) = "SpaceID"];
+    uint32           start_slot = 4 [(gogoproto.customname) = "StartSlot", (gogoproto.casttype) = "SlotID"];
+    uint32           end_slot   = 5 [(gogoproto.customname) = "EndSlot", (gogoproto.casttype) = "SlotID"];
+    repeated Replica replicas   = 6 [(gogoproto.nullable) = false];
+    PartitionStatus  status     = 7;
+}
+
+message Replica {
+    uint32        id        = 1 [(gogoproto.customname) = "ID", (gogoproto.casttype) = "ReplicaID"];
+    uint32        nodeID    = 2 [(gogoproto.customname) = "NodeID", (gogoproto.casttype) = "NodeID"];
+}
+
+message Node {
+    uint32    id         = 1 [(gogoproto.customname) = "ID", (gogoproto.casttype) = "NodeID"];
+    string    ip         = 2;
+    int32     port       = 3 [(gogoproto.casttype) = "int"];
+    string    zone       = 4;
+    uint32    version    = 5;
+    RaftAddrs raft_addrs = 6 [(gogoproto.nullable) = false, (gogoproto.embed) = true];
+}
+
+message RaftAddrs {
+    string heartbeat_addr = 1;
+    string replicate_addr = 2;
+}

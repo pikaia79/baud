@@ -1,0 +1,44 @@
+syntax = "proto3";
+
+import "github.com/gogo/protobuf/gogoproto/gogo.proto";
+
+import "github.com/tiglabs/baud/proto/metapb/meta.proto";
+
+option go_package = "pspb";
+
+option optimize_for = SPEED;
+option (gogoproto.marshaler_all) = true;
+option (gogoproto.sizer_all) = true;
+option (gogoproto.unmarshaler_all) = true;
+option (gogoproto.gostring_all) = true;
+option (gogoproto.equal_all) = true;
+option (gogoproto.verbose_equal_all) = false;
+option (gogoproto.goproto_stringer_all) = false;
+option (gogoproto.stringer_all) =  true;
+option (gogoproto.populate_all) = true;
+option (gogoproto.testgen_all) = false;
+option (gogoproto.benchgen_all) = false;
+option (gogoproto.goproto_getters_all) = false;
+
+service AdminGrpc {
+    rpc CreatePartition(CreatePartitionRequest) returns (CreatePartitionResponse) {}
+    rpc DeletePartition(DeletePartitionRequest) returns (DeletePartitionResponse) {}
+}
+
+message CreatePartitionRequest {
+    RequestHeader   header    = 1 [(gogoproto.nullable) = false, (gogoproto.embed) = true];
+    Partition       partition = 2 [(gogoproto.nullable) = false];
+}
+
+message CreatePartitionResponse {
+    ResponseHeader  header    = 1 [(gogoproto.nullable) = false, (gogoproto.embed) = true];
+}
+
+message DeletePartitionRequest {
+    RequestHeader   header    = 1 [(gogoproto.nullable) = false, (gogoproto.embed) = true];
+    uint32          id        = 2 [(gogoproto.customname) = "ID", (gogoproto.casttype) = "PartitionID"];
+}
+
+message DeletePartitionResponse {
+    ResponseHeader  header    = 1 [(gogoproto.nullable) = false, (gogoproto.embed) = true];
+}

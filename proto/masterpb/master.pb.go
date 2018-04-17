@@ -8,32 +8,34 @@
 		master.proto
 
 	It has these top-level messages:
+		Route
 		GetRouteRequest
 		GetRouteResponse
-		PSLoginRequest
-		PSLoginResponse
+		PSRegisterRequest
+		PSRegisterResponse
+		PSConfig
 		PSHeartbeatRequest
 		PSHeartbeatResponse
-		PartitionHeartbeatRequest
-		PartitionHeartbeatResponse
+		PartitionInfo
 */
 package masterpb
 
-import (
-	"fmt"
-	"io"
-	"math"
+import proto "github.com/gogo/protobuf/proto"
+import fmt "fmt"
+import math "math"
+import _ "github.com/gogo/protobuf/gogoproto"
+import meta "github.com/tiglabs/baud/proto/metapb"
+import stats "."
 
-	proto "github.com/golang/protobuf/proto"
+import github_com_tiglabs_baud_proto_metapb "github.com/tiglabs/baud/proto/metapb"
 
-	_ "github.com/gogo/protobuf/gogoproto"
+import strings "strings"
+import reflect "reflect"
 
-	metapb "."
+import context "golang.org/x/net/context"
+import grpc "google.golang.org/grpc"
 
-	context "golang.org/x/net/context"
-
-	grpc "google.golang.org/grpc"
-)
+import io "io"
 
 // Reference imports to suppress errors if they are not otherwise used.
 var _ = proto.Marshal
@@ -44,225 +46,564 @@ var _ = math.Inf
 // is compatible with the proto package it is being compiled against.
 // A compilation error at this line likely means your copy of the
 // proto package needs to be updated.
-const _ = proto.ProtoPackageIsVersion2 // please upgrade the proto package
+const _ = proto.GoGoProtoPackageIsVersion2 // please upgrade the proto package
+
+type Route struct {
+	meta.Partition `protobuf:"bytes,1,opt,name=partition,embedded=partition" json:"partition"`
+}
+
+func (m *Route) Reset()                    { *m = Route{} }
+func (*Route) ProtoMessage()               {}
+func (*Route) Descriptor() ([]byte, []int) { return fileDescriptorMaster, []int{0} }
 
 type GetRouteRequest struct {
-	Header *metapb.RequestHeader `protobuf:"bytes,1,opt,name=header" json:"header,omitempty"`
-	Space  uint32                `protobuf:"varint,2,opt,name=space,proto3" json:"space,omitempty"`
-	Slot   uint32                `protobuf:"varint,3,opt,name=slot,proto3" json:"slot,omitempty"`
+	meta.RequestHeader `protobuf:"bytes,1,opt,name=header,embedded=header" json:"header"`
+	Space              github_com_tiglabs_baud_proto_metapb.SpaceID `protobuf:"varint,2,opt,name=space,proto3,casttype=github.com/tiglabs/baud/proto/metapb.SpaceID" json:"space,omitempty"`
+	Slot               github_com_tiglabs_baud_proto_metapb.SlotID  `protobuf:"varint,3,opt,name=slot,proto3,casttype=github.com/tiglabs/baud/proto/metapb.SlotID" json:"slot,omitempty"`
 }
 
 func (m *GetRouteRequest) Reset()                    { *m = GetRouteRequest{} }
-func (m *GetRouteRequest) String() string            { return proto.CompactTextString(m) }
 func (*GetRouteRequest) ProtoMessage()               {}
-func (*GetRouteRequest) Descriptor() ([]byte, []int) { return fileDescriptorMaster, []int{0} }
-
-func (m *GetRouteRequest) GetHeader() *metapb.RequestHeader {
-	if m != nil {
-		return m.Header
-	}
-	return nil
-}
-
-func (m *GetRouteRequest) GetSpace() uint32 {
-	if m != nil {
-		return m.Space
-	}
-	return 0
-}
-
-func (m *GetRouteRequest) GetSlot() uint32 {
-	if m != nil {
-		return m.Slot
-	}
-	return 0
-}
+func (*GetRouteRequest) Descriptor() ([]byte, []int) { return fileDescriptorMaster, []int{1} }
 
 type GetRouteResponse struct {
-	Header *metapb.ResponseHeader `protobuf:"bytes,1,opt,name=header" json:"header,omitempty"`
-	Routes []*metapb.Route        `protobuf:"bytes,2,rep,name=routes" json:"routes,omitempty"`
+	meta.ResponseHeader `protobuf:"bytes,1,opt,name=header,embedded=header" json:"header"`
+	Routes              []Route `protobuf:"bytes,2,rep,name=routes" json:"routes"`
 }
 
 func (m *GetRouteResponse) Reset()                    { *m = GetRouteResponse{} }
-func (m *GetRouteResponse) String() string            { return proto.CompactTextString(m) }
 func (*GetRouteResponse) ProtoMessage()               {}
-func (*GetRouteResponse) Descriptor() ([]byte, []int) { return fileDescriptorMaster, []int{1} }
+func (*GetRouteResponse) Descriptor() ([]byte, []int) { return fileDescriptorMaster, []int{2} }
 
-func (m *GetRouteResponse) GetHeader() *metapb.ResponseHeader {
-	if m != nil {
-		return m.Header
-	}
-	return nil
+type PSRegisterRequest struct {
+	meta.RequestHeader `protobuf:"bytes,1,opt,name=header,embedded=header" json:"header"`
+	NodeID             NodeID `protobuf:"varint,2,opt,name=nodeID,proto3,casttype=NodeID" json:"nodeID,omitempty"`
+	Ip                 string `protobuf:"bytes,3,opt,name=ip,proto3" json:"ip,omitempty"`
+	stats.RuntimeInfo  `protobuf:"bytes,4,opt,name=runtime_info,json=runtimeInfo,embedded=runtime_info" json:"runtime_info"`
 }
 
-func (m *GetRouteResponse) GetRoutes() []*metapb.Route {
-	if m != nil {
-		return m.Routes
-	}
-	return nil
+func (m *PSRegisterRequest) Reset()                    { *m = PSRegisterRequest{} }
+func (*PSRegisterRequest) ProtoMessage()               {}
+func (*PSRegisterRequest) Descriptor() ([]byte, []int) { return fileDescriptorMaster, []int{3} }
+
+type PSRegisterResponse struct {
+	meta.ResponseHeader `protobuf:"bytes,1,opt,name=header,embedded=header" json:"header"`
+	NodeID              NodeID `protobuf:"varint,2,opt,name=nodeID,proto3,casttype=NodeID" json:"nodeID,omitempty"`
+	PSConfig            `protobuf:"bytes,3,opt,name=config,embedded=config" json:"config"`
+	Partitions          []meta.Partition `protobuf:"bytes,4,rep,name=partitions" json:"partitions"`
 }
 
-type PSLoginRequest struct {
-	Header         *metapb.RequestHeader   `protobuf:"bytes,1,opt,name=header" json:"header,omitempty"`
-	Server         *metapb.PartitionServer `protobuf:"bytes,2,opt,name=server" json:"server,omitempty"`
-	ServerResource *metapb.ServerResource  `protobuf:"bytes,3,opt,name=serverResource" json:"serverResource,omitempty"`
+func (m *PSRegisterResponse) Reset()                    { *m = PSRegisterResponse{} }
+func (*PSRegisterResponse) ProtoMessage()               {}
+func (*PSRegisterResponse) Descriptor() ([]byte, []int) { return fileDescriptorMaster, []int{4} }
+
+type PSConfig struct {
+	RPCPort                 int    `protobuf:"varint,1,opt,name=rpc_port,json=rpcPort,proto3,casttype=int" json:"rpc_port,omitempty"`
+	AdminPort               int    `protobuf:"varint,2,opt,name=admin_port,json=adminPort,proto3,casttype=int" json:"admin_port,omitempty"`
+	HeartbeatInterval       int    `protobuf:"varint,3,opt,name=heartbeat_interval,json=heartbeatInterval,proto3,casttype=int" json:"heartbeat_interval,omitempty"`
+	RaftHeartbeatPort       int    `protobuf:"varint,4,opt,name=raft_heartbeat_port,json=raftHeartbeatPort,proto3,casttype=int" json:"raft_heartbeat_port,omitempty"`
+	RaftReplicatePort       int    `protobuf:"varint,5,opt,name=raft_replicate_port,json=raftReplicatePort,proto3,casttype=int" json:"raft_replicate_port,omitempty"`
+	RaftHeartbeatInterval   int    `protobuf:"varint,6,opt,name=raft_heartbeat_interval,json=raftHeartbeatInterval,proto3,casttype=int" json:"raft_heartbeat_interval,omitempty"`
+	RaftRetainLogs          uint64 `protobuf:"varint,7,opt,name=raft_retain_logs,json=raftRetainLogs,proto3" json:"raft_retain_logs,omitempty"`
+	RaftReplicaConcurrency  int    `protobuf:"varint,8,opt,name=raft_replica_concurrency,json=raftReplicaConcurrency,proto3,casttype=int" json:"raft_replica_concurrency,omitempty"`
+	RaftSnapshotConcurrency int    `protobuf:"varint,9,opt,name=raft_snapshot_concurrency,json=raftSnapshotConcurrency,proto3,casttype=int" json:"raft_snapshot_concurrency,omitempty"`
 }
 
-func (m *PSLoginRequest) Reset()                    { *m = PSLoginRequest{} }
-func (m *PSLoginRequest) String() string            { return proto.CompactTextString(m) }
-func (*PSLoginRequest) ProtoMessage()               {}
-func (*PSLoginRequest) Descriptor() ([]byte, []int) { return fileDescriptorMaster, []int{2} }
-
-func (m *PSLoginRequest) GetHeader() *metapb.RequestHeader {
-	if m != nil {
-		return m.Header
-	}
-	return nil
-}
-
-func (m *PSLoginRequest) GetServer() *metapb.PartitionServer {
-	if m != nil {
-		return m.Server
-	}
-	return nil
-}
-
-func (m *PSLoginRequest) GetServerResource() *metapb.ServerResource {
-	if m != nil {
-		return m.ServerResource
-	}
-	return nil
-}
-
-type PSLoginResponse struct {
-	Header *metapb.ResponseHeader  `protobuf:"bytes,1,opt,name=header" json:"header,omitempty"`
-	Server *metapb.PartitionServer `protobuf:"bytes,2,opt,name=server" json:"server,omitempty"`
-}
-
-func (m *PSLoginResponse) Reset()                    { *m = PSLoginResponse{} }
-func (m *PSLoginResponse) String() string            { return proto.CompactTextString(m) }
-func (*PSLoginResponse) ProtoMessage()               {}
-func (*PSLoginResponse) Descriptor() ([]byte, []int) { return fileDescriptorMaster, []int{3} }
-
-func (m *PSLoginResponse) GetHeader() *metapb.ResponseHeader {
-	if m != nil {
-		return m.Header
-	}
-	return nil
-}
-
-func (m *PSLoginResponse) GetServer() *metapb.PartitionServer {
-	if m != nil {
-		return m.Server
-	}
-	return nil
-}
+func (m *PSConfig) Reset()                    { *m = PSConfig{} }
+func (*PSConfig) ProtoMessage()               {}
+func (*PSConfig) Descriptor() ([]byte, []int) { return fileDescriptorMaster, []int{5} }
 
 type PSHeartbeatRequest struct {
-	Header *metapb.RequestHeader `protobuf:"bytes,1,opt,name=header" json:"header,omitempty"`
-	PsId   uint32                `protobuf:"varint,3,opt,name=ps_id,json=psId,proto3" json:"ps_id,omitempty"`
+	meta.RequestHeader `protobuf:"bytes,1,opt,name=header,embedded=header" json:"header"`
+	NodeID             NodeID             `protobuf:"varint,2,opt,name=nodeID,proto3,casttype=NodeID" json:"nodeID,omitempty"`
+	Partitions         []PartitionInfo    `protobuf:"bytes,3,rep,name=partitions" json:"partitions"`
+	SysStats           stats.NodeSysStats `protobuf:"bytes,4,opt,name=sys_stats,json=sysStats" json:"sys_stats"`
 }
 
 func (m *PSHeartbeatRequest) Reset()                    { *m = PSHeartbeatRequest{} }
-func (m *PSHeartbeatRequest) String() string            { return proto.CompactTextString(m) }
 func (*PSHeartbeatRequest) ProtoMessage()               {}
-func (*PSHeartbeatRequest) Descriptor() ([]byte, []int) { return fileDescriptorMaster, []int{4} }
-
-func (m *PSHeartbeatRequest) GetHeader() *metapb.RequestHeader {
-	if m != nil {
-		return m.Header
-	}
-	return nil
-}
-
-func (m *PSHeartbeatRequest) GetPsId() uint32 {
-	if m != nil {
-		return m.PsId
-	}
-	return 0
-}
+func (*PSHeartbeatRequest) Descriptor() ([]byte, []int) { return fileDescriptorMaster, []int{6} }
 
 type PSHeartbeatResponse struct {
-	Header *metapb.ResponseHeader `protobuf:"bytes,1,opt,name=header" json:"header,omitempty"`
+	meta.ResponseHeader `protobuf:"bytes,1,opt,name=header,embedded=header" json:"header"`
 }
 
 func (m *PSHeartbeatResponse) Reset()                    { *m = PSHeartbeatResponse{} }
-func (m *PSHeartbeatResponse) String() string            { return proto.CompactTextString(m) }
 func (*PSHeartbeatResponse) ProtoMessage()               {}
-func (*PSHeartbeatResponse) Descriptor() ([]byte, []int) { return fileDescriptorMaster, []int{5} }
+func (*PSHeartbeatResponse) Descriptor() ([]byte, []int) { return fileDescriptorMaster, []int{7} }
 
-func (m *PSHeartbeatResponse) GetHeader() *metapb.ResponseHeader {
-	if m != nil {
-		return m.Header
-	}
-	return nil
+type PartitionInfo struct {
+	ID         PartitionID          `protobuf:"varint,1,opt,name=id,proto3,casttype=PartitionID" json:"id,omitempty"`
+	IsLeader   bool                 `protobuf:"varint,2,opt,name=is_leader,json=isLeader,proto3" json:"is_leader,omitempty"`
+	Status     meta.PartitionStatus `protobuf:"varint,3,opt,name=status,proto3,enum=PartitionStatus" json:"status,omitempty"`
+	Epoch      meta.PartitionEpoch  `protobuf:"bytes,4,opt,name=epoch" json:"epoch"`
+	RaftStatus *stats.RaftStatus    `protobuf:"bytes,5,opt,name=raft_status,json=raftStatus" json:"raft_status,omitempty"`
+	Statistics stats.PartitionStats `protobuf:"bytes,6,opt,name=statistics" json:"statistics"`
 }
 
-type PartitionHeartbeatRequest struct {
-	Header    *metapb.RequestHeader `protobuf:"bytes,1,opt,name=header" json:"header,omitempty"`
-	Partition *metapb.Partition     `protobuf:"bytes,2,opt,name=partition" json:"partition,omitempty"`
-	Replicas  []*metapb.Replica     `protobuf:"bytes,3,rep,name=replicas" json:"replicas,omitempty"`
-	Leader    uint32                `protobuf:"varint,4,opt,name=leader,proto3" json:"leader,omitempty"`
-}
-
-func (m *PartitionHeartbeatRequest) Reset()                    { *m = PartitionHeartbeatRequest{} }
-func (m *PartitionHeartbeatRequest) String() string            { return proto.CompactTextString(m) }
-func (*PartitionHeartbeatRequest) ProtoMessage()               {}
-func (*PartitionHeartbeatRequest) Descriptor() ([]byte, []int) { return fileDescriptorMaster, []int{6} }
-
-func (m *PartitionHeartbeatRequest) GetHeader() *metapb.RequestHeader {
-	if m != nil {
-		return m.Header
-	}
-	return nil
-}
-
-func (m *PartitionHeartbeatRequest) GetPartition() *metapb.Partition {
-	if m != nil {
-		return m.Partition
-	}
-	return nil
-}
-
-func (m *PartitionHeartbeatRequest) GetReplicas() []*metapb.Replica {
-	if m != nil {
-		return m.Replicas
-	}
-	return nil
-}
-
-func (m *PartitionHeartbeatRequest) GetLeader() uint32 {
-	if m != nil {
-		return m.Leader
-	}
-	return 0
-}
-
-type PartitionHeartbeatResponse struct {
-	Header *metapb.ResponseHeader `protobuf:"bytes,1,opt,name=header" json:"header,omitempty"`
-}
-
-func (m *PartitionHeartbeatResponse) Reset()                    { *m = PartitionHeartbeatResponse{} }
-func (m *PartitionHeartbeatResponse) String() string            { return proto.CompactTextString(m) }
-func (*PartitionHeartbeatResponse) ProtoMessage()               {}
-func (*PartitionHeartbeatResponse) Descriptor() ([]byte, []int) { return fileDescriptorMaster, []int{7} }
-
-func (m *PartitionHeartbeatResponse) GetHeader() *metapb.ResponseHeader {
-	if m != nil {
-		return m.Header
-	}
-	return nil
-}
+func (m *PartitionInfo) Reset()                    { *m = PartitionInfo{} }
+func (*PartitionInfo) ProtoMessage()               {}
+func (*PartitionInfo) Descriptor() ([]byte, []int) { return fileDescriptorMaster, []int{8} }
 
 func init() {
-	proto.RegisterType((*GetRouteRequest)(nil), "masterpb.GetRouteRequest")
-	proto.RegisterType((*GetRouteResponse)(nil), "masterpb.GetRouteResponse")
-	proto.RegisterType((*PSLoginRequest)(nil), "masterpb.PSLoginRequest")
-	proto.RegisterType((*PSLoginResponse)(nil), "masterpb.PSLoginResponse")
-	proto.RegisterType((*PSHeartbeatRequest)(nil), "masterpb.PSHeartbeatRequest")
-	proto.RegisterType((*PSHeartbeatResponse)(nil), "masterpb.PSHeartbeatResponse")
-	proto.RegisterType((*PartitionHeartbeatRequest)(nil), "masterpb.PartitionHeartbeatRequest")
-	proto.RegisterType((*PartitionHeartbeatResponse)(nil), "masterpb.PartitionHeartbeatResponse")
+	proto.RegisterType((*Route)(nil), "Route")
+	proto.RegisterType((*GetRouteRequest)(nil), "GetRouteRequest")
+	proto.RegisterType((*GetRouteResponse)(nil), "GetRouteResponse")
+	proto.RegisterType((*PSRegisterRequest)(nil), "PSRegisterRequest")
+	proto.RegisterType((*PSRegisterResponse)(nil), "PSRegisterResponse")
+	proto.RegisterType((*PSConfig)(nil), "PSConfig")
+	proto.RegisterType((*PSHeartbeatRequest)(nil), "PSHeartbeatRequest")
+	proto.RegisterType((*PSHeartbeatResponse)(nil), "PSHeartbeatResponse")
+	proto.RegisterType((*PartitionInfo)(nil), "PartitionInfo")
+}
+func (this *Route) Equal(that interface{}) bool {
+	if that == nil {
+		return this == nil
+	}
+
+	that1, ok := that.(*Route)
+	if !ok {
+		that2, ok := that.(Route)
+		if ok {
+			that1 = &that2
+		} else {
+			return false
+		}
+	}
+	if that1 == nil {
+		return this == nil
+	} else if this == nil {
+		return false
+	}
+	if !this.Partition.Equal(&that1.Partition) {
+		return false
+	}
+	return true
+}
+func (this *GetRouteRequest) Equal(that interface{}) bool {
+	if that == nil {
+		return this == nil
+	}
+
+	that1, ok := that.(*GetRouteRequest)
+	if !ok {
+		that2, ok := that.(GetRouteRequest)
+		if ok {
+			that1 = &that2
+		} else {
+			return false
+		}
+	}
+	if that1 == nil {
+		return this == nil
+	} else if this == nil {
+		return false
+	}
+	if !this.RequestHeader.Equal(&that1.RequestHeader) {
+		return false
+	}
+	if this.Space != that1.Space {
+		return false
+	}
+	if this.Slot != that1.Slot {
+		return false
+	}
+	return true
+}
+func (this *GetRouteResponse) Equal(that interface{}) bool {
+	if that == nil {
+		return this == nil
+	}
+
+	that1, ok := that.(*GetRouteResponse)
+	if !ok {
+		that2, ok := that.(GetRouteResponse)
+		if ok {
+			that1 = &that2
+		} else {
+			return false
+		}
+	}
+	if that1 == nil {
+		return this == nil
+	} else if this == nil {
+		return false
+	}
+	if !this.ResponseHeader.Equal(&that1.ResponseHeader) {
+		return false
+	}
+	if len(this.Routes) != len(that1.Routes) {
+		return false
+	}
+	for i := range this.Routes {
+		if !this.Routes[i].Equal(&that1.Routes[i]) {
+			return false
+		}
+	}
+	return true
+}
+func (this *PSRegisterRequest) Equal(that interface{}) bool {
+	if that == nil {
+		return this == nil
+	}
+
+	that1, ok := that.(*PSRegisterRequest)
+	if !ok {
+		that2, ok := that.(PSRegisterRequest)
+		if ok {
+			that1 = &that2
+		} else {
+			return false
+		}
+	}
+	if that1 == nil {
+		return this == nil
+	} else if this == nil {
+		return false
+	}
+	if !this.RequestHeader.Equal(&that1.RequestHeader) {
+		return false
+	}
+	if this.NodeID != that1.NodeID {
+		return false
+	}
+	if this.Ip != that1.Ip {
+		return false
+	}
+	if !this.RuntimeInfo.Equal(&that1.RuntimeInfo) {
+		return false
+	}
+	return true
+}
+func (this *PSRegisterResponse) Equal(that interface{}) bool {
+	if that == nil {
+		return this == nil
+	}
+
+	that1, ok := that.(*PSRegisterResponse)
+	if !ok {
+		that2, ok := that.(PSRegisterResponse)
+		if ok {
+			that1 = &that2
+		} else {
+			return false
+		}
+	}
+	if that1 == nil {
+		return this == nil
+	} else if this == nil {
+		return false
+	}
+	if !this.ResponseHeader.Equal(&that1.ResponseHeader) {
+		return false
+	}
+	if this.NodeID != that1.NodeID {
+		return false
+	}
+	if !this.PSConfig.Equal(&that1.PSConfig) {
+		return false
+	}
+	if len(this.Partitions) != len(that1.Partitions) {
+		return false
+	}
+	for i := range this.Partitions {
+		if !this.Partitions[i].Equal(&that1.Partitions[i]) {
+			return false
+		}
+	}
+	return true
+}
+func (this *PSConfig) Equal(that interface{}) bool {
+	if that == nil {
+		return this == nil
+	}
+
+	that1, ok := that.(*PSConfig)
+	if !ok {
+		that2, ok := that.(PSConfig)
+		if ok {
+			that1 = &that2
+		} else {
+			return false
+		}
+	}
+	if that1 == nil {
+		return this == nil
+	} else if this == nil {
+		return false
+	}
+	if this.RPCPort != that1.RPCPort {
+		return false
+	}
+	if this.AdminPort != that1.AdminPort {
+		return false
+	}
+	if this.HeartbeatInterval != that1.HeartbeatInterval {
+		return false
+	}
+	if this.RaftHeartbeatPort != that1.RaftHeartbeatPort {
+		return false
+	}
+	if this.RaftReplicatePort != that1.RaftReplicatePort {
+		return false
+	}
+	if this.RaftHeartbeatInterval != that1.RaftHeartbeatInterval {
+		return false
+	}
+	if this.RaftRetainLogs != that1.RaftRetainLogs {
+		return false
+	}
+	if this.RaftReplicaConcurrency != that1.RaftReplicaConcurrency {
+		return false
+	}
+	if this.RaftSnapshotConcurrency != that1.RaftSnapshotConcurrency {
+		return false
+	}
+	return true
+}
+func (this *PSHeartbeatRequest) Equal(that interface{}) bool {
+	if that == nil {
+		return this == nil
+	}
+
+	that1, ok := that.(*PSHeartbeatRequest)
+	if !ok {
+		that2, ok := that.(PSHeartbeatRequest)
+		if ok {
+			that1 = &that2
+		} else {
+			return false
+		}
+	}
+	if that1 == nil {
+		return this == nil
+	} else if this == nil {
+		return false
+	}
+	if !this.RequestHeader.Equal(&that1.RequestHeader) {
+		return false
+	}
+	if this.NodeID != that1.NodeID {
+		return false
+	}
+	if len(this.Partitions) != len(that1.Partitions) {
+		return false
+	}
+	for i := range this.Partitions {
+		if !this.Partitions[i].Equal(&that1.Partitions[i]) {
+			return false
+		}
+	}
+	if !this.SysStats.Equal(&that1.SysStats) {
+		return false
+	}
+	return true
+}
+func (this *PSHeartbeatResponse) Equal(that interface{}) bool {
+	if that == nil {
+		return this == nil
+	}
+
+	that1, ok := that.(*PSHeartbeatResponse)
+	if !ok {
+		that2, ok := that.(PSHeartbeatResponse)
+		if ok {
+			that1 = &that2
+		} else {
+			return false
+		}
+	}
+	if that1 == nil {
+		return this == nil
+	} else if this == nil {
+		return false
+	}
+	if !this.ResponseHeader.Equal(&that1.ResponseHeader) {
+		return false
+	}
+	return true
+}
+func (this *PartitionInfo) Equal(that interface{}) bool {
+	if that == nil {
+		return this == nil
+	}
+
+	that1, ok := that.(*PartitionInfo)
+	if !ok {
+		that2, ok := that.(PartitionInfo)
+		if ok {
+			that1 = &that2
+		} else {
+			return false
+		}
+	}
+	if that1 == nil {
+		return this == nil
+	} else if this == nil {
+		return false
+	}
+	if this.ID != that1.ID {
+		return false
+	}
+	if this.IsLeader != that1.IsLeader {
+		return false
+	}
+	if this.Status != that1.Status {
+		return false
+	}
+	if !this.Epoch.Equal(&that1.Epoch) {
+		return false
+	}
+	if !this.RaftStatus.Equal(that1.RaftStatus) {
+		return false
+	}
+	if !this.Statistics.Equal(&that1.Statistics) {
+		return false
+	}
+	return true
+}
+func (this *Route) GoString() string {
+	if this == nil {
+		return "nil"
+	}
+	s := make([]string, 0, 5)
+	s = append(s, "&masterpb.Route{")
+	s = append(s, "Partition: "+strings.Replace(this.Partition.GoString(), `&`, ``, 1)+",\n")
+	s = append(s, "}")
+	return strings.Join(s, "")
+}
+func (this *GetRouteRequest) GoString() string {
+	if this == nil {
+		return "nil"
+	}
+	s := make([]string, 0, 7)
+	s = append(s, "&masterpb.GetRouteRequest{")
+	s = append(s, "RequestHeader: "+strings.Replace(this.RequestHeader.GoString(), `&`, ``, 1)+",\n")
+	s = append(s, "Space: "+fmt.Sprintf("%#v", this.Space)+",\n")
+	s = append(s, "Slot: "+fmt.Sprintf("%#v", this.Slot)+",\n")
+	s = append(s, "}")
+	return strings.Join(s, "")
+}
+func (this *GetRouteResponse) GoString() string {
+	if this == nil {
+		return "nil"
+	}
+	s := make([]string, 0, 6)
+	s = append(s, "&masterpb.GetRouteResponse{")
+	s = append(s, "ResponseHeader: "+strings.Replace(this.ResponseHeader.GoString(), `&`, ``, 1)+",\n")
+	if this.Routes != nil {
+		vs := make([]*Route, len(this.Routes))
+		for i := range vs {
+			vs[i] = &this.Routes[i]
+		}
+		s = append(s, "Routes: "+fmt.Sprintf("%#v", vs)+",\n")
+	}
+	s = append(s, "}")
+	return strings.Join(s, "")
+}
+func (this *PSRegisterRequest) GoString() string {
+	if this == nil {
+		return "nil"
+	}
+	s := make([]string, 0, 8)
+	s = append(s, "&masterpb.PSRegisterRequest{")
+	s = append(s, "RequestHeader: "+strings.Replace(this.RequestHeader.GoString(), `&`, ``, 1)+",\n")
+	s = append(s, "NodeID: "+fmt.Sprintf("%#v", this.NodeID)+",\n")
+	s = append(s, "Ip: "+fmt.Sprintf("%#v", this.Ip)+",\n")
+	s = append(s, "RuntimeInfo: "+strings.Replace(this.RuntimeInfo.GoString(), `&`, ``, 1)+",\n")
+	s = append(s, "}")
+	return strings.Join(s, "")
+}
+func (this *PSRegisterResponse) GoString() string {
+	if this == nil {
+		return "nil"
+	}
+	s := make([]string, 0, 8)
+	s = append(s, "&masterpb.PSRegisterResponse{")
+	s = append(s, "ResponseHeader: "+strings.Replace(this.ResponseHeader.GoString(), `&`, ``, 1)+",\n")
+	s = append(s, "NodeID: "+fmt.Sprintf("%#v", this.NodeID)+",\n")
+	s = append(s, "PSConfig: "+strings.Replace(this.PSConfig.GoString(), `&`, ``, 1)+",\n")
+	if this.Partitions != nil {
+		vs := make([]*meta.Partition, len(this.Partitions))
+		for i := range vs {
+			vs[i] = &this.Partitions[i]
+		}
+		s = append(s, "Partitions: "+fmt.Sprintf("%#v", vs)+",\n")
+	}
+	s = append(s, "}")
+	return strings.Join(s, "")
+}
+func (this *PSConfig) GoString() string {
+	if this == nil {
+		return "nil"
+	}
+	s := make([]string, 0, 13)
+	s = append(s, "&masterpb.PSConfig{")
+	s = append(s, "RPCPort: "+fmt.Sprintf("%#v", this.RPCPort)+",\n")
+	s = append(s, "AdminPort: "+fmt.Sprintf("%#v", this.AdminPort)+",\n")
+	s = append(s, "HeartbeatInterval: "+fmt.Sprintf("%#v", this.HeartbeatInterval)+",\n")
+	s = append(s, "RaftHeartbeatPort: "+fmt.Sprintf("%#v", this.RaftHeartbeatPort)+",\n")
+	s = append(s, "RaftReplicatePort: "+fmt.Sprintf("%#v", this.RaftReplicatePort)+",\n")
+	s = append(s, "RaftHeartbeatInterval: "+fmt.Sprintf("%#v", this.RaftHeartbeatInterval)+",\n")
+	s = append(s, "RaftRetainLogs: "+fmt.Sprintf("%#v", this.RaftRetainLogs)+",\n")
+	s = append(s, "RaftReplicaConcurrency: "+fmt.Sprintf("%#v", this.RaftReplicaConcurrency)+",\n")
+	s = append(s, "RaftSnapshotConcurrency: "+fmt.Sprintf("%#v", this.RaftSnapshotConcurrency)+",\n")
+	s = append(s, "}")
+	return strings.Join(s, "")
+}
+func (this *PSHeartbeatRequest) GoString() string {
+	if this == nil {
+		return "nil"
+	}
+	s := make([]string, 0, 8)
+	s = append(s, "&masterpb.PSHeartbeatRequest{")
+	s = append(s, "RequestHeader: "+strings.Replace(this.RequestHeader.GoString(), `&`, ``, 1)+",\n")
+	s = append(s, "NodeID: "+fmt.Sprintf("%#v", this.NodeID)+",\n")
+	if this.Partitions != nil {
+		vs := make([]*PartitionInfo, len(this.Partitions))
+		for i := range vs {
+			vs[i] = &this.Partitions[i]
+		}
+		s = append(s, "Partitions: "+fmt.Sprintf("%#v", vs)+",\n")
+	}
+	s = append(s, "SysStats: "+strings.Replace(this.SysStats.GoString(), `&`, ``, 1)+",\n")
+	s = append(s, "}")
+	return strings.Join(s, "")
+}
+func (this *PSHeartbeatResponse) GoString() string {
+	if this == nil {
+		return "nil"
+	}
+	s := make([]string, 0, 5)
+	s = append(s, "&masterpb.PSHeartbeatResponse{")
+	s = append(s, "ResponseHeader: "+strings.Replace(this.ResponseHeader.GoString(), `&`, ``, 1)+",\n")
+	s = append(s, "}")
+	return strings.Join(s, "")
+}
+func (this *PartitionInfo) GoString() string {
+	if this == nil {
+		return "nil"
+	}
+	s := make([]string, 0, 10)
+	s = append(s, "&masterpb.PartitionInfo{")
+	s = append(s, "ID: "+fmt.Sprintf("%#v", this.ID)+",\n")
+	s = append(s, "IsLeader: "+fmt.Sprintf("%#v", this.IsLeader)+",\n")
+	s = append(s, "Status: "+fmt.Sprintf("%#v", this.Status)+",\n")
+	s = append(s, "Epoch: "+strings.Replace(this.Epoch.GoString(), `&`, ``, 1)+",\n")
+	if this.RaftStatus != nil {
+		s = append(s, "RaftStatus: "+fmt.Sprintf("%#v", this.RaftStatus)+",\n")
+	}
+	s = append(s, "Statistics: "+strings.Replace(this.Statistics.GoString(), `&`, ``, 1)+",\n")
+	s = append(s, "}")
+	return strings.Join(s, "")
+}
+func valueToGoStringMaster(v interface{}, typ string) string {
+	rv := reflect.ValueOf(v)
+	if rv.IsNil() {
+		return "nil"
+	}
+	pv := reflect.Indirect(rv).Interface()
+	return fmt.Sprintf("func(v %v) *%v { return &v } ( %#v )", typ, typ, pv)
 }
 
 // Reference imports to suppress errors if they are not otherwise used.
@@ -277,9 +618,8 @@ const _ = grpc.SupportPackageIsVersion4
 
 type MasterRpcClient interface {
 	GetRoute(ctx context.Context, in *GetRouteRequest, opts ...grpc.CallOption) (*GetRouteResponse, error)
-	PSLogin(ctx context.Context, in *PSLoginRequest, opts ...grpc.CallOption) (*PSLoginResponse, error)
+	PSRegister(ctx context.Context, in *PSRegisterRequest, opts ...grpc.CallOption) (*PSRegisterResponse, error)
 	PSHeartbeat(ctx context.Context, in *PSHeartbeatRequest, opts ...grpc.CallOption) (*PSHeartbeatResponse, error)
-	PartitionHeartbeat(ctx context.Context, in *PartitionHeartbeatRequest, opts ...grpc.CallOption) (*PartitionHeartbeatResponse, error)
 }
 
 type masterRpcClient struct {
@@ -292,16 +632,16 @@ func NewMasterRpcClient(cc *grpc.ClientConn) MasterRpcClient {
 
 func (c *masterRpcClient) GetRoute(ctx context.Context, in *GetRouteRequest, opts ...grpc.CallOption) (*GetRouteResponse, error) {
 	out := new(GetRouteResponse)
-	err := grpc.Invoke(ctx, "/masterpb.MasterRpc/GetRoute", in, out, c.cc, opts...)
+	err := grpc.Invoke(ctx, "/MasterRpc/GetRoute", in, out, c.cc, opts...)
 	if err != nil {
 		return nil, err
 	}
 	return out, nil
 }
 
-func (c *masterRpcClient) PSLogin(ctx context.Context, in *PSLoginRequest, opts ...grpc.CallOption) (*PSLoginResponse, error) {
-	out := new(PSLoginResponse)
-	err := grpc.Invoke(ctx, "/masterpb.MasterRpc/PSLogin", in, out, c.cc, opts...)
+func (c *masterRpcClient) PSRegister(ctx context.Context, in *PSRegisterRequest, opts ...grpc.CallOption) (*PSRegisterResponse, error) {
+	out := new(PSRegisterResponse)
+	err := grpc.Invoke(ctx, "/MasterRpc/PSRegister", in, out, c.cc, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -310,16 +650,7 @@ func (c *masterRpcClient) PSLogin(ctx context.Context, in *PSLoginRequest, opts 
 
 func (c *masterRpcClient) PSHeartbeat(ctx context.Context, in *PSHeartbeatRequest, opts ...grpc.CallOption) (*PSHeartbeatResponse, error) {
 	out := new(PSHeartbeatResponse)
-	err := grpc.Invoke(ctx, "/masterpb.MasterRpc/PSHeartbeat", in, out, c.cc, opts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
-func (c *masterRpcClient) PartitionHeartbeat(ctx context.Context, in *PartitionHeartbeatRequest, opts ...grpc.CallOption) (*PartitionHeartbeatResponse, error) {
-	out := new(PartitionHeartbeatResponse)
-	err := grpc.Invoke(ctx, "/masterpb.MasterRpc/PartitionHeartbeat", in, out, c.cc, opts...)
+	err := grpc.Invoke(ctx, "/MasterRpc/PSHeartbeat", in, out, c.cc, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -330,9 +661,8 @@ func (c *masterRpcClient) PartitionHeartbeat(ctx context.Context, in *PartitionH
 
 type MasterRpcServer interface {
 	GetRoute(context.Context, *GetRouteRequest) (*GetRouteResponse, error)
-	PSLogin(context.Context, *PSLoginRequest) (*PSLoginResponse, error)
+	PSRegister(context.Context, *PSRegisterRequest) (*PSRegisterResponse, error)
 	PSHeartbeat(context.Context, *PSHeartbeatRequest) (*PSHeartbeatResponse, error)
-	PartitionHeartbeat(context.Context, *PartitionHeartbeatRequest) (*PartitionHeartbeatResponse, error)
 }
 
 func RegisterMasterRpcServer(s *grpc.Server, srv MasterRpcServer) {
@@ -349,7 +679,7 @@ func _MasterRpc_GetRoute_Handler(srv interface{}, ctx context.Context, dec func(
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: "/masterpb.MasterRpc/GetRoute",
+		FullMethod: "/MasterRpc/GetRoute",
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(MasterRpcServer).GetRoute(ctx, req.(*GetRouteRequest))
@@ -357,20 +687,20 @@ func _MasterRpc_GetRoute_Handler(srv interface{}, ctx context.Context, dec func(
 	return interceptor(ctx, in, info, handler)
 }
 
-func _MasterRpc_PSLogin_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(PSLoginRequest)
+func _MasterRpc_PSRegister_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(PSRegisterRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(MasterRpcServer).PSLogin(ctx, in)
+		return srv.(MasterRpcServer).PSRegister(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: "/masterpb.MasterRpc/PSLogin",
+		FullMethod: "/MasterRpc/PSRegister",
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(MasterRpcServer).PSLogin(ctx, req.(*PSLoginRequest))
+		return srv.(MasterRpcServer).PSRegister(ctx, req.(*PSRegisterRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -385,7 +715,7 @@ func _MasterRpc_PSHeartbeat_Handler(srv interface{}, ctx context.Context, dec fu
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: "/masterpb.MasterRpc/PSHeartbeat",
+		FullMethod: "/MasterRpc/PSHeartbeat",
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(MasterRpcServer).PSHeartbeat(ctx, req.(*PSHeartbeatRequest))
@@ -393,26 +723,8 @@ func _MasterRpc_PSHeartbeat_Handler(srv interface{}, ctx context.Context, dec fu
 	return interceptor(ctx, in, info, handler)
 }
 
-func _MasterRpc_PartitionHeartbeat_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(PartitionHeartbeatRequest)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(MasterRpcServer).PartitionHeartbeat(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: "/masterpb.MasterRpc/PartitionHeartbeat",
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(MasterRpcServer).PartitionHeartbeat(ctx, req.(*PartitionHeartbeatRequest))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
 var _MasterRpc_serviceDesc = grpc.ServiceDesc{
-	ServiceName: "masterpb.MasterRpc",
+	ServiceName: "MasterRpc",
 	HandlerType: (*MasterRpcServer)(nil),
 	Methods: []grpc.MethodDesc{
 		{
@@ -420,20 +732,42 @@ var _MasterRpc_serviceDesc = grpc.ServiceDesc{
 			Handler:    _MasterRpc_GetRoute_Handler,
 		},
 		{
-			MethodName: "PSLogin",
-			Handler:    _MasterRpc_PSLogin_Handler,
+			MethodName: "PSRegister",
+			Handler:    _MasterRpc_PSRegister_Handler,
 		},
 		{
 			MethodName: "PSHeartbeat",
 			Handler:    _MasterRpc_PSHeartbeat_Handler,
 		},
-		{
-			MethodName: "PartitionHeartbeat",
-			Handler:    _MasterRpc_PartitionHeartbeat_Handler,
-		},
 	},
 	Streams:  []grpc.StreamDesc{},
 	Metadata: "master.proto",
+}
+
+func (m *Route) Marshal() (dAtA []byte, err error) {
+	size := m.Size()
+	dAtA = make([]byte, size)
+	n, err := m.MarshalTo(dAtA)
+	if err != nil {
+		return nil, err
+	}
+	return dAtA[:n], nil
+}
+
+func (m *Route) MarshalTo(dAtA []byte) (int, error) {
+	var i int
+	_ = i
+	var l int
+	_ = l
+	dAtA[i] = 0xa
+	i++
+	i = encodeVarintMaster(dAtA, i, uint64(m.Partition.Size()))
+	n1, err := m.Partition.MarshalTo(dAtA[i:])
+	if err != nil {
+		return 0, err
+	}
+	i += n1
+	return i, nil
 }
 
 func (m *GetRouteRequest) Marshal() (dAtA []byte, err error) {
@@ -451,16 +785,14 @@ func (m *GetRouteRequest) MarshalTo(dAtA []byte) (int, error) {
 	_ = i
 	var l int
 	_ = l
-	if m.Header != nil {
-		dAtA[i] = 0xa
-		i++
-		i = encodeVarintMaster(dAtA, i, uint64(m.Header.Size()))
-		n1, err := m.Header.MarshalTo(dAtA[i:])
-		if err != nil {
-			return 0, err
-		}
-		i += n1
+	dAtA[i] = 0xa
+	i++
+	i = encodeVarintMaster(dAtA, i, uint64(m.RequestHeader.Size()))
+	n2, err := m.RequestHeader.MarshalTo(dAtA[i:])
+	if err != nil {
+		return 0, err
 	}
+	i += n2
 	if m.Space != 0 {
 		dAtA[i] = 0x10
 		i++
@@ -489,16 +821,14 @@ func (m *GetRouteResponse) MarshalTo(dAtA []byte) (int, error) {
 	_ = i
 	var l int
 	_ = l
-	if m.Header != nil {
-		dAtA[i] = 0xa
-		i++
-		i = encodeVarintMaster(dAtA, i, uint64(m.Header.Size()))
-		n2, err := m.Header.MarshalTo(dAtA[i:])
-		if err != nil {
-			return 0, err
-		}
-		i += n2
+	dAtA[i] = 0xa
+	i++
+	i = encodeVarintMaster(dAtA, i, uint64(m.ResponseHeader.Size()))
+	n3, err := m.ResponseHeader.MarshalTo(dAtA[i:])
+	if err != nil {
+		return 0, err
 	}
+	i += n3
 	if len(m.Routes) > 0 {
 		for _, msg := range m.Routes {
 			dAtA[i] = 0x12
@@ -514,7 +844,7 @@ func (m *GetRouteResponse) MarshalTo(dAtA []byte) (int, error) {
 	return i, nil
 }
 
-func (m *PSLoginRequest) Marshal() (dAtA []byte, err error) {
+func (m *PSRegisterRequest) Marshal() (dAtA []byte, err error) {
 	size := m.Size()
 	dAtA = make([]byte, size)
 	n, err := m.MarshalTo(dAtA)
@@ -524,45 +854,93 @@ func (m *PSLoginRequest) Marshal() (dAtA []byte, err error) {
 	return dAtA[:n], nil
 }
 
-func (m *PSLoginRequest) MarshalTo(dAtA []byte) (int, error) {
+func (m *PSRegisterRequest) MarshalTo(dAtA []byte) (int, error) {
 	var i int
 	_ = i
 	var l int
 	_ = l
-	if m.Header != nil {
-		dAtA[i] = 0xa
-		i++
-		i = encodeVarintMaster(dAtA, i, uint64(m.Header.Size()))
-		n3, err := m.Header.MarshalTo(dAtA[i:])
-		if err != nil {
-			return 0, err
-		}
-		i += n3
+	dAtA[i] = 0xa
+	i++
+	i = encodeVarintMaster(dAtA, i, uint64(m.RequestHeader.Size()))
+	n4, err := m.RequestHeader.MarshalTo(dAtA[i:])
+	if err != nil {
+		return 0, err
 	}
-	if m.Server != nil {
-		dAtA[i] = 0x12
+	i += n4
+	if m.NodeID != 0 {
+		dAtA[i] = 0x10
 		i++
-		i = encodeVarintMaster(dAtA, i, uint64(m.Server.Size()))
-		n4, err := m.Server.MarshalTo(dAtA[i:])
-		if err != nil {
-			return 0, err
-		}
-		i += n4
+		i = encodeVarintMaster(dAtA, i, uint64(m.NodeID))
 	}
-	if m.ServerResource != nil {
+	if len(m.Ip) > 0 {
 		dAtA[i] = 0x1a
 		i++
-		i = encodeVarintMaster(dAtA, i, uint64(m.ServerResource.Size()))
-		n5, err := m.ServerResource.MarshalTo(dAtA[i:])
-		if err != nil {
-			return 0, err
+		i = encodeVarintMaster(dAtA, i, uint64(len(m.Ip)))
+		i += copy(dAtA[i:], m.Ip)
+	}
+	dAtA[i] = 0x22
+	i++
+	i = encodeVarintMaster(dAtA, i, uint64(m.RuntimeInfo.Size()))
+	n5, err := m.RuntimeInfo.MarshalTo(dAtA[i:])
+	if err != nil {
+		return 0, err
+	}
+	i += n5
+	return i, nil
+}
+
+func (m *PSRegisterResponse) Marshal() (dAtA []byte, err error) {
+	size := m.Size()
+	dAtA = make([]byte, size)
+	n, err := m.MarshalTo(dAtA)
+	if err != nil {
+		return nil, err
+	}
+	return dAtA[:n], nil
+}
+
+func (m *PSRegisterResponse) MarshalTo(dAtA []byte) (int, error) {
+	var i int
+	_ = i
+	var l int
+	_ = l
+	dAtA[i] = 0xa
+	i++
+	i = encodeVarintMaster(dAtA, i, uint64(m.ResponseHeader.Size()))
+	n6, err := m.ResponseHeader.MarshalTo(dAtA[i:])
+	if err != nil {
+		return 0, err
+	}
+	i += n6
+	if m.NodeID != 0 {
+		dAtA[i] = 0x10
+		i++
+		i = encodeVarintMaster(dAtA, i, uint64(m.NodeID))
+	}
+	dAtA[i] = 0x1a
+	i++
+	i = encodeVarintMaster(dAtA, i, uint64(m.PSConfig.Size()))
+	n7, err := m.PSConfig.MarshalTo(dAtA[i:])
+	if err != nil {
+		return 0, err
+	}
+	i += n7
+	if len(m.Partitions) > 0 {
+		for _, msg := range m.Partitions {
+			dAtA[i] = 0x22
+			i++
+			i = encodeVarintMaster(dAtA, i, uint64(msg.Size()))
+			n, err := msg.MarshalTo(dAtA[i:])
+			if err != nil {
+				return 0, err
+			}
+			i += n
 		}
-		i += n5
 	}
 	return i, nil
 }
 
-func (m *PSLoginResponse) Marshal() (dAtA []byte, err error) {
+func (m *PSConfig) Marshal() (dAtA []byte, err error) {
 	size := m.Size()
 	dAtA = make([]byte, size)
 	n, err := m.MarshalTo(dAtA)
@@ -572,30 +950,55 @@ func (m *PSLoginResponse) Marshal() (dAtA []byte, err error) {
 	return dAtA[:n], nil
 }
 
-func (m *PSLoginResponse) MarshalTo(dAtA []byte) (int, error) {
+func (m *PSConfig) MarshalTo(dAtA []byte) (int, error) {
 	var i int
 	_ = i
 	var l int
 	_ = l
-	if m.Header != nil {
-		dAtA[i] = 0xa
+	if m.RPCPort != 0 {
+		dAtA[i] = 0x8
 		i++
-		i = encodeVarintMaster(dAtA, i, uint64(m.Header.Size()))
-		n6, err := m.Header.MarshalTo(dAtA[i:])
-		if err != nil {
-			return 0, err
-		}
-		i += n6
+		i = encodeVarintMaster(dAtA, i, uint64(m.RPCPort))
 	}
-	if m.Server != nil {
-		dAtA[i] = 0x12
+	if m.AdminPort != 0 {
+		dAtA[i] = 0x10
 		i++
-		i = encodeVarintMaster(dAtA, i, uint64(m.Server.Size()))
-		n7, err := m.Server.MarshalTo(dAtA[i:])
-		if err != nil {
-			return 0, err
-		}
-		i += n7
+		i = encodeVarintMaster(dAtA, i, uint64(m.AdminPort))
+	}
+	if m.HeartbeatInterval != 0 {
+		dAtA[i] = 0x18
+		i++
+		i = encodeVarintMaster(dAtA, i, uint64(m.HeartbeatInterval))
+	}
+	if m.RaftHeartbeatPort != 0 {
+		dAtA[i] = 0x20
+		i++
+		i = encodeVarintMaster(dAtA, i, uint64(m.RaftHeartbeatPort))
+	}
+	if m.RaftReplicatePort != 0 {
+		dAtA[i] = 0x28
+		i++
+		i = encodeVarintMaster(dAtA, i, uint64(m.RaftReplicatePort))
+	}
+	if m.RaftHeartbeatInterval != 0 {
+		dAtA[i] = 0x30
+		i++
+		i = encodeVarintMaster(dAtA, i, uint64(m.RaftHeartbeatInterval))
+	}
+	if m.RaftRetainLogs != 0 {
+		dAtA[i] = 0x38
+		i++
+		i = encodeVarintMaster(dAtA, i, uint64(m.RaftRetainLogs))
+	}
+	if m.RaftReplicaConcurrency != 0 {
+		dAtA[i] = 0x40
+		i++
+		i = encodeVarintMaster(dAtA, i, uint64(m.RaftReplicaConcurrency))
+	}
+	if m.RaftSnapshotConcurrency != 0 {
+		dAtA[i] = 0x48
+		i++
+		i = encodeVarintMaster(dAtA, i, uint64(m.RaftSnapshotConcurrency))
 	}
 	return i, nil
 }
@@ -615,21 +1018,39 @@ func (m *PSHeartbeatRequest) MarshalTo(dAtA []byte) (int, error) {
 	_ = i
 	var l int
 	_ = l
-	if m.Header != nil {
-		dAtA[i] = 0xa
+	dAtA[i] = 0xa
+	i++
+	i = encodeVarintMaster(dAtA, i, uint64(m.RequestHeader.Size()))
+	n8, err := m.RequestHeader.MarshalTo(dAtA[i:])
+	if err != nil {
+		return 0, err
+	}
+	i += n8
+	if m.NodeID != 0 {
+		dAtA[i] = 0x10
 		i++
-		i = encodeVarintMaster(dAtA, i, uint64(m.Header.Size()))
-		n8, err := m.Header.MarshalTo(dAtA[i:])
-		if err != nil {
-			return 0, err
+		i = encodeVarintMaster(dAtA, i, uint64(m.NodeID))
+	}
+	if len(m.Partitions) > 0 {
+		for _, msg := range m.Partitions {
+			dAtA[i] = 0x1a
+			i++
+			i = encodeVarintMaster(dAtA, i, uint64(msg.Size()))
+			n, err := msg.MarshalTo(dAtA[i:])
+			if err != nil {
+				return 0, err
+			}
+			i += n
 		}
-		i += n8
 	}
-	if m.PsId != 0 {
-		dAtA[i] = 0x18
-		i++
-		i = encodeVarintMaster(dAtA, i, uint64(m.PsId))
+	dAtA[i] = 0x22
+	i++
+	i = encodeVarintMaster(dAtA, i, uint64(m.SysStats.Size()))
+	n9, err := m.SysStats.MarshalTo(dAtA[i:])
+	if err != nil {
+		return 0, err
 	}
+	i += n9
 	return i, nil
 }
 
@@ -648,20 +1069,18 @@ func (m *PSHeartbeatResponse) MarshalTo(dAtA []byte) (int, error) {
 	_ = i
 	var l int
 	_ = l
-	if m.Header != nil {
-		dAtA[i] = 0xa
-		i++
-		i = encodeVarintMaster(dAtA, i, uint64(m.Header.Size()))
-		n9, err := m.Header.MarshalTo(dAtA[i:])
-		if err != nil {
-			return 0, err
-		}
-		i += n9
+	dAtA[i] = 0xa
+	i++
+	i = encodeVarintMaster(dAtA, i, uint64(m.ResponseHeader.Size()))
+	n10, err := m.ResponseHeader.MarshalTo(dAtA[i:])
+	if err != nil {
+		return 0, err
 	}
+	i += n10
 	return i, nil
 }
 
-func (m *PartitionHeartbeatRequest) Marshal() (dAtA []byte, err error) {
+func (m *PartitionInfo) Marshal() (dAtA []byte, err error) {
 	size := m.Size()
 	dAtA = make([]byte, size)
 	n, err := m.MarshalTo(dAtA)
@@ -671,76 +1090,57 @@ func (m *PartitionHeartbeatRequest) Marshal() (dAtA []byte, err error) {
 	return dAtA[:n], nil
 }
 
-func (m *PartitionHeartbeatRequest) MarshalTo(dAtA []byte) (int, error) {
+func (m *PartitionInfo) MarshalTo(dAtA []byte) (int, error) {
 	var i int
 	_ = i
 	var l int
 	_ = l
-	if m.Header != nil {
-		dAtA[i] = 0xa
+	if m.ID != 0 {
+		dAtA[i] = 0x8
 		i++
-		i = encodeVarintMaster(dAtA, i, uint64(m.Header.Size()))
-		n10, err := m.Header.MarshalTo(dAtA[i:])
-		if err != nil {
-			return 0, err
-		}
-		i += n10
+		i = encodeVarintMaster(dAtA, i, uint64(m.ID))
 	}
-	if m.Partition != nil {
-		dAtA[i] = 0x12
+	if m.IsLeader {
+		dAtA[i] = 0x10
 		i++
-		i = encodeVarintMaster(dAtA, i, uint64(m.Partition.Size()))
-		n11, err := m.Partition.MarshalTo(dAtA[i:])
-		if err != nil {
-			return 0, err
+		if m.IsLeader {
+			dAtA[i] = 1
+		} else {
+			dAtA[i] = 0
 		}
-		i += n11
-	}
-	if len(m.Replicas) > 0 {
-		for _, msg := range m.Replicas {
-			dAtA[i] = 0x1a
-			i++
-			i = encodeVarintMaster(dAtA, i, uint64(msg.Size()))
-			n, err := msg.MarshalTo(dAtA[i:])
-			if err != nil {
-				return 0, err
-			}
-			i += n
-		}
-	}
-	if m.Leader != 0 {
-		dAtA[i] = 0x20
 		i++
-		i = encodeVarintMaster(dAtA, i, uint64(m.Leader))
 	}
-	return i, nil
-}
-
-func (m *PartitionHeartbeatResponse) Marshal() (dAtA []byte, err error) {
-	size := m.Size()
-	dAtA = make([]byte, size)
-	n, err := m.MarshalTo(dAtA)
+	if m.Status != 0 {
+		dAtA[i] = 0x18
+		i++
+		i = encodeVarintMaster(dAtA, i, uint64(m.Status))
+	}
+	dAtA[i] = 0x22
+	i++
+	i = encodeVarintMaster(dAtA, i, uint64(m.Epoch.Size()))
+	n11, err := m.Epoch.MarshalTo(dAtA[i:])
 	if err != nil {
-		return nil, err
+		return 0, err
 	}
-	return dAtA[:n], nil
-}
-
-func (m *PartitionHeartbeatResponse) MarshalTo(dAtA []byte) (int, error) {
-	var i int
-	_ = i
-	var l int
-	_ = l
-	if m.Header != nil {
-		dAtA[i] = 0xa
+	i += n11
+	if m.RaftStatus != nil {
+		dAtA[i] = 0x2a
 		i++
-		i = encodeVarintMaster(dAtA, i, uint64(m.Header.Size()))
-		n12, err := m.Header.MarshalTo(dAtA[i:])
+		i = encodeVarintMaster(dAtA, i, uint64(m.RaftStatus.Size()))
+		n12, err := m.RaftStatus.MarshalTo(dAtA[i:])
 		if err != nil {
 			return 0, err
 		}
 		i += n12
 	}
+	dAtA[i] = 0x32
+	i++
+	i = encodeVarintMaster(dAtA, i, uint64(m.Statistics.Size()))
+	n13, err := m.Statistics.MarshalTo(dAtA[i:])
+	if err != nil {
+		return 0, err
+	}
+	i += n13
 	return i, nil
 }
 
@@ -753,13 +1153,223 @@ func encodeVarintMaster(dAtA []byte, offset int, v uint64) int {
 	dAtA[offset] = uint8(v)
 	return offset + 1
 }
+func NewPopulatedRoute(r randyMaster, easy bool) *Route {
+	this := &Route{}
+	v1 := meta.NewPopulatedPartition(r, easy)
+	this.Partition = *v1
+	if !easy && r.Intn(10) != 0 {
+	}
+	return this
+}
+
+func NewPopulatedGetRouteRequest(r randyMaster, easy bool) *GetRouteRequest {
+	this := &GetRouteRequest{}
+	v2 := meta.NewPopulatedRequestHeader(r, easy)
+	this.RequestHeader = *v2
+	this.Space = github_com_tiglabs_baud_proto_metapb.SpaceID(r.Uint32())
+	this.Slot = github_com_tiglabs_baud_proto_metapb.SlotID(r.Uint32())
+	if !easy && r.Intn(10) != 0 {
+	}
+	return this
+}
+
+func NewPopulatedGetRouteResponse(r randyMaster, easy bool) *GetRouteResponse {
+	this := &GetRouteResponse{}
+	v3 := meta.NewPopulatedResponseHeader(r, easy)
+	this.ResponseHeader = *v3
+	if r.Intn(10) != 0 {
+		v4 := r.Intn(5)
+		this.Routes = make([]Route, v4)
+		for i := 0; i < v4; i++ {
+			v5 := NewPopulatedRoute(r, easy)
+			this.Routes[i] = *v5
+		}
+	}
+	if !easy && r.Intn(10) != 0 {
+	}
+	return this
+}
+
+func NewPopulatedPSRegisterRequest(r randyMaster, easy bool) *PSRegisterRequest {
+	this := &PSRegisterRequest{}
+	v6 := meta.NewPopulatedRequestHeader(r, easy)
+	this.RequestHeader = *v6
+	this.NodeID = NodeID(r.Uint32())
+	this.Ip = string(randStringMaster(r))
+	v7 := stats.NewPopulatedRuntimeInfo(r, easy)
+	this.RuntimeInfo = *v7
+	if !easy && r.Intn(10) != 0 {
+	}
+	return this
+}
+
+func NewPopulatedPSRegisterResponse(r randyMaster, easy bool) *PSRegisterResponse {
+	this := &PSRegisterResponse{}
+	v8 := meta.NewPopulatedResponseHeader(r, easy)
+	this.ResponseHeader = *v8
+	this.NodeID = NodeID(r.Uint32())
+	v9 := NewPopulatedPSConfig(r, easy)
+	this.PSConfig = *v9
+	if r.Intn(10) != 0 {
+		v10 := r.Intn(5)
+		this.Partitions = make([]meta.Partition, v10)
+		for i := 0; i < v10; i++ {
+			v11 := meta.NewPopulatedPartition(r, easy)
+			this.Partitions[i] = *v11
+		}
+	}
+	if !easy && r.Intn(10) != 0 {
+	}
+	return this
+}
+
+func NewPopulatedPSConfig(r randyMaster, easy bool) *PSConfig {
+	this := &PSConfig{}
+	this.RPCPort = int(r.Uint32())
+	this.AdminPort = int(r.Uint32())
+	this.HeartbeatInterval = int(r.Uint32())
+	this.RaftHeartbeatPort = int(r.Uint32())
+	this.RaftReplicatePort = int(r.Uint32())
+	this.RaftHeartbeatInterval = int(r.Uint32())
+	this.RaftRetainLogs = uint64(uint64(r.Uint32()))
+	this.RaftReplicaConcurrency = int(r.Uint32())
+	this.RaftSnapshotConcurrency = int(r.Uint32())
+	if !easy && r.Intn(10) != 0 {
+	}
+	return this
+}
+
+func NewPopulatedPSHeartbeatRequest(r randyMaster, easy bool) *PSHeartbeatRequest {
+	this := &PSHeartbeatRequest{}
+	v12 := meta.NewPopulatedRequestHeader(r, easy)
+	this.RequestHeader = *v12
+	this.NodeID = NodeID(r.Uint32())
+	if r.Intn(10) != 0 {
+		v13 := r.Intn(5)
+		this.Partitions = make([]PartitionInfo, v13)
+		for i := 0; i < v13; i++ {
+			v14 := NewPopulatedPartitionInfo(r, easy)
+			this.Partitions[i] = *v14
+		}
+	}
+	v15 := stats.NewPopulatedNodeSysStats(r, easy)
+	this.SysStats = *v15
+	if !easy && r.Intn(10) != 0 {
+	}
+	return this
+}
+
+func NewPopulatedPSHeartbeatResponse(r randyMaster, easy bool) *PSHeartbeatResponse {
+	this := &PSHeartbeatResponse{}
+	v16 := meta.NewPopulatedResponseHeader(r, easy)
+	this.ResponseHeader = *v16
+	if !easy && r.Intn(10) != 0 {
+	}
+	return this
+}
+
+func NewPopulatedPartitionInfo(r randyMaster, easy bool) *PartitionInfo {
+	this := &PartitionInfo{}
+	this.ID = PartitionID(r.Uint32())
+	this.IsLeader = bool(bool(r.Intn(2) == 0))
+	this.Status = meta.PartitionStatus([]int32{0, 1, 2, 3, 4}[r.Intn(5)])
+	v17 := meta.NewPopulatedPartitionEpoch(r, easy)
+	this.Epoch = *v17
+	if r.Intn(10) != 0 {
+		this.RaftStatus = stats.NewPopulatedRaftStatus(r, easy)
+	}
+	v18 := stats.NewPopulatedPartitionStats(r, easy)
+	this.Statistics = *v18
+	if !easy && r.Intn(10) != 0 {
+	}
+	return this
+}
+
+type randyMaster interface {
+	Float32() float32
+	Float64() float64
+	Int63() int64
+	Int31() int32
+	Uint32() uint32
+	Intn(n int) int
+}
+
+func randUTF8RuneMaster(r randyMaster) rune {
+	ru := r.Intn(62)
+	if ru < 10 {
+		return rune(ru + 48)
+	} else if ru < 36 {
+		return rune(ru + 55)
+	}
+	return rune(ru + 61)
+}
+func randStringMaster(r randyMaster) string {
+	v19 := r.Intn(100)
+	tmps := make([]rune, v19)
+	for i := 0; i < v19; i++ {
+		tmps[i] = randUTF8RuneMaster(r)
+	}
+	return string(tmps)
+}
+func randUnrecognizedMaster(r randyMaster, maxFieldNumber int) (dAtA []byte) {
+	l := r.Intn(5)
+	for i := 0; i < l; i++ {
+		wire := r.Intn(4)
+		if wire == 3 {
+			wire = 5
+		}
+		fieldNumber := maxFieldNumber + r.Intn(100)
+		dAtA = randFieldMaster(dAtA, r, fieldNumber, wire)
+	}
+	return dAtA
+}
+func randFieldMaster(dAtA []byte, r randyMaster, fieldNumber int, wire int) []byte {
+	key := uint32(fieldNumber)<<3 | uint32(wire)
+	switch wire {
+	case 0:
+		dAtA = encodeVarintPopulateMaster(dAtA, uint64(key))
+		v20 := r.Int63()
+		if r.Intn(2) == 0 {
+			v20 *= -1
+		}
+		dAtA = encodeVarintPopulateMaster(dAtA, uint64(v20))
+	case 1:
+		dAtA = encodeVarintPopulateMaster(dAtA, uint64(key))
+		dAtA = append(dAtA, byte(r.Intn(256)), byte(r.Intn(256)), byte(r.Intn(256)), byte(r.Intn(256)), byte(r.Intn(256)), byte(r.Intn(256)), byte(r.Intn(256)), byte(r.Intn(256)))
+	case 2:
+		dAtA = encodeVarintPopulateMaster(dAtA, uint64(key))
+		ll := r.Intn(100)
+		dAtA = encodeVarintPopulateMaster(dAtA, uint64(ll))
+		for j := 0; j < ll; j++ {
+			dAtA = append(dAtA, byte(r.Intn(256)))
+		}
+	default:
+		dAtA = encodeVarintPopulateMaster(dAtA, uint64(key))
+		dAtA = append(dAtA, byte(r.Intn(256)), byte(r.Intn(256)), byte(r.Intn(256)), byte(r.Intn(256)))
+	}
+	return dAtA
+}
+func encodeVarintPopulateMaster(dAtA []byte, v uint64) []byte {
+	for v >= 1<<7 {
+		dAtA = append(dAtA, uint8(uint64(v)&0x7f|0x80))
+		v >>= 7
+	}
+	dAtA = append(dAtA, uint8(v))
+	return dAtA
+}
+func (m *Route) Size() (n int) {
+	var l int
+	_ = l
+	l = m.Partition.Size()
+	n += 1 + l + sovMaster(uint64(l))
+	return n
+}
+
 func (m *GetRouteRequest) Size() (n int) {
 	var l int
 	_ = l
-	if m.Header != nil {
-		l = m.Header.Size()
-		n += 1 + l + sovMaster(uint64(l))
-	}
+	l = m.RequestHeader.Size()
+	n += 1 + l + sovMaster(uint64(l))
 	if m.Space != 0 {
 		n += 1 + sovMaster(uint64(m.Space))
 	}
@@ -772,10 +1382,8 @@ func (m *GetRouteRequest) Size() (n int) {
 func (m *GetRouteResponse) Size() (n int) {
 	var l int
 	_ = l
-	if m.Header != nil {
-		l = m.Header.Size()
-		n += 1 + l + sovMaster(uint64(l))
-	}
+	l = m.ResponseHeader.Size()
+	n += 1 + l + sovMaster(uint64(l))
 	if len(m.Routes) > 0 {
 		for _, e := range m.Routes {
 			l = e.Size()
@@ -785,34 +1393,71 @@ func (m *GetRouteResponse) Size() (n int) {
 	return n
 }
 
-func (m *PSLoginRequest) Size() (n int) {
+func (m *PSRegisterRequest) Size() (n int) {
 	var l int
 	_ = l
-	if m.Header != nil {
-		l = m.Header.Size()
+	l = m.RequestHeader.Size()
+	n += 1 + l + sovMaster(uint64(l))
+	if m.NodeID != 0 {
+		n += 1 + sovMaster(uint64(m.NodeID))
+	}
+	l = len(m.Ip)
+	if l > 0 {
 		n += 1 + l + sovMaster(uint64(l))
 	}
-	if m.Server != nil {
-		l = m.Server.Size()
-		n += 1 + l + sovMaster(uint64(l))
+	l = m.RuntimeInfo.Size()
+	n += 1 + l + sovMaster(uint64(l))
+	return n
+}
+
+func (m *PSRegisterResponse) Size() (n int) {
+	var l int
+	_ = l
+	l = m.ResponseHeader.Size()
+	n += 1 + l + sovMaster(uint64(l))
+	if m.NodeID != 0 {
+		n += 1 + sovMaster(uint64(m.NodeID))
 	}
-	if m.ServerResource != nil {
-		l = m.ServerResource.Size()
-		n += 1 + l + sovMaster(uint64(l))
+	l = m.PSConfig.Size()
+	n += 1 + l + sovMaster(uint64(l))
+	if len(m.Partitions) > 0 {
+		for _, e := range m.Partitions {
+			l = e.Size()
+			n += 1 + l + sovMaster(uint64(l))
+		}
 	}
 	return n
 }
 
-func (m *PSLoginResponse) Size() (n int) {
+func (m *PSConfig) Size() (n int) {
 	var l int
 	_ = l
-	if m.Header != nil {
-		l = m.Header.Size()
-		n += 1 + l + sovMaster(uint64(l))
+	if m.RPCPort != 0 {
+		n += 1 + sovMaster(uint64(m.RPCPort))
 	}
-	if m.Server != nil {
-		l = m.Server.Size()
-		n += 1 + l + sovMaster(uint64(l))
+	if m.AdminPort != 0 {
+		n += 1 + sovMaster(uint64(m.AdminPort))
+	}
+	if m.HeartbeatInterval != 0 {
+		n += 1 + sovMaster(uint64(m.HeartbeatInterval))
+	}
+	if m.RaftHeartbeatPort != 0 {
+		n += 1 + sovMaster(uint64(m.RaftHeartbeatPort))
+	}
+	if m.RaftReplicatePort != 0 {
+		n += 1 + sovMaster(uint64(m.RaftReplicatePort))
+	}
+	if m.RaftHeartbeatInterval != 0 {
+		n += 1 + sovMaster(uint64(m.RaftHeartbeatInterval))
+	}
+	if m.RaftRetainLogs != 0 {
+		n += 1 + sovMaster(uint64(m.RaftRetainLogs))
+	}
+	if m.RaftReplicaConcurrency != 0 {
+		n += 1 + sovMaster(uint64(m.RaftReplicaConcurrency))
+	}
+	if m.RaftSnapshotConcurrency != 0 {
+		n += 1 + sovMaster(uint64(m.RaftSnapshotConcurrency))
 	}
 	return n
 }
@@ -820,56 +1465,50 @@ func (m *PSLoginResponse) Size() (n int) {
 func (m *PSHeartbeatRequest) Size() (n int) {
 	var l int
 	_ = l
-	if m.Header != nil {
-		l = m.Header.Size()
-		n += 1 + l + sovMaster(uint64(l))
+	l = m.RequestHeader.Size()
+	n += 1 + l + sovMaster(uint64(l))
+	if m.NodeID != 0 {
+		n += 1 + sovMaster(uint64(m.NodeID))
 	}
-	if m.PsId != 0 {
-		n += 1 + sovMaster(uint64(m.PsId))
+	if len(m.Partitions) > 0 {
+		for _, e := range m.Partitions {
+			l = e.Size()
+			n += 1 + l + sovMaster(uint64(l))
+		}
 	}
+	l = m.SysStats.Size()
+	n += 1 + l + sovMaster(uint64(l))
 	return n
 }
 
 func (m *PSHeartbeatResponse) Size() (n int) {
 	var l int
 	_ = l
-	if m.Header != nil {
-		l = m.Header.Size()
-		n += 1 + l + sovMaster(uint64(l))
-	}
+	l = m.ResponseHeader.Size()
+	n += 1 + l + sovMaster(uint64(l))
 	return n
 }
 
-func (m *PartitionHeartbeatRequest) Size() (n int) {
+func (m *PartitionInfo) Size() (n int) {
 	var l int
 	_ = l
-	if m.Header != nil {
-		l = m.Header.Size()
+	if m.ID != 0 {
+		n += 1 + sovMaster(uint64(m.ID))
+	}
+	if m.IsLeader {
+		n += 2
+	}
+	if m.Status != 0 {
+		n += 1 + sovMaster(uint64(m.Status))
+	}
+	l = m.Epoch.Size()
+	n += 1 + l + sovMaster(uint64(l))
+	if m.RaftStatus != nil {
+		l = m.RaftStatus.Size()
 		n += 1 + l + sovMaster(uint64(l))
 	}
-	if m.Partition != nil {
-		l = m.Partition.Size()
-		n += 1 + l + sovMaster(uint64(l))
-	}
-	if len(m.Replicas) > 0 {
-		for _, e := range m.Replicas {
-			l = e.Size()
-			n += 1 + l + sovMaster(uint64(l))
-		}
-	}
-	if m.Leader != 0 {
-		n += 1 + sovMaster(uint64(m.Leader))
-	}
-	return n
-}
-
-func (m *PartitionHeartbeatResponse) Size() (n int) {
-	var l int
-	_ = l
-	if m.Header != nil {
-		l = m.Header.Size()
-		n += 1 + l + sovMaster(uint64(l))
-	}
+	l = m.Statistics.Size()
+	n += 1 + l + sovMaster(uint64(l))
 	return n
 }
 
@@ -885,6 +1524,209 @@ func sovMaster(x uint64) (n int) {
 }
 func sozMaster(x uint64) (n int) {
 	return sovMaster(uint64((x << 1) ^ uint64((int64(x) >> 63))))
+}
+func (this *Route) String() string {
+	if this == nil {
+		return "nil"
+	}
+	s := strings.Join([]string{`&Route{`,
+		`Partition:` + strings.Replace(strings.Replace(this.Partition.String(), "Partition", "meta.Partition", 1), `&`, ``, 1) + `,`,
+		`}`,
+	}, "")
+	return s
+}
+func (this *GetRouteRequest) String() string {
+	if this == nil {
+		return "nil"
+	}
+	s := strings.Join([]string{`&GetRouteRequest{`,
+		`RequestHeader:` + strings.Replace(strings.Replace(this.RequestHeader.String(), "RequestHeader", "meta.RequestHeader", 1), `&`, ``, 1) + `,`,
+		`Space:` + fmt.Sprintf("%v", this.Space) + `,`,
+		`Slot:` + fmt.Sprintf("%v", this.Slot) + `,`,
+		`}`,
+	}, "")
+	return s
+}
+func (this *GetRouteResponse) String() string {
+	if this == nil {
+		return "nil"
+	}
+	s := strings.Join([]string{`&GetRouteResponse{`,
+		`ResponseHeader:` + strings.Replace(strings.Replace(this.ResponseHeader.String(), "ResponseHeader", "meta.ResponseHeader", 1), `&`, ``, 1) + `,`,
+		`Routes:` + strings.Replace(strings.Replace(fmt.Sprintf("%v", this.Routes), "Route", "Route", 1), `&`, ``, 1) + `,`,
+		`}`,
+	}, "")
+	return s
+}
+func (this *PSRegisterRequest) String() string {
+	if this == nil {
+		return "nil"
+	}
+	s := strings.Join([]string{`&PSRegisterRequest{`,
+		`RequestHeader:` + strings.Replace(strings.Replace(this.RequestHeader.String(), "RequestHeader", "meta.RequestHeader", 1), `&`, ``, 1) + `,`,
+		`NodeID:` + fmt.Sprintf("%v", this.NodeID) + `,`,
+		`Ip:` + fmt.Sprintf("%v", this.Ip) + `,`,
+		`RuntimeInfo:` + strings.Replace(strings.Replace(this.RuntimeInfo.String(), "RuntimeInfo", "stats.RuntimeInfo", 1), `&`, ``, 1) + `,`,
+		`}`,
+	}, "")
+	return s
+}
+func (this *PSRegisterResponse) String() string {
+	if this == nil {
+		return "nil"
+	}
+	s := strings.Join([]string{`&PSRegisterResponse{`,
+		`ResponseHeader:` + strings.Replace(strings.Replace(this.ResponseHeader.String(), "ResponseHeader", "meta.ResponseHeader", 1), `&`, ``, 1) + `,`,
+		`NodeID:` + fmt.Sprintf("%v", this.NodeID) + `,`,
+		`PSConfig:` + strings.Replace(strings.Replace(this.PSConfig.String(), "PSConfig", "PSConfig", 1), `&`, ``, 1) + `,`,
+		`Partitions:` + strings.Replace(strings.Replace(fmt.Sprintf("%v", this.Partitions), "Partition", "meta.Partition", 1), `&`, ``, 1) + `,`,
+		`}`,
+	}, "")
+	return s
+}
+func (this *PSConfig) String() string {
+	if this == nil {
+		return "nil"
+	}
+	s := strings.Join([]string{`&PSConfig{`,
+		`RPCPort:` + fmt.Sprintf("%v", this.RPCPort) + `,`,
+		`AdminPort:` + fmt.Sprintf("%v", this.AdminPort) + `,`,
+		`HeartbeatInterval:` + fmt.Sprintf("%v", this.HeartbeatInterval) + `,`,
+		`RaftHeartbeatPort:` + fmt.Sprintf("%v", this.RaftHeartbeatPort) + `,`,
+		`RaftReplicatePort:` + fmt.Sprintf("%v", this.RaftReplicatePort) + `,`,
+		`RaftHeartbeatInterval:` + fmt.Sprintf("%v", this.RaftHeartbeatInterval) + `,`,
+		`RaftRetainLogs:` + fmt.Sprintf("%v", this.RaftRetainLogs) + `,`,
+		`RaftReplicaConcurrency:` + fmt.Sprintf("%v", this.RaftReplicaConcurrency) + `,`,
+		`RaftSnapshotConcurrency:` + fmt.Sprintf("%v", this.RaftSnapshotConcurrency) + `,`,
+		`}`,
+	}, "")
+	return s
+}
+func (this *PSHeartbeatRequest) String() string {
+	if this == nil {
+		return "nil"
+	}
+	s := strings.Join([]string{`&PSHeartbeatRequest{`,
+		`RequestHeader:` + strings.Replace(strings.Replace(this.RequestHeader.String(), "RequestHeader", "meta.RequestHeader", 1), `&`, ``, 1) + `,`,
+		`NodeID:` + fmt.Sprintf("%v", this.NodeID) + `,`,
+		`Partitions:` + strings.Replace(strings.Replace(fmt.Sprintf("%v", this.Partitions), "PartitionInfo", "PartitionInfo", 1), `&`, ``, 1) + `,`,
+		`SysStats:` + strings.Replace(strings.Replace(this.SysStats.String(), "NodeSysStats", "stats.NodeSysStats", 1), `&`, ``, 1) + `,`,
+		`}`,
+	}, "")
+	return s
+}
+func (this *PSHeartbeatResponse) String() string {
+	if this == nil {
+		return "nil"
+	}
+	s := strings.Join([]string{`&PSHeartbeatResponse{`,
+		`ResponseHeader:` + strings.Replace(strings.Replace(this.ResponseHeader.String(), "ResponseHeader", "meta.ResponseHeader", 1), `&`, ``, 1) + `,`,
+		`}`,
+	}, "")
+	return s
+}
+func (this *PartitionInfo) String() string {
+	if this == nil {
+		return "nil"
+	}
+	s := strings.Join([]string{`&PartitionInfo{`,
+		`ID:` + fmt.Sprintf("%v", this.ID) + `,`,
+		`IsLeader:` + fmt.Sprintf("%v", this.IsLeader) + `,`,
+		`Status:` + fmt.Sprintf("%v", this.Status) + `,`,
+		`Epoch:` + strings.Replace(strings.Replace(this.Epoch.String(), "PartitionEpoch", "meta.PartitionEpoch", 1), `&`, ``, 1) + `,`,
+		`RaftStatus:` + strings.Replace(fmt.Sprintf("%v", this.RaftStatus), "RaftStatus", "stats.RaftStatus", 1) + `,`,
+		`Statistics:` + strings.Replace(strings.Replace(this.Statistics.String(), "PartitionStats", "stats.PartitionStats", 1), `&`, ``, 1) + `,`,
+		`}`,
+	}, "")
+	return s
+}
+func valueToStringMaster(v interface{}) string {
+	rv := reflect.ValueOf(v)
+	if rv.IsNil() {
+		return "nil"
+	}
+	pv := reflect.Indirect(rv).Interface()
+	return fmt.Sprintf("*%v", pv)
+}
+func (m *Route) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
+	iNdEx := 0
+	for iNdEx < l {
+		preIndex := iNdEx
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowMaster
+			}
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := dAtA[iNdEx]
+			iNdEx++
+			wire |= (uint64(b) & 0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: Route: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: Route: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
+		switch fieldNum {
+		case 1:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Partition", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMaster
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				msglen |= (int(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthMaster
+			}
+			postIndex := iNdEx + msglen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			if err := m.Partition.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		default:
+			iNdEx = preIndex
+			skippy, err := skipMaster(dAtA[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if skippy < 0 {
+				return ErrInvalidLengthMaster
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			iNdEx += skippy
+		}
+	}
+
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
 }
 func (m *GetRouteRequest) Unmarshal(dAtA []byte) error {
 	l := len(dAtA)
@@ -917,7 +1759,7 @@ func (m *GetRouteRequest) Unmarshal(dAtA []byte) error {
 		switch fieldNum {
 		case 1:
 			if wireType != 2 {
-				return fmt.Errorf("proto: wrong wireType = %d for field Header", wireType)
+				return fmt.Errorf("proto: wrong wireType = %d for field RequestHeader", wireType)
 			}
 			var msglen int
 			for shift := uint(0); ; shift += 7 {
@@ -941,10 +1783,7 @@ func (m *GetRouteRequest) Unmarshal(dAtA []byte) error {
 			if postIndex > l {
 				return io.ErrUnexpectedEOF
 			}
-			if m.Header == nil {
-				m.Header = &metapb.RequestHeader{}
-			}
-			if err := m.Header.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+			if err := m.RequestHeader.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
 				return err
 			}
 			iNdEx = postIndex
@@ -962,7 +1801,7 @@ func (m *GetRouteRequest) Unmarshal(dAtA []byte) error {
 				}
 				b := dAtA[iNdEx]
 				iNdEx++
-				m.Space |= (uint32(b) & 0x7F) << shift
+				m.Space |= (github_com_tiglabs_baud_proto_metapb.SpaceID(b) & 0x7F) << shift
 				if b < 0x80 {
 					break
 				}
@@ -981,7 +1820,7 @@ func (m *GetRouteRequest) Unmarshal(dAtA []byte) error {
 				}
 				b := dAtA[iNdEx]
 				iNdEx++
-				m.Slot |= (uint32(b) & 0x7F) << shift
+				m.Slot |= (github_com_tiglabs_baud_proto_metapb.SlotID(b) & 0x7F) << shift
 				if b < 0x80 {
 					break
 				}
@@ -1038,7 +1877,7 @@ func (m *GetRouteResponse) Unmarshal(dAtA []byte) error {
 		switch fieldNum {
 		case 1:
 			if wireType != 2 {
-				return fmt.Errorf("proto: wrong wireType = %d for field Header", wireType)
+				return fmt.Errorf("proto: wrong wireType = %d for field ResponseHeader", wireType)
 			}
 			var msglen int
 			for shift := uint(0); ; shift += 7 {
@@ -1062,10 +1901,7 @@ func (m *GetRouteResponse) Unmarshal(dAtA []byte) error {
 			if postIndex > l {
 				return io.ErrUnexpectedEOF
 			}
-			if m.Header == nil {
-				m.Header = &metapb.ResponseHeader{}
-			}
-			if err := m.Header.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+			if err := m.ResponseHeader.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
 				return err
 			}
 			iNdEx = postIndex
@@ -1095,7 +1931,7 @@ func (m *GetRouteResponse) Unmarshal(dAtA []byte) error {
 			if postIndex > l {
 				return io.ErrUnexpectedEOF
 			}
-			m.Routes = append(m.Routes, &metapb.Route{})
+			m.Routes = append(m.Routes, Route{})
 			if err := m.Routes[len(m.Routes)-1].Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
 				return err
 			}
@@ -1121,7 +1957,7 @@ func (m *GetRouteResponse) Unmarshal(dAtA []byte) error {
 	}
 	return nil
 }
-func (m *PSLoginRequest) Unmarshal(dAtA []byte) error {
+func (m *PSRegisterRequest) Unmarshal(dAtA []byte) error {
 	l := len(dAtA)
 	iNdEx := 0
 	for iNdEx < l {
@@ -1144,15 +1980,15 @@ func (m *PSLoginRequest) Unmarshal(dAtA []byte) error {
 		fieldNum := int32(wire >> 3)
 		wireType := int(wire & 0x7)
 		if wireType == 4 {
-			return fmt.Errorf("proto: PSLoginRequest: wiretype end group for non-group")
+			return fmt.Errorf("proto: PSRegisterRequest: wiretype end group for non-group")
 		}
 		if fieldNum <= 0 {
-			return fmt.Errorf("proto: PSLoginRequest: illegal tag %d (wire type %d)", fieldNum, wire)
+			return fmt.Errorf("proto: PSRegisterRequest: illegal tag %d (wire type %d)", fieldNum, wire)
 		}
 		switch fieldNum {
 		case 1:
 			if wireType != 2 {
-				return fmt.Errorf("proto: wrong wireType = %d for field Header", wireType)
+				return fmt.Errorf("proto: wrong wireType = %d for field RequestHeader", wireType)
 			}
 			var msglen int
 			for shift := uint(0); ; shift += 7 {
@@ -1176,18 +2012,15 @@ func (m *PSLoginRequest) Unmarshal(dAtA []byte) error {
 			if postIndex > l {
 				return io.ErrUnexpectedEOF
 			}
-			if m.Header == nil {
-				m.Header = &metapb.RequestHeader{}
-			}
-			if err := m.Header.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+			if err := m.RequestHeader.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
 				return err
 			}
 			iNdEx = postIndex
 		case 2:
-			if wireType != 2 {
-				return fmt.Errorf("proto: wrong wireType = %d for field Server", wireType)
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field NodeID", wireType)
 			}
-			var msglen int
+			m.NodeID = 0
 			for shift := uint(0); ; shift += 7 {
 				if shift >= 64 {
 					return ErrIntOverflowMaster
@@ -1197,28 +2030,43 @@ func (m *PSLoginRequest) Unmarshal(dAtA []byte) error {
 				}
 				b := dAtA[iNdEx]
 				iNdEx++
-				msglen |= (int(b) & 0x7F) << shift
+				m.NodeID |= (NodeID(b) & 0x7F) << shift
 				if b < 0x80 {
 					break
 				}
 			}
-			if msglen < 0 {
-				return ErrInvalidLengthMaster
-			}
-			postIndex := iNdEx + msglen
-			if postIndex > l {
-				return io.ErrUnexpectedEOF
-			}
-			if m.Server == nil {
-				m.Server = &metapb.PartitionServer{}
-			}
-			if err := m.Server.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
-				return err
-			}
-			iNdEx = postIndex
 		case 3:
 			if wireType != 2 {
-				return fmt.Errorf("proto: wrong wireType = %d for field ServerResource", wireType)
+				return fmt.Errorf("proto: wrong wireType = %d for field Ip", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMaster
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= (uint64(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthMaster
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.Ip = string(dAtA[iNdEx:postIndex])
+			iNdEx = postIndex
+		case 4:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field RuntimeInfo", wireType)
 			}
 			var msglen int
 			for shift := uint(0); ; shift += 7 {
@@ -1242,10 +2090,7 @@ func (m *PSLoginRequest) Unmarshal(dAtA []byte) error {
 			if postIndex > l {
 				return io.ErrUnexpectedEOF
 			}
-			if m.ServerResource == nil {
-				m.ServerResource = &metapb.ServerResource{}
-			}
-			if err := m.ServerResource.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+			if err := m.RuntimeInfo.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
 				return err
 			}
 			iNdEx = postIndex
@@ -1270,7 +2115,7 @@ func (m *PSLoginRequest) Unmarshal(dAtA []byte) error {
 	}
 	return nil
 }
-func (m *PSLoginResponse) Unmarshal(dAtA []byte) error {
+func (m *PSRegisterResponse) Unmarshal(dAtA []byte) error {
 	l := len(dAtA)
 	iNdEx := 0
 	for iNdEx < l {
@@ -1293,15 +2138,15 @@ func (m *PSLoginResponse) Unmarshal(dAtA []byte) error {
 		fieldNum := int32(wire >> 3)
 		wireType := int(wire & 0x7)
 		if wireType == 4 {
-			return fmt.Errorf("proto: PSLoginResponse: wiretype end group for non-group")
+			return fmt.Errorf("proto: PSRegisterResponse: wiretype end group for non-group")
 		}
 		if fieldNum <= 0 {
-			return fmt.Errorf("proto: PSLoginResponse: illegal tag %d (wire type %d)", fieldNum, wire)
+			return fmt.Errorf("proto: PSRegisterResponse: illegal tag %d (wire type %d)", fieldNum, wire)
 		}
 		switch fieldNum {
 		case 1:
 			if wireType != 2 {
-				return fmt.Errorf("proto: wrong wireType = %d for field Header", wireType)
+				return fmt.Errorf("proto: wrong wireType = %d for field ResponseHeader", wireType)
 			}
 			var msglen int
 			for shift := uint(0); ; shift += 7 {
@@ -1325,16 +2170,32 @@ func (m *PSLoginResponse) Unmarshal(dAtA []byte) error {
 			if postIndex > l {
 				return io.ErrUnexpectedEOF
 			}
-			if m.Header == nil {
-				m.Header = &metapb.ResponseHeader{}
-			}
-			if err := m.Header.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+			if err := m.ResponseHeader.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
 				return err
 			}
 			iNdEx = postIndex
 		case 2:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field NodeID", wireType)
+			}
+			m.NodeID = 0
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMaster
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				m.NodeID |= (NodeID(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+		case 3:
 			if wireType != 2 {
-				return fmt.Errorf("proto: wrong wireType = %d for field Server", wireType)
+				return fmt.Errorf("proto: wrong wireType = %d for field PSConfig", wireType)
 			}
 			var msglen int
 			for shift := uint(0); ; shift += 7 {
@@ -1358,13 +2219,262 @@ func (m *PSLoginResponse) Unmarshal(dAtA []byte) error {
 			if postIndex > l {
 				return io.ErrUnexpectedEOF
 			}
-			if m.Server == nil {
-				m.Server = &metapb.PartitionServer{}
-			}
-			if err := m.Server.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+			if err := m.PSConfig.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
 				return err
 			}
 			iNdEx = postIndex
+		case 4:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Partitions", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMaster
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				msglen |= (int(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthMaster
+			}
+			postIndex := iNdEx + msglen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.Partitions = append(m.Partitions, meta.Partition{})
+			if err := m.Partitions[len(m.Partitions)-1].Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		default:
+			iNdEx = preIndex
+			skippy, err := skipMaster(dAtA[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if skippy < 0 {
+				return ErrInvalidLengthMaster
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			iNdEx += skippy
+		}
+	}
+
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
+}
+func (m *PSConfig) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
+	iNdEx := 0
+	for iNdEx < l {
+		preIndex := iNdEx
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowMaster
+			}
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := dAtA[iNdEx]
+			iNdEx++
+			wire |= (uint64(b) & 0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: PSConfig: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: PSConfig: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
+		switch fieldNum {
+		case 1:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field RPCPort", wireType)
+			}
+			m.RPCPort = 0
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMaster
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				m.RPCPort |= (int(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+		case 2:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field AdminPort", wireType)
+			}
+			m.AdminPort = 0
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMaster
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				m.AdminPort |= (int(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+		case 3:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field HeartbeatInterval", wireType)
+			}
+			m.HeartbeatInterval = 0
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMaster
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				m.HeartbeatInterval |= (int(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+		case 4:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field RaftHeartbeatPort", wireType)
+			}
+			m.RaftHeartbeatPort = 0
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMaster
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				m.RaftHeartbeatPort |= (int(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+		case 5:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field RaftReplicatePort", wireType)
+			}
+			m.RaftReplicatePort = 0
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMaster
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				m.RaftReplicatePort |= (int(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+		case 6:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field RaftHeartbeatInterval", wireType)
+			}
+			m.RaftHeartbeatInterval = 0
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMaster
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				m.RaftHeartbeatInterval |= (int(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+		case 7:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field RaftRetainLogs", wireType)
+			}
+			m.RaftRetainLogs = 0
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMaster
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				m.RaftRetainLogs |= (uint64(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+		case 8:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field RaftReplicaConcurrency", wireType)
+			}
+			m.RaftReplicaConcurrency = 0
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMaster
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				m.RaftReplicaConcurrency |= (int(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+		case 9:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field RaftSnapshotConcurrency", wireType)
+			}
+			m.RaftSnapshotConcurrency = 0
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMaster
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				m.RaftSnapshotConcurrency |= (int(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
 		default:
 			iNdEx = preIndex
 			skippy, err := skipMaster(dAtA[iNdEx:])
@@ -1417,7 +2527,7 @@ func (m *PSHeartbeatRequest) Unmarshal(dAtA []byte) error {
 		switch fieldNum {
 		case 1:
 			if wireType != 2 {
-				return fmt.Errorf("proto: wrong wireType = %d for field Header", wireType)
+				return fmt.Errorf("proto: wrong wireType = %d for field RequestHeader", wireType)
 			}
 			var msglen int
 			for shift := uint(0); ; shift += 7 {
@@ -1441,18 +2551,15 @@ func (m *PSHeartbeatRequest) Unmarshal(dAtA []byte) error {
 			if postIndex > l {
 				return io.ErrUnexpectedEOF
 			}
-			if m.Header == nil {
-				m.Header = &metapb.RequestHeader{}
-			}
-			if err := m.Header.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+			if err := m.RequestHeader.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
 				return err
 			}
 			iNdEx = postIndex
-		case 3:
+		case 2:
 			if wireType != 0 {
-				return fmt.Errorf("proto: wrong wireType = %d for field PsId", wireType)
+				return fmt.Errorf("proto: wrong wireType = %d for field NodeID", wireType)
 			}
-			m.PsId = 0
+			m.NodeID = 0
 			for shift := uint(0); ; shift += 7 {
 				if shift >= 64 {
 					return ErrIntOverflowMaster
@@ -1462,11 +2569,72 @@ func (m *PSHeartbeatRequest) Unmarshal(dAtA []byte) error {
 				}
 				b := dAtA[iNdEx]
 				iNdEx++
-				m.PsId |= (uint32(b) & 0x7F) << shift
+				m.NodeID |= (NodeID(b) & 0x7F) << shift
 				if b < 0x80 {
 					break
 				}
 			}
+		case 3:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Partitions", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMaster
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				msglen |= (int(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthMaster
+			}
+			postIndex := iNdEx + msglen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.Partitions = append(m.Partitions, PartitionInfo{})
+			if err := m.Partitions[len(m.Partitions)-1].Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		case 4:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field SysStats", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMaster
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				msglen |= (int(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthMaster
+			}
+			postIndex := iNdEx + msglen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			if err := m.SysStats.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
 		default:
 			iNdEx = preIndex
 			skippy, err := skipMaster(dAtA[iNdEx:])
@@ -1519,7 +2687,7 @@ func (m *PSHeartbeatResponse) Unmarshal(dAtA []byte) error {
 		switch fieldNum {
 		case 1:
 			if wireType != 2 {
-				return fmt.Errorf("proto: wrong wireType = %d for field Header", wireType)
+				return fmt.Errorf("proto: wrong wireType = %d for field ResponseHeader", wireType)
 			}
 			var msglen int
 			for shift := uint(0); ; shift += 7 {
@@ -1543,10 +2711,7 @@ func (m *PSHeartbeatResponse) Unmarshal(dAtA []byte) error {
 			if postIndex > l {
 				return io.ErrUnexpectedEOF
 			}
-			if m.Header == nil {
-				m.Header = &metapb.ResponseHeader{}
-			}
-			if err := m.Header.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+			if err := m.ResponseHeader.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
 				return err
 			}
 			iNdEx = postIndex
@@ -1571,7 +2736,7 @@ func (m *PSHeartbeatResponse) Unmarshal(dAtA []byte) error {
 	}
 	return nil
 }
-func (m *PartitionHeartbeatRequest) Unmarshal(dAtA []byte) error {
+func (m *PartitionInfo) Unmarshal(dAtA []byte) error {
 	l := len(dAtA)
 	iNdEx := 0
 	for iNdEx < l {
@@ -1594,114 +2759,17 @@ func (m *PartitionHeartbeatRequest) Unmarshal(dAtA []byte) error {
 		fieldNum := int32(wire >> 3)
 		wireType := int(wire & 0x7)
 		if wireType == 4 {
-			return fmt.Errorf("proto: PartitionHeartbeatRequest: wiretype end group for non-group")
+			return fmt.Errorf("proto: PartitionInfo: wiretype end group for non-group")
 		}
 		if fieldNum <= 0 {
-			return fmt.Errorf("proto: PartitionHeartbeatRequest: illegal tag %d (wire type %d)", fieldNum, wire)
+			return fmt.Errorf("proto: PartitionInfo: illegal tag %d (wire type %d)", fieldNum, wire)
 		}
 		switch fieldNum {
 		case 1:
-			if wireType != 2 {
-				return fmt.Errorf("proto: wrong wireType = %d for field Header", wireType)
-			}
-			var msglen int
-			for shift := uint(0); ; shift += 7 {
-				if shift >= 64 {
-					return ErrIntOverflowMaster
-				}
-				if iNdEx >= l {
-					return io.ErrUnexpectedEOF
-				}
-				b := dAtA[iNdEx]
-				iNdEx++
-				msglen |= (int(b) & 0x7F) << shift
-				if b < 0x80 {
-					break
-				}
-			}
-			if msglen < 0 {
-				return ErrInvalidLengthMaster
-			}
-			postIndex := iNdEx + msglen
-			if postIndex > l {
-				return io.ErrUnexpectedEOF
-			}
-			if m.Header == nil {
-				m.Header = &metapb.RequestHeader{}
-			}
-			if err := m.Header.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
-				return err
-			}
-			iNdEx = postIndex
-		case 2:
-			if wireType != 2 {
-				return fmt.Errorf("proto: wrong wireType = %d for field Partition", wireType)
-			}
-			var msglen int
-			for shift := uint(0); ; shift += 7 {
-				if shift >= 64 {
-					return ErrIntOverflowMaster
-				}
-				if iNdEx >= l {
-					return io.ErrUnexpectedEOF
-				}
-				b := dAtA[iNdEx]
-				iNdEx++
-				msglen |= (int(b) & 0x7F) << shift
-				if b < 0x80 {
-					break
-				}
-			}
-			if msglen < 0 {
-				return ErrInvalidLengthMaster
-			}
-			postIndex := iNdEx + msglen
-			if postIndex > l {
-				return io.ErrUnexpectedEOF
-			}
-			if m.Partition == nil {
-				m.Partition = &metapb.Partition{}
-			}
-			if err := m.Partition.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
-				return err
-			}
-			iNdEx = postIndex
-		case 3:
-			if wireType != 2 {
-				return fmt.Errorf("proto: wrong wireType = %d for field Replicas", wireType)
-			}
-			var msglen int
-			for shift := uint(0); ; shift += 7 {
-				if shift >= 64 {
-					return ErrIntOverflowMaster
-				}
-				if iNdEx >= l {
-					return io.ErrUnexpectedEOF
-				}
-				b := dAtA[iNdEx]
-				iNdEx++
-				msglen |= (int(b) & 0x7F) << shift
-				if b < 0x80 {
-					break
-				}
-			}
-			if msglen < 0 {
-				return ErrInvalidLengthMaster
-			}
-			postIndex := iNdEx + msglen
-			if postIndex > l {
-				return io.ErrUnexpectedEOF
-			}
-			m.Replicas = append(m.Replicas, &metapb.Replica{})
-			if err := m.Replicas[len(m.Replicas)-1].Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
-				return err
-			}
-			iNdEx = postIndex
-		case 4:
 			if wireType != 0 {
-				return fmt.Errorf("proto: wrong wireType = %d for field Leader", wireType)
+				return fmt.Errorf("proto: wrong wireType = %d for field ID", wireType)
 			}
-			m.Leader = 0
+			m.ID = 0
 			for shift := uint(0); ; shift += 7 {
 				if shift >= 64 {
 					return ErrIntOverflowMaster
@@ -1711,64 +2779,53 @@ func (m *PartitionHeartbeatRequest) Unmarshal(dAtA []byte) error {
 				}
 				b := dAtA[iNdEx]
 				iNdEx++
-				m.Leader |= (uint32(b) & 0x7F) << shift
+				m.ID |= (PartitionID(b) & 0x7F) << shift
 				if b < 0x80 {
 					break
 				}
 			}
-		default:
-			iNdEx = preIndex
-			skippy, err := skipMaster(dAtA[iNdEx:])
-			if err != nil {
-				return err
+		case 2:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field IsLeader", wireType)
 			}
-			if skippy < 0 {
-				return ErrInvalidLengthMaster
+			var v int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMaster
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				v |= (int(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
 			}
-			if (iNdEx + skippy) > l {
-				return io.ErrUnexpectedEOF
+			m.IsLeader = bool(v != 0)
+		case 3:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Status", wireType)
 			}
-			iNdEx += skippy
-		}
-	}
-
-	if iNdEx > l {
-		return io.ErrUnexpectedEOF
-	}
-	return nil
-}
-func (m *PartitionHeartbeatResponse) Unmarshal(dAtA []byte) error {
-	l := len(dAtA)
-	iNdEx := 0
-	for iNdEx < l {
-		preIndex := iNdEx
-		var wire uint64
-		for shift := uint(0); ; shift += 7 {
-			if shift >= 64 {
-				return ErrIntOverflowMaster
+			m.Status = 0
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMaster
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				m.Status |= (meta.PartitionStatus(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
 			}
-			if iNdEx >= l {
-				return io.ErrUnexpectedEOF
-			}
-			b := dAtA[iNdEx]
-			iNdEx++
-			wire |= (uint64(b) & 0x7F) << shift
-			if b < 0x80 {
-				break
-			}
-		}
-		fieldNum := int32(wire >> 3)
-		wireType := int(wire & 0x7)
-		if wireType == 4 {
-			return fmt.Errorf("proto: PartitionHeartbeatResponse: wiretype end group for non-group")
-		}
-		if fieldNum <= 0 {
-			return fmt.Errorf("proto: PartitionHeartbeatResponse: illegal tag %d (wire type %d)", fieldNum, wire)
-		}
-		switch fieldNum {
-		case 1:
+		case 4:
 			if wireType != 2 {
-				return fmt.Errorf("proto: wrong wireType = %d for field Header", wireType)
+				return fmt.Errorf("proto: wrong wireType = %d for field Epoch", wireType)
 			}
 			var msglen int
 			for shift := uint(0); ; shift += 7 {
@@ -1792,10 +2849,70 @@ func (m *PartitionHeartbeatResponse) Unmarshal(dAtA []byte) error {
 			if postIndex > l {
 				return io.ErrUnexpectedEOF
 			}
-			if m.Header == nil {
-				m.Header = &metapb.ResponseHeader{}
+			if err := m.Epoch.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+				return err
 			}
-			if err := m.Header.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+			iNdEx = postIndex
+		case 5:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field RaftStatus", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMaster
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				msglen |= (int(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthMaster
+			}
+			postIndex := iNdEx + msglen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			if m.RaftStatus == nil {
+				m.RaftStatus = &stats.RaftStatus{}
+			}
+			if err := m.RaftStatus.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		case 6:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Statistics", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMaster
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				msglen |= (int(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthMaster
+			}
+			postIndex := iNdEx + msglen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			if err := m.Statistics.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
 				return err
 			}
 			iNdEx = postIndex
@@ -1928,36 +3045,66 @@ var (
 func init() { proto.RegisterFile("master.proto", fileDescriptorMaster) }
 
 var fileDescriptorMaster = []byte{
-	// 481 bytes of a gzipped FileDescriptorProto
-	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0xa4, 0x54, 0xdd, 0x6a, 0x13, 0x41,
-	0x14, 0xee, 0x26, 0x6d, 0x4c, 0x4f, 0x6c, 0x53, 0x4f, 0x6b, 0xdd, 0x2c, 0x1a, 0xc2, 0xa8, 0x10,
-	0x10, 0x37, 0x10, 0xef, 0x45, 0x14, 0xb1, 0x42, 0x84, 0x30, 0xb9, 0xf1, 0x4e, 0x26, 0xc9, 0x21,
-	0xae, 0xa4, 0x99, 0x71, 0x66, 0xe2, 0xb3, 0xf8, 0x18, 0x3e, 0x82, 0xe0, 0x8d, 0x97, 0x3e, 0x82,
-	0xc4, 0x17, 0x91, 0xcc, 0xfe, 0x25, 0xdb, 0x54, 0x70, 0x7b, 0x77, 0x66, 0xbe, 0x6f, 0xbf, 0x73,
-	0xce, 0x37, 0xe7, 0x2c, 0xdc, 0xbe, 0x14, 0xc6, 0x92, 0x0e, 0x95, 0x96, 0x56, 0x62, 0x3d, 0x3e,
-	0xa9, 0x71, 0x70, 0x36, 0x93, 0x33, 0xe9, 0x2e, 0x7b, 0xeb, 0x28, 0xc6, 0x03, 0xb8, 0x24, 0x2b,
-	0xe2, 0x98, 0x7d, 0x82, 0xe6, 0x1b, 0xb2, 0x5c, 0x2e, 0x2d, 0x71, 0xfa, 0xbc, 0x24, 0x63, 0xf1,
-	0x29, 0xd4, 0x3e, 0x92, 0x98, 0x92, 0xf6, 0xbd, 0x8e, 0xd7, 0x6d, 0xf4, 0xef, 0x86, 0x6b, 0xbe,
-	0x1a, 0x87, 0x09, 0xe1, 0xc2, 0x81, 0x3c, 0x21, 0xe1, 0x19, 0x1c, 0x18, 0x25, 0x26, 0xe4, 0x57,
-	0x3a, 0x5e, 0xf7, 0x88, 0xc7, 0x07, 0x44, 0xd8, 0x37, 0x73, 0x69, 0xfd, 0xaa, 0xbb, 0x74, 0x31,
-	0x8b, 0xe0, 0x24, 0xcf, 0x65, 0x94, 0x5c, 0x18, 0xc2, 0xb0, 0x90, 0xec, 0x3c, 0x4f, 0x16, 0x33,
-	0x0a, 0xd9, 0x1e, 0x43, 0x4d, 0xaf, 0x05, 0x8c, 0x5f, 0xe9, 0x54, 0xbb, 0x8d, 0xfe, 0x51, 0xc6,
-	0x77, 0xb2, 0x09, 0xc8, 0xbe, 0x79, 0x70, 0x3c, 0x1c, 0x0d, 0xe4, 0x2c, 0x5a, 0x94, 0x6c, 0xab,
-	0x07, 0x35, 0x43, 0xfa, 0x0b, 0x69, 0xd7, 0x57, 0xa3, 0x7f, 0x2f, 0xa5, 0x0f, 0x85, 0xb6, 0x91,
-	0x8d, 0xe4, 0x62, 0xe4, 0x60, 0x9e, 0xd0, 0xf0, 0x39, 0x1c, 0xc7, 0x11, 0x27, 0x23, 0x97, 0x7a,
-	0x42, 0xae, 0xf7, 0x8d, 0x8e, 0x46, 0x5b, 0x28, 0x2f, 0xb0, 0x99, 0x86, 0x66, 0x56, 0x71, 0x49,
-	0x73, 0xfe, 0xb7, 0x66, 0xf6, 0x1e, 0x70, 0x38, 0xba, 0x20, 0xa1, 0xed, 0x98, 0x84, 0x2d, 0xe9,
-	0xd4, 0x29, 0x1c, 0x28, 0xf3, 0x21, 0x9a, 0xa6, 0x6f, 0xad, 0xcc, 0xdb, 0x29, 0x7b, 0x0d, 0xa7,
-	0x5b, 0xca, 0xe5, 0x3a, 0x62, 0xdf, 0x3d, 0x68, 0x65, 0xc5, 0xdf, 0xb4, 0xd0, 0x1e, 0x1c, 0xaa,
-	0x54, 0x2b, 0x71, 0xe8, 0xce, 0x15, 0x87, 0x78, 0xce, 0xc1, 0x27, 0x50, 0xd7, 0xa4, 0xe6, 0xd1,
-	0x44, 0x18, 0xbf, 0xea, 0xc6, 0xad, 0x99, 0x67, 0x70, 0xf7, 0x3c, 0x23, 0xe0, 0x39, 0xd4, 0xe6,
-	0x71, 0x31, 0xfb, 0xce, 0x87, 0xe4, 0xc4, 0x06, 0x10, 0xec, 0xea, 0xa0, 0x9c, 0x21, 0xfd, 0x1f,
-	0x15, 0x38, 0x7c, 0xe7, 0xd6, 0x9b, 0xab, 0x09, 0xbe, 0x82, 0x7a, 0xba, 0x51, 0xd8, 0x0a, 0xd3,
-	0xb5, 0x0f, 0x0b, 0x1b, 0x1d, 0x04, 0xbb, 0xa0, 0x58, 0x9e, 0xed, 0xe1, 0x0b, 0xb8, 0x95, 0x0c,
-	0x1e, 0xfa, 0x39, 0x71, 0x7b, 0x7b, 0x82, 0xd6, 0x0e, 0x24, 0x53, 0x18, 0x40, 0x63, 0xe3, 0xb1,
-	0xf1, 0xfe, 0x26, 0xb7, 0xf8, 0x68, 0xc1, 0x83, 0x6b, 0xd0, 0x4c, 0x4d, 0x00, 0x5e, 0x35, 0x0c,
-	0x1f, 0x6e, 0x7c, 0x76, 0xdd, 0x40, 0x04, 0x8f, 0xfe, 0x4d, 0x4a, 0x53, 0xbc, 0x3c, 0xf9, 0xb9,
-	0x6a, 0x7b, 0xbf, 0x56, 0x6d, 0xef, 0xf7, 0xaa, 0xed, 0x7d, 0xfd, 0xd3, 0xde, 0x1b, 0xd7, 0xdc,
-	0xef, 0xf0, 0xd9, 0xdf, 0x00, 0x00, 0x00, 0xff, 0xff, 0xff, 0xfb, 0x6f, 0x9d, 0x4a, 0x05, 0x00,
-	0x00,
+	// 964 bytes of a gzipped FileDescriptorProto
+	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0xbc, 0x56, 0xcf, 0x6f, 0x23, 0x35,
+	0x14, 0x9e, 0xc9, 0xaf, 0x26, 0x2f, 0x6d, 0xda, 0xba, 0xbb, 0x10, 0x8a, 0x34, 0xa9, 0x46, 0x80,
+	0x22, 0xb5, 0x3b, 0xe9, 0x86, 0x1f, 0xd5, 0xc2, 0x01, 0x48, 0x8b, 0x68, 0xc4, 0x02, 0x91, 0x73,
+	0xe3, 0x12, 0x4d, 0x26, 0x4e, 0x62, 0x91, 0x8c, 0x07, 0xdb, 0x41, 0xea, 0x8d, 0xff, 0x00, 0xfe,
+	0x0c, 0xee, 0x5c, 0x38, 0x21, 0x8e, 0x3d, 0xee, 0x81, 0x03, 0x07, 0x14, 0x6d, 0x86, 0x7f, 0x80,
+	0x23, 0xea, 0x01, 0xa1, 0xf1, 0x38, 0x99, 0x49, 0xba, 0x48, 0xa5, 0x87, 0x3d, 0x65, 0xfc, 0xfc,
+	0xbd, 0xef, 0xf9, 0x7b, 0xfe, 0x6c, 0x07, 0xb6, 0xa7, 0xae, 0x90, 0x84, 0x3b, 0x01, 0x67, 0x92,
+	0x1d, 0x3e, 0x1a, 0x51, 0x39, 0x9e, 0xf5, 0x1d, 0x8f, 0x4d, 0x1b, 0x23, 0x36, 0x62, 0x0d, 0x15,
+	0xee, 0xcf, 0x86, 0x6a, 0xa4, 0x06, 0xea, 0x4b, 0xc3, 0x1b, 0x29, 0xb8, 0xa4, 0xa3, 0x89, 0xdb,
+	0x17, 0x8d, 0xbe, 0x3b, 0x1b, 0xc4, 0x69, 0x8d, 0x29, 0x91, 0x6e, 0xd0, 0x57, 0x3f, 0x3a, 0xa1,
+	0x2c, 0xa4, 0x2b, 0x45, 0x3c, 0xb0, 0x3f, 0x80, 0x3c, 0x66, 0x33, 0x49, 0x50, 0x13, 0x4a, 0x81,
+	0xcb, 0x25, 0x95, 0x94, 0xf9, 0x55, 0xf3, 0xc8, 0xac, 0x97, 0x9b, 0xe0, 0x74, 0x96, 0x91, 0x56,
+	0xf1, 0x7a, 0x5e, 0x33, 0x9e, 0xcd, 0x6b, 0x26, 0x4e, 0x60, 0xf6, 0xc2, 0x84, 0xdd, 0x4f, 0x89,
+	0x54, 0x04, 0x98, 0x7c, 0x33, 0x23, 0x42, 0xa2, 0x53, 0x28, 0x8c, 0x89, 0x3b, 0x20, 0x5c, 0x93,
+	0x54, 0x1c, 0x3d, 0x73, 0xa9, 0xa2, 0x29, 0x22, 0x8d, 0x43, 0x5f, 0x42, 0x5e, 0x04, 0xae, 0x47,
+	0xaa, 0x99, 0x23, 0xb3, 0xbe, 0xd3, 0x7a, 0x12, 0xce, 0x6b, 0xf9, 0x6e, 0x14, 0xb8, 0x99, 0xd7,
+	0x4e, 0xee, 0x22, 0xce, 0x51, 0xe8, 0xf6, 0x05, 0x8e, 0x79, 0xd0, 0x67, 0x90, 0x13, 0x13, 0x26,
+	0xab, 0x59, 0xc5, 0x77, 0x16, 0xce, 0x6b, 0xb9, 0xee, 0x84, 0xc9, 0x9b, 0x79, 0xed, 0xf8, 0x6e,
+	0x74, 0x13, 0x26, 0xdb, 0x17, 0x58, 0x91, 0xd8, 0x5f, 0xc3, 0x5e, 0x22, 0x51, 0x04, 0xcc, 0x17,
+	0x04, 0x3d, 0xde, 0xd0, 0xb8, 0xeb, 0x2c, 0xa7, 0xfe, 0x53, 0xe4, 0x1b, 0x50, 0xe0, 0x11, 0x87,
+	0xa8, 0x66, 0x8e, 0xb2, 0xf5, 0x72, 0xb3, 0xe0, 0x28, 0xca, 0x56, 0x2e, 0x42, 0x62, 0x3d, 0x67,
+	0xff, 0x62, 0xc2, 0x7e, 0xa7, 0x8b, 0xc9, 0x88, 0x46, 0x7e, 0xb8, 0x7f, 0x4b, 0x4f, 0xa0, 0xe0,
+	0xb3, 0x01, 0x69, 0x5f, 0xe8, 0x9e, 0x3e, 0x08, 0xe7, 0xb5, 0xc2, 0x17, 0x2a, 0x72, 0xb3, 0xfa,
+	0xc2, 0x1a, 0x83, 0x2a, 0x90, 0xa1, 0x81, 0xea, 0x56, 0x09, 0x67, 0x68, 0x80, 0x9e, 0xc0, 0x36,
+	0x9f, 0xf9, 0x92, 0x4e, 0x49, 0x8f, 0xfa, 0x43, 0x56, 0xcd, 0xa9, 0xaa, 0xdb, 0x0e, 0x8e, 0x83,
+	0x6d, 0x7f, 0xc8, 0x52, 0x35, 0xcb, 0x3c, 0x09, 0xdb, 0xbf, 0x99, 0x80, 0xd2, 0x02, 0xee, 0xdf,
+	0xb0, 0xff, 0x27, 0xe1, 0x18, 0x0a, 0x1e, 0xf3, 0x87, 0x74, 0xa4, 0x64, 0x94, 0x9b, 0x25, 0xa7,
+	0xd3, 0x3d, 0x57, 0x81, 0x34, 0x75, 0x0c, 0x41, 0xa7, 0x00, 0x2b, 0x0f, 0x8b, 0x6a, 0x4e, 0xed,
+	0x47, 0xda, 0xeb, 0xf1, 0x9e, 0xa4, 0x30, 0xf6, 0x3f, 0x59, 0x28, 0x2e, 0x09, 0xd1, 0x23, 0x28,
+	0xf2, 0xc0, 0xeb, 0x05, 0x8c, 0x4b, 0x25, 0x67, 0xa7, 0x85, 0xc2, 0x79, 0x6d, 0x0b, 0x77, 0xce,
+	0x3b, 0x8c, 0x47, 0x2e, 0xcb, 0x52, 0x5f, 0xe2, 0x2d, 0x1e, 0x78, 0xd1, 0x18, 0xbd, 0x05, 0xe0,
+	0x0e, 0xa6, 0xd4, 0x8f, 0x13, 0x62, 0x31, 0x5b, 0x4b, 0x54, 0x49, 0x4d, 0x29, 0xdc, 0x7b, 0x80,
+	0xc6, 0xc4, 0xe5, 0xb2, 0x4f, 0x5c, 0xd9, 0xa3, 0xbe, 0x24, 0xfc, 0x5b, 0x77, 0xa2, 0x3d, 0xbc,
+	0xc2, 0xef, 0xaf, 0x20, 0x6d, 0x8d, 0x40, 0x67, 0x70, 0xc0, 0xdd, 0xa1, 0xec, 0x25, 0xc9, 0xaa,
+	0x50, 0x6e, 0x23, 0x31, 0xc2, 0x5c, 0x2e, 0x21, 0xaa, 0xe0, 0x32, 0x91, 0x93, 0x60, 0x42, 0x3d,
+	0x57, 0x92, 0x38, 0x31, 0xff, 0x82, 0x44, 0xbc, 0x84, 0xa8, 0xc4, 0x0f, 0xe1, 0xd5, 0x8d, 0x8a,
+	0xab, 0xe5, 0x16, 0xd6, 0x93, 0x1f, 0xae, 0x55, 0x5d, 0x2d, 0xb9, 0x0e, 0x7b, 0xba, 0xb2, 0x74,
+	0xa9, 0xdf, 0x9b, 0xb0, 0x91, 0xa8, 0x6e, 0x1d, 0x99, 0xf5, 0x1c, 0xae, 0xc4, 0xd5, 0xa2, 0xf0,
+	0x53, 0x36, 0x12, 0xe8, 0x63, 0xa8, 0xa6, 0xd7, 0xd8, 0xf3, 0x98, 0xef, 0xcd, 0x38, 0x27, 0xbe,
+	0x77, 0x55, 0x2d, 0xae, 0xd7, 0x7a, 0x25, 0xb5, 0xd0, 0xf3, 0x04, 0x86, 0xce, 0xe1, 0x35, 0x45,
+	0x21, 0x7c, 0x37, 0x10, 0x63, 0x26, 0xd7, 0x38, 0x4a, 0xeb, 0x1c, 0x4a, 0x57, 0x57, 0x03, 0x53,
+	0x24, 0xf6, 0x1f, 0xca, 0xd7, 0x2b, 0x25, 0x2f, 0xeb, 0x64, 0xbe, 0xb3, 0xe6, 0xd4, 0xac, 0x72,
+	0x6a, 0x25, 0x71, 0xaa, 0x3a, 0x89, 0xb7, 0xdc, 0x8a, 0x4e, 0xa1, 0x24, 0xae, 0x44, 0x4f, 0x5d,
+	0xf3, 0xfa, 0xf0, 0xee, 0x38, 0x11, 0x73, 0xf7, 0x4a, 0x74, 0xa3, 0xa0, 0xce, 0x29, 0x0a, 0x3d,
+	0xb6, 0x2f, 0xe1, 0x60, 0x4d, 0xdd, 0xbd, 0x8f, 0xad, 0xfd, 0x7d, 0x06, 0x76, 0xd6, 0xd6, 0x87,
+	0xde, 0x84, 0x0c, 0x1d, 0xe8, 0x83, 0xf2, 0x30, 0x9c, 0xd7, 0x32, 0x4a, 0x69, 0x39, 0x01, 0x5d,
+	0xe0, 0x0c, 0x1d, 0xa0, 0xd7, 0xa1, 0x44, 0x45, 0x6f, 0x12, 0x97, 0x8b, 0x7a, 0x53, 0xc4, 0x45,
+	0x2a, 0x9e, 0xc6, 0x5d, 0xab, 0x43, 0x21, 0x52, 0x33, 0x13, 0xea, 0x3c, 0x54, 0x9a, 0x7b, 0x49,
+	0x0f, 0xba, 0x2a, 0x8e, 0xf5, 0x3c, 0x3a, 0x86, 0x3c, 0x09, 0x98, 0x37, 0xd6, 0xba, 0x77, 0x13,
+	0xe0, 0x27, 0x51, 0x58, 0x2b, 0x8f, 0x31, 0xe8, 0x04, 0xca, 0xb1, 0x35, 0x62, 0xee, 0xbc, 0x4a,
+	0x29, 0x3b, 0x38, 0x32, 0x41, 0x4c, 0x0b, 0x7c, 0xf5, 0x8d, 0xde, 0x05, 0x88, 0x80, 0x54, 0x48,
+	0xea, 0x09, 0xe5, 0xf4, 0x35, 0xfe, 0x74, 0x67, 0x53, 0xc0, 0xe6, 0x4f, 0x26, 0x94, 0x3e, 0x57,
+	0xef, 0x3b, 0x0e, 0x3c, 0xf4, 0x18, 0x8a, 0xcb, 0xe7, 0x04, 0xed, 0x39, 0x1b, 0x8f, 0xe7, 0xe1,
+	0xbe, 0xb3, 0xf9, 0xd6, 0xd8, 0x06, 0x3a, 0x03, 0x48, 0xae, 0x54, 0x84, 0x9c, 0x5b, 0x0f, 0xc4,
+	0xe1, 0x81, 0x73, 0xfb, 0xce, 0xb5, 0x0d, 0xf4, 0x3e, 0x94, 0x53, 0xbb, 0x8a, 0x22, 0xd4, 0xa6,
+	0x83, 0x0f, 0x1f, 0x38, 0x2f, 0xd8, 0x78, 0xdb, 0x68, 0x7d, 0x74, 0xbd, 0xb0, 0x8c, 0xdf, 0x17,
+	0x96, 0xf1, 0x7c, 0x61, 0x19, 0x7f, 0x2d, 0x2c, 0xf3, 0xef, 0x85, 0x65, 0x7e, 0x17, 0x5a, 0xe6,
+	0x8f, 0xa1, 0x65, 0xfe, 0x1c, 0x5a, 0xc6, 0xaf, 0xa1, 0x65, 0x5c, 0x87, 0x96, 0xf9, 0x2c, 0xb4,
+	0xcc, 0xe7, 0xa1, 0x65, 0xfe, 0xf0, 0xa7, 0x65, 0x5c, 0x9a, 0x5f, 0x15, 0xe3, 0xbf, 0x32, 0x41,
+	0xbf, 0x5f, 0x50, 0x6f, 0xea, 0xdb, 0xff, 0x06, 0x00, 0x00, 0xff, 0xff, 0x65, 0x86, 0xab, 0xd8,
+	0xdd, 0x08, 0x00, 0x00,
 }
