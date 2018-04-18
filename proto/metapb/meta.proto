@@ -89,7 +89,7 @@ message Partition {
 }
 
 message Replica {
-    uint32        id        = 1 [(gogoproto.customname) = "ID", (gogoproto.casttype) = "ReplicaID"];
+    uint64        id        = 1 [(gogoproto.customname) = "ID", (gogoproto.casttype) = "ReplicaID"];
     uint32        nodeID    = 2 [(gogoproto.customname) = "NodeID", (gogoproto.casttype) = "NodeID"];
 }
 
