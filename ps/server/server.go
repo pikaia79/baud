@@ -6,9 +6,12 @@ import (
 	"sync"
 	"time"
 
+	"context"
+
 	"github.com/tiglabs/baud/proto/masterpb"
 	"github.com/tiglabs/baud/proto/metapb"
 	"github.com/tiglabs/baud/proto/pspb"
+	"github.com/tiglabs/baud/ps/metric"
 	"github.com/tiglabs/baud/ps/rpc"
 	"github.com/tiglabs/baud/util/config"
 	"github.com/tiglabs/baud/util/log"
@@ -20,18 +23,20 @@ import (
 
 // Server partition server
 type Server struct {
-	Config
-	raftConf     raft.Config
-	node         metapb.Node
+	config       Config
+	nodeID       metapb.NodeID
 	nodeResolver *NodeResolver
 	partitions   *sync.Map
+	context      context.Context
 	quit         chan struct{}
 
 	apiServer   *grpc.Server
 	adminServer *grpc.Server
 	raftServer  *raft.RaftServer
 
-	masterClient *masterpb.MasterRpcClient
+	masterClient masterpb.MasterRpcClient
+
+	systemMetric *metric.SystemMetric
 }
 
 // NewServer create server instance
@@ -47,32 +52,20 @@ func NewServer(conf *config.Config) (*Server, error) {
 	rc := raft.DefaultConfig()
 	rc.RetainLogs = serverConf.RaftRetainLogs
 	rc.TickInterval = time.Millisecond * time.Duration(serverConf.RaftHeartbeatInterval)
-	rc.HeartbeatAddr = serverConf.RaftHeartbeatAddr
-	rc.ReplicateAddr = serverConf.RaftReplicaAddr
+	rc.HeartbeatAddr = fmt.Sprintf(":%d", serverConf.RaftHeartbeatPort)
+	rc.ReplicateAddr = fmt.Sprintf(":%d", serverConf.RaftReplicatePort)
 	rc.Resolver = resolver
 	rc.MaxReplConcurrency = serverConf.RaftReplicaConcurrency
 	rc.MaxSnapConcurrency = serverConf.RaftSnapshotConcurrency
-	rc.NodeID = uint64(serverConf.NodeID)
+	rc.NodeID = 0
 	rs, err := raft.NewRaftServer(rc)
 	if err != nil {
 		return nil, fmt.Errorf("boot raft server failed, error: %v", err)
 	}
 
-	// self info
-	node := metapb.Node{
-		ID:   serverConf.NodeID,
-		Ip:   ip.String(),
-		Port: serverConf.RPCPort,
-		RaftAddrs: metapb.RaftAddrs{
-			HeartbeatAddr: serverConf.RaftHeartbeatAddr,
-			ReplicateAddr: serverConf.RaftReplicaAddr,
-		},
-	}
-
 	s := &Server{
-		Config:       *serverConf,
-		raftConf:     *rc,
-		node:         node,
+		config:       *serverConf,
+		nodeID:       0,
 		nodeResolver: resolver,
 		partitions:   &sync.Map{},
 		quit:         make(chan struct{}),
@@ -86,7 +79,7 @@ func NewServer(conf *config.Config) (*Server, error) {
 
 // Start start server
 func (s *Server) Start() error {
-	if ln, err := net.Listen("tcp", fmt.Sprintf(":%d", s.Config.RPCPort)); err != nil {
+	if ln, err := net.Listen("tcp", fmt.Sprintf(":%d", s.config.RPCPort)); err != nil {
 		return fmt.Errorf("Server failed to listen api port: %v", err)
 	} else {
 		pspb.RegisterApiGrpcServer(s.apiServer, s)
@@ -130,4 +123,8 @@ func (s *Server) closeAllRange() {
 		value.(*partition).Close()
 		return true
 	})
+}
+
+func (s *Server) reset() {
+
 }
