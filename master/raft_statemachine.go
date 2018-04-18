@@ -7,7 +7,7 @@ import (
 	"github.com/golang/protobuf/proto"
 	"github.com/tiglabs/raft"
 	raftproto "github.com/tiglabs/raft/proto"
-	"proto/ms_raftcmdpb"
+	"proto/msraftcmdpb"
 	"util/log"
 	"util/raftkvstore"
 )
@@ -23,7 +23,7 @@ var (
 	errUnknownResponseType = errors.New("unknown repsonse type")
 )
 
-type RaftApplyHandler func( /*req*/ *ms_raftcmdpb.Request, uint64) ( /*resp*/ *ms_raftcmdpb.Response /*err*/, error)
+type RaftApplyHandler func( /*req*/ *msraftcmdpb.Request, uint64) ( /*resp*/ *msraftcmdpb.Response /*err*/, error)
 
 type RaftPeerChangeHandler func( /*confChange*/ *raftproto.ConfChange) ( /*res*/ interface{} /*err*/, error)
 
@@ -95,7 +95,7 @@ func (rg *RaftGroup) submit(ctx context.Context, cmd []byte) (interface{}, error
 	return resp, nil
 }
 
-func (rg *RaftGroup) SubmitCommand(ctx context.Context, req *ms_raftcmdpb.Request) (*ms_raftcmdpb.Response, error) {
+func (rg *RaftGroup) SubmitCommand(ctx context.Context, req *msraftcmdpb.Request) (*msraftcmdpb.Response, error) {
 	cmd, err := proto.Marshal(req)
 	if err != nil {
 		return nil, err
@@ -104,7 +104,7 @@ func (rg *RaftGroup) SubmitCommand(ctx context.Context, req *ms_raftcmdpb.Reques
 	if err != nil {
 		return nil, err
 	}
-	if rsp, ok := resp.(*ms_raftcmdpb.Response); ok {
+	if rsp, ok := resp.(*msraftcmdpb.Response); ok {
 		return rsp, nil
 	}
 	return nil, errUnknownResponseType
@@ -140,7 +140,7 @@ func (rg *RaftGroup) RegisterFatalEventHandle(handler RaftFatalEventHandler) {
 //////////////////////statemachine begin///////////////////
 func (rg *RaftGroup) Apply(command []byte, index uint64) (res interface{}, err error) {
 	//TODO: PUT/DELTE & StoreApplyIndex use WriteBatch?
-	cmd := &ms_raftcmdpb.Request{}
+	cmd := &msraftcmdpb.Request{}
 	err = proto.Unmarshal(command, cmd)
 	if err != nil {
 		return

@@ -5,9 +5,9 @@ import (
 	"math"
 	"time"
 	"errors"
-	"encoding/binary"
 
 	"github.com/tiglabs/baud/kernel/analysis"
+	"github.com/tiglabs/baud/util"
 )
 
 const DefaultDateTimeProperty = StoreField | IndexField
@@ -19,24 +19,19 @@ var _ Field = &DateTimeField{}
 
 type DateTimeField struct {
 	name              string
-	arrayPositions    []uint64
 	property          Property
-	value             []byte
+	value             util.Value
 }
 
 func (n *DateTimeField) Name() string {
 	return n.name
 }
 
-func (n *DateTimeField) ArrayPositions() []uint64 {
-	return n.arrayPositions
-}
-
 func (n *DateTimeField) Property() Property {
 	return n.property
 }
 
-func (n *DateTimeField) Analyze() (int, analysis.TokenFrequencies) {
+func (n *DateTimeField) Analyze() (analysis.TokenFrequencies) {
 	tokens := make([]*analysis.Token, 0)
 	tokens = append(tokens, &analysis.Token{
 		Start:    0,
@@ -46,7 +41,7 @@ func (n *DateTimeField) Analyze() (int, analysis.TokenFrequencies) {
 		Type:     analysis.DateTime,
 	})
 
-	tokenFreqs := analysis.TokenFrequency(tokens, n.arrayPositions, n.property.IncludeTermVectors())
+	tokenFreqs := analysis.TokenFrequency(tokens, nil, n.property.IncludeTermVectors())
 	return tokenFreqs
 }
 
@@ -58,7 +53,7 @@ func (n *DateTimeField) DateTime() (time.Time, error) {
 	if len(n.value) == 0 {
 		return time.Time{}, errors.New("invalid data time")
 	}
-	i64, _ := binary.Varint(n.value)
+	i64, _ := n.value.Int64()
 	return time.Unix(0, i64).UTC(), nil
 }
 
@@ -66,28 +61,25 @@ func (n *DateTimeField) String() string {
 	return fmt.Sprintf("&document.DateField{Name:%s, Property: %s, Value: %s}", n.name, n.property, n.value)
 }
 
-func NewDateTimeFieldByBytes(name string, arrayPositions []uint64, value []byte) *DateTimeField {
+func NewDateTimeFieldByBytes(name string, value []byte) *DateTimeField {
 	return &DateTimeField{
 		name:              name,
-		arrayPositions:    arrayPositions,
 		value:             value,
 		property:          DefaultDateTimeProperty,
 	}
 }
 
-func NewDateTimeField(name string, arrayPositions []uint64, dt time.Time) (*DateTimeField, error) {
-	return NewDateTimeFieldWithProperty(name, arrayPositions, dt, DefaultDateTimeProperty)
+func NewDateTimeField(name string, dt time.Time) (*DateTimeField, error) {
+	return NewDateTimeFieldWithProperty(name, dt, DefaultDateTimeProperty)
 }
 
-func NewDateTimeFieldWithProperty(name string, arrayPositions []uint64, dt time.Time, property Property) (*DateTimeField, error) {
+func NewDateTimeFieldWithProperty(name string, dt time.Time, property Property) (*DateTimeField, error) {
 	if validTime(dt) {
 		dtInt64 := dt.UnixNano()
-		val := make([]byte, 9)
-		n := binary.PutVarint(val, dtInt64)
+		prefixCoded := util.PrefixCodedInt64(dtInt64, 0)
 		return &DateTimeField{
 			name:           name,
-			arrayPositions: arrayPositions,
-			value:          val[:n],
+			value:          prefixCoded,
 			property:       property,
 		}, nil
 	}

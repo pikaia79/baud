@@ -1,10 +1,10 @@
 package llrbdb
 
 import (
-	"testing"
 	"fmt"
 	"reflect"
 	"sync"
+	"testing"
 )
 
 func TestSetGetDelete(t *testing.T) {
@@ -17,7 +17,7 @@ func TestSetGetDelete(t *testing.T) {
 		key := []byte(fmt.Sprintf("key_%d", i))
 		value := []byte(fmt.Sprintf("val_%d", i))
 		err = db.Update(func(tx *Tx) error {
-			_,_, err = tx.Set(key, value)
+			_, _, err = tx.Set(key, value)
 			return err
 		})
 		if err != nil {
@@ -91,7 +91,7 @@ func TestSetGetDelete(t *testing.T) {
 		key := []byte(fmt.Sprintf("key_%d", i))
 		value := []byte(fmt.Sprintf("val_#%d", i))
 		err = db.Update(func(tx *Tx) error {
-			_,_, err = tx.Set(key, value)
+			_, _, err = tx.Set(key, value)
 			return err
 		})
 		if err != nil {
@@ -129,7 +129,7 @@ func TestWriteTransaction(t *testing.T) {
 	for i := 0; i < 10; i++ {
 		key := []byte(fmt.Sprintf("key_%d", i))
 		value := []byte(fmt.Sprintf("val_%d", i))
-		_,_, err = tx.Set(key, value)
+		_, _, err = tx.Set(key, value)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -163,7 +163,7 @@ func TestWriteTransaction(t *testing.T) {
 	for i := 0; i < 10; i++ {
 		key := []byte(fmt.Sprintf("key_%d", i))
 		value := []byte(fmt.Sprintf("val_#%d", i))
-		_,_, err = tx.Set(key, value)
+		_, _, err = tx.Set(key, value)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -204,7 +204,7 @@ func TestReadTransaction(t *testing.T) {
 	for i := 0; i < 10; i++ {
 		key := []byte(fmt.Sprintf("key_%d", i))
 		value := []byte(fmt.Sprintf("val_%d", i))
-		_,_, err = tx.Set(key, value)
+		_, _, err = tx.Set(key, value)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -260,7 +260,7 @@ func batchWriteRows(db *DB, rows []testRow) (err error) {
 		}
 	}()
 	for _, row := range rows {
-		_,_, err = tx.Set(row.key, row.val)
+		_, _, err = tx.Set(row.key, row.val)
 		if err != nil {
 			return err
 		}
@@ -324,7 +324,7 @@ func TestAscend(t *testing.T) {
 		t.Fatal(err)
 	}
 	var realKeys [][]byte
-	tx.Ascend(func(key []byte, val interface{})bool {
+	tx.Ascend(func(key []byte, val interface{}) bool {
 		realKeys = append(realKeys, key)
 		return true
 	})
@@ -332,7 +332,7 @@ func TestAscend(t *testing.T) {
 		t.Fatalf("expected keys %v, got %v", expectedAll, realKeys)
 	}
 	realKeys = realKeys[:0]
-	tx.AscendKeys([]byte("cat*"), func(key []byte, val interface{})bool {
+	tx.AscendKeys([]byte("cat*"), func(key []byte, val interface{}) bool {
 		realKeys = append(realKeys, key)
 		return true
 	})
@@ -341,7 +341,7 @@ func TestAscend(t *testing.T) {
 	}
 
 	realKeys = realKeys[:0]
-	tx.AscendRange([]byte("cat1"), []byte("dog1"), func(key []byte, val interface{})bool {
+	tx.AscendRange([]byte("cat1"), []byte("dog1"), func(key []byte, val interface{}) bool {
 		realKeys = append(realKeys, key)
 		return true
 	})
@@ -350,7 +350,7 @@ func TestAscend(t *testing.T) {
 	}
 
 	realKeys = realKeys[:0]
-	tx.AscendLessThan([]byte("dog1"), func(key []byte, val interface{})bool {
+	tx.AscendLessThan([]byte("dog1"), func(key []byte, val interface{}) bool {
 		realKeys = append(realKeys, key)
 		return true
 	})
@@ -359,7 +359,7 @@ func TestAscend(t *testing.T) {
 	}
 
 	realKeys = realKeys[:0]
-	tx.AscendGreaterOrEqual([]byte("dog1"), func(key []byte, val interface{})bool {
+	tx.AscendGreaterOrEqual([]byte("dog1"), func(key []byte, val interface{}) bool {
 		realKeys = append(realKeys, key)
 		return true
 	})
@@ -368,7 +368,7 @@ func TestAscend(t *testing.T) {
 	}
 
 	realKeys = realKeys[:0]
-	tx.AscendEqual([]byte("dog1"), func(key []byte, val interface{})bool {
+	tx.AscendEqual([]byte("dog1"), func(key []byte, val interface{}) bool {
 		realKeys = append(realKeys, key)
 		return true
 	})
@@ -432,7 +432,7 @@ func TestDescend(t *testing.T) {
 		t.Fatal(err)
 	}
 	var realKeys [][]byte
-	tx.Descend(func(key []byte, val interface{})bool {
+	tx.Descend(func(key []byte, val interface{}) bool {
 		realKeys = append(realKeys, key)
 		return true
 	})
@@ -440,7 +440,7 @@ func TestDescend(t *testing.T) {
 		t.Fatalf("expected keys %v, got %v", expectedAll, realKeys)
 	}
 	realKeys = realKeys[:0]
-	tx.DescendKeys([]byte("cat*"), func(key []byte, val interface{})bool {
+	tx.DescendKeys([]byte("cat*"), func(key []byte, val interface{}) bool {
 		realKeys = append(realKeys, key)
 		return true
 	})
@@ -450,7 +450,7 @@ func TestDescend(t *testing.T) {
 
 	realKeys = realKeys[:0]
 	fmt.Println("DescendRange ......")
-	tx.DescendRange([]byte("cat3"), []byte("apple"), func(key []byte, val interface{})bool {
+	tx.DescendRange([]byte("cat3"), []byte("apple"), func(key []byte, val interface{}) bool {
 		realKeys = append(realKeys, key)
 		return true
 	})
@@ -459,7 +459,7 @@ func TestDescend(t *testing.T) {
 	}
 
 	realKeys = realKeys[:0]
-	tx.DescendGreaterThan([]byte("cat3"), func(key []byte, val interface{})bool {
+	tx.DescendGreaterThan([]byte("cat3"), func(key []byte, val interface{}) bool {
 		realKeys = append(realKeys, key)
 		return true
 	})
@@ -468,7 +468,7 @@ func TestDescend(t *testing.T) {
 	}
 
 	realKeys = realKeys[:0]
-	tx.DescendLessOrEqual([]byte("dog"), func(key []byte, val interface{})bool {
+	tx.DescendLessOrEqual([]byte("dog"), func(key []byte, val interface{}) bool {
 		realKeys = append(realKeys, key)
 		return true
 	})
@@ -477,7 +477,7 @@ func TestDescend(t *testing.T) {
 	}
 
 	realKeys = realKeys[:0]
-	tx.DescendEqual([]byte("dog1"), func(key []byte, val interface{})bool {
+	tx.DescendEqual([]byte("dog1"), func(key []byte, val interface{}) bool {
 		realKeys = append(realKeys, key)
 		return true
 	})

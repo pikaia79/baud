@@ -4,11 +4,12 @@ type Property int
 
 const (
 	//
-	IndexField Property = 1 << iota
-	StoreField
-	TermVectors
+	InvalidField Property = 0
+	IndexField Property = 1
+	StoreField Property = 2
+	TermVectors Property = 4
 	// doc_id -> term values
-	DocValues
+	DocValues Property = 8
 )
 
 func (p Property) IsIndexed() bool {

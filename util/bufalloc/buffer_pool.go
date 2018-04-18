@@ -3,11 +3,19 @@ package bufalloc
 import (
 	"sync"
 
+<<<<<<< HEAD
 	"util"
 )
 
 const (
 	baseSize = 15
+=======
+	"csm/util"
+)
+
+const (
+	baseSize = 16
+>>>>>>> upstream/master
 	bigSize  = 64 * util.KB
 )
 
@@ -15,7 +23,11 @@ var buffPool *bufferPool
 
 func init() {
 	buffPool = &bufferPool{
+<<<<<<< HEAD
 		baseline: [...]int{64, 128, 256, 512, util.KB, 2 * util.KB, 4 * util.KB, 8 * util.KB, 16 * util.KB, 32 * util.KB, 64 * util.KB, 128 * util.KB, 256 * util.KB, 512 * util.KB, util.MB},
+=======
+		baseline: [...]int{32, 64, 128, 256, 512, util.KB, 2 * util.KB, 4 * util.KB, 8 * util.KB, 16 * util.KB, 32 * util.KB, 64 * util.KB, 128 * util.KB, 256 * util.KB, 512 * util.KB, util.MB},
+>>>>>>> upstream/master
 	}
 	for i, n := range buffPool.baseline {
 		buffPool.pool[i] = createPool(n)

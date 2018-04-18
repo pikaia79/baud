@@ -59,7 +59,6 @@ type Snapshot interface {
 	Close() error
 }
 
-
 // KVIterator is an abstraction around key iteration
 type KVIterator interface {
 
@@ -129,5 +128,5 @@ func MultiGet(reader Snapshot, keys [][]byte) ([][]byte, error) {
 
 type Option struct {
 	// only for raft when write
-	ApplyID   uint64
+	ApplyID uint64
 }

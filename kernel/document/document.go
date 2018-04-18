@@ -17,3 +17,12 @@ func (d *Document) AddField(f Field) *Document {
 	d.Fields = append(d.Fields, f)
 	return d
 }
+
+func (d *Document) FindField(name string) Field {
+	for _, f := range d.Fields {
+		if f.Name() == name {
+			return f
+		}
+	}
+	return nil
+}

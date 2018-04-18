@@ -3,7 +3,11 @@ package bufalloc
 import (
 	"testing"
 
+<<<<<<< HEAD
 	"util"
+=======
+	"csm/util"
+>>>>>>> upstream/master
 )
 
 func TestGetPoolNum(t *testing.T) {

@@ -344,6 +344,7 @@ func TestBufferGrowth(t *testing.T) {
 	buffPool.putBuffer(b)
 }
 
+<<<<<<< HEAD
 func BenchmarkBufferNotEmptyWriteRead(b *testing.B) {
 	buf := make([]byte, 1024)
 	for i := 0; i < b.N; i++ {
@@ -371,4 +372,58 @@ func BenchmarkBufferFullSmallReads(b *testing.B) {
 		}
 		buffPool.putBuffer(b)
 	}
+=======
+func BenchmarkRWWithoutGrow(b *testing.B) {
+	b.Run("Write", func(b *testing.B) {
+		b.ResetTimer()
+		b.RunParallel(func(pb *testing.PB) {
+			buf := make([]byte, 1024)
+			for pb.Next() {
+				b := buffPool.getBuffer(1024)
+				b.Write(buf)
+				buffPool.putBuffer(b)
+			}
+		})
+	})
+
+	b.Run("WriteRead", func(b *testing.B) {
+		b.ResetTimer()
+		b.RunParallel(func(pb *testing.PB) {
+			buf := make([]byte, 1024)
+			for pb.Next() {
+				b := buffPool.getBuffer(1024)
+				b.Write(buf)
+				b.Read(buf)
+				buffPool.putBuffer(b)
+			}
+		})
+	})
+}
+
+func BenchmarkRWWithGrow2x(b *testing.B) {
+	b.Run("Write", func(b *testing.B) {
+		b.ResetTimer()
+		b.RunParallel(func(pb *testing.PB) {
+			buf := make([]byte, 1024)
+			for pb.Next() {
+				b := buffPool.getBuffer(512)
+				b.Write(buf)
+				buffPool.putBuffer(b)
+			}
+		})
+	})
+
+	b.Run("WriteRead", func(b *testing.B) {
+		b.ResetTimer()
+		b.RunParallel(func(pb *testing.PB) {
+			buf := make([]byte, 1024)
+			for pb.Next() {
+				b := buffPool.getBuffer(512)
+				b.Write(buf)
+				b.Read(buf)
+				buffPool.putBuffer(b)
+			}
+		})
+	})
+>>>>>>> upstream/master
 }

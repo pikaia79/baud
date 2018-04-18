@@ -2,7 +2,7 @@ package ps
 
 import (
 	"encoding/json"
-	. "github.com/tiglabs//baud/schema"
+	. "github.com/tiglabs/baud/schema"
 	"github.com/tiglabs/baud/util/config"
 	"log"
 	"net"

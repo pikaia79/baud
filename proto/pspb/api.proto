@@ -1,0 +1,137 @@
+syntax = "proto3";
+
+import "github.com/gogo/protobuf/gogoproto/gogo.proto";
+
+import "github.com/tiglabs/baud/proto/metapb/meta.proto";
+
+option go_package = "pspb";
+
+option optimize_for = SPEED;
+option (gogoproto.marshaler_all) = true;
+option (gogoproto.sizer_all) = true;
+option (gogoproto.unmarshaler_all) = true;
+option (gogoproto.gostring_all) = false;
+option (gogoproto.equal_all) = true;
+option (gogoproto.verbose_equal_all) = false;
+option (gogoproto.goproto_stringer_all) = false;
+option (gogoproto.stringer_all) =  true;
+option (gogoproto.populate_all) = true;
+option (gogoproto.testgen_all) = false;
+option (gogoproto.benchgen_all) = false;
+option (gogoproto.goproto_getters_all) = false;
+
+service ApiGrpc {
+    rpc Get (GetRequest) returns (GetResponse) {}
+    rpc BulkWrite (BulkRequest) returns (BulkResponse) {}
+}
+
+enum RequestContentType {
+    JSON = 0;
+}
+
+enum OpType{
+    // Index the source. If there an existing document with the id, it will be replaced.
+    INDEX    = 0;
+    // Creates the resource. Simply adds it to the index, if there is an existing document with the id, then it won't be removed.
+    CREATE   = 1;
+    // Updates a document
+    UPDATE   = 2;
+    // Deletes a document
+    DELETE   = 3;
+}
+
+enum WriteResult {
+    CREATED   = 0;
+    UPDATED   = 1;
+    DELETED   = 2;
+    NOT_FOUND = 3;
+    NOOP      = 4;
+}
+
+message ActionRequestHeader {
+    uint32  space_id                = 1 [(gogoproto.customname) = "SpaceID", (gogoproto.casttype) = "github.com/tiglabs/baud/proto/metapb.SpaceID"];
+    uint32  partition_id            = 2 [(gogoproto.customname) = "PartitionID", (gogoproto.casttype) = "github.com/tiglabs/baud/proto/metapb.PartitionID"];
+    string  timeout                 = 3;
+    RequestContentType  content_ype = 4;
+    string  req_id                  = 5;
+}
+
+message BulkRequest {
+    option (gogoproto.goproto_stringer) = false;
+
+    ActionRequestHeader header        = 1 [(gogoproto.nullable) = false, (gogoproto.embed) = true];
+    repeated BulkItemRequest requests = 2 [(gogoproto.nullable) = false];
+}
+
+message BulkResponse {
+    option (gogoproto.goproto_stringer) = false;
+
+    ResponseHeader            header    = 1 [(gogoproto.nullable) = false, (gogoproto.embed) = true];
+    repeated BulkItemResponse responses = 2 [(gogoproto.nullable) = false];
+}
+
+message BulkItemRequest {
+    option (gogoproto.onlyone) = true;
+
+    OpType          op_type = 1;
+    IndexRequest    index   = 2;
+    UpdateRequest   update  = 3;
+    DeleteRequest   delete  = 4;
+}
+
+message BulkItemResponse {
+    option (gogoproto.onlyone) = true;
+
+    OpType          op_type = 1;
+    IndexResponse   index   = 2;
+    UpdateResponse  update  = 3;
+    DeleteResponse  delete  = 4;
+}
+
+message IndexRequest {
+    OpType  op_type = 1;
+    bytes   source = 2;
+
+}
+
+message IndexResponse {
+    string         id     = 1;
+    WriteResult    result = 2;
+}
+
+message UpdateRequest {
+    DocID     id            = 1 [(gogoproto.nullable) = false, (gogoproto.casttype) = "github.com/tiglabs/baud/proto/metapb.DocID"];
+    bytes     doc           = 2;
+    bool      doc_as_upsert = 3;
+}
+
+message UpdateResponse {
+    string         id     = 1;
+    WriteResult    result = 2;
+}
+
+message DeleteRequest {
+    DocID id = 1 [(gogoproto.nullable) = false, (gogoproto.casttype) = "github.com/tiglabs/baud/proto/metapb.DocID"];
+}
+
+message DeleteResponse {
+    string         id     = 1;
+    WriteResult    result = 2;
+}
+
+message GetRequest {
+    option (gogoproto.goproto_stringer) = false;
+
+    ActionRequestHeader header    = 1 [(gogoproto.nullable) = false, (gogoproto.embed) = true];
+    DocID               id        = 2 [(gogoproto.nullable) = false, (gogoproto.casttype) = "github.com/tiglabs/baud/proto/metapb.DocID"];
+    repeated string stored_fields = 3;
+}
+
+message GetResponse {
+    option (gogoproto.goproto_stringer) = false;
+
+    ResponseHeader   header    = 1 [(gogoproto.nullable) = false, (gogoproto.embed) = true];
+    string           id        = 2;
+    bool             found     = 3;
+    bytes            fields    = 4;
+}

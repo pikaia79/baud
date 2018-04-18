@@ -12,7 +12,6 @@ var _ Field = &BooleanField{}
 
 type BooleanField struct {
 	name              string
-	arrayPositions    []uint64
 	property          Property
 	value             []byte
 }
@@ -35,7 +34,7 @@ func (b *BooleanField) Analyze() (analysis.TokenFrequencies) {
 		Type:     analysis.Boolean,
 	})
 
-	tokenFreqs := analysis.TokenFrequency(tokens, b.arrayPositions, b.property.IncludeTermVectors())
+	tokenFreqs := analysis.TokenFrequency(tokens, nil, b.property.IncludeTermVectors())
 	return tokenFreqs
 }
 
@@ -54,27 +53,25 @@ func (b *BooleanField) String() string {
 	return fmt.Sprintf("&document.BooleanField{Name:%s, Property: %s, Value: %s}", b.name, b.property, b.value)
 }
 
-func NewBooleanFieldByBytes(name string, arrayPositions []uint64, value []byte) *BooleanField {
+func NewBooleanFieldByBytes(name string, value []byte) *BooleanField {
 	return &BooleanField{
 		name:              name,
-		arrayPositions:    arrayPositions,
 		value:             value,
 		property:          DefaultBooleanProperty,
 	}
 }
 
-func NewBooleanField(name string, arrayPositions []uint64, b bool) *BooleanField {
-	return NewBooleanFieldWithProperty(name, arrayPositions, b, DefaultBooleanProperty)
+func NewBooleanField(name string, b bool) *BooleanField {
+	return NewBooleanFieldWithProperty(name, b, DefaultBooleanProperty)
 }
 
-func NewBooleanFieldWithProperty(name string, arrayPositions []uint64, b bool, property Property) *BooleanField {
+func NewBooleanFieldWithProperty(name string, b bool, property Property) *BooleanField {
 	v := []byte("F")
 	if b {
 		v = []byte("T")
 	}
 	return &BooleanField{
 		name:              name,
-		arrayPositions:    arrayPositions,
 		value:             v,
 		property:          property,
 	}

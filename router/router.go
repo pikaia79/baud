@@ -1,42 +1,100 @@
 package router
 
 import (
-	"encoding/json"
-	"log"
-	"net"
 	"net/http"
-	"strconv"
-	"time"
+	"strings"
+	"httpd"
+	"util/config"
 )
 
-type Router struct{}
+type PSInfo struct {
+	BeginSlot uint32
+	EndSlot uint32
+	psAddr string
+}
+
+type SpaceInfo struct {
+	PSs []PSInfo
+}
+
+type DBInfo struct {
+	Spaces map[string]SpaceInfo
+}
+
+type Router struct {
+	httpServer *httpd.Service
+	dbInfos map[string]DBInfo
+}
 
 func NewServer() *Router {
 	return new(Router)
 }
 
-func (r *Router) Start(cfg *config.Config) error {
-	return nil
+func (router *Router) Start(cfg *config.Config) error {
+	router.httpServer = httpd.New(cfg.GetString("http"), router)
+	return router.httpServer.Start()
 }
 
-func (r *Router) Shutdown() {}
+func (router *Router) Shutdown() {
+	router.httpServer.Close()
+}
 
-func (r *Router) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+func (router *Router) ServeHTTP(writer http.ResponseWriter, request *http.Request) {
+	if err :=request.ParseForm(); err != nil {
+		router.WriteHeader(writer, http.StatusBadRequest)
+		return
+	}
 	switch {
-	case strings.HasPrefix(r.URL.Path, "insert"):
-		r.handleInsert(w, r)
-	case strings.HasPrefix(r.URL.Path, "get"):
-		r.handleGet(w, r)
-	case strings.HasPrefix(r.URL.Path, "update"):
-		r.handleUpdate(w, r)
-	case strings.HasPrefix(r.URL.Path, "delete"):
-		r.handleDelete(w, r)
+	case strings.HasPrefix(request.URL.Path, "insert"):
+		router.handleInsert(writer, request)
+	case strings.HasPrefix(request.URL.Path, "get"):
+		router.handleGet(writer, request)
+	case strings.HasPrefix(request.URL.Path, "update"):
+		router.handleUpdate(writer, request)
+	case strings.HasPrefix(request.URL.Path, "delete"):
+		router.handleDelete(writer, request)
 
-	case strings.HasPrefix(r.URL.Path, "status"):
-		r.handleStatus(w, r)
-	case strings.HasPrefix(r.URL.Path, "/debug/pprof"):
-		r.handlePprof(w, r)
+	case strings.HasPrefix(request.URL.Path, "status"):
+		router.handleStatus(writer, request)
+	case strings.HasPrefix(request.URL.Path, "/debug/pprof"):
+		router.handlePprof(writer, request)
 	default:
-		r.WriteHeader(http.StatusNotFound)
+		router.WriteHeader(writer, http.StatusNotFound)
 	}
 }
+
+func (router *Router) handleInsert(writer http.ResponseWriter, request *http.Request) {
+	dbName := request.FormValue("db")
+	spaceName := request.FormValue("space")
+}
+
+func (router *Router) handleGet(writer http.ResponseWriter, request *http.Request) {
+	dbName := request.FormValue("db")
+	spaceName := request.FormValue("space")
+	uid := request.FormValue("uid")
+}
+
+func (router *Router) handleUpdate(writer http.ResponseWriter, request *http.Request) {
+	dbName := request.FormValue("db")
+	spaceName := request.FormValue("space")
+	uid := request.FormValue("uid")
+}
+
+func (router *Router) handleDelete(writer http.ResponseWriter, request *http.Request) {
+	dbName := request.FormValue("db")
+	spaceName := request.FormValue("space")
+	uid := request.FormValue("uid")
+}
+
+func (router *Router) handleStatus(writer http.ResponseWriter, request *http.Request) {
+
+}
+
+func (router *Router) handlePprof(writer http.ResponseWriter, request *http.Request) {
+
+}
+
+func (router *Router) WriteHeader(writer http.ResponseWriter, status int) {
+	writer.WriteHeader(status)
+}
+

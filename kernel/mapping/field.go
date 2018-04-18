@@ -1,245 +1,695 @@
 package mapping
 
 import (
-	"time"
+	"reflect"
+	"errors"
+	"strings"
+	"strconv"
+	"fmt"
+
 	"github.com/tiglabs/baud/kernel/document"
-	"github.com/tiglabs/baud/kernel/analysis"
+	"time"
 )
 
-type FieldType int
-
-const (
-	StringField FieldType = 1 << iota
-	NumericField
-	DateField
-	BooleanField
-)
-
-type FileMapping interface {
-	Type() FieldType
-	// The name of the field that will be stored in the index. Defaults to the property/field name.
-	IndexName() string
-	// Set to true to actually store the field in the index, false to not store it. Defaults to false (note, the JSON document itself is stored, and it can be retrieved from it).
+type FieldMapping interface {
+	Name() string
+	Type() string
+	ID()   uint64
 	Store() bool
 	Index() bool
-	Boost() float64
-	NullValue() interface{}
-	IncludeInAll() bool
+	Enabled() bool
+	ParseField(data interface{}, path []string, context *parseContext) error
 }
 
-type StringFieldMapping struct {
+type EmptyFieldMapping struct {}
+func(e *EmptyFieldMapping) Name() string {return ""}
+func(e *EmptyFieldMapping) Type() string {return ""}
+func(e *EmptyFieldMapping) ID()   uint64 {return 0}
+func(e *EmptyFieldMapping) Store() bool {return false}
+func(e *EmptyFieldMapping) Index() bool {return false}
+func(e *EmptyFieldMapping) Enabled() bool {return false}
+func(e *EmptyFieldMapping) ParseField(data interface{}, path []string, context *parseContext) error {
+	return nil
+}
 
+type DynamicFieldMapping struct {
+	Name_ string                   `json:"name,omitempty"`
+	// field ID
+	Id  uint64                     `json:"id,omitempty"`
+	Type_ string                   `json:"type,omitempty"`
+	Enabled_ bool                  `json:"enabled,omitempty"`
+	Dynamic bool                   `json:"dynamic,omitempty"`
+	IncludeInAll bool              `json:"include_in_all,omitempty"`
+	Properties map[string]FieldMapping `json:"properties,omitempty"`
+}
+
+// type only can be object or nested
+func NewDynamicFieldMapping(name, type_ string, id uint64) *DynamicFieldMapping {
+	return &DynamicFieldMapping{
+		Name_: name,
+		Id: id,
+		Type_: type_,
+		Enabled_: true,
+		Dynamic: true,
+	}
+}
+
+func(f *DynamicFieldMapping) Name() string {return f.Name_}
+func(f *DynamicFieldMapping) Type() string {return f.Type_}
+func(f *DynamicFieldMapping) ID()   uint64 {return f.Id}
+func(f *DynamicFieldMapping) Store() bool {return false}
+func(f *DynamicFieldMapping) Index() bool {return false}
+func(f *DynamicFieldMapping) Enabled() bool {return false}
+func(f *DynamicFieldMapping) ParseField(data interface{}, path []string, context *parseContext) error {
+	// todo
+	return nil
+}
+
+type ObjectFieldMapping struct {
+	Name_ string                   `json:"name,omitempty"`
+	// field ID
+	Id  uint64                     `json:"id,omitempty"`
+	Type_ string                   `json:"type,omitempty"`
+	Enabled_ bool                  `json:"enabled,omitempty"`
+	Dynamic bool                   `json:"dynamic,omitempty"`
+	IncludeInAll bool              `json:"include_in_all,omitempty"`
+	Properties map[string]FieldMapping `json:"properties,omitempty"`
+}
+
+func NewObjectFieldMapping(name string, id uint64) *ObjectFieldMapping {
+	return &ObjectFieldMapping {
+		Name_: name,
+		Id: id,
+		Type_: "object",
+		Enabled_: true,
+		Dynamic: false,
+		IncludeInAll: true,
+	}
+}
+
+func(f *ObjectFieldMapping) Name() string {return f.Name_}
+func(f *ObjectFieldMapping) Type() string {return "object"}
+func(f *ObjectFieldMapping) ID()   uint64 {return 0}
+func(f *ObjectFieldMapping) Store() bool {return false}
+func(f *ObjectFieldMapping) Index() bool {return true}
+func(f *ObjectFieldMapping) Enabled() bool {return true}
+func(f *ObjectFieldMapping) AddFileMapping(field FieldMapping) {
+	if f.Properties == nil {
+		f.Properties = make( map[string]FieldMapping)
+	}
+	f.Properties[field.Name()] = field
+}
+
+func (f *ObjectFieldMapping) ParseField(data interface{}, path []string, context *parseContext) error {
+	if !f.Enabled() {
+		return nil
+	}
+	// not support dynamic now
+	if f.Dynamic {
+		// todo
+		return nil
+	}
+	val := reflect.ValueOf(data)
+	typ := val.Type()
+	switch typ.Kind() {
+	case reflect.Map:
+		if typ.Key().Kind() == reflect.String {
+			for _, key := range val.MapKeys() {
+				// get field
+				if f.Properties == nil {
+					return errors.New("Fields that can not be identified")
+				}
+				field, ok := f.Properties[key.String()]
+				if !ok {
+					return fmt.Errorf("Fields %s that can not be identified", key.String())
+				}
+				
+				fieldName := key.String()
+				fieldVal := val.MapIndex(key).Interface()
+				err := field.ParseField(fieldVal, append(path, f.Name(), fieldName), context)
+				if err != nil {
+					return err
+				}
+			}
+		}
+	default:
+		return errors.New("Fields that can not be identified")
+	}
+	return nil
+}
+
+type NestedFieldMapping struct {
+	Name_ string                   `json:"name,omitempty"`
+	// field ID
+	Id  uint64                     `json:"id,omitempty"`
+	Type_ string                   `json:"type,omitempty"`
+	Enabled_ bool                  `json:"enabled,omitempty"`
+	Dynamic bool                   `json:"dynamic,omitempty"`
+	IncludeInAll bool              `json:"include_in_all,omitempty"`
+	Properties map[string]FieldMapping `json:"properties,omitempty"`
+}
+
+func NewNestedFieldMapping(name string, id uint64) *NestedFieldMapping {
+	return &NestedFieldMapping{
+		Name_: name,
+		Id: id,
+		Type_: "nested",
+		Enabled_: true,
+		Dynamic: false,
+		IncludeInAll: true,
+	}
+}
+
+func(f *NestedFieldMapping) Name() string {return f.Name_}
+func(f *NestedFieldMapping) Type() string {return "nested"}
+func(f *NestedFieldMapping) ID()   uint64 {return 0}
+func(f *NestedFieldMapping) Store() bool {return false}
+func(f *NestedFieldMapping) Index() bool {return true}
+func(f *NestedFieldMapping) Enabled() bool {return true}
+func(f *NestedFieldMapping) AddFileMapping(field FieldMapping) {
+	if f.Properties == nil {
+		f.Properties = make( map[string]FieldMapping)
+	}
+	f.Properties[field.Name()] = field
+}
+
+func(f *NestedFieldMapping) ParseField(data interface{}, path []string, context *parseContext) error {
+	if !f.Enabled() {
+		return nil
+	}
+	// todo
+	return nil
+}
+
+type FieldDataFrequencyFilter struct {
+	Min    float64       `json:"min,omitempty"`
+	Max    float64       `json:"max,omitempty"`
+	MinSegmentSize int64 `json:"min_segment_size,omitempty"`
+}
+
+type TextFieldMapping struct {
+	Name_ string                   `json:"name,omitempty"`
+	// field ID
+	Id  uint64                     `json:"id,omitempty"`
+	Type_ string                   `json:"type,omitempty"`
+	Enabled_ bool                  `json:"enabled,omitempty"`
+	Analyzer_ string               `json:"analyzer,omitempty"`
+	Boost float64                  `json:"boost,omitempty"`
+	IncludeInAll bool              `json:"include_in_all,omitempty"`
+	FieldData bool                 `json:"fielddata,omitempty"`
+	// Expert settings which allow to decide which values to load in memory when fielddata is enabled. By default all values are loaded.
+	FieldDataFrequencyFilter *FieldDataFrequencyFilter `json:"fielddata_frequency_filter,omitempty"`
+	Fields map[string]FieldMapping `json:"fields,omitempty"`
+	Index_ bool                    `json:"index,omitempty"`
+	IndexOptions string            `json:"index_options,omitempty"`
+	Norms bool                     `json:"norms,omitempty"`
+	PositionIncrementGap int64     `json:"position_increment_gap,omitempty"`
+	Store_ bool                    `json:"store,omitempty"`
+	SearchAnalyzer string          `json:"search_analyzer,omitempty"`
+	SearchQuoteAnalyzer string     `json:"search_quote_analyzer,omitempty"`
+	Similarity string              `json:"similarity,omitempty"`
+	TermVector string              `json:"term_vector,omitempty"`
+}
+
+func NewTextFieldMapping(name string, id uint64) *TextFieldMapping {
+	return &TextFieldMapping{
+		Name_:  name,
+		Id: id,
+		Type_:  "text",
+		Enabled_: true,
+		Analyzer_: "standard",
+		Boost: 1.0,
+		IncludeInAll: true,
+		FieldData: false,
+		Index_: true,
+		IndexOptions: "positions",
+		Norms: true,
+		PositionIncrementGap: 100,
+		Store_: false,
+		SearchAnalyzer: "standard",
+		SearchQuoteAnalyzer: "standard",
+		Similarity: "BM25",
+		TermVector: "no",
+	}
+}
+
+func (f *TextFieldMapping) Name() string {
+	return f.Name_
+}
+
+func (f *TextFieldMapping) Type() string {
+	return f.Type_
+}
+
+func (f *TextFieldMapping) ID() uint64 {
+	return f.Id
+}
+
+func (f *TextFieldMapping) Store() bool {
+	return f.Store_
+}
+
+func (f *TextFieldMapping) Index() bool {
+	return f.Index_
+}
+
+func (f *TextFieldMapping) Enabled() bool {
+	return f.Enabled_
+}
+
+func (f *TextFieldMapping) Property() document.Property {
+	var p document.Property
+	if f.Store() {
+		p |= document.StoreField
+	}
+	if f.Index() {
+		p |= document.IndexField
+	}
+	if f.TermVector != "no" {
+		p |= document.TermVectors
+	}
+	return p
+}
+
+func (f *TextFieldMapping) AddField(field FieldMapping) {
+	// fixme check field type
+	if f.Fields == nil {
+		f.Fields = make(map[string]FieldMapping)
+	}
+	f.Fields[field.Name()] = field
+}
+
+func (f *TextFieldMapping) ParseField(data interface{}, path []string, context *parseContext) error {
+	if !f.Enabled() {
+		return nil
+	}
+	val := reflect.ValueOf(data)
+	typ := val.Type()
+	switch typ.Kind() {
+	case reflect.Ptr:
+		ptrElem := val.Elem()
+		if ptrElem.IsValid() && ptrElem.CanInterface() {
+			f.ParseField(ptrElem.Interface(), path, context)
+		}
+	case reflect.String:
+		propertyValueString := val.String()
+		analyzer := context.im.AnalyzerNamed(f.Analyzer_)
+		fieldName := getFieldName(path, f)
+		field := document.NewTextFieldCustom(getFieldName(path, f), []byte(propertyValueString), f.Property(), analyzer)
+		context.doc.AddField(field)
+
+		if !f.IncludeInAll {
+			context.excludedFromAll = append(context.excludedFromAll, fieldName)
+		}
+		for name, fieldMapping := range f.Fields {
+			err := fieldMapping.ParseField(propertyValueString, append(path, fieldName, name), context)
+			if err != nil {
+				return err
+			}
+		}
+	default:
+		return errors.New("invalid field type")
+	}
+	return nil
+}
+
+type KeywordFieldMapping struct {
+	Name_ string                   `json:"name,omitempty"`
+	// field ID
+	Id  uint64                     `json:"id,omitempty"`
+	Type_ string                   `json:"type,omitempty"`
+	Enabled_ bool                  `json:"enabled,omitempty"`
+	Boost float64                  `json:"boost,omitempty"`
+	DocValues bool                 `json:"doc_values,omitempty"`
+	IncludeInAll bool              `json:"include_in_all,omitempty"`
+	Fields map[string]FieldMapping `json:"fields,omitempty"`
+	IgnoreAbove uint64             `json:"ignore_above,omitempty"`
+	Index_ bool                    `json:"index,omitempty"`
+	IndexOptions string            `json:"index_options,omitempty"`
+	Norms bool                     `json:"norms,omitempty"`
+	NullValue string               `json:"null_value,omitempty"`
+	Store_ bool                    `json:"store,omitempty"`
+	Similarity string              `json:"similarity,omitempty"`
+	Normalizer string              `json:"normalizer,omitempty"`
+}
+
+func NewKeywordFieldMapping(name string, id uint64) *KeywordFieldMapping {
+	return &KeywordFieldMapping{
+		Name_:  name,
+		Id: id,
+		Type_:  "keyword",
+		Enabled_: true,
+		Boost: 1.0,
+		IncludeInAll: true,
+		DocValues: true,
+		IgnoreAbove: 2147483647,
+		Index_: true,
+		IndexOptions: "docs",
+		Norms: false,
+		Store_: false,
+		Similarity: "BM25",
+	}
+}
+
+func(f *KeywordFieldMapping) Name() string {return f.Name_}
+func(f *KeywordFieldMapping) Type() string {return f.Type_}
+func(f *KeywordFieldMapping) ID()   uint64 {return f.Id}
+func(f *KeywordFieldMapping) Store() bool {return f.Store_}
+func(f *KeywordFieldMapping) Index() bool {return f.Index_}
+func(f *KeywordFieldMapping) Enabled() bool {return f.Enabled_}
+func(f *KeywordFieldMapping) Property() document.Property {
+	var p document.Property
+	if f.Store() {
+		p |= document.StoreField
+	}
+	if f.Index() {
+		p |= document.IndexField
+	}
+	if f.DocValues {
+		p |= document.DocValues
+	}
+	return p
+}
+func (f *KeywordFieldMapping) ParseField(data interface{}, path []string, context *parseContext) error {
+	if !f.Enabled() {
+		return nil
+	}
+	val := reflect.ValueOf(data)
+	typ := val.Type()
+	switch typ.Kind() {
+	case reflect.Ptr:
+		ptrElem := val.Elem()
+		if ptrElem.IsValid() && ptrElem.CanInterface() {
+			f.ParseField(ptrElem.Interface(), path, context)
+		}
+	case reflect.String:
+		propertyValueString := val.String()
+		fieldName := getFieldName(path, f)
+		field := document.NewTextFieldCustom(getFieldName(path, f), []byte(propertyValueString), f.Property(), nil)
+		context.doc.AddField(field)
+
+		if !f.IncludeInAll {
+			context.excludedFromAll = append(context.excludedFromAll, fieldName)
+		}
+		for name, fieldMapping := range f.Fields {
+			err := fieldMapping.ParseField(propertyValueString, append(path, name), context)
+			if err != nil {
+				return err
+			}
+		}
+	default:
+		return errors.New("invalid field type")
+	}
+	return nil
 }
 
 type NumericFieldMapping struct {
+	Name_ string                   `json:"name,omitempty"`
+	// field ID
+	Id  uint64                     `json:"id,omitempty"`
+	Type_ string                   `json:"type,omitempty"`
+	Enabled_ bool                  `json:"enabled,omitempty"`
+	IncludeInAll bool              `json:"include_in_all,omitempty"`
+	Coerce bool                    `json:"coerce,omitempty"`
+	Boost float64                  `json:"boost,omitempty"`
+	DocValues bool                 `json:"doc_values,omitempty"`
+	IgnoreMalformed bool           `json:"ignore_malformed,omitempty"`
+	Index_ bool                     `json:"index,omitempty"`
+	NullValue float64              `json:"null_value,omitempty"`
+	Store_ bool                    `json:"store,omitempty"`
+}
 
+func NewNumericFieldMapping(name string, typ string, id uint64) *NumericFieldMapping{
+	return &NumericFieldMapping{
+		Name_: name,
+		Id: id,
+		Type_: typ,
+		Enabled_: true,
+		IncludeInAll: true,
+		Coerce: true,
+		Boost: 1.0,
+		DocValues: true,
+		IgnoreMalformed: false,
+		Index_: true,
+		Store_: false,
+	}
+}
+
+func(f *NumericFieldMapping) Name() string {return f.Name_}
+func(f *NumericFieldMapping) Type() string {return f.Type_}
+func(f *NumericFieldMapping) ID()   uint64 {return f.Id}
+func(f *NumericFieldMapping) Store() bool {return f.Store_}
+func(f *NumericFieldMapping) Index() bool {return f.Index_}
+func(f *NumericFieldMapping) Enabled() bool {return f.Enabled_}
+func(f *NumericFieldMapping) Property() document.Property {
+	var p document.Property
+	if f.Store() {
+		p |= document.StoreField
+	}
+	if f.Index() {
+		p |= document.IndexField
+	}
+	if f.DocValues {
+		p |= document.DocValues
+	}
+	return p
+}
+func(f *NumericFieldMapping) ParseField(data interface{}, path []string, context *parseContext) error {
+	if !f.Enabled() {
+		return nil
+	}
+	propertyValue := reflect.ValueOf(data)
+	if !propertyValue.IsValid() {
+		// cannot do anything with the zero value
+		return errors.New("field value invalid")
+	}
+	var propertyValFloat float64
+	var err error
+
+	propertyType := propertyValue.Type()
+	switch propertyType.Kind() {
+	case reflect.String:
+		if f.Coerce {
+			propertyValueString := propertyValue.String()
+			switch f.Type() {
+			case "long", "integer", "short", "byte":
+				var _val int64
+				_val, err = strconv.ParseInt(propertyValueString, 10, 64)
+				propertyValFloat = float64(_val)
+			case "double", "float", "half_float", "scaled_float":
+				propertyValFloat, err = strconv.ParseFloat(propertyValueString, 64)
+			default:
+				return fmt.Errorf("invalid field type %s", f.Type())
+			}
+			// todo ignore_malformed
+			if err != nil {
+				return err
+			}
+		} else {
+			return errors.New("invalid field type")
+		}
+	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
+		propertyValFloat = float64(propertyValue.Int())
+	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
+		propertyValFloat = float64(propertyValue.Uint())
+	case reflect.Float64, reflect.Float32:
+		propertyValFloat = propertyValue.Float()
+	default:
+		return fmt.Errorf("invalid field type %s", propertyType.Kind().String())
+	}
+	fieldName := getFieldName(path, f)
+	field := document.NewNumericFieldWithProperty(fieldName, propertyValFloat, f.Property())
+	context.doc.AddField(field)
+	if !f.IncludeInAll {
+		context.excludedFromAll = append(context.excludedFromAll, fieldName)
+	}
+	return nil
 }
 
 type DateFieldMapping struct {
-
-}
-
-type BooleanFieldMapping struct {
-
-}
-
-type FieldMapping struct {
-	Name       string              `json:"name,omitempty"`
+	Name_ string                   `json:"name,omitempty"`
 	// field ID
-	Id         uint32              `json:"id",omitempty`
-	Type       string              `json:"type,omitempty"`
+	Id  uint64                     `json:"id,omitempty"`
+	Type_ string                   `json:"type,omitempty"`
+	Enabled_ bool                  `json:"enabled,omitempty"`
+	IncludeInAll bool              `json:"include_in_all,omitempty"`
+	Boost float64                  `json:"boost,omitempty"`
+	DocValues bool                 `json:"doc_values,omitempty"`
+	Format string                  `json:"format,omitempty"`
+	// The locale to use when parsing dates since months do not have the same names and/or abbreviations in all languages.
+	// The default is the ROOT locale,
+	// TODO locale
 
-	// For analyzed string fields, use the analyzer attribute to specify which analyzer to apply both
-	// at search time and at index time. By default, Baud uses the standard analyzer,
-	// but you can change this by specifying one of the built-in analyzers, such as whitespace, simple, or english
-	Analyzer string `json:"analyzer,omitempty"`
-
-	// The normalizer property of keyword fields is similar to analyzer except that it guarantees that the analysis
-	// chain produces a single token.
-	// The normalizer is applied prior to indexing the keyword, as well as at search-time when the keyword field
-	// is searched via a query parser such as the match query.
-	Normalizer string `json:"normalizer",omitempty`
-
-	Boost float64
-
-	// Coercion attempts to clean up dirty values to fit the datatype of a field. For instance:
-	// 1. Strings will be coerced to numbers.
-    // 2. Floating points will be truncated for integer values.
-	Coerce bool `json:"coerce",omitempty`
-
-	// The copy_to parameter allows you to create custom _all fields. In other words, the values of multiple fields can be copied into a group field,
-	// which can then be queried as a single field.
-	CopyTo string `json:"copy_to",omitempty`
-
-	// Doc values are the on-disk data structure, built at document index time, which makes this data access pattern possible.
-	// They store the same values as the _source but in a column-oriented fashion that is way more efficient for sorting and aggregations. Doc values are supported on almost all field types, with the notable exception of analyzed string fields.
-	DocValues bool `json:"doc_values",omitempty`
-
-	// Baud tries to index all of the fields you give it, but sometimes you want to just store the field without indexing it.
-	Enabled bool
-
-	// just for text type field
-	FieldData bool `json:"fielddata", omitempty`
-
-	// Global ordinals is a data-structure on top of doc values, that maintains an incremental numbering for each unique term in a lexicographic order. Each term has a unique number and the number of term A is lower than the number of term B.
-	// Global ordinals are only supported with keyword and text fields.
-	EagerGlobalOrdinals bool `json:"eager_global_ordinals", omitempty`
-
-	// In JSON documents, dates are represented as strings. Baud uses a set of preconfigured formats to recognize and parse these strings into a long value representing milliseconds-since-the-epoch in UTC.
-	Format string `json:"format", omitempty`
-
-	// Strings longer than the ignore_above setting will not be indexed or stored.
-	IgnoreAbove uint64 `json:"ignore_above", omitempty`
-
-	// Default false
-	IgnoreMalformed bool `json:"ignore_malformed", omitempty`
-
-	// The index_options parameter controls what information is added to the inverted index, for search and highlighting purposes. It accepts the following settings:
-	// docs       Only the doc number is indexed. Can answer the question Does this term exist in this field?
-	// freqs      Doc number and term frequencies are indexed. Term frequencies are used to score repeated terms higher than single terms.
-	// positions  Doc number, term frequencies, and term positions (or order) are indexed. Positions can be used for proximity or phrase queries.
-	// offsets    Doc number, term frequencies, positions, and start and end character offsets (which map the term back to the original string) are indexed.
-	//            Offsets are used by the unified highlighter to speed up highlighting.
-	IndexOptions string `json:"index_options", omitempty`
-
-	Index bool `json:"index", omitempty`
-
-    // Norms store various normalization factors that are later used at query time in order to compute the score of a document relatively to a query.
-	Norms bool `json:"norms", omitempty`
-
-	NullValue []byte `json:"null_value", omitempty`
-
-	// Analyzed text fields take term positions into account, in order to be able to support proximity or phrase queries. When indexing text fields with multiple values a "fake" gap is added between the values to prevent most phrase queries from matching across the values.
-	// The size of this gap is configured using position_increment_gap and defaults to 100.
-	PositionIncrementGap int64 `json:"position_increment_gap", omitempty`
-
-	SearchAnalyzer string `json:"search_analyzer", omitempty`
-
-	// Baud allows you to configure a scoring algorithm or similarity per field. The similarity setting provides a simple way of choosing a similarity algorithm other than the default BM25, such as TF/IDF.
-	// The only similarities which can be used out of the box, without any further configuration are:
-    //
-	// BM25
-	// The Okapi BM25 algorithm. The algorithm used by default in Elasticsearch and Lucene. See Pluggable Similarity Algorithms for more information.
-    // classic
-    // The TF/IDF algorithm which used to be the default in Elasticsearch and Lucene. See Lucene’s Practical Scoring Function for more information.
-    // boolean
-    // A simple boolean similarity, which is used when full-text ranking is not needed and the score should only be based on whether the query terms match or not.
-	// Boolean similarity gives terms a score equal to their query boost.
-	Similarity string `json:"similarity", omitempty`
-
-	TermVector string `json:"term_vector", omitempty`
-
-	// Store indicates whether to store field values in the index.
-	Store bool `json:"store,omitempty"`
+	IgnoreMalformed bool           `json:"ignore_malformed,omitempty"`
+	Index_ bool                    `json:"index,omitempty"`
+	Store_ bool                    `json:"store,omitempty"`
 }
 
+func NewDateFieldMapping(name string, id uint64) *DateFieldMapping {
+	return &DateFieldMapping{
+		Name_: name,
+		Id: id,
+		Type_: "date",
+		Enabled_: true,
+		IncludeInAll: true,
+		Boost: 1.0,
+		DocValues: true,
+		Format: "strict_date_optional_time||epoch_millis",
+		IgnoreMalformed: false,
+		Index_: true,
+		Store_: false,
+	}
+}
 
-// Options returns the indexing options for this field.
-func (fm *FieldMapping) Property() document.Property {
+func(f *DateFieldMapping) Name() string {return f.Name_}
+func(f *DateFieldMapping) Type() string {return f.Type_}
+func(f *DateFieldMapping) ID()   uint64 {return f.Id}
+func(f *DateFieldMapping) Store() bool {return f.Store_}
+func(f *DateFieldMapping) Index() bool {return f.Index_}
+func(f *DateFieldMapping) Enabled() bool {return f.Enabled_}
+func(f *DateFieldMapping) Property() document.Property {
 	var p document.Property
-	if fm.Store {
+	if f.Store() {
 		p |= document.StoreField
 	}
-	if fm.Index != "no" {
+	if f.Index() {
 		p |= document.IndexField
 	}
-	if fm.IncludeTermVectors {
-		p |= document.TermVectors
-	}
-	if fm.DocValues {
+	if f.DocValues {
 		p |= document.DocValues
 	}
 	return p
 }
 
-func (fm *FieldMapping) processString(propertyValueString string, pathString string, path []string, indexes []uint64, context *walkContext) {
-	fieldName := getFieldName(pathString, path, fm)
-	options := fm.Property()
-	if fm.Type == "text" {
-		analyzer := fm.analyzerForField(path, context)
-		field := document.NewTextFieldCustom(fieldName, indexes, []byte(propertyValueString), options, analyzer)
-		context.doc.AddField(field)
-
-		if !fm.IncludeInAll {
-			context.excludedFromAll = append(context.excludedFromAll, fieldName)
-		}
-	} else if fm.Type == "datetime" {
-		dateTimeFormat := context.im.DefaultDateTimeParser
-		if fm.DateFormat != "" {
-			dateTimeFormat = fm.DateFormat
-		}
-		dateTimeParser := context.im.DateTimeParserNamed(dateTimeFormat)
-		if dateTimeParser != nil {
-			parsedDateTime, err := dateTimeParser.ParseDateTime(propertyValueString)
-			if err == nil {
-				fm.processTime(parsedDateTime, pathString, path, indexes, context)
+func(f *DateFieldMapping) ParseField(data interface{}, path []string, context *parseContext) error {
+	if !f.Enabled() {
+		return nil
+	}
+	propertyValue := reflect.ValueOf(data)
+	if !propertyValue.IsValid() {
+		// cannot do anything with the zero value
+		return errors.New("field value invalid")
+	}
+	propertyType := propertyValue.Type()
+	switch propertyType.Kind() {
+	case reflect.String:
+		propertyValueString := propertyValue.String()
+		formats := strings.Split(f.Format, "||")
+		var parsedDateTime time.Time
+		var err error
+		for _, format := range formats {
+			dateTimeParser := context.im.DateTimeParserNamed(format)
+			if dateTimeParser != nil {
+				parsedDateTime, err = dateTimeParser.ParseDateTime(propertyValueString)
+				// parse time ok
+				if err == nil {
+					break
+				}
 			}
 		}
-	}
-}
-
-func (fm *FieldMapping) processFloat64(propertyValFloat float64, pathString string, path []string, indexes []uint64, context *walkContext) {
-	fieldName := getFieldName(pathString, path, fm)
-	if fm.Type == "number" {
-		options := fm.Options()
-		field := document.NewNumericFieldWithIndexingOptions(fieldName, indexes, propertyValFloat, options)
+		if err != nil {
+			// todo ignore_malformed
+			return err
+		}
+		fieldName := getFieldName(path, f)
+		field, err := document.NewDateTimeFieldWithProperty(fieldName, parsedDateTime, f.Property())
+		if err != nil {
+			// todo ignore_malformed
+			return err
+		}
 		context.doc.AddField(field)
-
-		if !fm.IncludeInAll {
+		if !f.IncludeInAll {
 			context.excludedFromAll = append(context.excludedFromAll, fieldName)
 		}
+	default:
+		return errors.New("invalid field value")
+	}
+	return nil
+}
+
+type BooleanFieldMapping struct {
+	Name_ string                   `json:"name,omitempty"`
+	// field ID
+	Id  uint64                     `json:"id,omitempty"`
+	Type_ string                   `json:"type,omitempty"`
+	Enabled_ bool                  `json:"enabled,omitempty"`
+	Boost float64                  `json:"boost,omitempty"`
+	DocValues bool                 `json:"doc_values,omitempty"`
+	Index_ bool                    `json:"index,omitempty"`
+	NullValue float64              `json:"null_value,omitempty"`
+	Store_ bool                    `json:"store,omitempty"`
+}
+
+func NewBooleanFieldMapping(name string, id uint64) *BooleanFieldMapping {
+	return &BooleanFieldMapping{
+		Name_: name,
+		Id: id,
+		Type_: "boolean",
+		Enabled_: true,
+		Boost: 1.0,
+		DocValues: true,
+		Store_: false,
 	}
 }
 
-func (fm *FieldMapping) processTime(propertyValueTime time.Time, pathString string, path []string, indexes []uint64, context *walkContext) {
-	fieldName := getFieldName(pathString, path, fm)
-	if fm.Type == "datetime" {
-		options := fm.Options()
-		field, err := document.NewDateTimeFieldWithIndexingOptions(fieldName, indexes, propertyValueTime, options)
-		if err == nil {
-			context.doc.AddField(field)
-		} else {
-			logger.Printf("could not build date %v", err)
-		}
-
-		if !fm.IncludeInAll {
-			context.excludedFromAll = append(context.excludedFromAll, fieldName)
-		}
+func(f *BooleanFieldMapping) Name() string {return f.Name_}
+func(f *BooleanFieldMapping) Type() string {return f.Type_}
+func(f *BooleanFieldMapping) ID()   uint64 {return f.Id}
+func(f *BooleanFieldMapping) Store() bool {return f.Store_}
+func(f *BooleanFieldMapping) Index() bool {return f.Index_}
+func(f *BooleanFieldMapping) Enabled() bool {return f.Enabled_}
+func(f *BooleanFieldMapping) Property() document.Property {
+	var p document.Property
+	if f.Store() {
+		p |= document.StoreField
 	}
+	if f.Index() {
+		p |= document.IndexField
+	}
+	if f.DocValues {
+		p |= document.DocValues
+	}
+	return p
 }
 
-func (fm *FieldMapping) processBoolean(propertyValueBool bool, pathString string, path []string, indexes []uint64, context *walkContext) {
-	fieldName := getFieldName(pathString, path, fm)
-	if fm.Type == "boolean" {
-		options := fm.Options()
-		field := document.NewBooleanFieldWithIndexingOptions(fieldName, indexes, propertyValueBool, options)
+func(f *BooleanFieldMapping) ParseField(data interface{}, path []string, context *parseContext) error {
+	if !f.Enabled() {
+		return nil
+	}
+	propertyValue := reflect.ValueOf(data)
+	if !propertyValue.IsValid() {
+		// cannot do anything with the zero value
+		return errors.New("field value invalid")
+	}
+	propertyType := propertyValue.Type()
+	switch propertyType.Kind() {
+	case reflect.Bool:
+		propertyValueBool := propertyValue.Bool()
+		fieldName := getFieldName(path, f)
+		field := document.NewBooleanFieldWithProperty(fieldName, propertyValueBool, f.Property())
 		context.doc.AddField(field)
-
-		if !fm.IncludeInAll {
-			context.excludedFromAll = append(context.excludedFromAll, fieldName)
-		}
+	default:
+		return errors.New("invalid field type")
 	}
+	return nil
 }
 
-func (fm *FieldMapping) analyzerForField(path []string, context *walkContext) analysis.Analyzer {
-	analyzerName := fm.Analyzer
-	if analyzerName == "" {
-		analyzerName = context.dm.defaultAnalyzerName(path)
-		if analyzerName == "" {
-			analyzerName = context.im.DefaultAnalyzer
-		}
+func getFieldName(path []string, fieldMapping FieldMapping) string {
+	parentName := ""
+	if len(path) > 1 {
+		parentName = encodePath(path[:len(path)-1]) + pathSeparator
 	}
-	return context.im.AnalyzerNamed(analyzerName)
-}
-
-func getFieldName(pathString string, path []string, fieldMapping *FieldMapping) string {
-	fieldName := pathString
-	if fieldMapping.Name != "" {
-		parentName := ""
-		if len(path) > 1 {
-			parentName = encodePath(path[:len(path)-1]) + pathSeparator
-		}
-		fieldName = parentName + fieldMapping.Name
-	}
+	fieldName := parentName + fieldMapping.Name()
 	return fieldName
+}
+
+
+const pathSeparator = "."
+
+func decodePath(path string) []string {
+	return strings.Split(path, pathSeparator)
+}
+
+func encodePath(pathElements []string) string {
+	return strings.Join(pathElements, pathSeparator)
 }
