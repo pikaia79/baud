@@ -490,7 +490,7 @@ func (rs *RaftStore) HandleCmd(req *masterraftcmdpb.Request, raftIndex uint64) (
 	resp = new(masterraftcmdpb.Response)
 	resp.CmdType = req.GetCmdType()
 
-	// TODO check split status
+	// TODO check split Status
 	switch req.GetCmdType() {
 	case masterraftcmdpb.CmdType_Get:
 		_resp, err := rs.raftKvRawGet(req.GetGetReq(), raftIndex)

@@ -13,7 +13,7 @@ type Master struct {
 	apiServer *ApiServer
 	rpcServer *RpcServer
 
-	createProcessor *PartitionCreateProcessor
+	createProcessor *PartitionProcessor
 	wg              sync.WaitGroup
 }
 

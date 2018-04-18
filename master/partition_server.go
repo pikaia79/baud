@@ -6,30 +6,75 @@ import (
     "time"
     "util"
     "util/log"
+    "proto/masterpb"
+    "util/deepcopy"
+    "fmt"
+    "github.com/gogo/protobuf/proto"
 )
 
 const (
     DEFAULT_REPLICA_LIMIT_PER_PS = 1
+    PREFIX_PARTITION_SERVER    	  = "schema ps "
+)
+
+type PSStatus   int32
+
+const (
+    PS_Invalid PSStatus = iota
+    PS_Init
+    PS_Registered
+    PS_OFFLINE
+    PS_TOMBSTONE
+    PS_LOGOUT
 )
 
 type PartitionServer struct {
-    *metapb.PartitionServer
-    *metapb.ServerResource            `json:"-"`
+    *metapb.Node
+    *masterpb.NodeSysStats
 
-    status        metapb.PSStatus
-    lastHeartbeat time.Time
-    replicaCache  *ReplicaCache // those replicas belong to different partitions
-    propertyLock  sync.RWMutex
+    status PSStatus
+    lastHeartbeat   time.Time
+    partitionCache  *PartitionCache  // this partition only belong to same ps
+    propertyLock    sync.RWMutex
 }
 
-func NewPartitionServer(server *metapb.PartitionServer, resource *metapb.ServerResource) *PartitionServer {
-    return &PartitionServer{
-        PartitionServer: server,
-        ServerResource:  resource,
-        status:          metapb.PSStatus_PS_Initial,
-        lastHeartbeat:   time.Now(),
-        replicaCache:    new(ReplicaCache),
+func NewPartitionServer(ip string) (*PartitionServer, error) {
+    newId, err := GetIdGeneratorInstance(nil).GenID()
+    if err != nil {
+        log.Error("fail to generate ps id. err[%v]", err)
+        return nil, ErrGenIdFailed
     }
+
+    return &PartitionServer{
+        Node: &metapb.Node{
+            ID: newId,
+            Ip: ip,
+        },
+        NodeSysStats:   new(masterpb.NodeSysStats),
+        status:         PS_Init,
+        lastHeartbeat:  time.Now(),
+        partitionCache: new(PartitionCache),
+    }, nil
+}
+
+func (p *PartitionServer) persistent(store Store) error {
+    p.propertyLock.RLock()
+    defer p.propertyLock.RUnlock()
+
+    psCopy := deepcopy.Iface(p.Node).(*metapb.Node)
+    psVal, err := proto.Marshal(psCopy)
+    if err != nil {
+        log.Error("marshal ps[%v] is failed.", psCopy)
+        return ErrInternalError
+    }
+
+    psKey := []byte(fmt.Sprintf("%s%d", PREFIX_PARTITION_SERVER, psCopy.ID))
+    if err := store.Put(psKey, psVal); err != nil {
+        log.Error("fail to store partition into store. err[%v]", err)
+        return ErrBoltDbOpsFailed
+    }
+
+    return nil
 }
 
 func (p *PartitionServer) isReplicaFull() bool {
@@ -54,14 +99,14 @@ func (p *PartitionServer) changeStatus(newStatus metapb.PSStatus) {
     case metapb.PSStatus_PS_Offline:
     case metapb.PSStatus_PS_Logout:
     default:
-        log.Error("can not change to the new ps status[%v]", newStatus)
+        log.Error("can not change to the new ps Status[%v]", newStatus)
         return
     }
 
     if !isConfusing {
         p.status = newStatus
     } else {
-        log.Error("can not change ps[%v] status from [%v] to [%v]", p.Id, oldStatus, newStatus)
+        log.Error("can not change ps[%v] Status from [%v] to [%v]", p.Id, oldStatus, newStatus)
     }
 }
 
@@ -110,7 +155,7 @@ func (c *PSCache) addServer(server *PartitionServer) {
     defer c.lock.Unlock()
 
 
-    c.id2Servers[server.Id] = server
+    c.id2Servers[server.ID] = server
     c.addr2Servers[util.BuildAddr(server.Ip, server.Port)] = server
 }
 

@@ -54,64 +54,62 @@ func (rs *RpcServer) Close() {
 	}
 }
 
-func (rs *RpcServer) GetRoute(ctx context.Context, request *masterpb.GetRouteRequest) (*masterpb.GetRouteResponse, error) {
+func (rs *RpcServer) GetRoute(ctx context.Context,
+			request *masterpb.GetRouteRequest) (*masterpb.GetRouteResponse, error) {
 	return nil, nil
 }
 
-func (rs *RpcServer) PsLogin(ctx context.Context, request *masterpb.PSLoginRequest) (*masterpb.PsLoginResponse, error) {
-	resp := new(masterpb.PSLoginResponse)
+func (rs *RpcServer) PSRegister(ctx context.Context,
+			request *masterpb.PSRegisterRequest) (*masterpb.PSRegisterResponse, error) {
+	resp := new(masterpb.PSRegisterResponse)
 
-	server := request.GetServer()
-	resource := request.GetServerResource()
-	if server == nil || resource == nil {
-		resp.Header = makeRpcRespHeader(ErrGrpcParamError)
+	nodeId := request.NodeID
+
+	if nodeId == 0 {
+		// this is a new ps unregistered never, distribute new psid to it
+		ps, err := NewPartitionServer(request.Ip)
+		if err != nil {
+			resp.ResponseHeader = makeRpcRespHeader(err)
+			return resp, nil
+		}
+		ps.Status = PS_Registered
+		rs.cluster.psCache.addServer(ps)
+
+		resp.ResponseHeader = makeRpcRespHeader(ErrSuc)
+		resp.NodeID = ps.ID
 		return resp, nil
 	}
 
-	// use immutable ip and port to recognize same one ps
-	addr := util.BuildAddr(server.GetIp(), server.GetPort())
-	ps := rs.cluster.psCache.findServerByAddr(addr)
-	if ps != nil {
-		// old ps rebooted
-		ps.changeStatus(metapb.PSStatus_PS_Login)
-	} else {
-		// this is a new ps unregistered never, distribute new psid to it
-		psId, err := GetIdGeneratorInstance(nil).GenID()
-		if err != nil {
-			log.Error("fail to generate ps id. err[%v]", err)
-			resp.Header = makeRpcRespHeader(ErrGenIdFailed)
-			return resp, nil
-		}
-		server.Id = psId
-
-		ps := NewPartitionServer(server, resource)
-		ps.changeStatus(metapb.PSStatus_PS_Login)
-		rs.cluster.psCache.addServer(ps)
+	// use nodeid reserved by ps to recognize same one ps
+	ps := rs.cluster.psCache.findServerById(nodeId)
+	if ps == nil {
+		// illegal ps will register
+		log.Warn("Can not find nodeid[%v] in master.", nodeId)
+		resp.ResponseHeader = makeRpcRespHeader(ErrPSNotExists)
+		return resp, nil
 	}
 
-	resp.Header = makeRpcRespHeader(ErrSuc)
-	resp.Server = ps.PartitionServer
+	// old ps rebooted
+	ps.changeStatus(PS_Registered)
+
+	resp.ResponseHeader = makeRpcRespHeader(ErrSuc)
+	resp.NodeID = ps.ID
+	resp.Partitions = ps.partitionCache.getAllMetaPartitions()
+
 	return resp, nil
 }
 
-func (rs *RpcServer) PsHeartbeat(ctx context.Context, request *masterpb.PSHeartbeatRequest) (*masterpb.PSHeartbeatResponse, error) {
+func (rs *RpcServer) PSHeartbeat(ctx context.Context,
+			request *masterpb.PSHeartbeatRequest) (*masterpb.PSHeartbeatResponse, error) {
 	resp := new(masterpb.PSHeartbeatResponse)
 
-	psId := request.GetPsId()
+	psId := request.NodeID
 	ps := rs.cluster.psCache.findServerById(psId)
 	if ps == nil {
 		log.Error("psid[%v] is not be found", psId)
-		resp.Header = makeRpcRespHeader(ErrPSNotExists)
+		resp.ResponseHeader = makeRpcRespHeader(ErrPSNotExists)
 		return resp, nil
 	}
-
-	resp.Header = makeRpcRespHeader(ErrSuc)
-	return resp, nil
-}
-
-func (rs *RpcServer) PartitionHeartbeat(ctx context.Context,
-		request *masterpb.PartitionHeartbeatRequest) (*masterpb.PartitionHeartbeatResponse, error) {
-	resp := new(masterpb.PartitionHeartbeatResponse)
 
 	partition := request.GetPartition()
 	replpbs := request.Replicas
@@ -143,7 +141,7 @@ func (rs *RpcServer) PartitionHeartbeat(ctx context.Context,
 			continue
 		}
 
-		// TODO: modify space status
+		// TODO: modify space Status
 
 		newReplica := NewReplica(replpb)
 		if err := newReplica.persistent(rs.cluster.store); err != nil {
@@ -158,16 +156,16 @@ func (rs *RpcServer) PartitionHeartbeat(ctx context.Context,
 }
 
 func makeRpcRespHeader(err error) *metapb.ResponseHeader {
-	code, ok := Err2CodeMap[err.Error()]
+	code, ok := Err2CodeMap[err]
 	if ok {
 		return &metapb.ResponseHeader{
-			Code: code,
-			Msg:  err.Error(),
+			Code:    int16(code),
+			Message: err.Error(),
 		}
 	} else {
 		return &metapb.ResponseHeader{
-			Code:		ERRCODE_INTERNAL_ERROR,
-			Msg:		ErrInternalError.Error(),
+			Code:    ERRCODE_INTERNAL_ERROR,
+			Message: ErrInternalError.Error(),
 		}
 	}
 }

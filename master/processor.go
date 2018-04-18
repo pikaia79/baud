@@ -2,73 +2,145 @@ package master
 
 import (
     "context"
-    "time"
     "util/log"
-    "fmt"
+    "util"
+    "proto/metapb"
 )
 
 const (
-    PROCESSOR_DEFAULT_TIMEOUT       = time.Second * 60
-    PROCESSOR_DEFAULT_CHANNEL_LIMIT = 1000
-
-    EVENT_STATUS_FIRST_CREATE = "first_create"
-    EVENT_STATUS_WAIT_CONTAINER = "wait_container"
+    PARTITION_CHANNEL_LIMIT = 1000
 )
 
 const (
-    EVENT_TYPE_PARTITION_CREATE = iota
+    EVENT_TYPE_INVALID = iota
+    EVENT_TYPE_PARTITION_CREATE
     EVENT_TYPE_PARTITION_DELETE
 )
 
 var (
     processorStarted = false
-    partitionCreateProcessor *PartitionCreateProcessor
+
+    partitionProcessor *PartitionProcessor
 )
 
 type ProcessorEvent struct {
     typ    int
-    status string
     body   interface{}
 }
 
-type PartitionCreateProcessor struct {
+func NewPartitionCreateEvent(partition *Partition) *ProcessorEvent {
+    return &ProcessorEvent{
+        typ:  EVENT_TYPE_PARTITION_CREATE,
+        body: partition,
+    }
+}
+
+func NewPartitionDeleteEvent(partition *Partition) *ProcessorEvent {
+    return &ProcessorEvent{
+        typ:  EVENT_TYPE_PARTITION_DELETE,
+        body: partition,
+    }
+}
+
+type PartitionProcessor struct {
     ctx        context.Context
     cancelFunc context.CancelFunc
 
-    PartitionEventCh chan *Partition
-    timeout          time.Duration
+    eventCh chan *ProcessorEvent
 
     cluster        *Cluster
     serverSelector Selector
     jdos           DCOS
 }
 
-func createPartitionCreateProcessor(cluster *Cluster) {
-    p := &PartitionCreateProcessor{
-        PartitionEventCh: make(chan *Partition, PROCESSOR_DEFAULT_CHANNEL_LIMIT),
-        timeout:          PROCESSOR_DEFAULT_TIMEOUT,
-        cluster:          cluster,
-        serverSelector:   NewIdleSelector(),
-        jdos:             new(JDOS),
+
+func (p *PartitionProcessor) doRun() {
+    psRpcClient := GetPSRpcClientInstance()
+    idGenerator := GetIdGeneratorInstance(nil)
+
+    for {
+        select {
+        case <-p.ctx.Done():
+            return
+        case event := <-p.eventCh:
+
+            if event.typ == EVENT_TYPE_PARTITION_CREATE {
+                server := p.serverSelector.SelectTarget(p.cluster.psCache.getAllServers())
+                if server == nil {
+                    log.Error("Can not distribute suitable server")
+                    // TODO: calling jdos api to allocate a container asynchronously
+                    break
+                }
+
+                go func(partitionToCreate *Partition) {
+                    addr := util.BuildAddr(server.Ip, server.Port)
+                    replicaId, err := idGenerator.GenID()
+                    if err != nil {
+                        log.Error("fail to generate new replica ßid. err:[%v]", err)
+                        return
+                    }
+
+                    //servers := partitionReceived.replicaGroup.getAllServers()
+                    //if len(servers) >= FIXED_REPLICA_NUM {
+                    //    log.Error("!!!Cannot add new replica, because replica numbers[%v] of partition[%v]",
+                    //        " exceed fixed replica number[%v]", len(servers), partitionReceived, FIXED_REPLICA_NUM)
+                    //    break
+                    //}
+                    //servers = append(servers, server)
+
+                    var newReplica = metapb.Replica{ID: replicaId}
+                    partitionToCreate.Replicas = append(partitionToCreate.Replicas, newReplica)
+                    if err := psRpcClient.CreateReplica(addr, partitionToCreate.Partition); err != nil {
+                        log.Error("fail to do rpc create replica of partition[%v]. err:[%v]",
+                            partitionToCreate.Partition, err)
+                       return
+                    }
+
+                    // TODO: updatePartition
+                }(event.body.(*Partition))
+
+            } else if event.typ == EVENT_TYPE_PARTITION_DELETE {
+
+                go func() {
+
+                }()
+            }
+        }
+    }
+}
+
+func createPartitionProcessor(cluster *Cluster) {
+    p := &PartitionProcessor{
+        eventCh:        make(chan *ProcessorEvent, PARTITION_CHANNEL_LIMIT),
+        cluster:        cluster,
+        serverSelector: NewIdleSelector(),
+        jdos:           new(JDOS),
     }
     p.ctx, p.cancelFunc = context.WithCancel(context.Background())
 
-    partitionCreateProcessor = p
+    partitionProcessor = p
 }
 
-// background partitionCreateProcessor
+type PartitionDeleteProcessor struct {
+    ctx        context.Context
+    cancelFunc context.CancelFunc
+
+    PartitionEventCh chan *Partition
+}
+
+// background partitionProcessor
 func ProcessorStart(cluster *Cluster) {
-    createPartitionCreateProcessor(cluster)
+    createPartitionProcessor(cluster)
     go func() {
-        partitionCreateProcessor.doRun()
+        partitionProcessor.doRun()
     }()
 
     processorStarted = true
 }
 
 func ProcessorStop() {
-    if partitionCreateProcessor != nil && partitionCreateProcessor.cancelFunc != nil {
-        partitionCreateProcessor.cancelFunc()
+    if partitionProcessor != nil && partitionProcessor.cancelFunc != nil {
+        partitionProcessor.cancelFunc()
     }
 
     processorStarted = false
@@ -79,61 +151,18 @@ func PushProcessorEvent(event *ProcessorEvent) error {
         return ErrInternalError
     }
 
-    switch event.typ {
-    case EVENT_TYPE_PARTITION_CREATE:
-        if len(partitionCreateProcessor.PartitionEventCh) >= PROCESSOR_DEFAULT_CHANNEL_LIMIT * 0.9 {
-            log.Error("partition create partitionCreateProcessor will full, reject msg[%v]", msg)
+    if event.typ == EVENT_TYPE_PARTITION_CREATE || event.typ == EVENT_TYPE_PARTITION_DELETE {
+        if len(partitionProcessor.eventCh) >= PARTITION_CHANNEL_LIMIT*0.9 {
+            log.Error("partition channel will full, reject event[%v]", event)
             return ErrSysBusy
         }
 
-        partitionCreateProcessor.PartitionEventCh <- event.body.(*Partition)
+        partitionProcessor.eventCh <- event
 
-    case EVENT_TYPE_PARTITION_DELETE:
-    default:
+    } else {
         log.Error("processor received invalid event type[%v]", event.typ)
         return ErrInternalError
     }
 
     return nil
-}
-
-func (p *PartitionCreateProcessor) doRun() {
-    psRpcClient := GetPSRpcClientInstance()
-    idGenerator := GetIdGeneratorInstance(nil)
-
-    for {
-        select {
-        case <-p.ctx.Done():
-            return
-        case partitionToCreate := <-p.PartitionEventCh:
-
-            server := p.serverSelector.SelectTarget(p.cluster.psCache.getAllServers())
-            if server == nil {
-                log.Error("Can not distribute suitable server")
-                // TODO: calling jdos api to allocate a container asynchronously
-                break
-            } else {
-                addr := fmt.Sprintf("%s:%s", server.Ip, server.Port)
-                replicaId, err := idGenerator.GenID()
-                if err != nil {
-                    log.Error("fail to generate new replica ßid. err:[%v]", err)
-                    break
-                }
-
-                servers := partitionToCreate.replicaGroup.getAllServers()
-                if len(servers) >= FIXED_REPLICA_NUM {
-                    log.Error("!!!Cannot add new replica, because replica numbers[%v] of partition[%v]",
-                        " exceed fixed replica number[%v]", len(servers), partitionToCreate, FIXED_REPLICA_NUM)
-                    break
-                }
-                servers = append(servers, server)
-                if err := psRpcClient.CreateReplica(addr, partitionToCreate.Partition, replicaId, servers); err != nil {
-                    log.Error("fail to do rpc create replica of partition[%v]. err:[%v]",
-                        partitionToCreate.Partition, err)
-                    break
-                }
-                // new replica created do persistent when ps sent heartbeat up
-            }
-        }
-    }
 }

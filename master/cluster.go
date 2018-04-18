@@ -10,10 +10,11 @@ type Cluster struct {
 	config 			*Config
 	store 			Store
 
-	clusterLock     sync.RWMutex
 	dbCache 		*DBCache
 	psCache 		*PSCache
 	partitionCache  *PartitionCache
+
+    clusterLock     sync.RWMutex
 }
 
 func NewCluster(config *Config) *Cluster {
@@ -21,17 +22,21 @@ func NewCluster(config *Config) *Cluster {
 		config: 		config,
 		store: 			NewRaftStore(config),
 		dbCache: 		new(DBCache),
+		psCache:        new(PSCache),
+		partitionCache: new(PartitionCache),
 	}
 }
 
-func (c *Cluster) Start() (err error) {
-	if err = c.store.Open(); err != nil {
+func (c *Cluster) Start() error {
+	if err := c.store.Open(); err != nil {
 		log.Error("fail to create raft store. err:[%v]", err)
-		return
+		return err
 	}
 
 	GetIdGeneratorInstance(c.store)
 
+	// recovery memory meta data
+	c.store.Scan()
 	return nil
 }
 
@@ -98,39 +103,49 @@ func (c *Cluster) createSpace(dbName, spaceName, partitionKey, partitionFunc str
 		return nil, ErrDupSpace
 	}
 
+	// batch commit
+	batch := c.store.NewBatch()
+
 	policy := &PartitionPolicy{
 		Key: partitionKey,
 		Function:partitionFunc,
 		NumPartitions:partitionNum,
 	}
-	space, err := NewSpace(db.Id, dbName, spaceName, policy)
+	space, err := NewSpace(db.ID, dbName, spaceName, policy)
 	if err != nil {
 		return nil, err
 	}
-
-	if err := space.persistent(c.store); err != nil {
+	if err := space.batchPersistent(batch); err != nil {
 		return nil, err
 	}
-	db.spaceCache.addSpace(space)
 
 	slots := slotSplit(0, math.MaxUint32, partitionNum + 1)
 	if slots == nil {
 		log.Error("fail to split slot range [%v-%v]", 0, math.MaxUint32)
 		return nil, ErrInternalError
 	}
+	partitions := make([]*Partition, len(slots))
 	for i := 0; i < len(slots) - 1; i++ {
-		partition, err := NewPartition(db.Id, space.Id, slots[i], slots[i+1])
+		partition, err := NewPartition(db.ID, space.ID, slots[i], slots[i+1])
 		if err != nil {
 			return nil, err
 		}
-
-		if err := partition.persistent(c.store); err != nil {
+		partitions = append(partitions, partition)
+		if err := partition.batchPersistent(batch); err != nil {
 			return nil, err
 		}
+	}
+	if err := batch.Commit(); err != nil {
+		return nil, ErrBoltDbOpsFailed
+	}
+
+	// update memory and send event
+	db.spaceCache.addSpace(space)
+	for _, partition := range partitions {
 		space.putPartition(partition)
 
-		if err := PushProcessorEvent(partition); err != nil {
-			return
+		if err := PushProcessorEvent(NewPartitionCreateEvent(partition)); err != nil {
+			log.Error("fail to push event for creating partition[%v].", partition)
 		}
 	}
 
@@ -167,6 +182,16 @@ func (c *Cluster) renameSpace(dbName, srcSpaceName, destSpaceName string) error 
 
 func (c *Cluster) detailSpace(spaceId int) (*Space, error) {
 	return nil, nil
+}
+
+func (c *Cluster) createPS(ip string) (*PartitionServer, error) {
+
+
+    newPs := NewPartitionServer(newId, request.Ip)
+    newPs.changeStatus(PS_Registered)
+    rs.cluster.psCache.addServer(ps)
+    newPs.persistent()
+    resp.NodeID = newId
 }
 
 func slotSplit(start, end uint32, n int) []uint32 {

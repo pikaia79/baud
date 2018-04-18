@@ -7,11 +7,12 @@ import (
 	"util/log"
 	"util/deepcopy"
 	"fmt"
-	"github.com/gin-gonic/gin/json"
+	"time"
+	"github.com/gogo/protobuf/proto"
 )
 
 const (
-	PREFIX_PARTITION   string = "schema partition"
+	PREFIX_PARTITION    	  = "schema partition "
 	defaultBTreeDegree        = 64
 	FIXED_REPLICA_NUM   	  = 3
 )
@@ -19,14 +20,9 @@ const (
 type Partition struct {
 	*metapb.Partition
 
-	//for splitting & merging
-	leftCh  *Partition
-	rightCh *Partition
-	parent  *Partition
-
-	status       metapb.PartitionStatus //serving, splitting, cleaning, etc.
-	propertyLock sync.RWMutex
-	replicaGroup *ReplicaGroup
+	lastHeartbeat time.Time
+	propertyLock  sync.RWMutex
+	//	replicaGroup *ReplicaGroup
 }
 
 func NewPartition(dbId, spaceId, startSlot, endSlot uint32) (*Partition, error) {
@@ -37,80 +33,76 @@ func NewPartition(dbId, spaceId, startSlot, endSlot uint32) (*Partition, error) 
 	}
 	return &Partition{
 		Partition: &metapb.Partition{
-			Id:        partId,
-			Type:      "",
-			DbId:      dbId,
-			SpaceId:   spaceId,
+			ID:        partId,
+			DB:        dbId,
+			Space:     spaceId,
 			StartSlot: startSlot,
 			EndSlot:   endSlot,
+			Replicas:  make([]metapb.Replica, 0),
+			Status:    metapb.PartitionStatus_PA_NOTREAD,
 		},
-		status:		metapb.PartitionStatus_PA_NOTREAD,
-		replicaGroup:new(ReplicaGroup),
 	}, nil
 }
 
-func (p *Partition) persistent(store Store) error {
+func (p *Partition) batchPersistent(batch Batch) error {
 	p.propertyLock.RLock()
 	defer p.propertyLock.RUnlock()
 
 	copy := deepcopy.Iface(p.Partition).(*metapb.Partition)
-	marshalVal, err := json.Marshal(copy)
+	marshalVal, err := proto.Marshal(copy)
 	if err != nil {
 		log.Error("fail to marshal partition[%v]. err:[%v]", copy, err)
 		return err
 	}
-	key := []byte(fmt.Sprintf("%s %d", PREFIX_PARTITION, copy.Id))
-	if err := store.Put(key, marshalVal); err != nil {
-		log.Error("fail to put partition[%v] into store. err:[%v]", copy, err)
-		return ErrBoltDbOpsFailed
-	}
+	key := []byte(fmt.Sprintf("%s%d", PREFIX_PARTITION, copy.ID))
+	batch.Put(key, marshalVal)
 
 	return nil
 }
 
-type ReplicaGroup struct {
-	lock 		sync.RWMutex
-	replicas 	map[uint32]*Replica  // key: replicaId
-	servers  	map[uint32]*PartitionServer // key:replicaId
-}
+//type ReplicaGroup struct {
+//	lock 		sync.RWMutex
+//	replicas 	map[uint32]*Replica  // key: replicaId
+//	servers  	map[uint32]*PartitionServer // key:replicaId
+//}
 
-func (g *ReplicaGroup) getAllServers() []*PartitionServer {
-	g.lock.RLock()
-	defer g.lock.RUnlock()
-
-	servers := make([]*PartitionServer, 0)
-	for _, server := range g.servers {
-		servers = append(servers, server)
-	}
-	return servers
-}
-
-func (g *ReplicaGroup) addReplica(replica *Replica, server *PartitionServer) {
-	g.lock.Lock()
-	defer g.lock.RUnlock()
-
-	g.replicas[replica.GetId()] = replica
-	g.servers[replica.GetId()] = server
-}
-
-func (g *ReplicaGroup) findReplicaById(replicaId uint32) *Replica {
-	g.lock.RLock()
-	defer g.lock.RUnlock()
-
-	r, ok := g.replicas[replicaId]
-	if !ok {
-		return nil
-	}
-
-	return r
-}
-
-func (g *ReplicaGroup) count() int {
-	g.lock.RLock()
-	defer g.lock.RUnlock()
-
-	return len(g.replicas)
-}
+//func (g *ReplicaGroup) getAllServers() []*PartitionServer {
+//	g.lock.RLock()
+//	defer g.lock.RUnlock()
+//
+//	servers := make([]*PartitionServer, 0)
+//	for _, server := range g.servers {
+//		servers = append(servers, server)
+//	}
+//	return servers
+//}
+//
+//func (g *ReplicaGroup) addReplica(replica *Replica, server *PartitionServer) {
+//	g.lock.Lock()
+//	defer g.lock.RUnlock()
+//
+//	g.replicas[replica.GetId()] = replica
+//	g.servers[replica.GetId()] = server
+//}
+//
+//func (g *ReplicaGroup) findReplicaById(replicaId uint32) *Replica {
+//	g.lock.RLock()
+//	defer g.lock.RUnlock()
+//
+//	r, ok := g.replicas[replicaId]
+//	if !ok {
+//		return nil
+//	}
+//
+//	return r
+//}
+//
+//func (g *ReplicaGroup) count() int {
+//	g.lock.RLock()
+//	defer g.lock.RUnlock()
+//
+//	return len(g.replicas)
+//}
 
 type PartitionCache struct {
 	lock  		 sync.RWMutex
@@ -129,6 +121,18 @@ func (c *PartitionCache) findPartitionById(partitionId uint32) *Partition {
 	return p
 }
 
+func (c *PartitionCache) getAllMetaPartitions() []*metapb.Partition {
+	c.lock.RLock()
+	defer c.lock.RUnlock()
+
+	partitions := make([]*metapb.Partition, len(c.partitions))
+	for _, metaPartition := range c.partitions {
+		partitions = append(partitions, metaPartition.Partition)
+	}
+
+	return partitions
+}
+
 type PartitionItem struct {
 	partition   *metapb.Partition
 }
@@ -136,14 +140,14 @@ type PartitionItem struct {
 // Less returns true if the region start key is greater than the other.
 // So we will sort the region with start key reversely.
 func (r *PartitionItem) Less(other btree.Item) bool {
-	left := r.partition.GetStartSlot()
-	right := other.(*PartitionItem).partition.GetStartSlot()
+	left := r.partition.StartSlot
+	right := other.(*PartitionItem).partition.StartSlot
 	//return bytes.Compare(left, right) > 0
 	return left > right
 }
 
 func (r *PartitionItem) Contains(slot uint32) bool {
-	start, end := r.partition.GetStartSlot(), r.partition.GetEndSlot()
+	start, end := r.partition.StartSlot, r.partition.EndSlot
 	//return bytes.Compare(key, start) >= 0 && bytes.Compare(key, end) < 0
 	return slot >= start && slot < end
 }
@@ -201,7 +205,7 @@ func (t *PartitionTree) update(rng *metapb.Partition) {
 // is not the same with the region.
 func (t *PartitionTree) remove(rng *metapb.Partition) {
 	result := t.find(rng)
-	if result == nil || result.partition.GetId() != rng.GetId() {
+	if result == nil || result.partition.ID != rng.ID {
 		return
 	}
 
@@ -230,12 +234,12 @@ func (t *PartitionTree) multipleSearch(slot uint32, num int) []*metapb.Partition
 		//if len(endKey) != 0 {
 		if isFound {
 			//if bytes.Compare(r.region.GetStartKey(), endKey) != 0 {
-			if r.partition.GetStartSlot() != endSlot {
+			if r.partition.StartSlot != endSlot {
 				break
 			}
 		}
 		ranges = append(ranges, r.partition)
-		endSlot = r.partition.GetEndSlot()
+		endSlot = r.partition.EndSlot
 		isFound = true
 	}
 	return ranges

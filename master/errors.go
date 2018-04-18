@@ -46,7 +46,7 @@ const (
 	ERRCODE_BOLTDB_OPTFAILED
 //	ERRCODE_UNKNOWN_RAFTCMDTYPE
 )
-var Err2CodeMap = map[string]int32 {
+var Err2CodeMap = map[error]int32 {
 	ErrSuc:           ERRCODE_SUCCESS,
 	ErrInternalError: ERRCODE_INTERNAL_ERROR,
 	ErrSysBusy:       ERRCODE_SYSBUSY,

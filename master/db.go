@@ -3,14 +3,15 @@ package master
 import (
 	"sync"
 	"fmt"
-	"github.com/gin-gonic/gin/json"
 	"util/log"
 	"proto/metapb"
 	"util/deepcopy"
+	"util"
+	"github.com/gogo/protobuf/proto"
 )
 
 const (
-	PREFIX_DB 		string = "scheme sdb"
+	PREFIX_DB 		 = "scheme db "
 )
 
 type DB struct {
@@ -28,7 +29,7 @@ func NewDB(dbName string) (*DB, error) {
 	}
 	db := &DB{
 		DB:		&metapb.DB{
-			Id: 	dbId,
+			ID: 	dbId,
 			Name: 	dbName,
 		},
 		spaceCache: 	new(SpaceCache),
@@ -36,18 +37,25 @@ func NewDB(dbName string) (*DB, error) {
 	return db, nil
 }
 
+func NewDBByMeta(metaDb *metapb.DB) *DB {
+	return &DB{
+		DB:         metaDb,
+		spaceCache: new(SpaceCache),
+	}
+}
+
 func (db *DB) persistent(store Store) error {
 	db.propertyLock.RLock()
 	defer db.propertyLock.RUnlock()
 
 	copy := deepcopy.Iface(db.DB).(*metapb.DB)
-	dbVal, err := json.Marshal(copy)
+	dbVal, err := proto.Marshal(copy)
 	if err != nil {
 		log.Error("fail to marshal db[%v]. err:[%v]", copy, err)
 		return err
 	}
 
-	dbKey := []byte(fmt.Sprintf("%s %d", PREFIX_DB, copy.Id))
+	dbKey := []byte(fmt.Sprintf("%s%d", PREFIX_DB, copy.ID))
 	if err := store.Put(dbKey, dbVal); err != nil {
 		log.Error("fail to put db[%v] into store. err:[%v]", copy, err)
 		return ErrBoltDbOpsFailed
@@ -60,7 +68,7 @@ func (db *DB) erase(store Store) error {
 	db.propertyLock.RLock()
 	defer db.propertyLock.RUnlock()
 	
-	dbKey := []byte(fmt.Sprintf("%s %d", PREFIX_DB, db.DB.Id))
+	dbKey := []byte(fmt.Sprintf("%s%d", PREFIX_DB, db.DB.ID))
 	if err := store.Delete(dbKey); err != nil {
 		log.Error("fail to delete db[%v] from store. err:[%v]", db.DB, err)
 		return ErrBoltDbOpsFailed
@@ -98,7 +106,7 @@ func (c *DBCache) addDb(db *DB) {
 	defer c.lock.Unlock()
 
 	c.dbs[db.Name] = db
-	c.idNameMap[db.Id] = db.Name
+	c.idNameMap[db.ID] = db.Name
 }
 
 func (c *DBCache) deleteDb(db *DB) {
@@ -106,5 +114,30 @@ func (c *DBCache) deleteDb(db *DB) {
 	defer c.lock.Unlock()
 
 	delete(c.dbs, db.Name)
-	delete(c.idNameMap, db.Id)
+	delete(c.idNameMap, db.ID)
+}
+
+func (c *DBCache) recovery(store Store) (*DBCache, error) {
+	prefix := []byte(fmt.Sprintf("%s", PREFIX_DB))
+	startKey, limitKey := util.BytesPrefix(prefix)
+
+	var dbCache = new(DBCache)
+
+	iterator := store.Scan(startKey, limitKey)
+	defer iterator.Release()
+	for iterator.Next() {
+		if iterator.Key() == nil {
+			continue
+		}
+
+		val := iterator.Value()
+		metaDb := new(metapb.DB)
+		if err := proto.Unmarshal(val, metaDb); err != nil {
+			log.Error("fail to unmasharl db from store. err[%v]", err)
+			continue
+		}
+		dbCache.addDb(NewDBByMeta(metaDb))
+	}
+
+	return dbCache, nil
 }

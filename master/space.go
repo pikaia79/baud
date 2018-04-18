@@ -5,12 +5,12 @@ import (
 	"proto/metapb"
 	"util/log"
 	"util/deepcopy"
-	"encoding/json"
 	"fmt"
+	"github.com/gogo/protobuf/proto"
 )
 
 const (
-	PREFIX_SPACE 	string = "schema space"
+	PREFIX_SPACE   = "schema space "
 )
 
 type PartitionPolicy struct {
@@ -22,8 +22,9 @@ type PartitionPolicy struct {
 type Space struct {
 	*metapb.Space
 
+	// TODO:move partitioning to metapb.Space definition
 	partitioning *PartitionPolicy    `json:"-"`
-	Mapping      []Field
+	mapping      []Field
 
 	searchTree   *PartitionTree      `json:"-"`
 	propertyLock sync.RWMutex        `json:"-"`
@@ -47,10 +48,10 @@ func NewSpace(dbId uint32, dbName, spaceName string, policy *PartitionPolicy) (*
 	return &Space{
 		Space: &metapb.Space{
 			Name:   spaceName,
-			Id:     spaceId,
-			DbId:   dbId,
+			ID:     spaceId,
+			DB:   	dbId,
 			DbName: dbName,
-			Status: metapb.SpaceStatus_SS_Init,
+			Status: metapb.SS_Init,
 		},
 		partitioning: policy,
 		searchTree: NewPartitionTree(),
@@ -61,13 +62,13 @@ func (s *Space) persistent(store Store) error {
 	s.propertyLock.RLock()
 	defer s.propertyLock.RUnlock()
 
-	copy := deepcopy.Iface(*s).(*Space)
-	spaceVal, err := json.Marshal(copy)
+	copy := deepcopy.Iface(s.Space).(*metapb.Space)
+	spaceVal, err := proto.Marshal(copy)
 	if err != nil {
 		log.Error("fail to marshal space[%v]. err:[%v]", copy, err)
 		return err
 	}
-	spaceKey := []byte(fmt.Sprintf("%s %d", PREFIX_SPACE, copy.Id))
+	spaceKey := []byte(fmt.Sprintf("%s%d", PREFIX_SPACE, copy.ID))
 	if err := store.Put(spaceKey, spaceVal); err != nil {
 		log.Error("fail to put space[%v] into store. err:[%v]", copy, err)
 		return ErrBoltDbOpsFailed
@@ -76,11 +77,27 @@ func (s *Space) persistent(store Store) error {
 	return nil
 }
 
+func (s *Space) batchPersistent(batch Batch) error {
+	s.propertyLock.RLock()
+	defer s.propertyLock.RUnlock()
+
+	copy := deepcopy.Iface(s.Space).(*metapb.Space)
+	spaceVal, err := proto.Marshal(copy)
+	if err != nil {
+		log.Error("fail to marshal space[%v]. err:[%v]", copy, err)
+		return err
+	}
+	spaceKey := []byte(fmt.Sprintf("%s%d", PREFIX_SPACE, copy.ID))
+	batch.Put(spaceKey, spaceVal)
+
+	return nil
+}
+
 func (s *Space) erase(store Store) error {
 	s.propertyLock.RLock()
 	defer s.propertyLock.RUnlock()
 
-	spaceKey := []byte(fmt.Sprintf("%s %d", PREFIX_SPACE, ))
+	spaceKey := []byte(fmt.Sprintf("%s%d", PREFIX_SPACE, s.ID))
 	if err := store.Delete(spaceKey); err != nil {
 		log.Error("fail to delete space[%v] from store. err:[%v]", s.Space, err)
 		return ErrBoltDbOpsFailed
@@ -129,15 +146,15 @@ func (c *SpaceCache) addSpace(space *Space) {
 	c.lock.Lock()
 	defer c.lock.Unlock()
 
-	c.NameIdMap[space.Name] = space.Id
-	c.spaces[space.Id] = space
+	c.NameIdMap[space.Name] = space.ID
+	c.spaces[space.ID] = space
 }
 
 func (c *SpaceCache) deleteSpace(space *Space) {
 	c.lock.Lock()
 	defer c.lock.Unlock()
 
-	oldSpace, ok := c.spaces[space.Id]
+	oldSpace, ok := c.spaces[space.ID]
 	if !ok {
 		return
 	}
