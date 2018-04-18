@@ -26,20 +26,22 @@ message RuntimeInfo {
 }
 
 message RaftStatus {
-    uint64 term                           = 1;
-    uint64 index                          = 2;
-    uint64 commit                         = 3;
-    uint64 applied                        = 4;
-    repeated RaftFollowerStatus followers = 5 [(gogoproto.nullable) = false];
+    uint64 id                             = 1 [(gogoproto.customname) = "ID", (gogoproto.casttype) = "github.com/tiglabs/baud/proto/metapb.ReplicaID"];
+    uint64 term                           = 2;
+    uint64 index                          = 3;
+    uint64 commit                         = 4;
+    uint64 applied                        = 5;
+    repeated RaftFollowerStatus followers = 6 [(gogoproto.nullable) = false];
 }
 
 message RaftFollowerStatus {
-    uint32 nodeID       = 1 [(gogoproto.customname) = "NodeID", (gogoproto.casttype) = "github.com/tiglabs/baud/proto/metapb.NodeID"];
-    uint64 match        = 2;
-    uint64 commit       = 3;
-    uint64 next         = 4;
-    uint64 down_seconds = 5;
-    string state        = 6;
+    uint64 id           = 1 [(gogoproto.customname) = "ID", (gogoproto.casttype) = "github.com/tiglabs/baud/proto/metapb.ReplicaID"];
+    uint32 nodeID       = 2 [(gogoproto.customname) = "NodeID", (gogoproto.casttype) = "github.com/tiglabs/baud/proto/metapb.NodeID"];
+    uint64 match        = 3;
+    uint64 commit       = 4;
+    uint64 next         = 5;
+    uint64 down_seconds = 6;
+    string state        = 7;
 }
 
 message NodeSysStats {

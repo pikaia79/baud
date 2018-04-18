@@ -1,9 +1,9 @@
 package keys
 
 import (
-	"strings"
-
+	"fmt"
 	"strconv"
+	"strings"
 
 	"github.com/tiglabs/baud/proto/metapb"
 	"github.com/tiglabs/baud/util/encoding"
@@ -49,4 +49,22 @@ func DecodeDocIDToString(id metapb.Key) (string, error) {
 		return "", err
 	}
 	return strings.Join([]string{strconv.FormatUint(slotID, 10), strconv.FormatUint(seqNo, 10)}, docIDSeparator), nil
+}
+
+// DecodeDocIDFromString decode string to DocID
+func DecodeDocIDFromString(id string) (*metapb.DocID, error) {
+	ids := strings.Split(id, docIDSeparator)
+	if len(ids) != 2 {
+		return nil, fmt.Errorf("The given id(%s) is not a valid DocID", id)
+	}
+	slotID, err := strconv.ParseUint(ids[0], 10, 32)
+	if err != nil {
+		return nil, fmt.Errorf("The given id(%s) parse slotID error: %s", id, err.Error())
+	}
+	seqNo, err := strconv.ParseUint(ids[1], 10, 64)
+	if err != nil {
+		return nil, fmt.Errorf("The given id(%s) parse seqNo error: %s", id, err.Error())
+	}
+
+	return &metapb.DocID{SlotID: uint32(slotID), SeqNo: seqNo}, nil
 }
