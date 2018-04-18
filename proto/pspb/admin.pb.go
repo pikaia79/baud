@@ -12,6 +12,10 @@
 		CreatePartitionResponse
 		DeletePartitionRequest
 		DeletePartitionResponse
+		ChangeReplicaRequest
+		ChangeReplicaResponse
+		ChangeLeaderRequest
+		ChangeLeaderResponse
 */
 package pspb
 
@@ -21,11 +25,13 @@ import math "math"
 import _ "github.com/gogo/protobuf/gogoproto"
 import meta "github.com/tiglabs/baud/proto/metapb"
 
-import strings "strings"
-import reflect "reflect"
+import github_com_tiglabs_baud_proto_metapb "github.com/tiglabs/baud/proto/metapb"
 
 import context "golang.org/x/net/context"
 import grpc "google.golang.org/grpc"
+
+import strings "strings"
+import reflect "reflect"
 
 import io "io"
 
@@ -39,6 +45,27 @@ var _ = math.Inf
 // A compilation error at this line likely means your copy of the
 // proto package needs to be updated.
 const _ = proto.GoGoProtoPackageIsVersion2 // please upgrade the proto package
+
+type ReplicaChangeType int32
+
+const (
+	ReplicaChangeType_ReplicaAdd    ReplicaChangeType = 0
+	ReplicaChangeType_ReplicaRemove ReplicaChangeType = 1
+)
+
+var ReplicaChangeType_name = map[int32]string{
+	0: "ReplicaAdd",
+	1: "ReplicaRemove",
+}
+var ReplicaChangeType_value = map[string]int32{
+	"ReplicaAdd":    0,
+	"ReplicaRemove": 1,
+}
+
+func (x ReplicaChangeType) String() string {
+	return proto.EnumName(ReplicaChangeType_name, int32(x))
+}
+func (ReplicaChangeType) EnumDescriptor() ([]byte, []int) { return fileDescriptorAdmin, []int{0} }
 
 type CreatePartitionRequest struct {
 	meta.RequestHeader `protobuf:"bytes,1,opt,name=header,embedded=header" json:"header"`
@@ -59,7 +86,7 @@ func (*CreatePartitionResponse) Descriptor() ([]byte, []int) { return fileDescri
 
 type DeletePartitionRequest struct {
 	meta.RequestHeader `protobuf:"bytes,1,opt,name=header,embedded=header" json:"header"`
-	ID                 PartitionID `protobuf:"varint,2,opt,name=id,proto3,casttype=PartitionID" json:"id,omitempty"`
+	ID                 github_com_tiglabs_baud_proto_metapb.PartitionID `protobuf:"varint,2,opt,name=id,proto3,casttype=github.com/tiglabs/baud/proto/metapb.PartitionID" json:"id,omitempty"`
 }
 
 func (m *DeletePartitionRequest) Reset()                    { *m = DeletePartitionRequest{} }
@@ -74,11 +101,54 @@ func (m *DeletePartitionResponse) Reset()                    { *m = DeletePartit
 func (*DeletePartitionResponse) ProtoMessage()               {}
 func (*DeletePartitionResponse) Descriptor() ([]byte, []int) { return fileDescriptorAdmin, []int{3} }
 
+type ChangeReplicaRequest struct {
+	meta.RequestHeader `protobuf:"bytes,1,opt,name=header,embedded=header" json:"header"`
+	Type               ReplicaChangeType                                `protobuf:"varint,2,opt,name=type,proto3,enum=ReplicaChangeType" json:"type,omitempty"`
+	PartitionID        github_com_tiglabs_baud_proto_metapb.PartitionID `protobuf:"varint,3,opt,name=partition_id,json=partitionId,proto3,casttype=github.com/tiglabs/baud/proto/metapb.PartitionID" json:"partition_id,omitempty"`
+	ReplicaID          github_com_tiglabs_baud_proto_metapb.ReplicaID   `protobuf:"varint,4,opt,name=ReplicaID,proto3,casttype=github.com/tiglabs/baud/proto/metapb.ReplicaID" json:"ReplicaID,omitempty"`
+	NodeID             github_com_tiglabs_baud_proto_metapb.NodeID      `protobuf:"varint,5,opt,name=nodeID,proto3,casttype=github.com/tiglabs/baud/proto/metapb.NodeID" json:"nodeID,omitempty"`
+	meta.RaftAddrs     `protobuf:"bytes,6,opt,name=raft_addrs,json=raftAddrs,embedded=raft_addrs" json:"raft_addrs"`
+}
+
+func (m *ChangeReplicaRequest) Reset()                    { *m = ChangeReplicaRequest{} }
+func (*ChangeReplicaRequest) ProtoMessage()               {}
+func (*ChangeReplicaRequest) Descriptor() ([]byte, []int) { return fileDescriptorAdmin, []int{4} }
+
+type ChangeReplicaResponse struct {
+	meta.ResponseHeader `protobuf:"bytes,1,opt,name=header,embedded=header" json:"header"`
+}
+
+func (m *ChangeReplicaResponse) Reset()                    { *m = ChangeReplicaResponse{} }
+func (*ChangeReplicaResponse) ProtoMessage()               {}
+func (*ChangeReplicaResponse) Descriptor() ([]byte, []int) { return fileDescriptorAdmin, []int{5} }
+
+type ChangeLeaderRequest struct {
+	meta.RequestHeader `protobuf:"bytes,1,opt,name=header,embedded=header" json:"header"`
+	PartitionID        github_com_tiglabs_baud_proto_metapb.PartitionID `protobuf:"varint,2,opt,name=partition_id,json=partitionId,proto3,casttype=github.com/tiglabs/baud/proto/metapb.PartitionID" json:"partition_id,omitempty"`
+}
+
+func (m *ChangeLeaderRequest) Reset()                    { *m = ChangeLeaderRequest{} }
+func (*ChangeLeaderRequest) ProtoMessage()               {}
+func (*ChangeLeaderRequest) Descriptor() ([]byte, []int) { return fileDescriptorAdmin, []int{6} }
+
+type ChangeLeaderResponse struct {
+	meta.ResponseHeader `protobuf:"bytes,1,opt,name=header,embedded=header" json:"header"`
+}
+
+func (m *ChangeLeaderResponse) Reset()                    { *m = ChangeLeaderResponse{} }
+func (*ChangeLeaderResponse) ProtoMessage()               {}
+func (*ChangeLeaderResponse) Descriptor() ([]byte, []int) { return fileDescriptorAdmin, []int{7} }
+
 func init() {
 	proto.RegisterType((*CreatePartitionRequest)(nil), "CreatePartitionRequest")
 	proto.RegisterType((*CreatePartitionResponse)(nil), "CreatePartitionResponse")
 	proto.RegisterType((*DeletePartitionRequest)(nil), "DeletePartitionRequest")
 	proto.RegisterType((*DeletePartitionResponse)(nil), "DeletePartitionResponse")
+	proto.RegisterType((*ChangeReplicaRequest)(nil), "ChangeReplicaRequest")
+	proto.RegisterType((*ChangeReplicaResponse)(nil), "ChangeReplicaResponse")
+	proto.RegisterType((*ChangeLeaderRequest)(nil), "ChangeLeaderRequest")
+	proto.RegisterType((*ChangeLeaderResponse)(nil), "ChangeLeaderResponse")
+	proto.RegisterEnum("ReplicaChangeType", ReplicaChangeType_name, ReplicaChangeType_value)
 }
 func (this *CreatePartitionRequest) Equal(that interface{}) bool {
 	if that == nil {
@@ -182,55 +252,119 @@ func (this *DeletePartitionResponse) Equal(that interface{}) bool {
 	}
 	return true
 }
-func (this *CreatePartitionRequest) GoString() string {
-	if this == nil {
-		return "nil"
+func (this *ChangeReplicaRequest) Equal(that interface{}) bool {
+	if that == nil {
+		return this == nil
 	}
-	s := make([]string, 0, 6)
-	s = append(s, "&pspb.CreatePartitionRequest{")
-	s = append(s, "RequestHeader: "+strings.Replace(this.RequestHeader.GoString(), `&`, ``, 1)+",\n")
-	s = append(s, "Partition: "+strings.Replace(this.Partition.GoString(), `&`, ``, 1)+",\n")
-	s = append(s, "}")
-	return strings.Join(s, "")
+
+	that1, ok := that.(*ChangeReplicaRequest)
+	if !ok {
+		that2, ok := that.(ChangeReplicaRequest)
+		if ok {
+			that1 = &that2
+		} else {
+			return false
+		}
+	}
+	if that1 == nil {
+		return this == nil
+	} else if this == nil {
+		return false
+	}
+	if !this.RequestHeader.Equal(&that1.RequestHeader) {
+		return false
+	}
+	if this.Type != that1.Type {
+		return false
+	}
+	if this.PartitionID != that1.PartitionID {
+		return false
+	}
+	if this.ReplicaID != that1.ReplicaID {
+		return false
+	}
+	if this.NodeID != that1.NodeID {
+		return false
+	}
+	if !this.RaftAddrs.Equal(&that1.RaftAddrs) {
+		return false
+	}
+	return true
 }
-func (this *CreatePartitionResponse) GoString() string {
-	if this == nil {
-		return "nil"
+func (this *ChangeReplicaResponse) Equal(that interface{}) bool {
+	if that == nil {
+		return this == nil
 	}
-	s := make([]string, 0, 5)
-	s = append(s, "&pspb.CreatePartitionResponse{")
-	s = append(s, "ResponseHeader: "+strings.Replace(this.ResponseHeader.GoString(), `&`, ``, 1)+",\n")
-	s = append(s, "}")
-	return strings.Join(s, "")
+
+	that1, ok := that.(*ChangeReplicaResponse)
+	if !ok {
+		that2, ok := that.(ChangeReplicaResponse)
+		if ok {
+			that1 = &that2
+		} else {
+			return false
+		}
+	}
+	if that1 == nil {
+		return this == nil
+	} else if this == nil {
+		return false
+	}
+	if !this.ResponseHeader.Equal(&that1.ResponseHeader) {
+		return false
+	}
+	return true
 }
-func (this *DeletePartitionRequest) GoString() string {
-	if this == nil {
-		return "nil"
+func (this *ChangeLeaderRequest) Equal(that interface{}) bool {
+	if that == nil {
+		return this == nil
 	}
-	s := make([]string, 0, 6)
-	s = append(s, "&pspb.DeletePartitionRequest{")
-	s = append(s, "RequestHeader: "+strings.Replace(this.RequestHeader.GoString(), `&`, ``, 1)+",\n")
-	s = append(s, "ID: "+fmt.Sprintf("%#v", this.ID)+",\n")
-	s = append(s, "}")
-	return strings.Join(s, "")
+
+	that1, ok := that.(*ChangeLeaderRequest)
+	if !ok {
+		that2, ok := that.(ChangeLeaderRequest)
+		if ok {
+			that1 = &that2
+		} else {
+			return false
+		}
+	}
+	if that1 == nil {
+		return this == nil
+	} else if this == nil {
+		return false
+	}
+	if !this.RequestHeader.Equal(&that1.RequestHeader) {
+		return false
+	}
+	if this.PartitionID != that1.PartitionID {
+		return false
+	}
+	return true
 }
-func (this *DeletePartitionResponse) GoString() string {
-	if this == nil {
-		return "nil"
+func (this *ChangeLeaderResponse) Equal(that interface{}) bool {
+	if that == nil {
+		return this == nil
 	}
-	s := make([]string, 0, 5)
-	s = append(s, "&pspb.DeletePartitionResponse{")
-	s = append(s, "ResponseHeader: "+strings.Replace(this.ResponseHeader.GoString(), `&`, ``, 1)+",\n")
-	s = append(s, "}")
-	return strings.Join(s, "")
-}
-func valueToGoStringAdmin(v interface{}, typ string) string {
-	rv := reflect.ValueOf(v)
-	if rv.IsNil() {
-		return "nil"
+
+	that1, ok := that.(*ChangeLeaderResponse)
+	if !ok {
+		that2, ok := that.(ChangeLeaderResponse)
+		if ok {
+			that1 = &that2
+		} else {
+			return false
+		}
 	}
-	pv := reflect.Indirect(rv).Interface()
-	return fmt.Sprintf("func(v %v) *%v { return &v } ( %#v )", typ, typ, pv)
+	if that1 == nil {
+		return this == nil
+	} else if this == nil {
+		return false
+	}
+	if !this.ResponseHeader.Equal(&that1.ResponseHeader) {
+		return false
+	}
+	return true
 }
 
 // Reference imports to suppress errors if they are not otherwise used.
@@ -246,6 +380,8 @@ const _ = grpc.SupportPackageIsVersion4
 type AdminGrpcClient interface {
 	CreatePartition(ctx context.Context, in *CreatePartitionRequest, opts ...grpc.CallOption) (*CreatePartitionResponse, error)
 	DeletePartition(ctx context.Context, in *DeletePartitionRequest, opts ...grpc.CallOption) (*DeletePartitionResponse, error)
+	ChangeReplica(ctx context.Context, in *ChangeReplicaRequest, opts ...grpc.CallOption) (*ChangeReplicaResponse, error)
+	ChangeLeader(ctx context.Context, in *ChangeLeaderRequest, opts ...grpc.CallOption) (*ChangeLeaderResponse, error)
 }
 
 type adminGrpcClient struct {
@@ -274,11 +410,31 @@ func (c *adminGrpcClient) DeletePartition(ctx context.Context, in *DeletePartiti
 	return out, nil
 }
 
+func (c *adminGrpcClient) ChangeReplica(ctx context.Context, in *ChangeReplicaRequest, opts ...grpc.CallOption) (*ChangeReplicaResponse, error) {
+	out := new(ChangeReplicaResponse)
+	err := grpc.Invoke(ctx, "/AdminGrpc/ChangeReplica", in, out, c.cc, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *adminGrpcClient) ChangeLeader(ctx context.Context, in *ChangeLeaderRequest, opts ...grpc.CallOption) (*ChangeLeaderResponse, error) {
+	out := new(ChangeLeaderResponse)
+	err := grpc.Invoke(ctx, "/AdminGrpc/ChangeLeader", in, out, c.cc, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // Server API for AdminGrpc service
 
 type AdminGrpcServer interface {
 	CreatePartition(context.Context, *CreatePartitionRequest) (*CreatePartitionResponse, error)
 	DeletePartition(context.Context, *DeletePartitionRequest) (*DeletePartitionResponse, error)
+	ChangeReplica(context.Context, *ChangeReplicaRequest) (*ChangeReplicaResponse, error)
+	ChangeLeader(context.Context, *ChangeLeaderRequest) (*ChangeLeaderResponse, error)
 }
 
 func RegisterAdminGrpcServer(s *grpc.Server, srv AdminGrpcServer) {
@@ -321,6 +477,42 @@ func _AdminGrpc_DeletePartition_Handler(srv interface{}, ctx context.Context, de
 	return interceptor(ctx, in, info, handler)
 }
 
+func _AdminGrpc_ChangeReplica_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ChangeReplicaRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AdminGrpcServer).ChangeReplica(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/AdminGrpc/ChangeReplica",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AdminGrpcServer).ChangeReplica(ctx, req.(*ChangeReplicaRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _AdminGrpc_ChangeLeader_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ChangeLeaderRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AdminGrpcServer).ChangeLeader(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/AdminGrpc/ChangeLeader",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AdminGrpcServer).ChangeLeader(ctx, req.(*ChangeLeaderRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 var _AdminGrpc_serviceDesc = grpc.ServiceDesc{
 	ServiceName: "AdminGrpc",
 	HandlerType: (*AdminGrpcServer)(nil),
@@ -332,6 +524,14 @@ var _AdminGrpc_serviceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "DeletePartition",
 			Handler:    _AdminGrpc_DeletePartition_Handler,
+		},
+		{
+			MethodName: "ChangeReplica",
+			Handler:    _AdminGrpc_ChangeReplica_Handler,
+		},
+		{
+			MethodName: "ChangeLeader",
+			Handler:    _AdminGrpc_ChangeLeader_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},
@@ -455,6 +655,143 @@ func (m *DeletePartitionResponse) MarshalTo(dAtA []byte) (int, error) {
 	return i, nil
 }
 
+func (m *ChangeReplicaRequest) Marshal() (dAtA []byte, err error) {
+	size := m.Size()
+	dAtA = make([]byte, size)
+	n, err := m.MarshalTo(dAtA)
+	if err != nil {
+		return nil, err
+	}
+	return dAtA[:n], nil
+}
+
+func (m *ChangeReplicaRequest) MarshalTo(dAtA []byte) (int, error) {
+	var i int
+	_ = i
+	var l int
+	_ = l
+	dAtA[i] = 0xa
+	i++
+	i = encodeVarintAdmin(dAtA, i, uint64(m.RequestHeader.Size()))
+	n6, err := m.RequestHeader.MarshalTo(dAtA[i:])
+	if err != nil {
+		return 0, err
+	}
+	i += n6
+	if m.Type != 0 {
+		dAtA[i] = 0x10
+		i++
+		i = encodeVarintAdmin(dAtA, i, uint64(m.Type))
+	}
+	if m.PartitionID != 0 {
+		dAtA[i] = 0x18
+		i++
+		i = encodeVarintAdmin(dAtA, i, uint64(m.PartitionID))
+	}
+	if m.ReplicaID != 0 {
+		dAtA[i] = 0x20
+		i++
+		i = encodeVarintAdmin(dAtA, i, uint64(m.ReplicaID))
+	}
+	if m.NodeID != 0 {
+		dAtA[i] = 0x28
+		i++
+		i = encodeVarintAdmin(dAtA, i, uint64(m.NodeID))
+	}
+	dAtA[i] = 0x32
+	i++
+	i = encodeVarintAdmin(dAtA, i, uint64(m.RaftAddrs.Size()))
+	n7, err := m.RaftAddrs.MarshalTo(dAtA[i:])
+	if err != nil {
+		return 0, err
+	}
+	i += n7
+	return i, nil
+}
+
+func (m *ChangeReplicaResponse) Marshal() (dAtA []byte, err error) {
+	size := m.Size()
+	dAtA = make([]byte, size)
+	n, err := m.MarshalTo(dAtA)
+	if err != nil {
+		return nil, err
+	}
+	return dAtA[:n], nil
+}
+
+func (m *ChangeReplicaResponse) MarshalTo(dAtA []byte) (int, error) {
+	var i int
+	_ = i
+	var l int
+	_ = l
+	dAtA[i] = 0xa
+	i++
+	i = encodeVarintAdmin(dAtA, i, uint64(m.ResponseHeader.Size()))
+	n8, err := m.ResponseHeader.MarshalTo(dAtA[i:])
+	if err != nil {
+		return 0, err
+	}
+	i += n8
+	return i, nil
+}
+
+func (m *ChangeLeaderRequest) Marshal() (dAtA []byte, err error) {
+	size := m.Size()
+	dAtA = make([]byte, size)
+	n, err := m.MarshalTo(dAtA)
+	if err != nil {
+		return nil, err
+	}
+	return dAtA[:n], nil
+}
+
+func (m *ChangeLeaderRequest) MarshalTo(dAtA []byte) (int, error) {
+	var i int
+	_ = i
+	var l int
+	_ = l
+	dAtA[i] = 0xa
+	i++
+	i = encodeVarintAdmin(dAtA, i, uint64(m.RequestHeader.Size()))
+	n9, err := m.RequestHeader.MarshalTo(dAtA[i:])
+	if err != nil {
+		return 0, err
+	}
+	i += n9
+	if m.PartitionID != 0 {
+		dAtA[i] = 0x10
+		i++
+		i = encodeVarintAdmin(dAtA, i, uint64(m.PartitionID))
+	}
+	return i, nil
+}
+
+func (m *ChangeLeaderResponse) Marshal() (dAtA []byte, err error) {
+	size := m.Size()
+	dAtA = make([]byte, size)
+	n, err := m.MarshalTo(dAtA)
+	if err != nil {
+		return nil, err
+	}
+	return dAtA[:n], nil
+}
+
+func (m *ChangeLeaderResponse) MarshalTo(dAtA []byte) (int, error) {
+	var i int
+	_ = i
+	var l int
+	_ = l
+	dAtA[i] = 0xa
+	i++
+	i = encodeVarintAdmin(dAtA, i, uint64(m.ResponseHeader.Size()))
+	n10, err := m.ResponseHeader.MarshalTo(dAtA[i:])
+	if err != nil {
+		return 0, err
+	}
+	i += n10
+	return i, nil
+}
+
 func encodeVarintAdmin(dAtA []byte, offset int, v uint64) int {
 	for v >= 1<<7 {
 		dAtA[offset] = uint8(v&0x7f | 0x80)
@@ -488,7 +825,7 @@ func NewPopulatedDeletePartitionRequest(r randyAdmin, easy bool) *DeletePartitio
 	this := &DeletePartitionRequest{}
 	v4 := meta.NewPopulatedRequestHeader(r, easy)
 	this.RequestHeader = *v4
-	this.ID = PartitionID(r.Uint32())
+	this.ID = github_com_tiglabs_baud_proto_metapb.PartitionID(r.Uint32())
 	if !easy && r.Intn(10) != 0 {
 	}
 	return this
@@ -498,6 +835,49 @@ func NewPopulatedDeletePartitionResponse(r randyAdmin, easy bool) *DeletePartiti
 	this := &DeletePartitionResponse{}
 	v5 := meta.NewPopulatedResponseHeader(r, easy)
 	this.ResponseHeader = *v5
+	if !easy && r.Intn(10) != 0 {
+	}
+	return this
+}
+
+func NewPopulatedChangeReplicaRequest(r randyAdmin, easy bool) *ChangeReplicaRequest {
+	this := &ChangeReplicaRequest{}
+	v6 := meta.NewPopulatedRequestHeader(r, easy)
+	this.RequestHeader = *v6
+	this.Type = ReplicaChangeType([]int32{0, 1}[r.Intn(2)])
+	this.PartitionID = github_com_tiglabs_baud_proto_metapb.PartitionID(r.Uint32())
+	this.ReplicaID = github_com_tiglabs_baud_proto_metapb.ReplicaID(uint64(r.Uint32()))
+	this.NodeID = github_com_tiglabs_baud_proto_metapb.NodeID(r.Uint32())
+	v7 := meta.NewPopulatedRaftAddrs(r, easy)
+	this.RaftAddrs = *v7
+	if !easy && r.Intn(10) != 0 {
+	}
+	return this
+}
+
+func NewPopulatedChangeReplicaResponse(r randyAdmin, easy bool) *ChangeReplicaResponse {
+	this := &ChangeReplicaResponse{}
+	v8 := meta.NewPopulatedResponseHeader(r, easy)
+	this.ResponseHeader = *v8
+	if !easy && r.Intn(10) != 0 {
+	}
+	return this
+}
+
+func NewPopulatedChangeLeaderRequest(r randyAdmin, easy bool) *ChangeLeaderRequest {
+	this := &ChangeLeaderRequest{}
+	v9 := meta.NewPopulatedRequestHeader(r, easy)
+	this.RequestHeader = *v9
+	this.PartitionID = github_com_tiglabs_baud_proto_metapb.PartitionID(r.Uint32())
+	if !easy && r.Intn(10) != 0 {
+	}
+	return this
+}
+
+func NewPopulatedChangeLeaderResponse(r randyAdmin, easy bool) *ChangeLeaderResponse {
+	this := &ChangeLeaderResponse{}
+	v10 := meta.NewPopulatedResponseHeader(r, easy)
+	this.ResponseHeader = *v10
 	if !easy && r.Intn(10) != 0 {
 	}
 	return this
@@ -522,9 +902,9 @@ func randUTF8RuneAdmin(r randyAdmin) rune {
 	return rune(ru + 61)
 }
 func randStringAdmin(r randyAdmin) string {
-	v6 := r.Intn(100)
-	tmps := make([]rune, v6)
-	for i := 0; i < v6; i++ {
+	v11 := r.Intn(100)
+	tmps := make([]rune, v11)
+	for i := 0; i < v11; i++ {
 		tmps[i] = randUTF8RuneAdmin(r)
 	}
 	return string(tmps)
@@ -546,11 +926,11 @@ func randFieldAdmin(dAtA []byte, r randyAdmin, fieldNumber int, wire int) []byte
 	switch wire {
 	case 0:
 		dAtA = encodeVarintPopulateAdmin(dAtA, uint64(key))
-		v7 := r.Int63()
+		v12 := r.Int63()
 		if r.Intn(2) == 0 {
-			v7 *= -1
+			v12 *= -1
 		}
-		dAtA = encodeVarintPopulateAdmin(dAtA, uint64(v7))
+		dAtA = encodeVarintPopulateAdmin(dAtA, uint64(v12))
 	case 1:
 		dAtA = encodeVarintPopulateAdmin(dAtA, uint64(key))
 		dAtA = append(dAtA, byte(r.Intn(256)), byte(r.Intn(256)), byte(r.Intn(256)), byte(r.Intn(256)), byte(r.Intn(256)), byte(r.Intn(256)), byte(r.Intn(256)), byte(r.Intn(256)))
@@ -612,6 +992,55 @@ func (m *DeletePartitionResponse) Size() (n int) {
 	return n
 }
 
+func (m *ChangeReplicaRequest) Size() (n int) {
+	var l int
+	_ = l
+	l = m.RequestHeader.Size()
+	n += 1 + l + sovAdmin(uint64(l))
+	if m.Type != 0 {
+		n += 1 + sovAdmin(uint64(m.Type))
+	}
+	if m.PartitionID != 0 {
+		n += 1 + sovAdmin(uint64(m.PartitionID))
+	}
+	if m.ReplicaID != 0 {
+		n += 1 + sovAdmin(uint64(m.ReplicaID))
+	}
+	if m.NodeID != 0 {
+		n += 1 + sovAdmin(uint64(m.NodeID))
+	}
+	l = m.RaftAddrs.Size()
+	n += 1 + l + sovAdmin(uint64(l))
+	return n
+}
+
+func (m *ChangeReplicaResponse) Size() (n int) {
+	var l int
+	_ = l
+	l = m.ResponseHeader.Size()
+	n += 1 + l + sovAdmin(uint64(l))
+	return n
+}
+
+func (m *ChangeLeaderRequest) Size() (n int) {
+	var l int
+	_ = l
+	l = m.RequestHeader.Size()
+	n += 1 + l + sovAdmin(uint64(l))
+	if m.PartitionID != 0 {
+		n += 1 + sovAdmin(uint64(m.PartitionID))
+	}
+	return n
+}
+
+func (m *ChangeLeaderResponse) Size() (n int) {
+	var l int
+	_ = l
+	l = m.ResponseHeader.Size()
+	n += 1 + l + sovAdmin(uint64(l))
+	return n
+}
+
 func sovAdmin(x uint64) (n int) {
 	for {
 		n++
@@ -662,6 +1091,52 @@ func (this *DeletePartitionResponse) String() string {
 		return "nil"
 	}
 	s := strings.Join([]string{`&DeletePartitionResponse{`,
+		`ResponseHeader:` + strings.Replace(strings.Replace(this.ResponseHeader.String(), "ResponseHeader", "meta.ResponseHeader", 1), `&`, ``, 1) + `,`,
+		`}`,
+	}, "")
+	return s
+}
+func (this *ChangeReplicaRequest) String() string {
+	if this == nil {
+		return "nil"
+	}
+	s := strings.Join([]string{`&ChangeReplicaRequest{`,
+		`RequestHeader:` + strings.Replace(strings.Replace(this.RequestHeader.String(), "RequestHeader", "meta.RequestHeader", 1), `&`, ``, 1) + `,`,
+		`Type:` + fmt.Sprintf("%v", this.Type) + `,`,
+		`PartitionID:` + fmt.Sprintf("%v", this.PartitionID) + `,`,
+		`ReplicaID:` + fmt.Sprintf("%v", this.ReplicaID) + `,`,
+		`NodeID:` + fmt.Sprintf("%v", this.NodeID) + `,`,
+		`RaftAddrs:` + strings.Replace(strings.Replace(this.RaftAddrs.String(), "RaftAddrs", "meta.RaftAddrs", 1), `&`, ``, 1) + `,`,
+		`}`,
+	}, "")
+	return s
+}
+func (this *ChangeReplicaResponse) String() string {
+	if this == nil {
+		return "nil"
+	}
+	s := strings.Join([]string{`&ChangeReplicaResponse{`,
+		`ResponseHeader:` + strings.Replace(strings.Replace(this.ResponseHeader.String(), "ResponseHeader", "meta.ResponseHeader", 1), `&`, ``, 1) + `,`,
+		`}`,
+	}, "")
+	return s
+}
+func (this *ChangeLeaderRequest) String() string {
+	if this == nil {
+		return "nil"
+	}
+	s := strings.Join([]string{`&ChangeLeaderRequest{`,
+		`RequestHeader:` + strings.Replace(strings.Replace(this.RequestHeader.String(), "RequestHeader", "meta.RequestHeader", 1), `&`, ``, 1) + `,`,
+		`PartitionID:` + fmt.Sprintf("%v", this.PartitionID) + `,`,
+		`}`,
+	}, "")
+	return s
+}
+func (this *ChangeLeaderResponse) String() string {
+	if this == nil {
+		return "nil"
+	}
+	s := strings.Join([]string{`&ChangeLeaderResponse{`,
 		`ResponseHeader:` + strings.Replace(strings.Replace(this.ResponseHeader.String(), "ResponseHeader", "meta.ResponseHeader", 1), `&`, ``, 1) + `,`,
 		`}`,
 	}, "")
@@ -938,7 +1413,7 @@ func (m *DeletePartitionRequest) Unmarshal(dAtA []byte) error {
 				}
 				b := dAtA[iNdEx]
 				iNdEx++
-				m.ID |= (PartitionID(b) & 0x7F) << shift
+				m.ID |= (github_com_tiglabs_baud_proto_metapb.PartitionID(b) & 0x7F) << shift
 				if b < 0x80 {
 					break
 				}
@@ -991,6 +1466,451 @@ func (m *DeletePartitionResponse) Unmarshal(dAtA []byte) error {
 		}
 		if fieldNum <= 0 {
 			return fmt.Errorf("proto: DeletePartitionResponse: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
+		switch fieldNum {
+		case 1:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field ResponseHeader", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowAdmin
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				msglen |= (int(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthAdmin
+			}
+			postIndex := iNdEx + msglen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			if err := m.ResponseHeader.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		default:
+			iNdEx = preIndex
+			skippy, err := skipAdmin(dAtA[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if skippy < 0 {
+				return ErrInvalidLengthAdmin
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			iNdEx += skippy
+		}
+	}
+
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
+}
+func (m *ChangeReplicaRequest) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
+	iNdEx := 0
+	for iNdEx < l {
+		preIndex := iNdEx
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowAdmin
+			}
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := dAtA[iNdEx]
+			iNdEx++
+			wire |= (uint64(b) & 0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: ChangeReplicaRequest: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: ChangeReplicaRequest: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
+		switch fieldNum {
+		case 1:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field RequestHeader", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowAdmin
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				msglen |= (int(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthAdmin
+			}
+			postIndex := iNdEx + msglen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			if err := m.RequestHeader.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		case 2:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Type", wireType)
+			}
+			m.Type = 0
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowAdmin
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				m.Type |= (ReplicaChangeType(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+		case 3:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field PartitionID", wireType)
+			}
+			m.PartitionID = 0
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowAdmin
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				m.PartitionID |= (github_com_tiglabs_baud_proto_metapb.PartitionID(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+		case 4:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field ReplicaID", wireType)
+			}
+			m.ReplicaID = 0
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowAdmin
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				m.ReplicaID |= (github_com_tiglabs_baud_proto_metapb.ReplicaID(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+		case 5:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field NodeID", wireType)
+			}
+			m.NodeID = 0
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowAdmin
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				m.NodeID |= (github_com_tiglabs_baud_proto_metapb.NodeID(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+		case 6:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field RaftAddrs", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowAdmin
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				msglen |= (int(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthAdmin
+			}
+			postIndex := iNdEx + msglen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			if err := m.RaftAddrs.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		default:
+			iNdEx = preIndex
+			skippy, err := skipAdmin(dAtA[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if skippy < 0 {
+				return ErrInvalidLengthAdmin
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			iNdEx += skippy
+		}
+	}
+
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
+}
+func (m *ChangeReplicaResponse) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
+	iNdEx := 0
+	for iNdEx < l {
+		preIndex := iNdEx
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowAdmin
+			}
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := dAtA[iNdEx]
+			iNdEx++
+			wire |= (uint64(b) & 0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: ChangeReplicaResponse: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: ChangeReplicaResponse: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
+		switch fieldNum {
+		case 1:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field ResponseHeader", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowAdmin
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				msglen |= (int(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthAdmin
+			}
+			postIndex := iNdEx + msglen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			if err := m.ResponseHeader.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		default:
+			iNdEx = preIndex
+			skippy, err := skipAdmin(dAtA[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if skippy < 0 {
+				return ErrInvalidLengthAdmin
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			iNdEx += skippy
+		}
+	}
+
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
+}
+func (m *ChangeLeaderRequest) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
+	iNdEx := 0
+	for iNdEx < l {
+		preIndex := iNdEx
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowAdmin
+			}
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := dAtA[iNdEx]
+			iNdEx++
+			wire |= (uint64(b) & 0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: ChangeLeaderRequest: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: ChangeLeaderRequest: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
+		switch fieldNum {
+		case 1:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field RequestHeader", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowAdmin
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				msglen |= (int(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthAdmin
+			}
+			postIndex := iNdEx + msglen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			if err := m.RequestHeader.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		case 2:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field PartitionID", wireType)
+			}
+			m.PartitionID = 0
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowAdmin
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				m.PartitionID |= (github_com_tiglabs_baud_proto_metapb.PartitionID(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+		default:
+			iNdEx = preIndex
+			skippy, err := skipAdmin(dAtA[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if skippy < 0 {
+				return ErrInvalidLengthAdmin
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			iNdEx += skippy
+		}
+	}
+
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
+}
+func (m *ChangeLeaderResponse) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
+	iNdEx := 0
+	for iNdEx < l {
+		preIndex := iNdEx
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowAdmin
+			}
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := dAtA[iNdEx]
+			iNdEx++
+			wire |= (uint64(b) & 0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: ChangeLeaderResponse: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: ChangeLeaderResponse: illegal tag %d (wire type %d)", fieldNum, wire)
 		}
 		switch fieldNum {
 		case 1:
@@ -1152,29 +2072,45 @@ var (
 func init() { proto.RegisterFile("admin.proto", fileDescriptorAdmin) }
 
 var fileDescriptorAdmin = []byte{
-	// 370 bytes of a gzipped FileDescriptorProto
-	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0xe2, 0xe2, 0x4e, 0x4c, 0xc9, 0xcd,
-	0xcc, 0xd3, 0x2b, 0x28, 0xca, 0x2f, 0xc9, 0x97, 0xd2, 0x4d, 0xcf, 0x2c, 0xc9, 0x28, 0x4d, 0xd2,
-	0x4b, 0xce, 0xcf, 0xd5, 0x4f, 0xcf, 0x4f, 0xcf, 0xd7, 0x07, 0x0b, 0x27, 0x95, 0xa6, 0x81, 0x79,
-	0x60, 0x0e, 0x98, 0x05, 0x55, 0xae, 0x8f, 0xa4, 0xbc, 0x24, 0x33, 0x3d, 0x27, 0x31, 0xa9, 0x58,
-	0x3f, 0x29, 0xb1, 0x34, 0x05, 0xa2, 0x4d, 0x3f, 0x37, 0xb5, 0x24, 0xb1, 0x20, 0x09, 0x4c, 0x41,
-	0x34, 0x28, 0x55, 0x71, 0x89, 0x39, 0x17, 0xa5, 0x26, 0x96, 0xa4, 0x06, 0x24, 0x16, 0x95, 0x64,
-	0x96, 0x64, 0xe6, 0xe7, 0x05, 0xa5, 0x16, 0x96, 0xa6, 0x16, 0x97, 0x08, 0x19, 0x70, 0xb1, 0x65,
-	0xa4, 0x26, 0xa6, 0xa4, 0x16, 0x49, 0x30, 0x2a, 0x30, 0x6a, 0x70, 0x1b, 0xf1, 0xe9, 0x41, 0x65,
-	0x3c, 0xc0, 0xa2, 0x4e, 0x1c, 0x27, 0xee, 0xc9, 0x33, 0x5c, 0xb8, 0x27, 0xcf, 0x18, 0x04, 0x55,
-	0x27, 0xa4, 0xc7, 0xc5, 0x59, 0x00, 0x33, 0x45, 0x82, 0x09, 0xac, 0x89, 0x4b, 0x0f, 0x6e, 0xae,
-	0x13, 0x0b, 0x48, 0x43, 0x10, 0x42, 0x89, 0x92, 0x0f, 0x97, 0x38, 0x86, 0xdd, 0xc5, 0x05, 0xf9,
-	0x79, 0xc5, 0xa9, 0x42, 0x86, 0x68, 0x96, 0xf3, 0xeb, 0xc1, 0xa4, 0x70, 0xd9, 0xae, 0x54, 0xc8,
-	0x25, 0xe6, 0x92, 0x9a, 0x93, 0x4a, 0x15, 0x9f, 0xa8, 0x72, 0x31, 0x65, 0xa6, 0x80, 0xbd, 0xc0,
-	0xeb, 0x24, 0xfa, 0xe8, 0x9e, 0x3c, 0x93, 0xa7, 0xcb, 0xaf, 0x7b, 0xf2, 0xdc, 0x70, 0x93, 0x3d,
-	0x5d, 0x82, 0x98, 0x32, 0x53, 0x40, 0x1e, 0xc0, 0xb0, 0x92, 0x6c, 0x0f, 0x18, 0xcd, 0x66, 0xe4,
-	0xe2, 0x74, 0x04, 0x45, 0xbd, 0x7b, 0x51, 0x41, 0xb2, 0x90, 0x1b, 0x17, 0x3f, 0x5a, 0xe0, 0x08,
-	0x89, 0xeb, 0x61, 0x8f, 0x2a, 0x29, 0x09, 0x3d, 0x1c, 0xe1, 0xa8, 0xc4, 0x00, 0x32, 0x07, 0xcd,
-	0x8d, 0x42, 0xe2, 0x7a, 0xd8, 0x03, 0x4a, 0x4a, 0x42, 0x0f, 0x87, 0x77, 0x94, 0x18, 0x9c, 0x6c,
-	0x4e, 0x3c, 0x94, 0x63, 0xb8, 0xf1, 0x50, 0x8e, 0xe1, 0xc1, 0x43, 0x39, 0x86, 0x0f, 0x0f, 0xe5,
-	0x18, 0x7f, 0x3c, 0x94, 0x63, 0x6c, 0x78, 0x24, 0xc7, 0xb8, 0xe2, 0x91, 0x1c, 0xe3, 0x8e, 0x47,
-	0x72, 0x0c, 0x07, 0x1e, 0xc9, 0x31, 0x9c, 0x78, 0x24, 0xc7, 0x78, 0xe1, 0x91, 0x1c, 0xe3, 0x83,
-	0x47, 0x72, 0x8c, 0x13, 0x1e, 0xcb, 0x31, 0x78, 0x30, 0x46, 0xb1, 0x14, 0x14, 0x17, 0x24, 0x25,
-	0xb1, 0x81, 0x53, 0x9b, 0x31, 0x20, 0x00, 0x00, 0xff, 0xff, 0xc4, 0xc6, 0x8f, 0x24, 0xdc, 0x02,
-	0x00, 0x00,
+	// 633 bytes of a gzipped FileDescriptorProto
+	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0xb4, 0x54, 0x4d, 0x6f, 0xd3, 0x4c,
+	0x10, 0xde, 0x75, 0xf3, 0x46, 0x6f, 0x26, 0xfd, 0x5c, 0xfa, 0x61, 0xe5, 0xb0, 0xae, 0x7c, 0x40,
+	0x15, 0x88, 0x4d, 0x69, 0x25, 0x24, 0x10, 0x08, 0x9a, 0x46, 0x50, 0x57, 0x15, 0x02, 0x8b, 0x13,
+	0x12, 0xaa, 0xd6, 0xdd, 0x4d, 0x6a, 0xa9, 0x89, 0x8d, 0xed, 0x20, 0x95, 0x13, 0x3f, 0x81, 0x13,
+	0x27, 0x7e, 0x00, 0x37, 0xae, 0xdc, 0xe0, 0xd8, 0x63, 0x8f, 0x9c, 0xac, 0xc6, 0xfc, 0x01, 0x8e,
+	0xa8, 0x27, 0x94, 0x8d, 0xf3, 0x41, 0xea, 0x4a, 0x95, 0x05, 0xa7, 0xc4, 0xcf, 0xce, 0x3c, 0xb3,
+	0xcf, 0xcc, 0xb3, 0x03, 0x65, 0x2e, 0x5a, 0x6e, 0x9b, 0xf9, 0x81, 0x17, 0x79, 0x95, 0x5b, 0x4d,
+	0x37, 0x3a, 0xec, 0x38, 0xec, 0xc0, 0x6b, 0x55, 0x9b, 0x5e, 0xd3, 0xab, 0x2a, 0xd8, 0xe9, 0x34,
+	0xd4, 0x97, 0xfa, 0x50, 0xff, 0xd2, 0xf0, 0xea, 0x58, 0x78, 0xe4, 0x36, 0x8f, 0xb8, 0x13, 0x56,
+	0x1d, 0xde, 0x11, 0xfd, 0xb4, 0x6a, 0x4b, 0x46, 0xdc, 0x77, 0xd4, 0x4f, 0x3f, 0xc1, 0x7c, 0x0b,
+	0xcb, 0xdb, 0x81, 0xe4, 0x91, 0x7c, 0xc6, 0x83, 0xc8, 0x8d, 0x5c, 0xaf, 0x6d, 0xcb, 0xd7, 0x1d,
+	0x19, 0x46, 0x64, 0x1d, 0x8a, 0x87, 0x92, 0x0b, 0x19, 0xe8, 0x78, 0x15, 0xaf, 0x95, 0x37, 0x66,
+	0x59, 0x7a, 0xb2, 0xa3, 0xd0, 0xda, 0xff, 0x27, 0xb1, 0x81, 0x4e, 0x63, 0x03, 0xdb, 0x69, 0x1c,
+	0x61, 0x50, 0xf2, 0x07, 0x2c, 0xba, 0xa6, 0x92, 0x80, 0x0d, 0x79, 0x6b, 0x85, 0x5e, 0x82, 0x3d,
+	0x0a, 0x31, 0xf7, 0x60, 0xe5, 0x42, 0xed, 0xd0, 0xf7, 0xda, 0xa1, 0x24, 0xb7, 0x27, 0x8a, 0xcf,
+	0xb1, 0xc1, 0xd1, 0x65, 0xd5, 0xcd, 0x0f, 0x18, 0x96, 0xeb, 0xf2, 0x48, 0xfe, 0x15, 0x29, 0xbb,
+	0xa0, 0xb9, 0x42, 0x69, 0x98, 0xa9, 0xdd, 0x4b, 0x62, 0x43, 0xb3, 0xea, 0xe7, 0xb1, 0xb1, 0x7e,
+	0x95, 0xee, 0x8e, 0x14, 0x5b, 0x75, 0x5b, 0x73, 0x45, 0x4f, 0xe6, 0x85, 0x7b, 0xe5, 0x97, 0xf9,
+	0x75, 0x0a, 0x16, 0xb7, 0x0f, 0x79, 0xbb, 0x29, 0x6d, 0xe9, 0x1f, 0xb9, 0x07, 0x3c, 0xbf, 0xc8,
+	0xeb, 0x50, 0x88, 0x8e, 0x7d, 0xa9, 0x64, 0xce, 0x6e, 0x10, 0x96, 0x12, 0xf6, 0xd9, 0x5f, 0x1c,
+	0xfb, 0xd2, 0x56, 0xe7, 0xa4, 0x01, 0xd3, 0xc3, 0xa1, 0xed, 0xbb, 0x42, 0x9f, 0x52, 0x6d, 0xd9,
+	0x4e, 0x62, 0xa3, 0x3c, 0xa6, 0x35, 0x57, 0x7f, 0xca, 0x43, 0x62, 0x4b, 0x90, 0x57, 0x50, 0x4a,
+	0xaf, 0x60, 0xd5, 0xf5, 0xc2, 0x2a, 0x5e, 0x2b, 0xd4, 0x1e, 0x26, 0xb1, 0x31, 0x02, 0xcf, 0x63,
+	0x83, 0x5d, 0xa9, 0xc4, 0x30, 0xc3, 0x1e, 0x25, 0x93, 0xe7, 0x50, 0x6c, 0x7b, 0x42, 0x5a, 0x75,
+	0xfd, 0x3f, 0x25, 0xe0, 0x6e, 0x12, 0x1b, 0xc5, 0xa7, 0x0a, 0x39, 0x8f, 0x8d, 0x9b, 0x57, 0x22,
+	0xee, 0x87, 0xdb, 0x29, 0x11, 0xd9, 0x04, 0x08, 0x78, 0x23, 0xda, 0xe7, 0x42, 0x04, 0xa1, 0x5e,
+	0x4c, 0x2d, 0x6f, 0xf3, 0x46, 0xb4, 0xd5, 0x43, 0xc6, 0x7a, 0x5e, 0x0a, 0x06, 0xa0, 0xb9, 0x0b,
+	0x4b, 0x13, 0x03, 0xcc, 0xef, 0x86, 0xcf, 0x18, 0xae, 0xf5, 0xc9, 0xf6, 0x14, 0x90, 0xdf, 0x0c,
+	0x93, 0x43, 0xd6, 0xfe, 0xcd, 0x90, 0x4d, 0x6b, 0x60, 0xdf, 0xc1, 0x85, 0x73, 0x8b, 0xbf, 0x71,
+	0x07, 0x16, 0x2e, 0x58, 0x96, 0xcc, 0x02, 0xa4, 0xe0, 0x96, 0x10, 0xf3, 0x88, 0x2c, 0xc0, 0xcc,
+	0xb0, 0xcf, 0x2d, 0xef, 0x8d, 0x9c, 0xc7, 0x1b, 0x1f, 0x35, 0x28, 0x6d, 0xf5, 0x76, 0xec, 0x93,
+	0xc0, 0x3f, 0x20, 0x8f, 0x61, 0x6e, 0x62, 0x0b, 0x91, 0x15, 0x96, 0xbd, 0x13, 0x2b, 0x3a, 0xbb,
+	0x64, 0x61, 0x99, 0xa8, 0xc7, 0x33, 0xf1, 0xcc, 0xc9, 0x0a, 0xcb, 0x5e, 0x48, 0x15, 0x9d, 0x5d,
+	0xb2, 0x11, 0x4c, 0x44, 0x1e, 0xc1, 0xcc, 0x1f, 0xf6, 0x20, 0x4b, 0x2c, 0xeb, 0xbd, 0x57, 0x96,
+	0x59, 0xa6, 0x8b, 0x4c, 0x44, 0x1e, 0xc0, 0xf4, 0x78, 0x8b, 0xc9, 0x22, 0xcb, 0xb0, 0x48, 0x65,
+	0x89, 0x65, 0xcd, 0xc1, 0x44, 0xb5, 0xfb, 0x27, 0x5d, 0x8a, 0xbe, 0x77, 0x29, 0x3a, 0xeb, 0x52,
+	0xf4, 0xb3, 0x4b, 0xd1, 0xaf, 0x2e, 0xc5, 0xef, 0x12, 0x8a, 0x3f, 0x25, 0x14, 0x7f, 0x49, 0x28,
+	0xfa, 0x96, 0x50, 0x74, 0x92, 0x50, 0x7c, 0x9a, 0x50, 0x7c, 0x96, 0x50, 0xfc, 0xfe, 0x07, 0x45,
+	0x3b, 0xf8, 0x65, 0xc1, 0x0f, 0x7d, 0xc7, 0x29, 0x2a, 0x1b, 0x6c, 0xfe, 0x0e, 0x00, 0x00, 0xff,
+	0xff, 0xd5, 0x3c, 0x65, 0x23, 0xc6, 0x06, 0x00, 0x00,
 }

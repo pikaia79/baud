@@ -8,7 +8,7 @@ option optimize_for = SPEED;
 option (gogoproto.marshaler_all) = true;
 option (gogoproto.sizer_all) = true;
 option (gogoproto.unmarshaler_all) = true;
-option (gogoproto.gostring_all) = true;
+option (gogoproto.gostring_all) = false;
 option (gogoproto.equal_all) = true;
 option (gogoproto.verbose_equal_all) = false;
 option (gogoproto.goproto_stringer_all) = false;
@@ -25,6 +25,11 @@ message RequestHeader {
 message ResponseHeader {
     int32   code     = 1 [(gogoproto.casttype) = "int16"];
     string  message  = 2;
+}
+
+message DocID {
+    uint32 slot_id = 1 [(gogoproto.customname) = "SlotID", (gogoproto.casttype) = "SlotID"];
+    uint64 seq_no  = 2;
 }
 
 message DB {
@@ -84,7 +89,7 @@ message Partition {
 }
 
 message Replica {
-    uint32        id        = 1 [(gogoproto.customname) = "ID", (gogoproto.casttype) = "ReplicaID"];
+    uint64        id        = 1 [(gogoproto.customname) = "ID", (gogoproto.casttype) = "ReplicaID"];
     uint32        nodeID    = 2 [(gogoproto.customname) = "NodeID", (gogoproto.casttype) = "NodeID"];
 }
 
