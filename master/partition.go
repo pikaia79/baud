@@ -109,6 +109,12 @@ type PartitionCache struct {
 	partitions   map[uint32]*Partition
 }
 
+func NewPartitionCache() *PartitionCache {
+	return &PartitionCache{
+		partitions: make(map[uint32]*Partition),
+	}
+}
+
 func (c *PartitionCache) findPartitionById(partitionId uint32) *Partition {
 	c.lock.RLock()
 	defer c.lock.RUnlock()

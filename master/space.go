@@ -121,16 +121,23 @@ func (s *Space) putPartition(partition *Partition) {
 }
 
 type SpaceCache struct {
-	lock      sync.RWMutex
-	NameIdMap map[string]uint32
-	spaces    map[uint32]*Space
+	lock     sync.RWMutex
+	name2Ids map[string]uint32
+	spaces   map[uint32]*Space
+}
+
+func NewSpaceCache() *SpaceCache {
+	return &SpaceCache{
+		name2Ids: make(map[string]uint32),
+		spaces:   make(map[uint32]*Space),
+	}
 }
 
 func (c *SpaceCache) findSpaceByName(spaceName string) *Space {
 	c.lock.RLock()
 	defer c.lock.RUnlock()
 
-	spaceId, ok := c.NameIdMap[spaceName]
+	spaceId, ok := c.name2Ids[spaceName]
 	if !ok {
 		return nil
 	}
@@ -146,7 +153,7 @@ func (c *SpaceCache) addSpace(space *Space) {
 	c.lock.Lock()
 	defer c.lock.Unlock()
 
-	c.NameIdMap[space.Name] = space.ID
+	c.name2Ids[space.Name] = space.ID
 	c.spaces[space.ID] = space
 }
 
@@ -158,5 +165,5 @@ func (c *SpaceCache) deleteSpace(space *Space) {
 	if !ok {
 		return
 	}
-	delete(c.NameIdMap, oldSpace.Name)
+	delete(c.name2Ids, oldSpace.Name)
 }

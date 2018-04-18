@@ -53,8 +53,16 @@ func NewPartitionServer(ip string) (*PartitionServer, error) {
         NodeSysStats:   new(masterpb.NodeSysStats),
         status:         PS_Init,
         lastHeartbeat:  time.Now(),
-        partitionCache: new(PartitionCache),
+        partitionCache: NewPartitionCache(),
     }, nil
+}
+
+func NewPartitionServerByMeta(metaPS *metapb.Node) *PartitionServer {
+    return &PartitionServer{
+        Node:           metaPS,
+        status:         PS_Init,
+        partitionCache: NewPartitionCache(),
+    }
 }
 
 func (p *PartitionServer) persistent(store Store) error {
@@ -111,9 +119,16 @@ func (p *PartitionServer) changeStatus(newStatus metapb.PSStatus) {
 }
 
 type PSCache struct {
-    lock         sync.RWMutex
-    id2Servers   map[uint32]*PartitionServer
-    addr2Servers map[string]*PartitionServer  // key is ip:port
+    lock       sync.RWMutex
+    id2Servers map[uint32]*PartitionServer
+    ip2Servers map[string]*PartitionServer
+}
+
+func NewPSCache() *PSCache {
+    return &PSCache{
+        id2Servers: make(map[uint32]*PartitionServer),
+        ip2Servers: make(map[string]*PartitionServer),
+    }
 }
 
 func (c *PSCache) getAllServers() []*PartitionServer {
@@ -132,7 +147,7 @@ func (c *PSCache) findServerByAddr(addr string) *PartitionServer {
     c.lock.RLock()
     defer c.lock.RUnlock()
 
-    ps, ok := c.addr2Servers[addr]
+    ps, ok := c.ip2Servers[addr]
     if !ok {
         return nil
     }
@@ -156,7 +171,34 @@ func (c *PSCache) addServer(server *PartitionServer) {
 
 
     c.id2Servers[server.ID] = server
-    c.addr2Servers[util.BuildAddr(server.Ip, server.Port)] = server
+    c.ip2Servers[server.Ip] = server
+}
+
+func (c *PSCache) recovery(store Store) ([]*PartitionServer, error) {
+    prefix := []byte(PREFIX_PARTITION_SERVER)
+    startKey, limitKey := util.BytesPrefix(prefix)
+
+    resultServers := make([]*PartitionServer, 0)
+
+    iterator := store.Scan(startKey, limitKey)
+    defer iterator.Release()
+    for iterator.Next() {
+        if iterator.Key() == nil {
+            log.Error("ps store key is nil. never happened!!!")
+            continue
+        }
+
+        val := iterator.Value()
+        metaPS := new(metapb.Node)
+        if err := proto.Unmarshal(val, metaPS); err != nil {
+            log.Error("fail to unmarshal ps from store. err[%v]", err)
+            return nil, ErrInternalError
+        }
+
+        resultServers = append(resultServers, NewPartitionServerByMeta(metaPS))
+    }
+
+    return resultServers, nil
 }
 
 

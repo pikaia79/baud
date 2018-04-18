@@ -28,11 +28,11 @@ func NewDB(dbName string) (*DB, error) {
 		return nil, ErrGenIdFailed
 	}
 	db := &DB{
-		DB:		&metapb.DB{
-			ID: 	dbId,
-			Name: 	dbName,
+		DB: &metapb.DB{
+			ID:   dbId,
+			Name: dbName,
 		},
-		spaceCache: 	new(SpaceCache),
+		spaceCache: NewSpaceCache(),
 	}
 	return db, nil
 }
@@ -40,7 +40,7 @@ func NewDB(dbName string) (*DB, error) {
 func NewDBByMeta(metaDb *metapb.DB) *DB {
 	return &DB{
 		DB:         metaDb,
-		spaceCache: new(SpaceCache),
+		spaceCache: NewSpaceCache(),
 	}
 }
 
@@ -85,17 +85,30 @@ func (db *DB) rename(newDbName string) {
 }
 
 type DBCache struct {
-	lock      sync.RWMutex
-	dbs       map[string]*DB
-	idNameMap map[uint32]string
+	lock     sync.RWMutex
+	dbs      map[uint32]*DB
+	name2Ids map[string]uint32
+}
+
+func NewDBCache() *DBCache {
+	return &DBCache{
+		dbs:     make(map[uint32]*DB),
+		name2Ids:make(map[string]uint32),
+	}
 }
 
 func (c *DBCache) findDbByName(dbName string) *DB {
 	c.lock.RLock()
 	defer c.lock.RUnlock()
 
-	db, ok := c.dbs[dbName]
+	id, ok := c.name2Ids[dbName]
 	if !ok {
+		return nil
+	}
+
+	db, ok := c.dbs[id]
+	if !ok {
+		log.Error("dbCache data is unmatched, name[%v], id[%v]", dbName, id)
 		return nil
 	}
 	return db
@@ -105,39 +118,49 @@ func (c *DBCache) addDb(db *DB) {
 	c.lock.Lock()
 	defer c.lock.Unlock()
 
-	c.dbs[db.Name] = db
-	c.idNameMap[db.ID] = db.Name
+	c.dbs[db.ID] = db
+	c.name2Ids[db.Name] = db.ID
 }
 
 func (c *DBCache) deleteDb(db *DB) {
 	c.lock.Lock()
 	defer c.lock.Unlock()
 
-	delete(c.dbs, db.Name)
-	delete(c.idNameMap, db.ID)
+	delete(c.dbs, db.ID)
+	delete(c.name2Ids, db.Name)
 }
 
-func (c *DBCache) recovery(store Store) (*DBCache, error) {
-	prefix := []byte(fmt.Sprintf("%s", PREFIX_DB))
+func (c *DBCache) getAllDBs() ([]*DB, error) {
+	c.lock.RLock()
+	defer c.lock.RUnlock()
+
+	dbs := make([]*DB, len(c.dbs))
+
+}
+
+func (c *DBCache) recovery(store Store) ([]*DB, error) {
+	prefix := []byte(PREFIX_DB)
 	startKey, limitKey := util.BytesPrefix(prefix)
 
-	var dbCache = new(DBCache)
+	resultDBs := make([]*DB, 0)
 
 	iterator := store.Scan(startKey, limitKey)
 	defer iterator.Release()
 	for iterator.Next() {
 		if iterator.Key() == nil {
+			log.Error("db store key is nil. never happened!!!")
 			continue
 		}
 
 		val := iterator.Value()
 		metaDb := new(metapb.DB)
 		if err := proto.Unmarshal(val, metaDb); err != nil {
-			log.Error("fail to unmasharl db from store. err[%v]", err)
-			continue
+			log.Error("fail to unmarshal db from store. err[%v]", err)
+			return nil, ErrInternalError
 		}
-		dbCache.addDb(NewDBByMeta(metaDb))
+
+		resultDBs = append(resultDBs, NewDBByMeta(metaDb))
 	}
 
-	return dbCache, nil
+	return resultDBs, nil
 }

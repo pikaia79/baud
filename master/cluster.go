@@ -21,9 +21,9 @@ func NewCluster(config *Config) *Cluster {
 	return &Cluster{
 		config: 		config,
 		store: 			NewRaftStore(config),
-		dbCache: 		new(DBCache),
-		psCache:        new(PSCache),
-		partitionCache: new(PartitionCache),
+		dbCache: 		NewDBCache(),
+		psCache:        NewPSCache(),
+		partitionCache: NewPartitionCache(),
 	}
 }
 
@@ -36,7 +36,15 @@ func (c *Cluster) Start() error {
 	GetIdGeneratorInstance(c.store)
 
 	// recovery memory meta data
-	c.store.Scan()
+	if err := c.recoveryPSCache(); err != nil {
+		log.Error("fail to recovery psCache. err:[%v]", err)
+		return err
+	}
+	if err := c.recoveryDBCache(); err != nil {
+		log.Error("fail to recovery dbCache. err[%v]", err)
+		return err
+	}
+
 	return nil
 }
 
@@ -44,6 +52,55 @@ func (c *Cluster) Close() {
 	if c.store != nil {
 		c.store.Close()
 	}
+}
+
+func (c *Cluster) recoveryPSCache() error {
+	c.clusterLock.Lock()
+	defer c.clusterLock.Unlock()
+
+	servers, err := c.psCache.recovery(c.store)
+	if err != nil {
+		return err
+	}
+
+	for _, server := range servers {
+		c.psCache.addServer(server)
+	}
+
+	return nil
+}
+
+func (c *Cluster) recoveryDBCache() error {
+	c.clusterLock.Lock()
+	defer c.clusterLock.Unlock()
+
+	dbs, err := c.dbCache.recovery(c.store)
+	if err != nil {
+		return err
+	}
+
+	for _, db := range dbs {
+		c.dbCache.addDb(db)
+	}
+
+	return nil
+}
+
+func (c *Cluster) recoverySpaceCache() error {
+	c.clusterLock.Lock()
+	defer c.clusterLock.Unlock()
+
+	c.dbCache.recovery()
+	dbs, err := c.spaceCache.recovery(c.store)
+	if err != nil {
+		return err
+	}
+
+	for _, db := range dbs {
+		c.dbCache.addDb(db)
+	}
+
+	return nil
 }
 
 func (c *Cluster) createDb(dbName string) (*DB, error) {
