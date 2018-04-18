@@ -344,6 +344,35 @@ func TestBufferGrowth(t *testing.T) {
 	buffPool.putBuffer(b)
 }
 
+<<<<<<< HEAD
+func BenchmarkBufferNotEmptyWriteRead(b *testing.B) {
+	buf := make([]byte, 1024)
+	for i := 0; i < b.N; i++ {
+		b := buffPool.getBuffer(1024)
+		b.Write(buf[0:1])
+		for i := 0; i < 5<<10; i++ {
+			b.Write(buf)
+			b.Read(buf)
+		}
+		buffPool.putBuffer(b)
+	}
+}
+
+func BenchmarkBufferFullSmallReads(b *testing.B) {
+	buf := make([]byte, 1024)
+	for i := 0; i < b.N; i++ {
+		b := buffPool.getBuffer(1024)
+		b.Write(buf)
+		for b.Len()+20 < b.Cap() {
+			b.Write(buf[:10])
+		}
+		for i := 0; i < 5<<10; i++ {
+			b.Read(buf[:1])
+			b.Write(buf[:1])
+		}
+		buffPool.putBuffer(b)
+	}
+=======
 func BenchmarkRWWithoutGrow(b *testing.B) {
 	b.Run("Write", func(b *testing.B) {
 		b.ResetTimer()
@@ -396,4 +425,5 @@ func BenchmarkRWWithGrow2x(b *testing.B) {
 			}
 		})
 	})
+>>>>>>> upstream/master
 }

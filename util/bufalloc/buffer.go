@@ -15,10 +15,13 @@ type Buffer interface {
 	// Grow grows the buffer's capacity, if necessary, to guarantee space for n bytes.
 	// If n is negative, Grow will panic. If the buffer can't grow it will panic with bytes.ErrTooLarge.
 	Grow(n int)
+<<<<<<< HEAD
+=======
 	// WriteString appends the contents of s to the buffer, growing the buffer as
 	// needed. The return value n is the length of s; err is always nil. If the
 	// buffer becomes too large, WriteString will panic with ErrTooLarge.
 	WriteString(s string) (n int, err error)
+>>>>>>> upstream/master
 	// Write appends the contents of p to the buffer, growing the buffer as needed.
 	// The return value n is the length of p; err is always nil.
 	// If the buffer becomes too large, Write will panic with bytes.ErrTooLarge.
@@ -66,12 +69,18 @@ type Buffer interface {
 	Cap() int
 }
 
+<<<<<<< HEAD
+=======
 // AllocBuffer allocation byte buffer to a given size
+>>>>>>> upstream/master
 func AllocBuffer(n int) Buffer {
 	return buffPool.getBuffer(n)
 }
 
+<<<<<<< HEAD
+=======
 // FreeBuffer release buffer to pool
+>>>>>>> upstream/master
 func FreeBuffer(buf Buffer) {
 	buffPool.putBuffer(buf)
 }
