@@ -17,7 +17,6 @@ type NumericField struct {
 	name              string
 	property          Property
 	value             util.Value
-	numPlainTextBytes uint64
 }
 
 func (n *NumericField) Name() string {
@@ -84,7 +83,6 @@ func NewNumericFieldFromBytes(name string, value []byte) *NumericField {
 		name:              name,
 		value:             value,
 		property:          DefaultNumericProperty,
-		numPlainTextBytes: uint64(len(value)),
 	}
 }
 

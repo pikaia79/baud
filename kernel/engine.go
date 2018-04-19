@@ -8,7 +8,7 @@ type Engine interface {
 	DeleteDocuments(docIDs []string) (int, error)
 
 	// source set true means need return _source
-	GetDoc(docID string, fields []string, source bool) (document.Document, bool)
+	GetDocument(docID string, fields []string, source bool) (*document.Document, bool)
 
 	// TODO search
 }

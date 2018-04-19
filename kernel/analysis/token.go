@@ -7,7 +7,6 @@ const (
 	DateTime
 	Boolean
 	Text
-	IPv4
 	KeyWord
 )
 
@@ -24,6 +23,5 @@ type Token struct {
 	// occurrences of its term in the field.
 	Position int       `json:"position"`
 	Type     TokenType `json:"type"`
-	KeyWord  bool      `json:"keyword"`
 }
 
