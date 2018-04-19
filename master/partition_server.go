@@ -69,7 +69,6 @@ func (p *PartitionServer) persistent(store Store) error {
     p.propertyLock.RLock()
     defer p.propertyLock.RUnlock()
 
-    psCopy := deepcopy.Iface(p.Node).(*metapb.Node)
     psVal, err := proto.Marshal(psCopy)
     if err != nil {
         log.Error("marshal ps[%v] is failed.", psCopy)
@@ -116,6 +115,13 @@ func (p *PartitionServer) changeStatus(newStatus metapb.PSStatus) {
     } else {
         log.Error("can not change ps[%v] Status from [%v] to [%v]", p.Id, oldStatus, newStatus)
     }
+}
+
+func (p *PartitionServer) getRpcAddr() string {
+    p.propertyLock.RLock()
+    defer p.propertyLock.RUnlock()
+
+    return util.BuildAddr(p.Ip, p.Port)
 }
 
 type PSCache struct {

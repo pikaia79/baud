@@ -160,7 +160,10 @@ func (c *Cluster) recoveryPartition() error {
 				continue
 			}
 		}
-		partition.deleteReplica(delMetaReplicas...)
+		if err := partition.deleteReplica(c.store, delMetaReplicas...); err != nil {
+		    log.Error("partition delete unused replicas err[%v]", err)
+		    continue
+        }
 
 		// TODO : add partition or replicas into ps
 	}

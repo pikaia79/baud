@@ -72,6 +72,8 @@ func (rs *RpcServer) PSRegister(ctx context.Context,
 			resp.ResponseHeader = makeRpcRespHeader(err)
 			return resp, nil
 		}
+		ps.persistent(rs.cluster.store)
+
 		ps.status = PS_Registered
 		rs.cluster.psCache.addServer(ps)
 
