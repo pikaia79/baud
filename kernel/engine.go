@@ -7,8 +7,8 @@ type Engine interface {
 	UpdateDocuments(docs []*document.Document) error
 	DeleteDocuments(docIDs []string) (int, error)
 
-	// source set true means need return _source
-	GetDocument(docID string, fields []string, source bool) (*document.Document, bool)
+	// _source, _all as system field
+	GetDocument(docID string, fields []string) (*document.Document, bool)
 
 	// TODO search
 }
