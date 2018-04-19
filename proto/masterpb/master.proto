@@ -25,10 +25,33 @@ service MasterRpc {
     rpc GetRoute(GetRouteRequest)       returns (GetRouteResponse) {}
     rpc PSRegister(PSRegisterRequest)   returns (PSRegisterResponse) {}
     rpc PSHeartbeat(PSHeartbeatRequest) returns (PSHeartbeatResponse) {}
+    rpc GetDB(GetDBRequest)             returns (GetDBResponse) {}
+    rpc GetSpace(GetSpaceRequest)       returns (GetSpaceResponse) {}
 }
 
 message Route {
     Partition        partition  = 1 [(gogoproto.nullable) = false, (gogoproto.embed) = true];
+}
+
+message GetDBRequest {
+    RequestHeader header = 1 [(gogoproto.nullable) = false, (gogoproto.embed) = true];
+    string        DB_name = 2;
+}
+
+message GetDBResponse {
+    ResponseHeader header = 1 [(gogoproto.nullable) = false, (gogoproto.embed) = true];
+    DB             db    = 2 [(gogoproto.nullable) = false];
+}
+
+message GetSpaceRequest {
+    RequestHeader header = 1 [(gogoproto.nullable) = false, (gogoproto.embed) = true];
+    uint32        db_id   = 2 [(gogoproto.customname) = "ID", (gogoproto.casttype) = "DBID"];
+    string        Space_name = 3;
+}
+
+message GetSpaceResponse {
+    ResponseHeader header = 1 [(gogoproto.nullable) = false, (gogoproto.embed) = true];
+    Space             space    = 2 [(gogoproto.nullable) = false];
 }
 
 message GetRouteRequest {
