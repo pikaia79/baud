@@ -151,16 +151,16 @@ func (c *Cluster) recoveryPartition() error {
 		space.searchTree.update(partition.Partition)
 		c.partitionCache.addPartition(partition)
 
-		var delMetaReplias = make([]*metapb.Replica, 0)
+		var delMetaReplicas = make([]*metapb.Replica, 0)
 		for _, metaReplica := range partition.getAllReplicas() {
 			ps := c.psCache.findServerById(metaReplica.NodeID)
 			if ps == nil {
 				log.Warn("Cannot find ps for the replica[%v] when recovery replicas. discord it", metaReplica)
-				delMetaReplias = append(delMetaReplias, metaReplica)
+				delMetaReplicas = append(delMetaReplicas, metaReplica)
 				continue
 			}
 		}
-		partition.deleteReplica(delMetaReplias...)
+		partition.deleteReplica(delMetaReplicas...)
 
 		// TODO : add partition or replicas into ps
 	}
