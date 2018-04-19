@@ -1,43 +1,43 @@
 package master
 
 import (
-	"util/log"
-	"fmt"
-	"sync/atomic"
-	"sync"
 	"encoding/binary"
+	"fmt"
+	"sync"
+	"sync/atomic"
+	"util/log"
 )
 
 var (
 	GEN_STEP          uint32 = 10
 	AUTO_INCREMENT_ID string = fmt.Sprintf("$auto_increment_id")
 
-	singleInstance 				IDGenerator
-	singleInstanceSyncOnce 		sync.Once
+	idGeneratorInstance IDGenerator
+	idGeneratorSyncOnce sync.Once
 )
 
 type IDGenerator interface {
 	GenID() (uint32, error)
 }
 
-func IdGeneratorSingleInstance(store Store) IDGenerator {
-	singleInstanceSyncOnce.Do(func() {
-		singleInstance = NewIDGenerator([]byte(AUTO_INCREMENT_ID), GEN_STEP, store)
+func GetIdGeneratorInstance(store Store) IDGenerator {
+	idGeneratorSyncOnce.Do(func() {
+		idGeneratorInstance = NewIDGenerator([]byte(AUTO_INCREMENT_ID), GEN_STEP, store)
 	})
-	return singleInstance
+	return idGeneratorInstance
 }
 
 type idGenerator struct {
-	lock   	sync.Mutex
-	base 	uint32
-	end  	uint32
+	lock sync.Mutex
+	base uint32
+	end  uint32
 
-	key 	[]byte
-	step 	uint32
+	key  []byte
+	step uint32
 
 	// TODO: put operation of this store transfer new end value yielded through raft message,
 	// may be slow GenID()
-	store 	Store
+	store Store
 }
 
 func NewIDGenerator(key []byte, step uint32, store Store) *idGenerator {

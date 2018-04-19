@@ -23,8 +23,13 @@ message RequestHeader {
 }
 
 message ResponseHeader {
-    int32   code     = 1 [(gogoproto.casttype) = "int16"];
-    string  message  = 2;
+    uint32   code     = 1 [(gogoproto.casttype) = "RespCode"];
+    string   message  = 2;
+}
+
+message DocID {
+    uint32 slot_id = 1 [(gogoproto.customname) = "SlotID", (gogoproto.casttype) = "SlotID"];
+    uint64 seq_no  = 2;
 }
 
 message DocID {

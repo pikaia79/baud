@@ -196,7 +196,7 @@ func newHttpErrReply(err error) *HttpReply {
 		return newHttpSucReply("")
 	}
 
-	code, ok := httpErrMap[err.Error()]
+	code, ok := Err2CodeMap[err.Error()]
 	if ok {
 		return &HttpReply{
 			Code: code,

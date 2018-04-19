@@ -13,7 +13,8 @@ type Master struct {
 	apiServer *ApiServer
 	rpcServer *RpcServer
 
-	wg 		  sync.WaitGroup
+	createProcessor *PartitionProcessor
+	wg              sync.WaitGroup
 }
 
 func NewServer() *Master {
@@ -44,6 +45,8 @@ func (ms *Master) Start(config *Config) error {
 		return err
 	}
 
+	ProcessorStart(ms.cluster)
+
 	return nil
 }
 
@@ -57,4 +60,5 @@ func (ms *Master) Shutdown() {
 	if ms.cluster != nil {
 		ms.cluster.Close()
 	}
+	ProcessorStop()
 }

@@ -17,16 +17,16 @@ const (
 )
 
 var (
-    singleInstance *PSRpcClient
+    singleInstance *PSClient
     instanceLock   sync.RWMutex
 )
 
-type PSRpcClient struct {
+type PSClient struct {
     connPool map[string]*PSConn
     lock     sync.RWMutex
 }
 
-func GetPSRpcClientInstance() *PSRpcClient {
+func GetPSRpcClientInstance() *PSClient {
     if singleInstance != nil {
         return singleInstance
     }
@@ -34,7 +34,7 @@ func GetPSRpcClientInstance() *PSRpcClient {
     instanceLock.Lock()
     defer instanceLock.Unlock()
     if singleInstance == nil {
-        singleInstance = &PSRpcClient{
+        singleInstance = &PSClient{
             connPool: make(map[string]*PSConn),
         }
     }
@@ -44,7 +44,7 @@ func GetPSRpcClientInstance() *PSRpcClient {
 type PSConn struct {
     rpcAddr string
     conn    *grpc.ClientConn
-    client  pspb.AdminGrpcClient
+    client  pspb.ApiGrpcClient
 }
 
 func (c *PSConn) callRpc(req interface{}, timeout time.Duration) (resp interface{}, err error) {
@@ -80,8 +80,8 @@ func (c *PSConn) callRpc(req interface{}, timeout time.Duration) (resp interface
     return nil, ErrGrpcInvokeFailed
 }
 
-func (c *PSRpcClient) CreateReplica(addr string, partition *metapb.Partition) error {
-    psConn, err := c.getConn(addr)
+func (client *PSClient) CreateReplica(addr string, partition *metapb.Partition) error {
+    psConn, err := client.getConn(addr)
     if err != nil {
         return err
     }
@@ -98,8 +98,8 @@ func (c *PSRpcClient) CreateReplica(addr string, partition *metapb.Partition) er
     return nil
 }
 
-func (c *PSRpcClient) DeleteReplica(addr string, partition *metapb.Partition) error {
-    psConn, err := c.getConn(addr)
+func (client *PSClient) DeleteReplica(addr string, partition *metapb.Partition) error {
+    psConn, err := client.getConn(addr)
     if err != nil {
         return err
     }
@@ -116,14 +116,14 @@ func (c *PSRpcClient) DeleteReplica(addr string, partition *metapb.Partition) er
     return nil
 }
 
-func (c *PSRpcClient) getConn(addr string) (*PSConn, error) {
+func (client *PSClient) getConn(addr string) (*PSConn, error) {
     if len(addr) == 0 {
         return nil, ErrInternalError
     }
-    c.lock.Lock()
-    defer c.lock.Unlock()
+    client.lock.Lock()
+    defer client.lock.Unlock()
 
-    if psConn, ok := c.connPool[addr]; ok {
+    if psConn, ok := client.connPool[addr]; ok {
         return psConn, nil
     }
 
@@ -139,7 +139,7 @@ func (c *PSRpcClient) getConn(addr string) (*PSConn, error) {
         conn:    grpcConn,
         client:  pspb.NewAdminGrpcClient(grpcConn),
     }
-    c.connPool[addr] = psConn
+    client.connPool[addr] = psConn
 
     return psConn, nil
 }
