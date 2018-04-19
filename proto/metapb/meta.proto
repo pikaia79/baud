@@ -32,11 +32,6 @@ message DocID {
     uint64 seq_no  = 2;
 }
 
-message DocID {
-    uint32 slot_id = 1 [(gogoproto.customname) = "SlotID", (gogoproto.casttype) = "SlotID"];
-    uint64 seq_no  = 2;
-}
-
 message DB {
     uint32 id   = 1 [(gogoproto.customname) = "ID", (gogoproto.casttype) = "DBID"];
     string name = 2;
