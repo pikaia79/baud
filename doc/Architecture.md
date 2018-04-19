@@ -132,6 +132,8 @@ for entity partition, (UID, fieldID) -> a single or multiple packed values of th
 
 for edge partition, (<UID1, UID2>, fieldID) -> ...
 
+FieldTables are on the disk. 
+
 * PostingListTable
 
 foreach field, an in-memory B-Tree as the Dictionary, and the leaf values are the pointers to PostingLists. 
@@ -152,6 +154,8 @@ type PostingChunk struct {
 
 * PositionListTable
 
+foreach field, (docID + term) -> PositionList, in-memory
+
 type PositionList struct {
     positions []uint32
     wdf int
@@ -159,9 +163,9 @@ type PositionList struct {
 
 * SynonymTable
 
-* TermListTable
+term synonyms
 
-UID -> TermList
+on-disk store
 
 
 ### Key Operations
