@@ -4,6 +4,8 @@ import (
 	"util/log"
 	"sync"
 	"math"
+	"util"
+	"proto/metapb"
 )
 
 type Cluster struct {
@@ -11,6 +13,7 @@ type Cluster struct {
 	store 			Store
 
 	dbCache 		*DBCache
+	//spaceCache      *SpaceCache
 	psCache 		*PSCache
 	partitionCache  *PartitionCache
 
@@ -22,6 +25,7 @@ func NewCluster(config *Config) *Cluster {
 		config: 		config,
 		store: 			NewRaftStore(config),
 		dbCache: 		NewDBCache(),
+		//spaceCache: 	NewSpaceCache(),
 		psCache:        NewPSCache(),
 		partitionCache: NewPartitionCache(),
 	}
@@ -44,7 +48,16 @@ func (c *Cluster) Start() error {
 		log.Error("fail to recovery dbCache. err[%v]", err)
 		return err
 	}
+	if err := c.recoverySpaceCache(); err != nil {
+		log.Error("fail to recovery spaceCache. err[%v]", err)
+		return err
+	}
+	if err := c.recoveryPartition(); err != nil {
+		log.Error("fail to recovery partitionCache. err[%v]", err)
+		return err
+	}
 
+	log.Info("finish to recovery whole cluster")
 	return nil
 }
 
@@ -90,14 +103,66 @@ func (c *Cluster) recoverySpaceCache() error {
 	c.clusterLock.Lock()
 	defer c.clusterLock.Unlock()
 
-	c.dbCache.recovery()
-	dbs, err := c.spaceCache.recovery(c.store)
+	dbs := c.dbCache.getAllDBs()
+	if dbs == nil || len(dbs) == 0 {
+		return nil
+	}
+
+	allSpaces, err := dbs[0].spaceCache.recovery(c.store)
 	if err != nil {
 		return err
 	}
 
-	for _, db := range dbs {
-		c.dbCache.addDb(db)
+	for _, space := range allSpaces {
+		db := c.dbCache.findDbById(space.DB)
+		if db == nil {
+			log.Warn("Cannot find db for the space[%v] when recovery space. discord it", space)
+			continue
+		}
+
+		db.spaceCache.addSpace(space)
+	}
+
+	return nil
+}
+
+func (c *Cluster) recoveryPartition() error {
+	c.clusterLock.Lock()
+	defer c.clusterLock.Unlock()
+
+	partitions, err := c.partitionCache.recovery(c.store)
+	if err != nil {
+		return err
+	}
+
+	for _, partition := range partitions {
+		db := c.dbCache.findDbById(partition.DB)
+		if db == nil {
+			log.Warn("Cannot find db for the partition[%v] when recovery partition. discord it", partition)
+			continue
+		}
+
+		space := db.spaceCache.findSpaceById(partition.Space)
+		if space == nil {
+			log.Warn("Cannot find space for the partition[%v] when recovery partition. discord it", partition)
+			continue
+		}
+
+		space.searchTree.update(partition.Partition)
+		c.partitionCache.addPartition(partition)
+
+		var delMetaReplias = make([]*metapb.Replica, 0)
+		for _, metaReplica := range partition.getAllReplicas() {
+			ps := c.psCache.findServerById(metaReplica.NodeID)
+			if ps == nil {
+				log.Warn("Cannot find ps for the replica[%v] when recovery replicas. discord it", metaReplica)
+				delMetaReplias = append(delMetaReplias, metaReplica)
+				continue
+			}
+		}
+		partition.deleteReplica(delMetaReplias...)
+
+		// TODO : add partition or replicas into ps
 	}
 
 	return nil
@@ -176,7 +241,7 @@ func (c *Cluster) createSpace(dbName, spaceName, partitionKey, partitionFunc str
 		return nil, err
 	}
 
-	slots := slotSplit(0, math.MaxUint32, partitionNum + 1)
+	slots := util.SlotSplit(0, math.MaxUint32, partitionNum + 1)
 	if slots == nil {
 		log.Error("fail to split slot range [%v-%v]", 0, math.MaxUint32)
 		return nil, ErrInternalError
@@ -239,50 +304,4 @@ func (c *Cluster) renameSpace(dbName, srcSpaceName, destSpaceName string) error 
 
 func (c *Cluster) detailSpace(spaceId int) (*Space, error) {
 	return nil, nil
-}
-
-func (c *Cluster) createPS(ip string) (*PartitionServer, error) {
-
-
-    newPs := NewPartitionServer(newId, request.Ip)
-    newPs.changeStatus(PS_Registered)
-    rs.cluster.psCache.addServer(ps)
-    newPs.persistent()
-    resp.NodeID = newId
-}
-
-func slotSplit(start, end uint32, n int) []uint32 {
-	if n <= 0 {
-		return nil
-	}
-	if end - start + 1 < uint32(n) {
-		return nil
-	}
-
-	var min, max uint32
-	if start <= end {
-		min = start
-		max = end
-	} else {
-		min = end
-		max = start
-	}
-
-	ret := make([]uint32, 0)
-	switch n {
-	case 1:
-		ret = append(ret, min)
-	case 2:
-		ret = append(ret, min)
-		ret = append(ret, max)
-	default:
-		step := (max - min) / uint32(n - 1)
-		ret = append(ret, min)
-		for i := 1 ; i < n - 1; i++ {
-			ret = append(ret, min + uint32(i) * step)
-		}
-		ret = append(ret, max)
-	}
-
-	return ret
 }

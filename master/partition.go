@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"time"
 	"github.com/gogo/protobuf/proto"
+	"util"
 )
 
 const (
@@ -18,7 +19,7 @@ const (
 )
 
 type Partition struct {
-	*metapb.Partition
+	*metapb.Partition  // !!! 不要直接操作Replicas，要先获取propertyLock
 
 	lastHeartbeat time.Time
 	propertyLock  sync.RWMutex
@@ -44,6 +45,12 @@ func NewPartition(dbId, spaceId, startSlot, endSlot uint32) (*Partition, error) 
 	}, nil
 }
 
+func NewPartitionByMeta(metaPartition *metapb.Partition) *Partition {
+	return &Partition{
+		Partition: metaPartition,
+	}
+}
+
 func (p *Partition) batchPersistent(batch Batch) error {
 	p.propertyLock.RLock()
 	defer p.propertyLock.RUnlock()
@@ -58,6 +65,38 @@ func (p *Partition) batchPersistent(batch Batch) error {
 	batch.Put(key, marshalVal)
 
 	return nil
+}
+
+func (p *Partition) deleteReplica(metaReplicas ...*metapb.Replica) {
+	p.propertyLock.Lock()
+	defer p.propertyLock.Unlock()
+
+	for i := len(p.Replicas) - 1; i >= 0; i-- {
+		for _, metaReplica := range metaReplicas {
+			if p.Replicas[i].ID == metaReplica.ID {
+				p.Replicas = append(p.Replicas[:i], p.Replicas[i+1:]...)
+			}
+		}
+	}
+}
+
+func (p *Partition) addReplica(metaReplicas *metapb.Replica) {
+	p.propertyLock.Lock()
+	defer p.propertyLock.Unlock()
+
+	p.Replicas = append(p.Replicas, *metaReplicas)
+}
+
+func (p *Partition) getAllReplicas() []*metapb.Replica {
+	p.propertyLock.RLock()
+	defer p.propertyLock.RUnlock()
+
+	replicas := make([]*metapb.Replica, len(p.Replicas))
+	for _, metaReplica := range p.Replicas {
+		replicas = append(replicas, &metaReplica)
+	}
+
+	return replicas
 }
 
 //type ReplicaGroup struct {
@@ -127,6 +166,13 @@ func (c *PartitionCache) findPartitionById(partitionId uint32) *Partition {
 	return p
 }
 
+func (c *PartitionCache) addPartition(partition *Partition) {
+	c.lock.Lock()
+	defer c.lock.Unlock()
+
+	c.partitions[partition.ID] = partition
+}
+
 func (c *PartitionCache) getAllMetaPartitions() []*metapb.Partition {
 	c.lock.RLock()
 	defer c.lock.RUnlock()
@@ -137,6 +183,34 @@ func (c *PartitionCache) getAllMetaPartitions() []*metapb.Partition {
 	}
 
 	return partitions
+}
+
+
+func (c *PartitionCache) recovery(store Store) ([]*Partition, error) {
+	prefix := []byte(PREFIX_PARTITION)
+	startKey, limitKey := util.BytesPrefix(prefix)
+
+	resultPartitions := make([]*Partition, 0)
+
+	iterator := store.Scan(startKey, limitKey)
+	defer iterator.Release()
+	for iterator.Next() {
+		if iterator.Key() == nil {
+			log.Error("partition store key is nil. never happened!!!")
+			continue
+		}
+
+		val := iterator.Value()
+		metaPartition := new(metapb.Partition)
+		if err := proto.Unmarshal(val, metaPartition); err != nil {
+			log.Error("fail to unmarshal partition from store. err[%v]", err)
+			return nil, ErrInternalError
+		}
+
+		resultPartitions = append(resultPartitions, NewPartitionByMeta(metaPartition))
+	}
+
+	return resultPartitions, nil
 }
 
 type PartitionItem struct {
@@ -295,4 +369,3 @@ func (t *PartitionTree) ascendScan(rng *metapb.Partition, num int) []*PartitionI
 	})
 	return results
 }
-

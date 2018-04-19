@@ -88,8 +88,8 @@ func (p *PartitionProcessor) doRun() {
                     //}
                     //servers = append(servers, server)
 
-                    var newReplica = metapb.Replica{ID: replicaId}
-                    partitionToCreate.Replicas = append(partitionToCreate.Replicas, newReplica)
+                    var newMetaReplica = &metapb.Replica{ID: replicaId}
+                    partitionToCreate.addReplica(newMetaReplica)
                     if err := psRpcClient.CreateReplica(addr, partitionToCreate.Partition); err != nil {
                         log.Error("fail to do rpc create replica of partition[%v]. err:[%v]",
                             partitionToCreate.Partition, err)

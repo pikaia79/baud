@@ -108,9 +108,21 @@ func (c *DBCache) findDbByName(dbName string) *DB {
 
 	db, ok := c.dbs[id]
 	if !ok {
-		log.Error("dbCache data is unmatched, name[%v], id[%v]", dbName, id)
+		log.Error("!!!db cache map not consistent, db[%v : %v] not exists. never happened", dbName, id)
 		return nil
 	}
+	return db
+}
+
+func (c *DBCache) findDbById(dbId uint32) *DB {
+	c.lock.RLock()
+	defer c.lock.RUnlock()
+
+	db, ok := c.dbs[dbId]
+	if !ok {
+		return nil
+	}
+
 	return db
 }
 
@@ -130,12 +142,16 @@ func (c *DBCache) deleteDb(db *DB) {
 	delete(c.name2Ids, db.Name)
 }
 
-func (c *DBCache) getAllDBs() ([]*DB, error) {
+func (c *DBCache) getAllDBs() ([]*DB) {
 	c.lock.RLock()
 	defer c.lock.RUnlock()
 
 	dbs := make([]*DB, len(c.dbs))
+	for _, db := range c.dbs {
+		dbs = append(dbs, db)
+	}
 
+	return dbs
 }
 
 func (c *DBCache) recovery(store Store) ([]*DB, error) {

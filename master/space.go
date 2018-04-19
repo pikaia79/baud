@@ -7,6 +7,7 @@ import (
 	"util/deepcopy"
 	"fmt"
 	"github.com/gogo/protobuf/proto"
+	"util"
 )
 
 const (
@@ -56,6 +57,13 @@ func NewSpace(dbId uint32, dbName, spaceName string, policy *PartitionPolicy) (*
 		partitioning: policy,
 		searchTree: NewPartitionTree(),
 	}, nil
+}
+
+func NewSpaceByMeta(metaSpace *metapb.Space) *Space {
+	return &Space{
+		Space:      metaSpace,
+		searchTree: NewPartitionTree(),
+	}
 }
 
 func (s *Space) persistent(store Store) error {
@@ -143,7 +151,18 @@ func (c *SpaceCache) findSpaceByName(spaceName string) *Space {
 	}
 	space, ok := c.spaces[spaceId]
 	if !ok {
-		log.Error("!!!space cache map not consistent, space[%v] not exists.", spaceId)
+		log.Error("!!!space cache map not consistent, space[%v : %v] not exists. never happened", spaceName, spaceId)
+		return nil
+	}
+	return space
+}
+
+func (c *SpaceCache) findSpaceById(spaceId uint32) *Space {
+	c.lock.RLock()
+	defer c.lock.RUnlock()
+
+	space, ok := c.spaces[spaceId]
+	if !ok {
 		return nil
 	}
 	return space
@@ -166,4 +185,31 @@ func (c *SpaceCache) deleteSpace(space *Space) {
 		return
 	}
 	delete(c.name2Ids, oldSpace.Name)
+}
+
+func (c *SpaceCache) recovery(store Store) ([]*Space, error) {
+	prefix := []byte(PREFIX_SPACE)
+	startKey, limitKey := util.BytesPrefix(prefix)
+
+	resultSpaces := make([]*Space, 0)
+
+	iterator := store.Scan(startKey, limitKey)
+	defer iterator.Release()
+	for iterator.Next() {
+		if iterator.Key() == nil {
+			log.Error("space store key is nil. never happened!!!")
+			continue
+		}
+
+		val := iterator.Value()
+		metaSpace := new(metapb.Space)
+		if err := proto.Unmarshal(val, metaSpace); err != nil {
+			log.Error("fail to unmarshal space from store. err[%v]", err)
+			return nil, ErrInternalError
+		}
+
+		resultSpaces = append(resultSpaces, NewSpaceByMeta(metaSpace))
+	}
+
+	return resultSpaces, nil
 }

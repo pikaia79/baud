@@ -6,11 +6,11 @@ type (
 	// SpaceID is a custom type for space ID
 	SpaceID = uint32
 	// PartitionID is a custom type for partition ID
-	PartitionID = uint64
+	PartitionID = uint32
 	// SlotID is a custom type for slot ID
 	SlotID = uint32
 	// ReplicaID is a custom type for repl ID
-	ReplicaID = uint64
+	ReplicaID = uint32
 	// NodeID is a custom type for node ID
 	NodeID = uint32
 	// Key is a custom type for key

@@ -32,3 +32,39 @@ func BytesPrefix(prefix []byte) ([]byte, []byte) {
     }
     return prefix, limit
 }
+
+func SlotSplit(start, end uint32, n int) []uint32 {
+    if n <= 0 {
+        return nil
+    }
+    if end - start + 1 < uint32(n) {
+        return nil
+    }
+
+    var min, max uint32
+    if start <= end {
+        min = start
+        max = end
+    } else {
+        min = end
+        max = start
+    }
+
+    ret := make([]uint32, 0)
+    switch n {
+    case 1:
+        ret = append(ret, min)
+    case 2:
+        ret = append(ret, min)
+        ret = append(ret, max)
+    default:
+        step := (max - min) / uint32(n - 1)
+        ret = append(ret, min)
+        for i := 1 ; i < n - 1; i++ {
+            ret = append(ret, min + uint32(i) * step)
+        }
+        ret = append(ret, max)
+    }
+
+    return ret
+}
