@@ -117,6 +117,10 @@ func (c *Cluster) recoverySpaceCache() error {
 		db := c.dbCache.findDbById(space.DB)
 		if db == nil {
 			log.Warn("Cannot find db for the space[%v] when recovery space. discord it", space)
+
+			if err := space.erase(c.store); err != nil {
+				log.Error("fail to remove unused space[%v] when recovery. err:[%v]", space, err)
+			}
 			continue
 		}
 
@@ -139,12 +143,20 @@ func (c *Cluster) recoveryPartition() error {
 		db := c.dbCache.findDbById(partition.DB)
 		if db == nil {
 			log.Warn("Cannot find db for the partition[%v] when recovery partition. discord it", partition)
+
+			if err := partition.erase(c.store); err != nil {
+				log.Error("fail to remove unused partition[%v] when recovery. err:[%v]", partition, err)
+			}
 			continue
 		}
 
 		space := db.spaceCache.findSpaceById(partition.Space)
 		if space == nil {
 			log.Warn("Cannot find space for the partition[%v] when recovery partition. discord it", partition)
+
+			if err := partition.erase(c.store); err != nil {
+				log.Error("fail to remove unused partition[%v] when recovery. err:[%v]", partition, err)
+			}
 			continue
 		}
 
@@ -159,13 +171,13 @@ func (c *Cluster) recoveryPartition() error {
 				delMetaReplicas = append(delMetaReplicas, metaReplica)
 				continue
 			}
+
+			ps.addPartition(partition)
 		}
 		if err := partition.deleteReplica(c.store, delMetaReplicas...); err != nil {
-		    log.Error("partition delete unused replicas err[%v]", err)
+		    log.Error("fail to remove unused replicas when recovery partition[%v]. err[%v]", partition, err)
 		    continue
         }
-
-		// TODO : add partition or replicas into ps
 	}
 
 	return nil

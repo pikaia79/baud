@@ -67,8 +67,8 @@ func NewSpaceByMeta(metaSpace *metapb.Space) *Space {
 }
 
 func (s *Space) persistent(store Store) error {
-	s.propertyLock.RLock()
-	defer s.propertyLock.RUnlock()
+	s.propertyLock.Lock()
+	defer s.propertyLock.Unlock()
 
 	copy := deepcopy.Iface(s.Space).(*metapb.Space)
 	spaceVal, err := proto.Marshal(copy)
@@ -86,8 +86,8 @@ func (s *Space) persistent(store Store) error {
 }
 
 func (s *Space) batchPersistent(batch Batch) error {
-	s.propertyLock.RLock()
-	defer s.propertyLock.RUnlock()
+	s.propertyLock.Lock()
+	defer s.propertyLock.Unlock()
 
 	copy := deepcopy.Iface(s.Space).(*metapb.Space)
 	spaceVal, err := proto.Marshal(copy)
@@ -102,8 +102,8 @@ func (s *Space) batchPersistent(batch Batch) error {
 }
 
 func (s *Space) erase(store Store) error {
-	s.propertyLock.RLock()
-	defer s.propertyLock.RUnlock()
+	s.propertyLock.Lock()
+	defer s.propertyLock.Unlock()
 
 	spaceKey := []byte(fmt.Sprintf("%s%d", PREFIX_SPACE, s.ID))
 	if err := store.Delete(spaceKey); err != nil {

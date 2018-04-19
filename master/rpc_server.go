@@ -74,7 +74,7 @@ func (rs *RpcServer) PSRegister(ctx context.Context,
 		}
 		ps.persistent(rs.cluster.store)
 
-		ps.status = PS_Registered
+		ps.status = PS_REGISTERED
 		rs.cluster.psCache.addServer(ps)
 
 		resp.ResponseHeader = makeRpcRespHeader(ErrSuc)
@@ -92,7 +92,7 @@ func (rs *RpcServer) PSRegister(ctx context.Context,
 	}
 
 	// old ps rebooted
-	ps.changeStatus(PS_Registered)
+	ps.changeStatus(PS_REGISTERED)
 
 	resp.ResponseHeader = makeRpcRespHeader(ErrSuc)
 	resp.NodeID = ps.ID

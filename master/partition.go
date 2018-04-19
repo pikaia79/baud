@@ -53,14 +53,27 @@ func NewPartitionByMeta(metaPartition *metapb.Partition) *Partition {
 }
 
 func (p *Partition) batchPersistent(batch Batch) error {
-	p.propertyLock.RLock()
-	defer p.propertyLock.RUnlock()
+	p.propertyLock.Lock()
+	defer p.propertyLock.Unlock()
 
-	key, val, err := p.metaMarshal()
+	key, val, err := doMetaMarshal(p.Partition)
 	if err != nil {
 		return err
 	}
 	batch.Put(key, val)
+
+	return nil
+}
+
+func (p *Partition) erase(store Store) error {
+	p.propertyLock.Lock()
+	defer p.propertyLock.Unlock()
+
+	key := []byte(fmt.Sprintf("%s%d", PREFIX_PARTITION, p.ID))
+	if err := store.Delete(key); err != nil {
+		log.Error("fail to delete partition[%v] from store. err:[%v]", p.Partition, err)
+		return ErrBoltDbOpsFailed
+	}
 
 	return nil
 }

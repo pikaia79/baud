@@ -90,10 +90,6 @@ func (p *PartitionProcessor) doRun() {
                     }
 
                     // TODO: to prevent from the new replica as garbage is removed, in the case replica
-                    // when ps heartbeat report.
-                    // Secondly create
-                    // Finally notify new member to the raft leader, partition info has already included leader address.
-                    // Finally notify the leader to
                     var newMetaReplica = &metapb.Replica{ID: replicaId, NodeID: destPS.ID}
 
                     partitionCopy := deepcopy.Iface(partitionToCreate.Partition).(*metapb.Partition)
@@ -117,8 +113,6 @@ func (p *PartitionProcessor) doRun() {
                         return
                     }
 
-                    // only whole progress success, then add new replica into memory and persistent
-                    // others replicas will be deleted in background worker process
                     if err := partitionToCreate.addReplica(p.cluster.store, newMetaReplica); err != nil {
                         log.Error("partition add new replica err[%v]", err)
                         return
