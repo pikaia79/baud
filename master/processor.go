@@ -1,72 +1,168 @@
 package master
 
 import (
-	"context"
-	"time"
-	"util/log"
+    "context"
+    "util/log"
+    "util"
+    "proto/metapb"
 )
 
 const (
-	PROCESSOR_DEFAULT_TIMEOUT = time.Second * 60
-	PROCESSOR_DEFAULT_CHANNEL_LIMIT = 1000
+    PARTITION_CHANNEL_LIMIT = 1000
 )
 
-type Processor interface {
-	PushMsg(interface{}) error
-	Run()
+const (
+    EVENT_TYPE_INVALID = iota
+    EVENT_TYPE_PARTITION_CREATE
+    EVENT_TYPE_PARTITION_DELETE
+)
+
+var (
+    processorStarted = false
+
+    partitionProcessor *PartitionProcessor
+)
+
+type ProcessorEvent struct {
+    typ    int
+    body   interface{}
 }
 
-type SpaceCreateProcessor struct {
-	ctx 	context.Context
-	ctxCancel context.CancelFunc
-	timeout 	time.Duration
-	spaceCh   chan*Space
-
-	cluster  *Cluster
-	serverSelector Selector
+func NewPartitionCreateEvent(partition *Partition) *ProcessorEvent {
+    return &ProcessorEvent{
+        typ:  EVENT_TYPE_PARTITION_CREATE,
+        body: partition,
+    }
 }
 
-func NewSpaceCreateProcessor(cluster *Cluster) Processor {
-	p := new(SpaceCreateProcessor)
-	p.ctx, p.ctxCancel = context.WithCancel(context.Background())
-	p.spaceCh = make(chan *Space, PROCESSOR_DEFAULT_CHANNEL_LIMIT)
-	p.cluster = cluster
-	p.serverSelector = NewIdleSelector()
-	return p
+func NewPartitionDeleteEvent(partition *Partition) *ProcessorEvent {
+    return &ProcessorEvent{
+        typ:  EVENT_TYPE_PARTITION_DELETE,
+        body: partition,
+    }
 }
 
-func (p *SpaceCreateProcessor) PushMsg(msg interface{}) error {
-	if len(p.spaceCh) >= PROCESSOR_DEFAULT_CHANNEL_LIMIT * 0.9 {
-		log.Error("space create processor will full, rejected the space[%v] request", space)
-		return ErrSysBusy
-	}
+type PartitionProcessor struct {
+    ctx        context.Context
+    cancelFunc context.CancelFunc
 
-	p.spaceCh <- msg.(*Space)
+    eventCh chan *ProcessorEvent
 
-	return nil
-}
-
-func (p *SpaceCreateProcessor) Run() {
-
-	for {
-		var space *Space
-		select {
-		case <-p.ctx.Done():
-			return
-		case space = <-p.spaceCh:
-			//numPartitions := space.Partitioning.NumPartitions
-			//
-			//server := p.serverSelector.SelectTarget(p.cluster.psCache.getAllPartitionServers())
-			//if server == nil {
-			//	log.Error("Do not distribute suitable server")
-			//	// TODO: calling jdos api to allocate a container asynchronously
-			//	break
-			//} else {
-			//	client.CreateRplica
-			//}
-
-		}
-	}
+    cluster        *Cluster
+    serverSelector Selector
+    jdos           DCOS
 }
 
 
+func (p *PartitionProcessor) doRun() {
+    psRpcClient := GetPSRpcClientInstance()
+    idGenerator := GetIdGeneratorInstance(nil)
+
+    for {
+        select {
+        case <-p.ctx.Done():
+            return
+        case event := <-p.eventCh:
+
+            if event.typ == EVENT_TYPE_PARTITION_CREATE {
+                server := p.serverSelector.SelectTarget(p.cluster.psCache.getAllServers())
+                if server == nil {
+                    log.Error("Can not distribute suitable server")
+                    // TODO: calling jdos api to allocate a container asynchronously
+                    break
+                }
+
+                go func(partitionToCreate *Partition) {
+                    addr := util.BuildAddr(server.Ip, server.Port)
+                    replicaId, err := idGenerator.GenID()
+                    if err != nil {
+                        log.Error("fail to generate new replica ßid. err:[%v]", err)
+                        return
+                    }
+
+                    //servers := partitionReceived.replicaGroup.getAllServers()
+                    //if len(servers) >= FIXED_REPLICA_NUM {
+                    //    log.Error("!!!Cannot add new replica, because replica numbers[%v] of partition[%v]",
+                    //        " exceed fixed replica number[%v]", len(servers), partitionReceived, FIXED_REPLICA_NUM)
+                    //    break
+                    //}
+                    //servers = append(servers, server)
+
+                    var newMetaReplica = &metapb.Replica{ID: replicaId}
+                    partitionToCreate.addReplica(newMetaReplica)
+                    if err := psRpcClient.CreateReplica(addr, partitionToCreate.Partition); err != nil {
+                        log.Error("fail to do rpc create replica of partition[%v]. err:[%v]",
+                            partitionToCreate.Partition, err)
+                       return
+                    }
+
+                    // TODO: updatePartition
+                }(event.body.(*Partition))
+
+            } else if event.typ == EVENT_TYPE_PARTITION_DELETE {
+
+                go func() {
+
+                }()
+            }
+        }
+    }
+}
+
+func createPartitionProcessor(cluster *Cluster) {
+    p := &PartitionProcessor{
+        eventCh:        make(chan *ProcessorEvent, PARTITION_CHANNEL_LIMIT),
+        cluster:        cluster,
+        serverSelector: NewIdleSelector(),
+        jdos:           new(JDOS),
+    }
+    p.ctx, p.cancelFunc = context.WithCancel(context.Background())
+
+    partitionProcessor = p
+}
+
+type PartitionDeleteProcessor struct {
+    ctx        context.Context
+    cancelFunc context.CancelFunc
+
+    PartitionEventCh chan *Partition
+}
+
+// background partitionProcessor
+func ProcessorStart(cluster *Cluster) {
+    createPartitionProcessor(cluster)
+    go func() {
+        partitionProcessor.doRun()
+    }()
+
+    processorStarted = true
+}
+
+func ProcessorStop() {
+    if partitionProcessor != nil && partitionProcessor.cancelFunc != nil {
+        partitionProcessor.cancelFunc()
+    }
+
+    processorStarted = false
+}
+
+func PushProcessorEvent(event *ProcessorEvent) error {
+    if event == nil {
+        return ErrInternalError
+    }
+
+    if event.typ == EVENT_TYPE_PARTITION_CREATE || event.typ == EVENT_TYPE_PARTITION_DELETE {
+        if len(partitionProcessor.eventCh) >= PARTITION_CHANNEL_LIMIT*0.9 {
+            log.Error("partition channel will full, reject event[%v]", event)
+            return ErrSysBusy
+        }
+
+        partitionProcessor.eventCh <- event
+
+    } else {
+        log.Error("processor received invalid event type[%v]", event.typ)
+        return ErrInternalError
+    }
+
+    return nil
+}

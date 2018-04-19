@@ -5,7 +5,7 @@ import (
 	"github.com/gogo/protobuf/proto"
 	raftproto "github.com/tiglabs/raft/proto"
 	"io"
-	"proto/msraftcmdpb"
+	"proto/masterraftcmdpb"
 	"util/raftkvstore"
 )
 
@@ -39,7 +39,7 @@ func (s *RaftSnapshot) Next() ([]byte, error) {
 	if !hasNext {
 		return nil, io.EOF
 	}
-	kvPair := &msraftcmdpb.RaftKvPair{
+	kvPair := &masterraftcmdpb.RaftKvPair{
 		Key:        s.iter.Key(),
 		Value:      s.iter.Value(),
 		ApplyIndex: s.ApplyIndex(),
@@ -67,13 +67,13 @@ func NewSnapshotKVIterator(rawIter raftproto.SnapIterator) *SnapshotKVIterator {
 	}
 }
 
-func (i *SnapshotKVIterator) Next() (kvPair *msraftcmdpb.RaftKvPair, err error) {
+func (i *SnapshotKVIterator) Next() (kvPair *masterraftcmdpb.RaftKvPair, err error) {
 	var data []byte
 	data, err = i.rawIter.Next()
 	if err != nil {
 		return
 	}
-	kvPair = &msraftcmdpb.RaftKvPair{}
+	kvPair = &masterraftcmdpb.RaftKvPair{}
 	err = proto.Unmarshal(data, kvPair)
 	if err != nil {
 		return nil, err

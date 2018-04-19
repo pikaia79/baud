@@ -4,34 +4,60 @@ import (
 	"util/log"
 	"sync"
 	"math"
+	"util"
+	"proto/metapb"
 )
 
 type Cluster struct {
 	config 			*Config
 	store 			Store
 
-	clusterLock     sync.RWMutex
 	dbCache 		*DBCache
+	//spaceCache      *SpaceCache
 	psCache 		*PSCache
 	partitionCache  *PartitionCache
+
+    clusterLock     sync.RWMutex
 }
 
 func NewCluster(config *Config) *Cluster {
 	return &Cluster{
 		config: 		config,
 		store: 			NewRaftStore(config),
-		dbCache: 		new(DBCache),
+		dbCache: 		NewDBCache(),
+		//spaceCache: 	NewSpaceCache(),
+		psCache:        NewPSCache(),
+		partitionCache: NewPartitionCache(),
 	}
 }
 
-func (c *Cluster) Start() (err error) {
-	if err = c.store.Open(); err != nil {
+func (c *Cluster) Start() error {
+	if err := c.store.Open(); err != nil {
 		log.Error("fail to create raft store. err:[%v]", err)
-		return
+		return err
 	}
 
-	IdGeneratorSingleInstance(c.store)
+	GetIdGeneratorInstance(c.store)
 
+	// recovery memory meta data
+	if err := c.recoveryPSCache(); err != nil {
+		log.Error("fail to recovery psCache. err:[%v]", err)
+		return err
+	}
+	if err := c.recoveryDBCache(); err != nil {
+		log.Error("fail to recovery dbCache. err[%v]", err)
+		return err
+	}
+	if err := c.recoverySpaceCache(); err != nil {
+		log.Error("fail to recovery spaceCache. err[%v]", err)
+		return err
+	}
+	if err := c.recoveryPartition(); err != nil {
+		log.Error("fail to recovery partitionCache. err[%v]", err)
+		return err
+	}
+
+	log.Info("finish to recovery whole cluster")
 	return nil
 }
 
@@ -39,6 +65,107 @@ func (c *Cluster) Close() {
 	if c.store != nil {
 		c.store.Close()
 	}
+}
+
+func (c *Cluster) recoveryPSCache() error {
+	c.clusterLock.Lock()
+	defer c.clusterLock.Unlock()
+
+	servers, err := c.psCache.recovery(c.store)
+	if err != nil {
+		return err
+	}
+
+	for _, server := range servers {
+		c.psCache.addServer(server)
+	}
+
+	return nil
+}
+
+func (c *Cluster) recoveryDBCache() error {
+	c.clusterLock.Lock()
+	defer c.clusterLock.Unlock()
+
+	dbs, err := c.dbCache.recovery(c.store)
+	if err != nil {
+		return err
+	}
+
+	for _, db := range dbs {
+		c.dbCache.addDb(db)
+	}
+
+	return nil
+}
+
+func (c *Cluster) recoverySpaceCache() error {
+	c.clusterLock.Lock()
+	defer c.clusterLock.Unlock()
+
+	dbs := c.dbCache.getAllDBs()
+	if dbs == nil || len(dbs) == 0 {
+		return nil
+	}
+
+	allSpaces, err := dbs[0].spaceCache.recovery(c.store)
+	if err != nil {
+		return err
+	}
+
+	for _, space := range allSpaces {
+		db := c.dbCache.findDbById(space.DB)
+		if db == nil {
+			log.Warn("Cannot find db for the space[%v] when recovery space. discord it", space)
+			continue
+		}
+
+		db.spaceCache.addSpace(space)
+	}
+
+	return nil
+}
+
+func (c *Cluster) recoveryPartition() error {
+	c.clusterLock.Lock()
+	defer c.clusterLock.Unlock()
+
+	partitions, err := c.partitionCache.recovery(c.store)
+	if err != nil {
+		return err
+	}
+
+	for _, partition := range partitions {
+		db := c.dbCache.findDbById(partition.DB)
+		if db == nil {
+			log.Warn("Cannot find db for the partition[%v] when recovery partition. discord it", partition)
+			continue
+		}
+
+		space := db.spaceCache.findSpaceById(partition.Space)
+		if space == nil {
+			log.Warn("Cannot find space for the partition[%v] when recovery partition. discord it", partition)
+			continue
+		}
+
+		space.searchTree.update(partition.Partition)
+		c.partitionCache.addPartition(partition)
+
+		var delMetaReplias = make([]*metapb.Replica, 0)
+		for _, metaReplica := range partition.getAllReplicas() {
+			ps := c.psCache.findServerById(metaReplica.NodeID)
+			if ps == nil {
+				log.Warn("Cannot find ps for the replica[%v] when recovery replicas. discord it", metaReplica)
+				delMetaReplias = append(delMetaReplias, metaReplica)
+				continue
+			}
+		}
+		partition.deleteReplica(delMetaReplias...)
+
+		// TODO : add partition or replicas into ps
+	}
+
+	return nil
 }
 
 func (c *Cluster) createDb(dbName string) (*DB, error) {
@@ -98,36 +225,50 @@ func (c *Cluster) createSpace(dbName, spaceName, partitionKey, partitionFunc str
 		return nil, ErrDupSpace
 	}
 
+	// batch commit
+	batch := c.store.NewBatch()
+
 	policy := &PartitionPolicy{
 		Key: partitionKey,
 		Function:partitionFunc,
 		NumPartitions:partitionNum,
 	}
-	space, err := NewSpace(db.Id, dbName, spaceName, policy)
+	space, err := NewSpace(db.ID, dbName, spaceName, policy)
 	if err != nil {
 		return nil, err
 	}
-
-	if err := space.persistent(c.store); err != nil {
+	if err := space.batchPersistent(batch); err != nil {
 		return nil, err
 	}
-	db.spaceCache.addSpace(space)
 
-	slots := slotSplit(0, math.MaxUint32, partitionNum + 1)
+	slots := util.SlotSplit(0, math.MaxUint32, partitionNum + 1)
 	if slots == nil {
 		log.Error("fail to split slot range [%v-%v]", 0, math.MaxUint32)
 		return nil, ErrInternalError
 	}
+	partitions := make([]*Partition, len(slots))
 	for i := 0; i < len(slots) - 1; i++ {
-		partition, err := NewPartition(db.Id, space.Id, slots[i], slots[i+1])
+		partition, err := NewPartition(db.ID, space.ID, slots[i], slots[i+1])
 		if err != nil {
 			return nil, err
 		}
-
-		if err := partition.persistent(c.store); err != nil {
+		partitions = append(partitions, partition)
+		if err := partition.batchPersistent(batch); err != nil {
 			return nil, err
 		}
+	}
+	if err := batch.Commit(); err != nil {
+		return nil, ErrBoltDbOpsFailed
+	}
+
+	// update memory and send event
+	db.spaceCache.addSpace(space)
+	for _, partition := range partitions {
 		space.putPartition(partition)
+
+		if err := PushProcessorEvent(NewPartitionCreateEvent(partition)); err != nil {
+			log.Error("fail to push event for creating partition[%v].", partition)
+		}
 	}
 
 	return space, nil
@@ -163,40 +304,4 @@ func (c *Cluster) renameSpace(dbName, srcSpaceName, destSpaceName string) error 
 
 func (c *Cluster) detailSpace(spaceId int) (*Space, error) {
 	return nil, nil
-}
-
-func slotSplit(start, end uint32, n int) []uint32 {
-	if n <= 0 {
-		return nil
-	}
-	if end - start + 1 < uint32(n) {
-		return nil
-	}
-
-	var min, max uint32
-	if start <= end {
-		min = start
-		max = end
-	} else {
-		min = end
-		max = start
-	}
-
-	ret := make([]uint32, 0)
-	switch n {
-	case 1:
-		ret = append(ret, min)
-	case 2:
-		ret = append(ret, min)
-		ret = append(ret, max)
-	default:
-		step := (max - min) / uint32(n - 1)
-		ret = append(ret, min)
-		for i := 1 ; i < n - 1; i++ {
-			ret = append(ret, min + uint32(i) * step)
-		}
-		ret = append(ret, max)
-	}
-
-	return ret
 }

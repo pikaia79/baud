@@ -2,9 +2,6 @@ package main
 
 import (
 	"flag"
-	"github.com/tiglabs/baud/master"
-	"github.com/tiglabs/baud/partition"
-	"github.com/tiglabs/baud/util/config"
 	"util/log"
 	"net/http"
 	_ "net/http/pprof"
@@ -14,6 +11,8 @@ import (
 	"syscall"
 	"router"
 	"sync"
+	"util/config"
+	"fmt"
 )
 
 const (
@@ -46,7 +45,7 @@ func interceptSignal(s IServer) {
 }
 
 func main() {
-	log.Println("Hello, Baud!")
+	fmt.Println("Hello, Baud!")
 	flag.Parse()
 	cfg := config.LoadConfigFile(*configFile)
 	role := cfg.GetString("role")
@@ -57,21 +56,21 @@ func main() {
 
 	//init profile server
 	go func() {
-		log.Println(http.ListenAndServe(":"+profPort, nil))
+		fmt.Println(http.ListenAndServe(":"+profPort, nil))
 	}()
 
 	var server IServer
 
 	switch role {
 	case "master":
-		server = master.NewServer()
+		//server = master.NewServer()
 	case "ps":
-		server = partition.NewServer()
+		//server = partition.NewServer()
 	case "router":
 		server = router.NewServer()
 
 	default:
-		log.Println("Fatal: unmath role: ", role)
+		fmt.Println("Fatal: unmath role: ", role)
 		return
 	}
 

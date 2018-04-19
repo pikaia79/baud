@@ -3,14 +3,15 @@ package master
 import (
 	"sync"
 	"fmt"
-	"github.com/gin-gonic/gin/json"
 	"util/log"
 	"proto/metapb"
 	"util/deepcopy"
+	"util"
+	"github.com/gogo/protobuf/proto"
 )
 
 const (
-	PREFIX_DB 		string = "scheme sdb"
+	PREFIX_DB 		 = "scheme db "
 )
 
 type DB struct {
@@ -21,19 +22,26 @@ type DB struct {
 }
 
 func NewDB(dbName string) (*DB, error) {
-	dbId, err := IdGeneratorSingleInstance(nil).GenID()
+	dbId, err := GetIdGeneratorInstance(nil).GenID()
 	if err != nil {
 		log.Error("generate db id is failed. err[%v]", err)
 		return nil, ErrGenIdFailed
 	}
 	db := &DB{
-		DB:		&metapb.DB{
-			Id: 	dbId,
-			Name: 	dbName,
+		DB: &metapb.DB{
+			ID:   dbId,
+			Name: dbName,
 		},
-		spaceCache: 	new(SpaceCache),
+		spaceCache: NewSpaceCache(),
 	}
 	return db, nil
+}
+
+func NewDBByMeta(metaDb *metapb.DB) *DB {
+	return &DB{
+		DB:         metaDb,
+		spaceCache: NewSpaceCache(),
+	}
 }
 
 func (db *DB) persistent(store Store) error {
@@ -41,13 +49,13 @@ func (db *DB) persistent(store Store) error {
 	defer db.propertyLock.RUnlock()
 
 	copy := deepcopy.Iface(db.DB).(*metapb.DB)
-	dbVal, err := json.Marshal(copy)
+	dbVal, err := proto.Marshal(copy)
 	if err != nil {
 		log.Error("fail to marshal db[%v]. err:[%v]", copy, err)
 		return err
 	}
 
-	dbKey := []byte(fmt.Sprintf("%s %d", PREFIX_DB, copy.Id))
+	dbKey := []byte(fmt.Sprintf("%s%d", PREFIX_DB, copy.ID))
 	if err := store.Put(dbKey, dbVal); err != nil {
 		log.Error("fail to put db[%v] into store. err:[%v]", copy, err)
 		return ErrBoltDbOpsFailed
@@ -60,7 +68,7 @@ func (db *DB) erase(store Store) error {
 	db.propertyLock.RLock()
 	defer db.propertyLock.RUnlock()
 	
-	dbKey := []byte(fmt.Sprintf("%s %d", PREFIX_DB, db.DB.Id))
+	dbKey := []byte(fmt.Sprintf("%s%d", PREFIX_DB, db.DB.ID))
 	if err := store.Delete(dbKey); err != nil {
 		log.Error("fail to delete db[%v] from store. err:[%v]", db.DB, err)
 		return ErrBoltDbOpsFailed
@@ -77,19 +85,44 @@ func (db *DB) rename(newDbName string) {
 }
 
 type DBCache struct {
-	lock      sync.RWMutex
-	dbs       map[string]*DB
-	idNameMap map[uint32]string
+	lock     sync.RWMutex
+	dbs      map[uint32]*DB
+	name2Ids map[string]uint32
+}
+
+func NewDBCache() *DBCache {
+	return &DBCache{
+		dbs:     make(map[uint32]*DB),
+		name2Ids:make(map[string]uint32),
+	}
 }
 
 func (c *DBCache) findDbByName(dbName string) *DB {
 	c.lock.RLock()
 	defer c.lock.RUnlock()
 
-	db, ok := c.dbs[dbName]
+	id, ok := c.name2Ids[dbName]
 	if !ok {
 		return nil
 	}
+
+	db, ok := c.dbs[id]
+	if !ok {
+		log.Error("!!!db cache map not consistent, db[%v : %v] not exists. never happened", dbName, id)
+		return nil
+	}
+	return db
+}
+
+func (c *DBCache) findDbById(dbId uint32) *DB {
+	c.lock.RLock()
+	defer c.lock.RUnlock()
+
+	db, ok := c.dbs[dbId]
+	if !ok {
+		return nil
+	}
+
 	return db
 }
 
@@ -97,14 +130,53 @@ func (c *DBCache) addDb(db *DB) {
 	c.lock.Lock()
 	defer c.lock.Unlock()
 
-	c.dbs[db.Name] = db
-	c.idNameMap[db.Id] = db.Name
+	c.dbs[db.ID] = db
+	c.name2Ids[db.Name] = db.ID
 }
 
 func (c *DBCache) deleteDb(db *DB) {
 	c.lock.Lock()
 	defer c.lock.Unlock()
 
-	delete(c.dbs, db.Name)
-	delete(c.idNameMap, db.Id)
+	delete(c.dbs, db.ID)
+	delete(c.name2Ids, db.Name)
+}
+
+func (c *DBCache) getAllDBs() ([]*DB) {
+	c.lock.RLock()
+	defer c.lock.RUnlock()
+
+	dbs := make([]*DB, len(c.dbs))
+	for _, db := range c.dbs {
+		dbs = append(dbs, db)
+	}
+
+	return dbs
+}
+
+func (c *DBCache) recovery(store Store) ([]*DB, error) {
+	prefix := []byte(PREFIX_DB)
+	startKey, limitKey := util.BytesPrefix(prefix)
+
+	resultDBs := make([]*DB, 0)
+
+	iterator := store.Scan(startKey, limitKey)
+	defer iterator.Release()
+	for iterator.Next() {
+		if iterator.Key() == nil {
+			log.Error("db store key is nil. never happened!!!")
+			continue
+		}
+
+		val := iterator.Value()
+		metaDb := new(metapb.DB)
+		if err := proto.Unmarshal(val, metaDb); err != nil {
+			log.Error("fail to unmarshal db from store. err[%v]", err)
+			return nil, ErrInternalError
+		}
+
+		resultDBs = append(resultDBs, NewDBByMeta(metaDb))
+	}
+
+	return resultDBs, nil
 }
