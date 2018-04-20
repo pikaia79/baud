@@ -10,8 +10,6 @@ import (
 	"github.com/tiglabs/baud/util"
 )
 
-const DefaultDateTimeProperty = StoreField | IndexField
-
 var MinTime = time.Unix(0, math.MinInt64)
 var MaxTime = time.Unix(0, math.MaxInt64)
 
@@ -41,7 +39,7 @@ func (n *DateTimeField) Analyze() (analysis.TokenFrequencies) {
 		Type:     analysis.DateTime,
 	})
 
-	tokenFreqs := analysis.TokenFrequency(tokens, nil, n.property.IncludeTermVectors())
+	tokenFreqs := analysis.TokenFrequency(tokens, n.property.IncludeTermVectors())
 	return tokenFreqs
 }
 
@@ -61,16 +59,16 @@ func (n *DateTimeField) String() string {
 	return fmt.Sprintf("&document.DateField{Name:%s, Property: %s, Value: %s}", n.name, n.property, n.value)
 }
 
-func NewDateTimeFieldByBytes(name string, value []byte) *DateTimeField {
+func NewDateTimeFieldByBytes(name string, value []byte, property Property) *DateTimeField {
 	return &DateTimeField{
 		name:              name,
 		value:             value,
-		property:          DefaultDateTimeProperty,
+		property:          property,
 	}
 }
 
-func NewDateTimeField(name string, dt time.Time) (*DateTimeField, error) {
-	return NewDateTimeFieldWithProperty(name, dt, DefaultDateTimeProperty)
+func NewDateTimeField(name string, dt time.Time, property Property) (*DateTimeField, error) {
+	return NewDateTimeFieldWithProperty(name, dt, property)
 }
 
 func NewDateTimeFieldWithProperty(name string, dt time.Time, property Property) (*DateTimeField, error) {

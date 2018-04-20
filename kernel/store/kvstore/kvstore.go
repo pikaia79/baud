@@ -8,6 +8,8 @@ type KVStore interface {
 	// MultiGet retrieves multiple values in one call.
 	MultiGet(keys [][]byte) ([][]byte, error)
 
+	NewTransaction(writable bool) (Transaction, error)
+
 	// PrefixIterator returns a KVIterator that will
 	// visit all K/V pairs with the provided prefix
 	PrefixIterator(prefix []byte) KVIterator

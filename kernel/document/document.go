@@ -21,6 +21,17 @@ func (d *Document) AddField(f Field) *Document {
 	return d
 }
 
+func (d *Document) DeleteField(name string) bool {
+	if d.Fields == nil {
+		return true
+	}
+	if _, find := d.Fields[name]; find {
+		delete(d.Fields, name)
+		return true
+	}
+	return false
+}
+
 func (d *Document) FindFields(name string) []Field {
 	if d.Fields == nil {
 		return nil

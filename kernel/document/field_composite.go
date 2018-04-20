@@ -2,7 +2,6 @@ package document
 
 import "github.com/tiglabs/baud/kernel/analysis"
 
-const DefaultCompositeProperty = IndexField
 const space = byte(' ')
 
 var _ Field = &CompositeField{}
@@ -16,8 +15,8 @@ type CompositeField struct {
 	compositeFrequencies analysis.TokenFrequencies
 }
 
-func NewCompositeField(name string, exclude []string) *CompositeField {
-	return NewCompositeFieldWithProperty(name, exclude, DefaultCompositeProperty)
+func NewCompositeField(name string, exclude []string, property Property) *CompositeField {
+	return NewCompositeFieldWithProperty(name, exclude, property)
 }
 
 func NewCompositeFieldWithProperty(name string, exclude []string, property Property) *CompositeField {

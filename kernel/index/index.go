@@ -2,69 +2,118 @@ package index
 
 import (
 	"errors"
+	"bytes"
 
 	"github.com/tiglabs/baud/kernel/document"
 	"github.com/tiglabs/baud/kernel/store/kvstore"
-	"github.com/tiglabs/baud/util/encoding"
-)
-
-type KEY_TYPE byte
-type FIELD_TYPE byte
-
-const (
-	KEY_TYPE_F KEY_TYPE = 'F'
-)
-
-const (
-	FIELD_TYPE_T FIELD_TYPE = 'T'
-	FIELD_TYPE_N FIELD_TYPE = 'N'
-	FIELD_TYPE_D FIELD_TYPE = 'D'
-	FIELD_TYPE_B FIELD_TYPE = 'B'
+	"github.com/tiglabs/baud/kernel/util"
+	"github.com/tiglabs/baud/kernel/mapping"
+	"github.com/tiglabs/baud/kernel"
 )
 
 type IndexDriver struct {
-	store     kvstore.KVStore
+	store        kvstore.KVStore
+	indexMapping mapping.IndexMapping
 }
 
-func (id *IndexDriver) AddDocuments(docs []*document.Document) error {
-	batch := id.store.NewKVBatch()
-	for _, doc := range docs {
-		// check doc
-		val, err := id.store.Get([]byte(doc.ID))
-		if err != nil {
-			return err
-		}
-		if val != nil {
-			return errors.New("document exist")
-		}
-		for _, fields := range doc.Fields {
-			key, row, err := encodeStoreField(doc.ID, fields)
+func (id *IndexDriver) AddDocuments(docs []*document.Document, ops ...*kernel.Option) error {
+	tx, err := id.store.NewTransaction(true)
+	if err != nil {
+		return err
+	}
+	err = func () error {
+		for _, doc := range docs {
+			// check doc version
+			val, err := tx.Get(encodeStoreFieldKey(doc.ID, "_version"))
 			if err != nil {
 				return err
 			}
-			batch.Set(key, row)
+			if val != nil {
+				return errors.New("document exist")
+			}
+			for _, fields := range doc.Fields {
+				key, row, err := encodeStoreField(doc.ID, fields)
+				if err != nil {
+					return err
+				}
+				tx.Put(key, row)
+			}
 		}
+		return nil
+	}()
+	if err != nil {
+		return tx.Rollback()
 	}
-	return id.store.ExecuteBatch(batch)
+	return tx.Commit()
 }
 
-func (id *IndexDriver) UpdateDocuments(docs []*document.Document) error {
-	return nil
+// parameter docs must merge before update
+// IndexDriver UpdateDocuments API will be called by ps when raft apply
+func (id *IndexDriver) UpdateDocuments(docs []*document.Document, ops ...*kernel.Option) error {
+	tx, err := id.store.NewTransaction(true)
+	if err != nil {
+		return err
+	}
+	err = func () error {
+		for _, doc := range docs {
+			// get old document
+			iter := tx.PrefixIterator(encodeStoreFieldKey(doc.ID, ""))
+			oldDoc, err := getDocument(doc.ID, iter)
+			iter.Close()
+			if err != nil {
+				return err
+			}
+			// check version
+			fs := oldDoc.FindFields("_version")
+			oldVersion := fs[0].Value()
+			fs = doc.FindFields("_version")
+			srcVersion := fs[0].Value()
+			if bytes.Compare(oldVersion, srcVersion) != 0 {
+				return errors.New("version conflict")
+			}
+			_, err = id.deleteDocument(tx, doc.ID)
+			if err != nil {
+				return err
+			}
+			// todo delete old document(send delete event)
+			err = id.deleteDocumentIndex(oldDoc)
+			if err != nil {
+				return err
+			}
+			// fixme _source, _all, _version need special handle
+			for _, fields := range doc.Fields {
+				key, row, err := encodeStoreField(doc.ID, fields)
+				if err != nil {
+					return err
+				}
+				tx.Put(key, row)
+			}
+			// todo analysis document
+		}
+		return nil
+	}()
+	if err != nil {
+		return tx.Rollback()
+	}
+	return tx.Commit()
 }
 
-func (id *IndexDriver) DeleteDocuments(docIDs []string) (int, error) {
+func (id *IndexDriver) DeleteDocuments(docIDs []string, ops ...*kernel.Option) (int, error) {
+	tx, err := id.store.NewTransaction(true)
+	if err != nil {
+		return err
+	}
+	var count int
 	for _, docID := range docIDs {
-		// check doc
-		val, err := id.store.Get([]byte(docID))
+		n, err := id.deleteDocument(tx, docID)
 		if err != nil {
-			return err
+			tx.Rollback()
+			return count, err
 		}
-		if val != nil {
-			return errors.New("document exist")
-		}
-		// todo delete document
+		count += n
 	}
-	return nil
+	err = tx.Commit()
+	return count, err
 }
 
 // source set true means need return _source
@@ -93,82 +142,50 @@ func (id *IndexDriver) GetDocument(docID string, fields []string) (*document.Doc
 	return doc, nil
 }
 
-func encodeStoreFieldKey(docID, fieldName string) (key []byte) {
-	key = append(key, KEY_TYPE_F)
-	key = encoding.EncodeBytesAscending(key, []byte(docID))
-	key = encoding.EncodeBytesAscending(key, []byte(fieldName))
-	return
+func (id *IndexDriver) deleteDocument(tx kvstore.Transaction, docID string) (int, error) {
+	iter := tx.PrefixIterator(encodeStoreFieldKey(docID, ""))
+	defer iter.Close()
+	if !iter.Valid() {
+		return 0, nil
+	}
+	for iter.Valid() {
+		key, _, has := iter.Current()
+		if !has {
+			return nil, errors.New("document not exist")
+		}
+		err := tx.Delete(key)
+		if err != nil {
+			return err
+		}
+		iter.Next()
+	}
+	return nil
 }
 
-// fields must have the same field type
-func encodeStoreField(docID string, fields []document.Field) (key []byte, row []byte, err error) {
-	var fieldType FIELD_TYPE
-	for i, field := range fields {
-		if !field.Property().IsStored() {
-			return
-		}
-		if fieldType == 0 {
-			switch field.(type) {
-			case *document.TextField:
-				fieldType = FIELD_TYPE_T
-			case *document.NumericField:
-				fieldType = FIELD_TYPE_N
-			case *document.BooleanField:
-				fieldType = FIELD_TYPE_B
-			case *document.DateTimeField:
-				fieldType = FIELD_TYPE_D
-			case *document.CompositeField:
-				fieldType = FIELD_TYPE_T
-			default:
-				err = errors.New("invalid field type")
-				return
-			}
-			key = encodeStoreFieldKey(docID, field.Name())
-			row = append(row, fieldType)
-		}
-		row = encoding.EncodeBytesValue(row, i, field.Value())
-	}
-	return
+// TODO
+func (id *IndexDriver) deleteDocumentIndex(doc document.Document) error {
+	return nil
 }
 
-func decodeStoreField(fieldName string, row []byte) ([]document.Field, error) {
-	if len(row) <= 1 {
-		return nil, errors.New("invalid field row")
-	}
-	var fields []document.Field
-	var err error
-	fieldType := FIELD_TYPE(row[0])
-	row = row[1:]
-	for len(row) > 0 {
-		var val []byte
-		switch fieldType {
-		case FIELD_TYPE_D:
-			row, val, err = encoding.DecodeBytesValue(row)
-			if err != nil {
-				return nil, err
-			}
-			fields = append(fields, document.NewDateTimeFieldByBytes(fieldName, val))
-		case FIELD_TYPE_B:
-			row, val, err = encoding.DecodeBytesValue(row)
-			if err != nil {
-				return nil, err
-			}
-			fields = append(fields, document.NewBooleanFieldByBytes(fieldName, val))
-		case FIELD_TYPE_N:
-			row, val, err = encoding.DecodeBytesValue(row)
-			if err != nil {
-				return nil, err
-			}
-			fields = append(fields, document.NewNumericFieldFromBytes(fieldName, val))
-		case FIELD_TYPE_T:
-			row, val, err = encoding.DecodeBytesValue(row)
-			if err != nil {
-				return nil, err
-			}
-			fields = append(fields, document.NewTextField(fieldName, val))
-		default:
-			return nil, errors.New("invalid field type")
+func getDocument(docID string, iter kvstore.KVIterator) (*document.Document, error) {
+	doc := document.NewDocument(docID)
+	for iter.Valid() {
+		key, value, has := iter.Current()
+		if !has {
+			return nil, errors.New("document not exist")
 		}
+		fileName, err := decodeStoreFieldKey(key)
+		if err != nil {
+			return nil, err
+		}
+		fields, err := decodeStoreField(fileName, util.CloneBytes(value))
+		if err != nil {
+			return nil, err
+		}
+		for _, field := range fields {
+			doc.AddField(field)
+		}
+		iter.Next()
 	}
-	return fields, nil
+	return doc, nil
 }
