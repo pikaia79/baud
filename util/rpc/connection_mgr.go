@@ -3,17 +3,19 @@ package rpc
 import (
 	"context"
 	"math"
+	"runtime"
 	"sync"
 	"time"
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/keepalive"
 
-	"fmt"
-
 	"github.com/tiglabs/baud/util/log"
 	"github.com/tiglabs/baud/util/routine"
-	"github.com/tiglabs/baud/util/rpc/heartbeat"
+)
+
+const (
+	heartbeatConcurrent = 63
 )
 
 // DefaultManagerOption create a default option
@@ -31,27 +33,23 @@ type ManagerOption struct {
 
 // ConnectionMgr grpc connection manager.
 type ConnectionMgr struct {
-	ctx               context.Context
-	cancelFunc        context.CancelFunc
-	heartbeatInterval time.Duration
-	heartbeatTimeout  time.Duration
-	heartbeatCallback func()
+	ctx        context.Context
+	cancelFunc context.CancelFunc
+	option     ManagerOption
 
-	conns *sync.Map
+	conns sync.Map
 }
 
 // NewConnectionMgr creates an connection manager with the supplied values.
 func NewConnectionMgr(ctx context.Context, option *ManagerOption) *ConnectionMgr {
 	mgr := &ConnectionMgr{
-		heartbeatInterval: option.HeartbeatInterval,
-		heartbeatTimeout:  option.HeartbeatTimeout,
-		heartbeatCallback: option.HeartbeatCallback,
-		conns:             new(sync.Map),
+		option: *option,
 	}
 	mgr.ctx, mgr.cancelFunc = context.WithCancel(ctx)
 	routine.AddCancel(func() {
 		mgr.Close()
 	})
+	routine.RunWorkDaemon("GRPC-HEARTBEAT", mgr.runHeartbeat, mgr.ctx.Done())
 
 	return mgr
 }
@@ -60,20 +58,20 @@ func NewConnectionMgr(ctx context.Context, option *ManagerOption) *ConnectionMgr
 func (mgr *ConnectionMgr) grpcDial(key, target string, option *ClientOption) *connection {
 	value, ok := mgr.conns.Load(key)
 	if !ok {
-		value, _ = mgr.conns.LoadOrStore(key, newConnection(mgr.ctx, option.ClusterID))
+		value, _ = mgr.conns.LoadOrStore(key, newConnection(option.ClusterID, target, mgr))
 	}
 
 	conn := value.(*connection)
 	conn.initOnce.Do(func() {
-		var redialChan <-chan struct{}
-		conn.grpcConn, redialChan, conn.dialErr = mgr.grpcDialRaw(target, option)
+		conn.grpcConn, conn.redialChan, conn.dialErr = mgr.grpcDialRaw(target, option)
 		if conn.dialErr == nil {
-			routine.RunWorkAsync("GRPC-HEARTBEAT", func() {
-				err := mgr.runHeartbeat(conn, target, redialChan)
+			routine.RunWork("GRPC-DOINITHEARTBEAT", func() error {
+				err := conn.heartbeat()
 				if err != nil && !IsClosedGrpcConnection(err) {
 					log.Error("removing connection to %s due to error: %s", target, err)
 				}
 				mgr.removeConn(key, conn)
+				return err
 			}, routine.LogPanic(false))
 		}
 	})
@@ -112,68 +110,50 @@ func (mgr *ConnectionMgr) grpcDialRaw(target string, option *ClientOption) (*grp
 	return conn, dialer.redialChan, err
 }
 
-func (mgr *ConnectionMgr) runHeartbeat(conn *connection, target string, redialChan <-chan struct{}) error {
-	request := heartbeat.PingRequest{
-		Ping:      "OK",
-		ClusterId: conn.clusterID,
-	}
-	heartbeatClient := heartbeat.NewHeartbeatClient(conn.grpcConn)
-
+func (mgr *ConnectionMgr) runHeartbeat() {
 	var heartbeatTimer time.Timer
-	heartbeatTimer.Reset(0)
+	heartbeatTimer.Reset(mgr.option.HeartbeatInterval)
 	defer heartbeatTimer.Stop()
 
-	var (
-		succeeded = false
-		breakFlag = false
-		err       error
-		response  *heartbeat.PingResponse
-	)
 	for {
 		select {
-		case <-redialChan:
-			err = ErrCannotReuseClientConn
-			breakFlag = true
-
-		case <-conn.ctx.Done():
-			err = conn.ctx.Err()
-			breakFlag = true
+		case <-mgr.ctx.Done():
+			return
 
 		case <-heartbeatTimer.C:
-			goCtx := conn.ctx
-			var cancel context.CancelFunc
-			if hbTimeout := mgr.heartbeatTimeout; hbTimeout > 0 {
-				goCtx, cancel = context.WithTimeout(goCtx, hbTimeout)
-			}
-			response, err = heartbeatClient.Ping(goCtx, &request)
-			if cancel != nil {
-				cancel()
-			}
+			count := 0
+			mgr.conns.Range(func(k, v interface{}) bool {
+				conn := v.(*connection)
+				routine.RunWorkAsync("GRPC-DOHEARTBEAT", func() {
+					select {
+					case <-conn.closeDone:
+						return
+					default:
+					}
 
-			if err == nil {
-				if request.ClusterId != response.ClusterId {
-					err = fmt.Errorf("client cluster_id(%s) doesn't match server cluster_id(%s)", request.ClusterId, response.ClusterId)
-					breakFlag = true
+					select {
+					case <-conn.manager.ctx.Done():
+						return
+
+					case <-conn.heartbeatDone:
+						err := conn.heartbeat()
+						if err != nil && !IsClosedGrpcConnection(err) {
+							log.Error("grpc heartbeat failed to %s due to error: %s", conn.addr, err)
+						}
+
+					default:
+					}
+				}, routine.LogPanic(false))
+
+				count++
+				if (count & heartbeatConcurrent) == 0 {
+					runtime.Gosched()
 				}
-			}
-			if err == nil {
-				succeeded = true
-				if cb := mgr.heartbeatCallback; cb != nil {
-					cb()
-				}
-			}
+				return true
+			})
 		}
 
-		conn.heartbeatResult.Store(heartbeatResult{
-			succeeded: succeeded,
-			err:       err,
-		})
-		conn.setInitialHeartbeatDone()
-		if breakFlag {
-			return err
-		}
-
-		heartbeatTimer.Reset(mgr.heartbeatInterval)
+		heartbeatTimer.Reset(mgr.option.HeartbeatInterval)
 	}
 }
 
