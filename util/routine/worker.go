@@ -169,10 +169,7 @@ func AddCloser(c io.Closer) {
 }
 
 // AddCancel addcancel hook
-func AddCancel(c context.Context) (ctx context.Context) {
-	var cancel func()
-	ctx, cancel = context.WithCancel(c)
-
+func AddCancel(cancel func()) (ctx context.Context) {
 	globalWorker.rwMu.Lock()
 	globalWorker.cancels = append(globalWorker.cancels, cancel)
 	globalWorker.rwMu.Unlock()

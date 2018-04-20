@@ -1,34 +1,37 @@
-package rpc
+package grpc
 
 import (
 	"context"
-	"math"
 	"time"
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/keepalive"
 	"google.golang.org/grpc/stats"
-)
 
-const (
-	defaultConcurrentStreams = math.MaxInt32
-	defaultRecvMsgSize       = math.MaxInt32
-	defaultSendMsgSize       = math.MaxInt32
-	defaultWindowSize        = 65535 * 32
-	defaultConnWindowSize    = defaultWindowSize * 16
-	defaultKeepaliveTime     = 3 * time.Second
-	defaultKeepaliveTimeout  = 3 * time.Second
+	"github.com/tiglabs/baud/util/grpc/heartbeat"
 )
 
 // By default, gRPC disconnects clients that send "too many" pings,
-// we don't really care about that, so configure the server to be as permissive as possible.
+// We configure the server to be as permissive as possible.
 var serverEnforcement = keepalive.EnforcementPolicy{
 	MinTime:             time.Nanosecond,
 	PermitWithoutStream: true,
 }
 
-// Option contains the fields required by the rpc framework.
-type Option struct {
+// DefaultServerOption create a default option
+var DefaultServerOption = ServerOption{
+	MaxRecvMsgSize:        defaultRecvMsgSize,
+	MaxSendMsgSize:        defaultSendMsgSize,
+	InitialWindowSize:     defaultInitialWindowSize,
+	InitialConnWindowSize: defaultInitialConnWindowSize,
+	MaxConcurrentStreams:  defaultConcurrentStreams,
+	KeepaliveTime:         defaultKeepaliveTime,
+	KeepaliveTimeout:      defaultKeepaliveTimeout,
+}
+
+// ServerOption contains the fields required by the rpc framework.
+type ServerOption struct {
+	ClusterID             string
 	MaxRecvMsgSize        int
 	MaxSendMsgSize        int
 	InitialWindowSize     int32
@@ -40,21 +43,8 @@ type Option struct {
 	Interceptor           func(fullMethod string) error
 }
 
-// DefaultOption create a default option
-func DefaultOption() *Option {
-	return &Option{
-		MaxRecvMsgSize:        defaultRecvMsgSize,
-		MaxSendMsgSize:        defaultSendMsgSize,
-		InitialWindowSize:     defaultWindowSize,
-		InitialConnWindowSize: defaultConnWindowSize,
-		MaxConcurrentStreams:  defaultConcurrentStreams,
-		KeepaliveTime:         defaultKeepaliveTime,
-		KeepaliveTimeout:      defaultKeepaliveTimeout,
-	}
-}
-
-// CreateGrpcServer is create a grpc server instance.
-func CreateGrpcServer(option *Option) *grpc.Server {
+// NewGrpcServer is create a grpc server instance.
+func NewGrpcServer(option *ServerOption) *grpc.Server {
 	opts := []grpc.ServerOption{
 		grpc.MaxRecvMsgSize(option.MaxRecvMsgSize),
 		grpc.MaxSendMsgSize(option.MaxSendMsgSize),
@@ -92,5 +82,7 @@ func CreateGrpcServer(option *Option) *grpc.Server {
 		opts = append(opts, grpc.StreamInterceptor(streamInterceptor))
 	}
 
-	return grpc.NewServer(opts...)
+	server := grpc.NewServer(opts...)
+	heartbeat.RegisterHeartbeatServer(server, &heartbeat.HeartbeatService{ClusterID: option.ClusterID})
+	return server
 }

@@ -71,8 +71,6 @@ message BulkResponse {
 }
 
 message BulkItemRequest {
-    option (gogoproto.onlyone) = true;
-
     OpType          op_type = 1;
     IndexRequest    index   = 2;
     UpdateRequest   update  = 3;
