@@ -136,13 +136,17 @@ func (s *RpcServer) PSHeartbeat(ctx context.Context,
         if partitionMS == nil {
             log.Debug("ps heartbeat received a partition[%v] not existed.", partitionId)
 
-            if err := pickReplicaAndDelete(&partitionInfo, partitionMS.pickLeaderReplica().NodeID); err != nil {
-                resp.ResponseHeader = *makeRpcRespHeader(err)
-                return resp, nil
-            }
+            // TODO: force to delete
 
-            PushProcessorEvent(NewPartitionDeleteEvent(partitionId, partitionMS.pickLeaderReplica().NodeID,
-                replica))
+
+
+            //if err := pickReplicaAndDelete(&partitionInfo, partitionMS.pickLeaderReplica().NodeID); err != nil {
+            //    resp.ResponseHeader = *makeRpcRespHeader(err)
+            //    return resp, nil
+            //}
+            //
+            //PushProcessorEvent(NewGhostPartitionDeleteEvent(partitionId, partitionMS.pickLeaderReplica().NodeID,
+            //    replica))
 
             continue
         }
