@@ -10,6 +10,7 @@ import (
 	"github.com/gogo/protobuf/proto"
 	"util"
 	"util/deepcopy"
+	"github.com/tiglabs/baud/proto/masterpb"
 )
 
 const (
@@ -18,13 +19,17 @@ const (
 	FIXED_REPLICA_NUM   	  = 3
 )
 
-type Partition struct {
-	*metapb.Partition  // !!! 不要直接操作Replicas，要先获取propertyLock
 
-	leader		  *metapb.Replica
+type Partition struct {
+	*metapb.Partition  // !!! Do not directly operate the Replicas，must be firstly take the propertyLock
+
+	leader        *metapb.Replica
+
+	taskFlag      bool
+	taskTimeout   time.Time
+
 	lastHeartbeat time.Time
 	propertyLock  sync.RWMutex
-	//	replicaGroup *ReplicaGroup
 }
 
 func NewPartition(dbId, spaceId, startSlot, endSlot uint32) (*Partition, error) {
@@ -121,6 +126,45 @@ func (p *Partition) addReplica(store Store, metaReplicas ...*metapb.Replica) err
 	return nil
 }
 
+func (p *Partition) updateInfo(store Store, info *masterpb.PartitionInfo, nodeId metapb.NodeID) error {
+	p.propertyLock.Lock()
+	defer p.propertyLock.Unlock()
+
+	p.Status = info.Status
+	p.lastHeartbeat = time.Now()
+	p.Epoch = info.Epoch
+
+	p.taskFlag = false
+	p.taskTimeout = 0
+
+	p.Replicas = make([]metapb.Replica, len(info.RaftStatus.Followers))
+	p.leader = nil
+
+	for _, follower := range info.RaftStatus.Followers {
+		replica := &metapb.Replica{ID: follower.ID, NodeID: follower.NodeID}
+		p.Replicas = append(p.Replicas, *replica)
+
+		if replica.NodeID == nodeId {
+			p.leader = replica
+		}
+	}
+
+	key, val, err := doMetaMarshal(p.Partition)
+	if err != nil {
+		return err
+	}
+	store.Put(key, val)
+
+	return nil
+}
+
+func (p *Partition) countReplicas() int {
+	p.propertyLock.RLock()
+	defer p.propertyLock.RUnlock()
+
+	return len(p.Replicas)
+}
+
 func (p *Partition) getAllReplicas() []*metapb.Replica {
 	p.propertyLock.RLock()
 	defer p.propertyLock.RUnlock()
@@ -138,6 +182,19 @@ func (p *Partition) pickLeaderReplica() *metapb.Replica {
 	defer p.propertyLock.RUnlock()
 
 	return p.leader
+}
+
+func (p *Partition) takeChangeMemberTask() bool {
+	p.propertyLock.Lock()
+	defer p.propertyLock.Unlock()
+
+	if p.taskFlag == false || time.Now().Sub(p.taskTimeout) >= 30 *time.Second {
+		p.taskFlag = true
+		p.taskTimeout = time.Now()
+		return true
+	}
+
+	return false
 }
 
 // internal use, need to write lock external
@@ -226,16 +283,16 @@ func (c *PartitionCache) addPartition(partition *Partition) {
 	c.partitions[partition.ID] = partition
 }
 
-func (c *PartitionCache) getAllMetaPartitions() []*metapb.Partition {
+func (c *PartitionCache) getAllMetaPartitions() *[]metapb.Partition {
 	c.lock.RLock()
 	defer c.lock.RUnlock()
 
-	partitions := make([]*metapb.Partition, len(c.partitions))
+	partitions := make([]metapb.Partition, len(c.partitions))
 	for _, metaPartition := range c.partitions {
-		partitions = append(partitions, metaPartition.Partition)
+		partitions = append(partitions, *metaPartition.Partition)
 	}
 
-	return partitions
+	return &partitions
 }
 
 
