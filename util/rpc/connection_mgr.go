@@ -1,4 +1,4 @@
-package grpc
+package rpc
 
 import (
 	"context"
@@ -10,9 +10,9 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/keepalive"
 
-	"github.com/tiglabs/baud/util/grpc/heartbeat"
 	"github.com/tiglabs/baud/util/log"
 	"github.com/tiglabs/baud/util/routine"
+	"github.com/tiglabs/baud/util/rpc/heartbeat"
 )
 
 // DefaultManagerOption create a default option
@@ -23,7 +23,6 @@ var DefaultManagerOption = ManagerOption{
 
 // ManagerOption contains the fields required by the rpc framework.
 type ManagerOption struct {
-	ctx               context.Context
 	HeartbeatInterval time.Duration
 	HeartbeatTimeout  time.Duration
 	HeartbeatCallback func()
@@ -41,14 +40,14 @@ type ConnectionMgr struct {
 }
 
 // NewConnectionMgr creates an connection manager with the supplied values.
-func NewConnectionMgr(option *ManagerOption) *ConnectionMgr {
+func NewConnectionMgr(ctx context.Context, option *ManagerOption) *ConnectionMgr {
 	mgr := &ConnectionMgr{
 		heartbeatInterval: option.HeartbeatInterval,
 		heartbeatTimeout:  option.HeartbeatTimeout,
 		heartbeatCallback: option.HeartbeatCallback,
 		conns:             new(sync.Map),
 	}
-	mgr.ctx, mgr.cancelFunc = context.WithCancel(option.ctx)
+	mgr.ctx, mgr.cancelFunc = context.WithCancel(ctx)
 	routine.AddCancel(func() {
 		mgr.Close()
 	})

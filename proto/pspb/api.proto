@@ -3,6 +3,7 @@ syntax = "proto3";
 import "github.com/gogo/protobuf/gogoproto/gogo.proto";
 
 import "github.com/tiglabs/baud/proto/metapb/meta.proto";
+import "github.com/tiglabs/baud/proto/metapb/api.proto";
 
 option go_package = "pspb";
 

@@ -3,8 +3,6 @@ package server
 import (
 	"errors"
 
-	"strconv"
-
 	"github.com/tiglabs/baud/proto/masterpb"
 	"github.com/tiglabs/baud/util/bytes"
 	"github.com/tiglabs/baud/util/config"
@@ -17,7 +15,7 @@ import (
 type Config struct {
 	masterpb.PSConfig
 
-	ClusterID    uint64
+	ClusterID    string
 	MasterServer string
 	DataPath     string
 
@@ -35,10 +33,7 @@ func LoadConfig(conf *config.Config) (*Config, error) {
 	c := &Config{}
 	multierr := new(multierror.MultiError)
 
-	if clusterID := conf.GetString("cluster.id"); clusterID != "" {
-		c.ClusterID, _ = strconv.ParseUint(clusterID, 10, 32)
-	}
-	if c.ClusterID == 0 {
+	if c.ClusterID = conf.GetString("cluster.id"); c.ClusterID == "" {
 		multierr.Append(errors.New("cluster.id not specified"))
 	}
 	if c.MasterServer = conf.GetString("master.server"); c.MasterServer == "" {

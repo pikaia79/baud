@@ -1,4 +1,4 @@
-package grpc
+package rpc
 
 import (
 	"context"
@@ -8,7 +8,7 @@ import (
 	"google.golang.org/grpc/keepalive"
 	"google.golang.org/grpc/stats"
 
-	"github.com/tiglabs/baud/util/grpc/heartbeat"
+	"github.com/tiglabs/baud/util/rpc/heartbeat"
 )
 
 // By default, gRPC disconnects clients that send "too many" pings,
@@ -31,7 +31,6 @@ var DefaultServerOption = ServerOption{
 
 // ServerOption contains the fields required by the rpc framework.
 type ServerOption struct {
-	ClusterID             string
 	MaxRecvMsgSize        int
 	MaxSendMsgSize        int
 	InitialWindowSize     int32
@@ -39,8 +38,10 @@ type ServerOption struct {
 	MaxConcurrentStreams  uint32
 	KeepaliveTime         time.Duration
 	KeepaliveTimeout      time.Duration
-	StatsHandler          stats.Handler
-	Interceptor           func(fullMethod string) error
+
+	ClusterID    string
+	StatsHandler stats.Handler
+	Interceptor  func(fullMethod string) error
 }
 
 // NewGrpcServer is create a grpc server instance.

@@ -1,15 +1,11 @@
-package grpc
+package rpc
 
 import (
-	"time"
-
-	"sync"
-
-	"sync/atomic"
-
-	"strings"
-
 	"strconv"
+	"strings"
+	"sync"
+	"sync/atomic"
+	"time"
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/stats"
