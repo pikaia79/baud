@@ -30,7 +30,9 @@ service MasterRpc {
 }
 
 message Route {
-    Partition        partition  = 1 [(gogoproto.nullable) = false, (gogoproto.embed) = true];
+    Partition       partition  = 1 [(gogoproto.nullable) = false, (gogoproto.embed) = true];
+    repeated Node   nodes = 2;
+    uint32          leaderNode = 3;
 }
 
 message GetDBRequest {
@@ -56,8 +58,9 @@ message GetSpaceResponse {
 
 message GetRouteRequest {
     RequestHeader header = 1 [(gogoproto.nullable) = false, (gogoproto.embed) = true];
-    uint32        space  = 2 [(gogoproto.customname) = "Space", (gogoproto.casttype) = "github.com/tiglabs/baud/proto/metapb.SpaceID"];
-    uint32        slot   = 3 [(gogoproto.customname) = "Slot", (gogoproto.casttype) = "github.com/tiglabs/baud/proto/metapb.SlotID"];
+    uint32        db  = 2 [(gogoproto.customname) = "DB", (gogoproto.casttype) = "github.com/tiglabs/baud/proto/metapb.DBID"];
+    uint32        space  = 3 [(gogoproto.customname) = "Space", (gogoproto.casttype) = "github.com/tiglabs/baud/proto/metapb.SpaceID"];
+    uint32        slot   = 4 [(gogoproto.customname) = "Slot", (gogoproto.casttype) = "github.com/tiglabs/baud/proto/metapb.SlotID"];
 }
 
 message GetRouteResponse {
