@@ -78,8 +78,8 @@ func (p *PartitionProcessor) doRun() {
         case event := <-p.eventCh:
 
             if event.typ == EVENT_TYPE_PARTITION_CREATE {
-                destPS := p.serverSelector.SelectTarget(p.cluster.psCache.getAllServers())
-                if destPS == nil {
+                psToCreate := p.serverSelector.SelectTarget(p.cluster.psCache.getAllServers())
+                if psToCreate == nil {
                     log.Error("Can not distribute suitable ps")
                     // TODO: calling jdos api to allocate a container asynchronously
                     break
@@ -87,33 +87,13 @@ func (p *PartitionProcessor) doRun() {
 
                 go func(partitionToCreate *Partition) {
                     leaderReplica := partitionToCreate.pickLeaderReplica()
-                    leaderPS := p.cluster.psCache.findServerById(leaderReplica.NodeID)
-                    if leaderPS == nil {
-                        log.Debug("can not find leader ps when notify adding replicas to leader")
-                        return
+                    if leaderReplica == nil {
+                        createFirstReplica(partitionToCreate, psToCreate)
+                    } else {
+                        craeteNonFirstReplica(partitionToCreate, psToCreate, leaderReplica)
                     }
 
-                    replicaId, err := idGenerator.GenID()
-                    if err != nil {
-                        log.Error("fail to generate new replica ßid. err:[%v]", err)
-                        return
-                    }
-                    var newMetaReplica = &metapb.Replica{ID: metapb.ReplicaID(replicaId), NodeID: destPS.ID}
 
-
-                    partitionCopy := deepcopy.Iface(partitionToCreate.Partition).(*metapb.Partition)
-                    partitionCopy.Replicas = append(partitionCopy.Replicas, *newMetaReplica)
-                    if err := psRpcClient.CreatePartition(destPS.getRpcAddr(), partitionCopy); err != nil {
-                        log.Error("Rpc fail to create partition[%v] into ps. err:[%v]",
-                            partitionToCreate.Partition, err)
-                       return
-                    }
-
-                    if err := psRpcClient.AddReplica(leaderPS.getRpcAddr(), partitionToCreate.ID, &destPS.RaftAddrs,
-                            newMetaReplica.ID, newMetaReplica.NodeID); err != nil {
-                        log.Error("Rpc fail to add replica[%v] into leader ps. err[%v]", newMetaReplica, err)
-                        return
-                    }
                     //
                     //if err := partitionToCreate.addReplica(p.cluster.store, newMetaReplica); err != nil {
                     //    log.Error("partition add new replica err[%v]", err)
@@ -162,6 +142,42 @@ func (p *PartitionProcessor) doRun() {
     }
 }
 
+func createFirstReplica(partitionToCreate *Partition, psToCreate *PartitionServer) {
+
+}
+
+
+func createNonFirstReplica(cluster *Cluster, partitionToCreate *Partition, psToCreate *PartitionServer,
+        leaderReplica *metapb.Replica) {
+    leaderPS := cluster.psCache.findServerById(leaderReplica.NodeID)
+    if leaderPS == nil {
+        log.Debug("can not find leader ps when notify adding replicas to leader")
+        return
+    }
+
+    replicaId, err := idGenerator.GenID()
+    if err != nil {
+        log.Error("fail to generate new replica ßid. err:[%v]", err)
+        return
+    }
+    var newMetaReplica = &metapb.Replica{ID: metapb.ReplicaID(replicaId), NodeID: destPS.ID}
+
+
+    partitionCopy := deepcopy.Iface(partitionToCreate.Partition).(*metapb.Partition)
+    partitionCopy.Replicas = append(partitionCopy.Replicas, *newMetaReplica)
+    if err := psRpcClient.CreatePartition(destPS.getRpcAddr(), partitionCopy); err != nil {
+        log.Error("Rpc fail to create partition[%v] into ps. err:[%v]",
+            partitionToCreate.Partition, err)
+        return
+    }
+
+    if err := psRpcClient.AddReplica(leaderPS.getRpcAddr(), partitionToCreate.ID, &destPS.RaftAddrs,
+        newMetaReplica.ID, newMetaReplica.NodeID); err != nil {
+        log.Error("Rpc fail to add replica[%v] into leader ps. err[%v]", newMetaReplica, err)
+        return
+    }
+}
+
 func createPartitionProcessor(cluster *Cluster) {
     p := &PartitionProcessor{
         eventCh:        make(chan *ProcessorEvent, PARTITION_CHANNEL_LIMIT),
@@ -201,6 +217,7 @@ func ProcessorStop() {
 
 func PushProcessorEvent(event *ProcessorEvent) error {
     if event == nil {
+        log.Error("empty event")
         return ErrInternalError
     }
 
