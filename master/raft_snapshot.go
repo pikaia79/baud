@@ -5,7 +5,6 @@ import (
 	"github.com/gogo/protobuf/proto"
 	raftproto "github.com/tiglabs/raft/proto"
 	"io"
-	"proto/masterraftcmdpb"
 	"util/raftkvstore"
 )
 

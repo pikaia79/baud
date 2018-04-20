@@ -3,8 +3,8 @@ package master
 import (
     "context"
     "util/log"
-    "util"
-    "proto/metapb"
+    "github.com/tiglabs/baud/proto/metapb"
+    "util/deepcopy"
 )
 
 const (
@@ -12,9 +12,11 @@ const (
 )
 
 const (
-    EVENT_TYPE_INVALID = iota
+    EVENT_TYPE_INVALID              = iota
     EVENT_TYPE_PARTITION_CREATE
     EVENT_TYPE_PARTITION_DELETE
+    //EVENT_TYPE_REPLICA_ADD
+    //EVENT_TYPE_REPLICA_REMOVE
 )
 
 var (
@@ -35,10 +37,18 @@ func NewPartitionCreateEvent(partition *Partition) *ProcessorEvent {
     }
 }
 
-func NewPartitionDeleteEvent(partition *Partition) *ProcessorEvent {
+// internal use
+type PartitionDeleteBody struct {
+    partitionToDelete *Partition
+    replicaToDelete   *metapb.Replica
+}
+func NewPartitionDeleteEvent(partition *Partition, replica *metapb.Replica) *ProcessorEvent {
     return &ProcessorEvent{
         typ:  EVENT_TYPE_PARTITION_DELETE,
-        body: partition,
+        body: &PartitionDeleteBody {
+            partitionToDelete: partition,
+            replicaToDelete:   replica,
+        },
     }
 }
 
@@ -65,45 +75,82 @@ func (p *PartitionProcessor) doRun() {
         case event := <-p.eventCh:
 
             if event.typ == EVENT_TYPE_PARTITION_CREATE {
-                server := p.serverSelector.SelectTarget(p.cluster.psCache.getAllServers())
-                if server == nil {
-                    log.Error("Can not distribute suitable server")
+                destPS := p.serverSelector.SelectTarget(p.cluster.psCache.getAllServers())
+                if destPS == nil {
+                    log.Error("Can not distribute suitable ps")
                     // TODO: calling jdos api to allocate a container asynchronously
                     break
                 }
 
                 go func(partitionToCreate *Partition) {
-                    addr := util.BuildAddr(server.Ip, server.Port)
                     replicaId, err := idGenerator.GenID()
                     if err != nil {
                         log.Error("fail to generate new replica ßid. err:[%v]", err)
                         return
                     }
 
-                    //servers := partitionReceived.replicaGroup.getAllServers()
-                    //if len(servers) >= FIXED_REPLICA_NUM {
-                    //    log.Error("!!!Cannot add new replica, because replica numbers[%v] of partition[%v]",
-                    //        " exceed fixed replica number[%v]", len(servers), partitionReceived, FIXED_REPLICA_NUM)
-                    //    break
-                    //}
-                    //servers = append(servers, server)
+                    var newMetaReplica = &metapb.Replica{ID: replicaId, NodeID: destPS.ID}
 
-                    var newMetaReplica = &metapb.Replica{ID: replicaId}
-                    partitionToCreate.addReplica(newMetaReplica)
-                    if err := psRpcClient.CreateReplica(addr, partitionToCreate.Partition); err != nil {
-                        log.Error("fail to do rpc create replica of partition[%v]. err:[%v]",
+                    partitionCopy := deepcopy.Iface(partitionToCreate.Partition).(*metapb.Partition)
+                    partitionCopy.Replicas = append(partitionCopy.Replicas, *newMetaReplica)
+                    if err := psRpcClient.CreatePartition(destPS.getRpcAddr(), partitionCopy); err != nil {
+                        log.Error("Rpc fail to create partition[%v] into ps. err:[%v]",
                             partitionToCreate.Partition, err)
                        return
                     }
 
-                    // TODO: updatePartition
+                    // notify the leader to new member
+                    leaderReplica := partitionToCreate.pickLeaderReplica()
+                    leaderPS := p.cluster.psCache.findServerById(leaderReplica.NodeID)
+                    if leaderPS == nil {
+                        log.Debug("can not find leader ps when notify adding replicas to leader")
+                        return
+                    }
+                    if err := psRpcClient.AddReplica(leaderPS.getRpcAddr(), destPS.Node, partitionToCreate.Partition,
+                            newMetaReplica); err != nil {
+                        log.Error("Rpc fail to add replica[%v] into leader ps. err[%v]", newMetaReplica, err)
+                        return
+                    }
+                    //
+                    //if err := partitionToCreate.addReplica(p.cluster.store, newMetaReplica); err != nil {
+                    //    log.Error("partition add new replica err[%v]", err)
+                    //    return
+                    //}
+
                 }(event.body.(*Partition))
 
             } else if event.typ == EVENT_TYPE_PARTITION_DELETE {
 
-                go func() {
+                body := event.body.(*PartitionDeleteBody)
 
-                }()
+                go func(partitionToDelete *Partition, replicaToDelete *metapb.Replica) {
+                    // firstly delete the replica from disk, secondly delete it from raft group, finally from ps,
+                    // if deleting progress failure, delete it again when ps heartbeat report at next time
+                    if err := partitionToDelete.deleteReplica(p.cluster.store, replicaToDelete); err != nil {
+                        log.Error("partition delete replica err[%v]", err)
+                        return
+                    }
+
+                    leaderReplica := partitionToDelete.pickLeaderReplica()
+                    leaderPS := p.cluster.psCache.findServerById(leaderReplica.NodeID)
+                    if leaderPS == nil {
+                        log.Debug("can not find leader ps when notify deleting replicas to leader")
+                        return
+                    }
+
+                    destPS := p.cluster.psCache.findServerById(replicaToDelete.NodeID)
+                    if destPS == nil {
+                        log.Debug("can not find replica[%v] ps needed to deleted", replicaToDelete)
+                        return
+                    }
+                    if err := psRpcClient.RemoveReplica(leaderPS.getRpcAddr(), destPS.Node, partitionToDelete.Partition,
+                            replicaToDelete); err != nil {
+                        log.Error("Rpc fail to remove replica[%v] from ps. err[%v]", replicaToDelete, err)
+                        return
+                    }
+
+
+                }(body.partitionToDelete, body.replicaToDelete)
             }
         }
     }

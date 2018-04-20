@@ -4,8 +4,7 @@ import (
 	"sync"
 	"fmt"
 	"util/log"
-	"proto/metapb"
-	"util/deepcopy"
+    "github.com/tiglabs/baud/proto/metapb"
 	"util"
 	"github.com/gogo/protobuf/proto"
 )
@@ -45,19 +44,18 @@ func NewDBByMeta(metaDb *metapb.DB) *DB {
 }
 
 func (db *DB) persistent(store Store) error {
-	db.propertyLock.RLock()
-	defer db.propertyLock.RUnlock()
+	db.propertyLock.Lock()
+	defer db.propertyLock.Unlock()
 
-	copy := deepcopy.Iface(db.DB).(*metapb.DB)
-	dbVal, err := proto.Marshal(copy)
+	dbVal, err := proto.Marshal(db.DB)
 	if err != nil {
-		log.Error("fail to marshal db[%v]. err:[%v]", copy, err)
+		log.Error("fail to marshal db[%v]. err:[%v]", db.DB, err)
 		return err
 	}
 
-	dbKey := []byte(fmt.Sprintf("%s%d", PREFIX_DB, copy.ID))
+	dbKey := []byte(fmt.Sprintf("%s%d", PREFIX_DB, db.ID))
 	if err := store.Put(dbKey, dbVal); err != nil {
-		log.Error("fail to put db[%v] into store. err:[%v]", copy, err)
+		log.Error("fail to put db[%v] into store. err:[%v]", db.DB, err)
 		return ErrBoltDbOpsFailed
 	}
 
@@ -65,8 +63,8 @@ func (db *DB) persistent(store Store) error {
 }
 
 func (db *DB) erase(store Store) error {
-	db.propertyLock.RLock()
-	defer db.propertyLock.RUnlock()
+	db.propertyLock.Lock()
+	defer db.propertyLock.Unlock()
 	
 	dbKey := []byte(fmt.Sprintf("%s%d", PREFIX_DB, db.DB.ID))
 	if err := store.Delete(dbKey); err != nil {
@@ -86,14 +84,14 @@ func (db *DB) rename(newDbName string) {
 
 type DBCache struct {
 	lock     sync.RWMutex
-	dbs      map[uint32]*DB
-	name2Ids map[string]uint32
+	dbs      map[metapb.DBID]*DB
+	name2Ids map[string]metapb.DBID
 }
 
 func NewDBCache() *DBCache {
 	return &DBCache{
-		dbs:     make(map[uint32]*DB),
-		name2Ids:make(map[string]uint32),
+		dbs:     make(map[metapb.DBID]*DB),
+		name2Ids:make(map[string]metapb.DBID),
 	}
 }
 

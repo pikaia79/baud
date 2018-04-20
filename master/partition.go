@@ -1,15 +1,15 @@
 package master
 
 import (
-	"proto/metapb"
+	"github.com/tiglabs/baud/proto/metapb"
 	"github.com/google/btree"
 	"sync"
 	"util/log"
-	"util/deepcopy"
 	"fmt"
 	"time"
 	"github.com/gogo/protobuf/proto"
 	"util"
+	"util/deepcopy"
 )
 
 const (
@@ -21,6 +21,7 @@ const (
 type Partition struct {
 	*metapb.Partition  // !!! 不要直接操作Replicas，要先获取propertyLock
 
+	leader		  *metapb.Replica
 	lastHeartbeat time.Time
 	propertyLock  sync.RWMutex
 	//	replicaGroup *ReplicaGroup
@@ -34,7 +35,7 @@ func NewPartition(dbId, spaceId, startSlot, endSlot uint32) (*Partition, error) 
 	}
 	return &Partition{
 		Partition: &metapb.Partition{
-			ID:        partId,
+			ID:        metapb.PartitionID(partId),
 			DB:        dbId,
 			Space:     spaceId,
 			StartSlot: startSlot,
@@ -52,39 +53,72 @@ func NewPartitionByMeta(metaPartition *metapb.Partition) *Partition {
 }
 
 func (p *Partition) batchPersistent(batch Batch) error {
-	p.propertyLock.RLock()
-	defer p.propertyLock.RUnlock()
+	p.propertyLock.Lock()
+	defer p.propertyLock.Unlock()
 
-	copy := deepcopy.Iface(p.Partition).(*metapb.Partition)
-	marshalVal, err := proto.Marshal(copy)
+	key, val, err := doMetaMarshal(p.Partition)
 	if err != nil {
-		log.Error("fail to marshal partition[%v]. err:[%v]", copy, err)
 		return err
 	}
-	key := []byte(fmt.Sprintf("%s%d", PREFIX_PARTITION, copy.ID))
-	batch.Put(key, marshalVal)
+	batch.Put(key, val)
 
 	return nil
 }
 
-func (p *Partition) deleteReplica(metaReplicas ...*metapb.Replica) {
+func (p *Partition) erase(store Store) error {
 	p.propertyLock.Lock()
 	defer p.propertyLock.Unlock()
 
-	for i := len(p.Replicas) - 1; i >= 0; i-- {
+	key := []byte(fmt.Sprintf("%s%d", PREFIX_PARTITION, p.ID))
+	if err := store.Delete(key); err != nil {
+		log.Error("fail to delete partition[%v] from store. err:[%v]", p.Partition, err)
+		return ErrBoltDbOpsFailed
+	}
+
+	return nil
+}
+
+func (p *Partition) deleteReplica(store Store, metaReplicas ...*metapb.Replica) error {
+	p.propertyLock.Lock()
+	defer p.propertyLock.Unlock()
+
+	copy := deepcopy.Iface(p.Partition).(*metapb.Partition)
+	for i := len(copy.Replicas) - 1; i >= 0; i-- {
 		for _, metaReplica := range metaReplicas {
-			if p.Replicas[i].ID == metaReplica.ID {
-				p.Replicas = append(p.Replicas[:i], p.Replicas[i+1:]...)
+			if copy.Replicas[i].ID == metaReplica.ID {
+				copy.Replicas = append(copy.Replicas[:i], copy.Replicas[i+1:]...)
 			}
 		}
 	}
+
+	key, val, err := doMetaMarshal(copy)
+	if err != nil {
+		return err
+	}
+	store.Put(key, val)
+
+	p.Partition = copy
+	return nil
 }
 
-func (p *Partition) addReplica(metaReplicas *metapb.Replica) {
+func (p *Partition) addReplica(store Store, metaReplicas ...*metapb.Replica) error {
 	p.propertyLock.Lock()
 	defer p.propertyLock.Unlock()
 
-	p.Replicas = append(p.Replicas, *metaReplicas)
+	copy := deepcopy.Iface(p.Partition).(*metapb.Partition)
+	for _, r := range metaReplicas {
+		copy.Replicas = append(copy.Replicas, *r)
+	}
+
+	key, val, err := doMetaMarshal(copy)
+	if err != nil {
+		return err
+	}
+	store.Put(key, val)
+
+	p.Partition = copy
+
+	return nil
 }
 
 func (p *Partition) getAllReplicas() []*metapb.Replica {
@@ -97,6 +131,25 @@ func (p *Partition) getAllReplicas() []*metapb.Replica {
 	}
 
 	return replicas
+}
+
+func (p *Partition) pickLeaderReplica() *metapb.Replica {
+	p.propertyLock.RLock()
+	defer p.propertyLock.RUnlock()
+
+	return p.leader
+}
+
+// internal use, need to write lock external
+func doMetaMarshal(p *metapb.Partition) ([]byte, []byte, error) {
+	val, err := proto.Marshal(p)
+	if err != nil {
+		log.Error("fail to marshal partition[%v]. err:[%v]", p, err)
+		return nil, nil, err
+	}
+	key := []byte(fmt.Sprintf("%s%d", PREFIX_PARTITION, p.ID))
+
+	return key, val, err
 }
 
 //type ReplicaGroup struct {
@@ -145,16 +198,16 @@ func (p *Partition) getAllReplicas() []*metapb.Replica {
 
 type PartitionCache struct {
 	lock  		 sync.RWMutex
-	partitions   map[uint32]*Partition
+	partitions   map[metapb.PartitionID]*Partition
 }
 
 func NewPartitionCache() *PartitionCache {
 	return &PartitionCache{
-		partitions: make(map[uint32]*Partition),
+		partitions: make(map[metapb.PartitionID]*Partition),
 	}
 }
 
-func (c *PartitionCache) findPartitionById(partitionId uint32) *Partition {
+func (c *PartitionCache) findPartitionById(partitionId metapb.PartitionID) *Partition {
 	c.lock.RLock()
 	defer c.lock.RUnlock()
 

@@ -3,8 +3,8 @@ package master
 import (
     "sync"
     "google.golang.org/grpc"
-    "proto/metapb"
-    "proto/pspb"
+    "github.com/tiglabs/baud/proto/metapb"
+    "github.com/tiglabs/baud/proto/pspb"
     "util/log"
     "time"
     "context"
@@ -70,6 +70,45 @@ func (c *PSConn) callRpc(req interface{}, timeout time.Duration) (resp interface
         if header.Code == 0 {
             return out, nil
         }
+
+    case *pspb.DeletePartitionRequest:
+        out, err := c.client.DeletePartition(ctx, in)
+        cancel()
+        if err != nil {
+            if status, ok := status.FromError(err); ok {
+                err = status.Err()
+            }
+            log.Error("grpc invoke is failed. err[%v]", err)
+            return nil, ErrGrpcInvokeFailed
+        }
+
+        header = out.ResponseHeader
+        if header == nil {
+            return nil, ErrGrpcInvalidResp
+        }
+        if header.Code == 0 {
+            return out, nil
+        }
+
+    case *pspb.ChangeReplicaRequest:
+        out, err := c.client.ChangeReplica(ctx, in)
+        cancel()
+        if err != nil {
+            if status, ok := status.FromError(err); ok {
+                err = status.Err()
+            }
+            log.Error("grpc invoke is failed. err[%v]", err)
+            return nil, ErrGrpcInvokeFailed
+        }
+
+        header = out.ResponseHeader
+        if header == nil {
+            return nil, ErrGrpcInvalidResp
+        }
+        if header.Code == 0 {
+            return out, nil
+        }
+
     default:
         cancel()
         log.Error("invalid grpc request type[%v]", in)
@@ -80,7 +119,7 @@ func (c *PSConn) callRpc(req interface{}, timeout time.Duration) (resp interface
     return nil, ErrGrpcInvokeFailed
 }
 
-func (c *PSRpcClient) CreateReplica(addr string, partition *metapb.Partition) error {
+func (c *PSRpcClient) CreatePartition(addr string, partition *metapb.Partition) error {
     psConn, err := c.getConn(addr)
     if err != nil {
         return err
@@ -98,7 +137,7 @@ func (c *PSRpcClient) CreateReplica(addr string, partition *metapb.Partition) er
     return nil
 }
 
-func (c *PSRpcClient) DeleteReplica(addr string, partition *metapb.Partition) error {
+func (c *PSRpcClient) DeletePartition(addr string, partition *metapb.Partition) error {
     psConn, err := c.getConn(addr)
     if err != nil {
         return err
@@ -106,7 +145,53 @@ func (c *PSRpcClient) DeleteReplica(addr string, partition *metapb.Partition) er
 
     req := &pspb.DeletePartitionRequest{
         RequestHeader: new(metapb.RequestHeader),
-        Partition:     partition,
+        ID:            partition.ID,
+    }
+    _, err = psConn.callRpc(req, GRPC_REQUEST_TIMEOUT)
+    if err != nil {
+        return err
+    }
+
+    return nil
+}
+
+func (c *PSRpcClient) AddReplica(addr string, metaPS *metapb.Node, metaPartition *metapb.Partition,
+            metaReplica *metapb.Replica) error {
+    psConn, err := c.getConn(addr)
+    if err != nil {
+        return err
+    }
+
+    req := &pspb.ChangeReplicaRequest {
+        RequestHeader: new(metapb.RequestHeader),
+        Type:          pspb.ReplicaChangeType_ReplicaAdd,
+        PartitionID:   metaPartition.ID,
+        ReplicaID:     metaReplica.ID,
+        NodeID:        metaReplica.NodeID,
+        RaftAddrs:     metaPS.RaftAddrs,
+    }
+    _, err = psConn.callRpc(req, GRPC_REQUEST_TIMEOUT)
+    if err != nil {
+        return err
+    }
+
+    return nil
+}
+
+func (c *PSRpcClient) RemoveReplica(addr string, metaPS *metapb.Node, metaPartition *metapb.Partition,
+    metaReplica *metapb.Replica) error {
+    psConn, err := c.getConn(addr)
+    if err != nil {
+        return err
+    }
+
+    req := &pspb.ChangeReplicaRequest {
+        RequestHeader: new(metapb.RequestHeader),
+        Type:          pspb.ReplicaChangeType_ReplicaRemove,
+        PartitionID:   metaPartition.ID,
+        ReplicaID:     metaReplica.ID,
+        NodeID:        metaReplica.NodeID,
+        RaftAddrs:     metaPS.RaftAddrs,
     }
     _, err = psConn.callRpc(req, GRPC_REQUEST_TIMEOUT)
     if err != nil {

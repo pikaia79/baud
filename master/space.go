@@ -2,7 +2,7 @@ package master
 
 import (
 	"sync"
-	"proto/metapb"
+    "github.com/tiglabs/baud/proto/metapb"
 	"util/log"
 	"util/deepcopy"
 	"fmt"
@@ -39,7 +39,7 @@ type Field struct {
 	MultiValue  bool
 }
 
-func NewSpace(dbId uint32, dbName, spaceName string, policy *PartitionPolicy) (*Space, error) {
+func NewSpace(dbId metapb.DBID, dbName, spaceName string, policy *PartitionPolicy) (*Space, error) {
 	spaceId, err := GetIdGeneratorInstance(nil).GenID()
 	if err != nil {
 		log.Error("generate space id is failed. err:[%v]", err)
@@ -67,8 +67,8 @@ func NewSpaceByMeta(metaSpace *metapb.Space) *Space {
 }
 
 func (s *Space) persistent(store Store) error {
-	s.propertyLock.RLock()
-	defer s.propertyLock.RUnlock()
+	s.propertyLock.Lock()
+	defer s.propertyLock.Unlock()
 
 	copy := deepcopy.Iface(s.Space).(*metapb.Space)
 	spaceVal, err := proto.Marshal(copy)
@@ -86,8 +86,8 @@ func (s *Space) persistent(store Store) error {
 }
 
 func (s *Space) batchPersistent(batch Batch) error {
-	s.propertyLock.RLock()
-	defer s.propertyLock.RUnlock()
+	s.propertyLock.Lock()
+	defer s.propertyLock.Unlock()
 
 	copy := deepcopy.Iface(s.Space).(*metapb.Space)
 	spaceVal, err := proto.Marshal(copy)
@@ -102,8 +102,8 @@ func (s *Space) batchPersistent(batch Batch) error {
 }
 
 func (s *Space) erase(store Store) error {
-	s.propertyLock.RLock()
-	defer s.propertyLock.RUnlock()
+	s.propertyLock.Lock()
+	defer s.propertyLock.Unlock()
 
 	spaceKey := []byte(fmt.Sprintf("%s%d", PREFIX_SPACE, s.ID))
 	if err := store.Delete(spaceKey); err != nil {
@@ -130,14 +130,14 @@ func (s *Space) putPartition(partition *Partition) {
 
 type SpaceCache struct {
 	lock     sync.RWMutex
-	name2Ids map[string]uint32
-	spaces   map[uint32]*Space
+	name2Ids map[string]metapb.SpaceID
+	spaces   map[metapb.SpaceID]*Space
 }
 
 func NewSpaceCache() *SpaceCache {
 	return &SpaceCache{
-		name2Ids: make(map[string]uint32),
-		spaces:   make(map[uint32]*Space),
+		name2Ids: make(map[string]metapb.SpaceID),
+		spaces:   make(map[metapb.SpaceID]*Space),
 	}
 }
 

@@ -10,7 +10,6 @@ import (
 	"io"
 	"os"
 	"path/filepath"
-	"proto/masterraftcmdpb"
 	"sync"
 	"time"
 	"util/log"

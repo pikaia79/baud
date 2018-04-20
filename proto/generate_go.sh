@@ -7,7 +7,7 @@ echo $0 "[out_dir [source_dir]]"
 
 PROGRAM=$(basename "$0")
 
-installed_commands=(protoc-gen-gogofaster goimports)
+installed_commands=(protoc-gen-gogofast goimports)
 for cmd in ${installed_commands[@]}
 do
     command -v $cmd >/dev/null 2>&1 || { echo >&2 "I require "$cmd" but it's not installed.  Aborting."; exit 1; }
@@ -39,7 +39,7 @@ if [ ! -d $GOGO_ROOT ]; then
     ${GO_INSTALL} ${gogo_protobuf_url}/proto
     ${GO_INSTALL} ${gogo_protobuf_url}/protoc-gen-gogo
     ${GO_INSTALL} ${gogo_protobuf_url}/gogoproto
-    ${GO_INSTALL} ${gogo_protobuf_url}/protoc-gen-gogofaster
+    ${GO_INSTALL} ${gogo_protobuf_url}/protoc-gen-gogofast
 fi
 
 goimports_url="golang.org/x/tools/cmd/goimports"
@@ -49,8 +49,8 @@ if [ ! -d $first_gopath/src/${goimports_url} ]; then
 fi
 
 # add the bin path of gogoproto generator into PATH if it's missing
-if ! cmd_exists protoc-gen-gogofaster; then
-    gogo_proto_bin="${first_gopath}/bin/protoc-gen-gogofaster"
+if ! cmd_exists protoc-gen-gogofast; then
+    gogo_proto_bin="${first_gopath}/bin/protoc-gen-gogofast"
     if [ -e "${gogo_proto_bin}" ]; then
         export PATH=$(dirname "${gogo_proto_bin}"):$PATH
         break
@@ -74,7 +74,7 @@ ret=0
 for file in `ls ${proto_dir}/*.proto`
 do
     base_name=$(basename $file ".proto")"pb"
-    protoc -I${proto_dir}:${first_gopath}/src:${GOGO_ROOT}:${GOGO_ROOT}/protobuf --gogofaster_out=plugins=grpc,$GO_OUT_M:$gen_out_dir $file || ret=$?
+    protoc -I${proto_dir}:${first_gopath}/src:${GOGO_ROOT}:${GOGO_ROOT}/protobuf --gofast_out=plugins=grpc,$GO_OUT_M:$gen_out_dir $file || ret=$?
     pb_files=${gen_out_dir}/*.pb.go
     sed -i.bak -E 's/import _ \"gogoproto\"//g' ${pb_files}
     sed -i.bak -E 's/import fmt \"fmt\"//g' ${pb_files}

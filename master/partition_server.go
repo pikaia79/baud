@@ -2,12 +2,11 @@ package master
 
 import (
     "sync"
-    "proto/metapb"
+    "github.com/tiglabs/baud/proto/metapb"
+    "github.com/tiglabs/baud/proto/masterpb"
     "time"
     "util"
     "util/log"
-    "proto/masterpb"
-    "util/deepcopy"
     "fmt"
     "github.com/gogo/protobuf/proto"
 )
@@ -20,9 +19,9 @@ const (
 type PSStatus   int32
 
 const (
-    PS_Invalid PSStatus = iota
-    PS_Init
-    PS_Registered
+    PS_INVALID    PSStatus = iota
+    PS_INIT
+    PS_REGISTERED
     PS_OFFLINE
     PS_TOMBSTONE
     PS_LOGOUT
@@ -32,10 +31,10 @@ type PartitionServer struct {
     *metapb.Node
     *masterpb.NodeSysStats
 
-    status PSStatus
-    lastHeartbeat   time.Time
-    partitionCache  *PartitionCache  // this partition only belong to same ps
-    propertyLock    sync.RWMutex
+    status         PSStatus
+    lastHeartbeat  time.Time
+    partitionCache *PartitionCache
+    propertyLock   sync.RWMutex
 }
 
 func NewPartitionServer(ip string) (*PartitionServer, error) {
@@ -51,7 +50,7 @@ func NewPartitionServer(ip string) (*PartitionServer, error) {
             Ip: ip,
         },
         NodeSysStats:   new(masterpb.NodeSysStats),
-        status:         PS_Init,
+        status:         PS_INIT,
         lastHeartbeat:  time.Now(),
         partitionCache: NewPartitionCache(),
     }, nil
@@ -60,39 +59,45 @@ func NewPartitionServer(ip string) (*PartitionServer, error) {
 func NewPartitionServerByMeta(metaPS *metapb.Node) *PartitionServer {
     return &PartitionServer{
         Node:           metaPS,
-        status:         PS_Init,
+        status:         PS_INIT,
         partitionCache: NewPartitionCache(),
     }
 }
 
 func (p *PartitionServer) persistent(store Store) error {
-    p.propertyLock.RLock()
-    defer p.propertyLock.RUnlock()
+    p.propertyLock.Lock()
+    defer p.propertyLock.Unlock()
 
-    psCopy := deepcopy.Iface(p.Node).(*metapb.Node)
-    psVal, err := proto.Marshal(psCopy)
+    val, err := proto.Marshal(p.Node)
     if err != nil {
-        log.Error("marshal ps[%v] is failed.", psCopy)
+        log.Error("marshal ps[%v] is failed.", p.Node)
         return ErrInternalError
     }
 
-    psKey := []byte(fmt.Sprintf("%s%d", PREFIX_PARTITION_SERVER, psCopy.ID))
-    if err := store.Put(psKey, psVal); err != nil {
-        log.Error("fail to store partition into store. err[%v]", err)
+    key := []byte(fmt.Sprintf("%s%d", PREFIX_PARTITION_SERVER, p.Node.ID))
+    if err := store.Put(key, val); err != nil {
+        log.Error("fail to store ps into store. err[%v]", err)
         return ErrBoltDbOpsFailed
     }
 
     return nil
 }
 
-func (p *PartitionServer) isReplicaFull() bool {
-    p.propertyLock.RLock()
-    defer p.propertyLock.RUnlock()
+//func (p *PartitionServer) isReplicaFull() bool {
+//    p.propertyLock.RLock()
+//    defer p.propertyLock.RUnlock()
+//
+//    return p.replicaCache.count() == DEFAULT_REPLICA_LIMIT_PER_PS
+//}
 
-    return p.replicaCache.count() == DEFAULT_REPLICA_LIMIT_PER_PS
+func (p *PartitionServer) addPartition(partition *Partition) {
+    p.propertyLock.Lock()
+    defer p.propertyLock.Unlock()
+
+    p.partitionCache.addPartition(partition)
 }
 
-func (p *PartitionServer) changeStatus(newStatus metapb.PSStatus) {
+func (p *PartitionServer) changeStatus(newStatus PSStatus) {
     p.propertyLock.Lock()
     defer p.propertyLock.Unlock()
 
@@ -100,12 +105,12 @@ func (p *PartitionServer) changeStatus(newStatus metapb.PSStatus) {
 
     var isConfusing bool
     switch newStatus {
-    case metapb.PSStatus_PS_Login:
-        if oldStatus != metapb.PSStatus_PS_Initial {
+    case PS_INIT:
+        if oldStatus != PS_INIT {
             isConfusing = true
         }
-    case metapb.PSStatus_PS_Offline:
-    case metapb.PSStatus_PS_Logout:
+    case PS_OFFLINE:
+    case PS_LOGOUT:
     default:
         log.Error("can not change to the new ps Status[%v]", newStatus)
         return
@@ -114,19 +119,26 @@ func (p *PartitionServer) changeStatus(newStatus metapb.PSStatus) {
     if !isConfusing {
         p.status = newStatus
     } else {
-        log.Error("can not change ps[%v] Status from [%v] to [%v]", p.Id, oldStatus, newStatus)
+        log.Error("can not change ps[%v] Status from [%v] to [%v]", p.ID, oldStatus, newStatus)
     }
+}
+
+func (p *PartitionServer) getRpcAddr() string {
+    p.propertyLock.RLock()
+    defer p.propertyLock.RUnlock()
+
+    return util.BuildAddr(p.Ip, p.Port)
 }
 
 type PSCache struct {
     lock       sync.RWMutex
-    id2Servers map[uint32]*PartitionServer
+    id2Servers map[metapb.NodeID]*PartitionServer
     ip2Servers map[string]*PartitionServer
 }
 
 func NewPSCache() *PSCache {
     return &PSCache{
-        id2Servers: make(map[uint32]*PartitionServer),
+        id2Servers: make(map[metapb.NodeID]*PartitionServer),
         ip2Servers: make(map[string]*PartitionServer),
     }
 }

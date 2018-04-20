@@ -7,9 +7,9 @@ import (
 	"github.com/golang/protobuf/proto"
 	"github.com/tiglabs/raft"
 	raftproto "github.com/tiglabs/raft/proto"
-	"proto/masterraftcmdpb"
 	"util/log"
 	"util/raftkvstore"
+	"github.com/tiglabs/baud/proto/masterpb"
 )
 
 var (
@@ -23,7 +23,7 @@ var (
 	errUnknownResponseType = errors.New("unknown repsonse type")
 )
 
-type RaftApplyHandler func( /*req*/ *masterraftcmdpb.Request, uint64) ( /*resp*/ *masterraftcmdpb.Response /*err*/, error)
+type RaftApplyHandler func( /*req*/ *masterpb.Request, uint64) ( /*resp*/ *masterpb.Response /*err*/, error)
 
 type RaftPeerChangeHandler func( /*confChange*/ *raftproto.ConfChange) ( /*res*/ interface{} /*err*/, error)
 

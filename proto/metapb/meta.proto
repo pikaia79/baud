@@ -32,11 +32,6 @@ message DocID {
     uint64 seq_no  = 2;
 }
 
-message DocID {
-    uint32 slot_id = 1 [(gogoproto.customname) = "SlotID", (gogoproto.casttype) = "SlotID"];
-    uint64 seq_no  = 2;
-}
-
 message DB {
     uint32 id   = 1 [(gogoproto.customname) = "ID", (gogoproto.casttype) = "DBID"];
     string name = 2;
@@ -91,6 +86,7 @@ message Partition {
     uint32           end_slot   = 5 [(gogoproto.customname) = "EndSlot", (gogoproto.casttype) = "SlotID"];
     repeated Replica replicas   = 6 [(gogoproto.nullable) = false];
     PartitionStatus  status     = 7;
+    PartitionEpoch   epoch      = 8 [(gogoproto.nullable) = false];
 }
 
 message Replica {
