@@ -46,6 +46,10 @@ func (w *Store) ExecuteBatch(batch kvstore.KVBatch, ops ...*kvstore.Option) erro
 	return nil
 }
 
+func (w *Store) NewTransaction(writable bool) (kvstore.Transaction, error) {
+	return &transaction{}, nil
+}
+
 func (r *Store) Close() error {
 	return nil
 }
@@ -114,3 +118,13 @@ func (i *batch) Merge(key, val []byte)           {}
 func (i *batch) Reset()                          {}
 func (i *batch) Operations() []kvstore.Operation { return nil }
 func (i *batch) Close() error                    { return nil }
+
+type transaction struct {}
+
+func(tx *transaction) Put(key, value []byte, ops ...*kvstore.Option) error {return nil}
+func(tx *transaction) Get(key []byte) ([]byte, error) {return nil, nil}
+func(tx *transaction) Delete(key []byte, ops ...*kvstore.Option) error {return nil}
+func(tx *transaction) PrefixIterator(prefix []byte) kvstore.KVIterator {return &iterator{}}
+func(tx *transaction) RangeIterator(start, end []byte) kvstore.KVIterator {return &iterator{}}
+func (tx *transaction) Commit() error { return nil }
+func (tx *transaction) Rollback() error { return nil }

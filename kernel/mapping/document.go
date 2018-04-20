@@ -17,8 +17,17 @@ func NewDocumentMapping(mapping *ObjectFieldMapping) *DocumentMapping {
 func (dm *DocumentMapping) parseDocument(doc interface{}, context *parseContext) error {
 	if dm.Mapping != nil {
 		var path []string
-		return dm.Mapping.ParseField(doc, path, context)
+		err := dm.Mapping.ParseField(doc, path, context)
+		if err != nil {
+			return err
+		}
 		// TODO _all field
+		allFieldMapping := dm.Mapping.FindProperty("_all")
+		if allFieldMapping != nil && allFieldMapping.Enabled() {
+			field := document.NewCompositeFieldWithProperty("_all", context.excludedFromAll, allFieldMapping.(*TextFieldMapping).Property())
+			context.doc.AddField(field)
+		}
+		// TODO _source field
 	}
 	return nil
 }

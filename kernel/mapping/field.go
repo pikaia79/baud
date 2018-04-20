@@ -6,9 +6,9 @@ import (
 	"strings"
 	"strconv"
 	"fmt"
+	"time"
 
 	"github.com/tiglabs/baud/kernel/document"
-	"time"
 )
 
 type FieldMapping interface {
@@ -109,6 +109,7 @@ func (f *ObjectFieldMapping) ParseField(data interface{}, path []string, context
 		// todo
 		return nil
 	}
+	var err error
 	val := reflect.ValueOf(data)
 	typ := val.Type()
 	switch typ.Kind() {
@@ -126,7 +127,17 @@ func (f *ObjectFieldMapping) ParseField(data interface{}, path []string, context
 				
 				fieldName := key.String()
 				fieldVal := val.MapIndex(key).Interface()
-				err := field.ParseField(fieldVal, append(path, f.Name(), fieldName), context)
+				err = field.ParseField(fieldVal, append(path, f.Name(), fieldName), context)
+				if err != nil {
+					return err
+				}
+			}
+		}
+	case reflect.Slice, reflect.Array:
+		for i := 0; i < val.Len(); i++ {
+			if val.Index(i).CanInterface() {
+				fieldVal := val.Index(i).Interface()
+				err = f.ParseField(fieldVal, path, context)
 				if err != nil {
 					return err
 				}
@@ -136,6 +147,13 @@ func (f *ObjectFieldMapping) ParseField(data interface{}, path []string, context
 		return errors.New("Fields that can not be identified")
 	}
 	return nil
+}
+
+func (f *ObjectFieldMapping) FindProperty(name string) FieldMapping {
+	if f.Properties == nil {
+		return nil
+	}
+	return f.Properties[name]
 }
 
 type NestedFieldMapping struct {
@@ -283,6 +301,7 @@ func (f *TextFieldMapping) ParseField(data interface{}, path []string, context *
 	if !f.Enabled() {
 		return nil
 	}
+	var err error
 	val := reflect.ValueOf(data)
 	typ := val.Type()
 	switch typ.Kind() {
@@ -302,9 +321,19 @@ func (f *TextFieldMapping) ParseField(data interface{}, path []string, context *
 			context.excludedFromAll = append(context.excludedFromAll, fieldName)
 		}
 		for name, fieldMapping := range f.Fields {
-			err := fieldMapping.ParseField(propertyValueString, append(path, fieldName, name), context)
+			err = fieldMapping.ParseField(propertyValueString, append(path, fieldName, name), context)
 			if err != nil {
 				return err
+			}
+		}
+	case reflect.Slice, reflect.Array:
+		for i := 0; i < val.Len(); i++ {
+			if val.Index(i).CanInterface() {
+				fieldVal := val.Index(i).Interface()
+				err = f.ParseField(fieldVal, path, context)
+				if err != nil {
+					return err
+				}
 			}
 		}
 	default:
@@ -374,6 +403,7 @@ func (f *KeywordFieldMapping) ParseField(data interface{}, path []string, contex
 	if !f.Enabled() {
 		return nil
 	}
+	var err error
 	val := reflect.ValueOf(data)
 	typ := val.Type()
 	switch typ.Kind() {
@@ -392,9 +422,19 @@ func (f *KeywordFieldMapping) ParseField(data interface{}, path []string, contex
 			context.excludedFromAll = append(context.excludedFromAll, fieldName)
 		}
 		for name, fieldMapping := range f.Fields {
-			err := fieldMapping.ParseField(propertyValueString, append(path, name), context)
+			err = fieldMapping.ParseField(propertyValueString, append(path, name), context)
 			if err != nil {
 				return err
+			}
+		}
+	case reflect.Slice, reflect.Array:
+		for i := 0; i < val.Len(); i++ {
+			if val.Index(i).CanInterface() {
+				fieldVal := val.Index(i).Interface()
+				err = f.ParseField(fieldVal, path, context)
+				if err != nil {
+					return err
+				}
 			}
 		}
 	default:
@@ -458,26 +498,25 @@ func(f *NumericFieldMapping) ParseField(data interface{}, path []string, context
 	if !f.Enabled() {
 		return nil
 	}
-	propertyValue := reflect.ValueOf(data)
-	if !propertyValue.IsValid() {
+	var valFloat float64
+	var err error
+	val := reflect.ValueOf(data)
+	if !val.IsValid() {
 		// cannot do anything with the zero value
 		return errors.New("field value invalid")
 	}
-	var propertyValFloat float64
-	var err error
-
-	propertyType := propertyValue.Type()
-	switch propertyType.Kind() {
+	typ := val.Type()
+	switch typ.Kind() {
 	case reflect.String:
 		if f.Coerce {
-			propertyValueString := propertyValue.String()
+			propertyValueString := val.String()
 			switch f.Type() {
 			case "long", "integer", "short", "byte":
 				var _val int64
 				_val, err = strconv.ParseInt(propertyValueString, 10, 64)
-				propertyValFloat = float64(_val)
+				valFloat = float64(_val)
 			case "double", "float", "half_float", "scaled_float":
-				propertyValFloat, err = strconv.ParseFloat(propertyValueString, 64)
+				valFloat, err = strconv.ParseFloat(propertyValueString, 64)
 			default:
 				return fmt.Errorf("invalid field type %s", f.Type())
 			}
@@ -489,16 +528,26 @@ func(f *NumericFieldMapping) ParseField(data interface{}, path []string, context
 			return errors.New("invalid field type")
 		}
 	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
-		propertyValFloat = float64(propertyValue.Int())
+		valFloat = float64(val.Int())
 	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
-		propertyValFloat = float64(propertyValue.Uint())
+		valFloat = float64(val.Uint())
 	case reflect.Float64, reflect.Float32:
-		propertyValFloat = propertyValue.Float()
+		valFloat = val.Float()
+	case reflect.Slice, reflect.Array:
+		for i := 0; i < val.Len(); i++ {
+			if val.Index(i).CanInterface() {
+				fieldVal := val.Index(i).Interface()
+				err = f.ParseField(fieldVal, path, context)
+				if err != nil {
+					return err
+				}
+			}
+		}
 	default:
-		return fmt.Errorf("invalid field type %s", propertyType.Kind().String())
+		return fmt.Errorf("invalid field type %s", val.Kind().String())
 	}
 	fieldName := getFieldName(path, f)
-	field := document.NewNumericFieldWithProperty(fieldName, propertyValFloat, f.Property())
+	field := document.NewNumericFieldWithProperty(fieldName, valFloat, f.Property())
 	context.doc.AddField(field)
 	if !f.IncludeInAll {
 		context.excludedFromAll = append(context.excludedFromAll, fieldName)
@@ -565,18 +614,18 @@ func(f *DateFieldMapping) ParseField(data interface{}, path []string, context *p
 	if !f.Enabled() {
 		return nil
 	}
-	propertyValue := reflect.ValueOf(data)
-	if !propertyValue.IsValid() {
+	val := reflect.ValueOf(data)
+	if !val.IsValid() {
 		// cannot do anything with the zero value
 		return errors.New("field value invalid")
 	}
-	propertyType := propertyValue.Type()
-	switch propertyType.Kind() {
+	var err error
+	typ := val.Type()
+	switch typ.Kind() {
 	case reflect.String:
-		propertyValueString := propertyValue.String()
+		propertyValueString := val.String()
 		formats := strings.Split(f.Format, "||")
 		var parsedDateTime time.Time
-		var err error
 		for _, format := range formats {
 			dateTimeParser := context.im.DateTimeParserNamed(format)
 			if dateTimeParser != nil {
@@ -600,6 +649,16 @@ func(f *DateFieldMapping) ParseField(data interface{}, path []string, context *p
 		context.doc.AddField(field)
 		if !f.IncludeInAll {
 			context.excludedFromAll = append(context.excludedFromAll, fieldName)
+		}
+	case reflect.Slice, reflect.Array:
+		for i := 0; i < val.Len(); i++ {
+			if val.Index(i).CanInterface() {
+				fieldVal := val.Index(i).Interface()
+				err = f.ParseField(fieldVal, path, context)
+				if err != nil {
+					return err
+				}
+			}
 		}
 	default:
 		return errors.New("invalid field value")
@@ -656,18 +715,28 @@ func(f *BooleanFieldMapping) ParseField(data interface{}, path []string, context
 	if !f.Enabled() {
 		return nil
 	}
-	propertyValue := reflect.ValueOf(data)
-	if !propertyValue.IsValid() {
+	val := reflect.ValueOf(data)
+	if !val.IsValid() {
 		// cannot do anything with the zero value
 		return errors.New("field value invalid")
 	}
-	propertyType := propertyValue.Type()
-	switch propertyType.Kind() {
+	typ := val.Type()
+	switch typ.Kind() {
 	case reflect.Bool:
-		propertyValueBool := propertyValue.Bool()
+		propertyValueBool := val.Bool()
 		fieldName := getFieldName(path, f)
 		field := document.NewBooleanFieldWithProperty(fieldName, propertyValueBool, f.Property())
 		context.doc.AddField(field)
+	case reflect.Slice, reflect.Array:
+		for i := 0; i < val.Len(); i++ {
+			if val.Index(i).CanInterface() {
+				fieldVal := val.Index(i).Interface()
+				err := f.ParseField(fieldVal, path, context)
+				if err != nil {
+					return err
+				}
+			}
+		}
 	default:
 		return errors.New("invalid field type")
 	}
