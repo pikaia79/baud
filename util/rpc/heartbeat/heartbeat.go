@@ -2,7 +2,8 @@ package heartbeat
 
 import (
 	"context"
-	"fmt"
+
+	"github.com/tiglabs/baud/util/log"
 )
 
 // HeartbeatService exposes a method to echo its request params.
@@ -12,13 +13,15 @@ type HeartbeatService struct {
 
 // Ping echos the contents of the request to the response.
 func (hs *HeartbeatService) Ping(ctx context.Context, req *PingRequest) (*PingResponse, error) {
+	pong := req.Ping
 	// Check cluster id
 	if req.ClusterId != hs.ClusterID {
-		return nil, fmt.Errorf("client cluster_id(%s) doesn't match server cluster_id(%s)", req.ClusterId, hs.ClusterID)
+		log.Error("client cluster_id(%s) doesn't match server cluster_id(%s)", req.ClusterId, hs.ClusterID)
+		pong = "reject"
 	}
 
 	return &PingResponse{
-		Pong:      req.Ping,
+		Pong:      pong,
 		ClusterId: hs.ClusterID,
 	}, nil
 }
