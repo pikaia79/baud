@@ -43,16 +43,15 @@ type ClientOption struct {
 // Client grpc wrap client
 type Client struct {
 	concurrent uint32
-	option     *ClientOption
-	pools      *sync.Map
+	option     ClientOption
+	pools      sync.Map
 }
 
 // NewClient create a Client object
 func NewClient(concurrent uint32, option *ClientOption) *Client {
 	return &Client{
 		concurrent: concurrent,
-		option:     option,
-		pools:      new(sync.Map),
+		option:     *option,
 	}
 }
 
@@ -60,7 +59,7 @@ func NewClient(concurrent uint32, option *ClientOption) *Client {
 func (c *Client) GetGrpcClient(addr string) (interface{}, error) {
 	value, ok := c.pools.Load(addr)
 	if !ok {
-		value, _ = c.pools.LoadOrStore(addr, newClientPool(c.concurrent, addr, c.option))
+		value, _ = c.pools.LoadOrStore(addr, newClientPool(c.concurrent, addr, &c.option))
 	}
 
 	return value.(*clientPool).getClient()
@@ -82,18 +81,9 @@ type clientWrapper struct {
 	addr   string
 	option *ClientOption
 
-	rwMutex   *sync.RWMutex
+	rwMutex   sync.RWMutex
 	conn      *connection
 	clientRaw interface{}
-}
-
-func newClientWrapper(key, addr string, option *ClientOption) *clientWrapper {
-	return &clientWrapper{
-		key:     key,
-		addr:    addr,
-		option:  option,
-		rwMutex: new(sync.RWMutex),
-	}
 }
 
 func (cw *clientWrapper) getClient() (interface{}, error) {
@@ -132,6 +122,7 @@ func (cw *clientWrapper) Close() error {
 	cw.rwMutex.Lock()
 	if cw.conn != nil {
 		cw.option.ConnectMgr.removeConn(cw.key, cw.conn)
+		cw.conn = nil
 	}
 	cw.rwMutex.Unlock()
 
@@ -141,17 +132,19 @@ func (cw *clientWrapper) Close() error {
 type clientPool struct {
 	size     uint32
 	pos      uint32
-	wrappers []*clientWrapper
+	wrappers []clientWrapper
 }
 
 func newClientPool(size uint32, addr string, option *ClientOption) *clientPool {
 	pool := &clientPool{
 		size:     size,
-		wrappers: make([]*clientWrapper, size),
+		wrappers: make([]clientWrapper, size),
 	}
 
 	for i := 0; i < int(size); i++ {
-		pool.wrappers[i] = newClientWrapper(strings.Join([]string{addr, strconv.Itoa(i)}, "-"), addr, option)
+		pool.wrappers[i].key = strings.Join([]string{addr, strconv.Itoa(i)}, "-")
+		pool.wrappers[i].addr = addr
+		pool.wrappers[i].option = option
 	}
 
 	return pool
@@ -168,8 +161,8 @@ func (p *clientPool) getClient() (interface{}, error) {
 }
 
 func (p *clientPool) Close() error {
-	for _, c := range p.wrappers {
-		c.Close()
+	for i := 0; i < len(p.wrappers); i++ {
+		p.wrappers[i].Close()
 	}
 	return nil
 }
