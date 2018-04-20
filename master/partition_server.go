@@ -97,6 +97,13 @@ func (p *PartitionServer) addPartition(partition *Partition) {
     p.partitionCache.addPartition(partition)
 }
 
+func (p *PartitionServer) updateHb() {
+    p.propertyLock.Lock()
+    defer p.propertyLock.Unlock()
+
+    p.lastHeartbeat = time.Now()
+}
+
 func (p *PartitionServer) changeStatus(newStatus PSStatus) {
     p.propertyLock.Lock()
     defer p.propertyLock.Unlock()
