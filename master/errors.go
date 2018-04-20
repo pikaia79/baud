@@ -27,6 +27,8 @@ var (
 	ErrGrpcInvokeFailed			= errors.New("invoke grpc is failed")
 	//ErrGrpcInvalidReq           = errors.New("invalid grpc request")
 	ErrGrpcParamError           = errors.New("grpc param error")
+	ErrGrpcEmptyFollowers		= errors.New("reported empty followers")
+	ErrGrpcInvalidFollowers		= errors.New("reported invalid followers")
 )
 
 // http response error code and error message definitions

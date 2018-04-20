@@ -75,7 +75,7 @@ func (s *RpcServer) PSRegister(ctx context.Context,
         // this is a new ps unregistered never, distribute new psid to it
         ps, err := NewPartitionServer(request.Ip)
         if err != nil {
-            resp.ResponseHeader = makeRpcRespHeader(err)
+            resp.ResponseHeader = *makeRpcRespHeader(err)
             return resp, nil
         }
         ps.persistent(s.cluster.store)
@@ -83,7 +83,7 @@ func (s *RpcServer) PSRegister(ctx context.Context,
         ps.status = PS_REGISTERED
         s.cluster.psCache.addServer(ps)
 
-        resp.ResponseHeader = makeRpcRespHeader(ErrSuc)
+        resp.ResponseHeader = *makeRpcRespHeader(ErrSuc)
         resp.NodeID = ps.ID
         return resp, nil
     }
@@ -93,16 +93,16 @@ func (s *RpcServer) PSRegister(ctx context.Context,
     if ps == nil {
         // illegal ps will register
         log.Warn("Can not find nodeid[%v] in master.", nodeId)
-        resp.ResponseHeader = makeRpcRespHeader(ErrPSNotExists)
+        resp.ResponseHeader = *makeRpcRespHeader(ErrPSNotExists)
         return resp, nil
     }
 
     // old ps rebooted
     ps.changeStatus(PS_REGISTERED)
 
-    resp.ResponseHeader = makeRpcRespHeader(ErrSuc)
+    resp.ResponseHeader = *makeRpcRespHeader(ErrSuc)
     resp.NodeID = ps.ID
-    resp.Partitions = ps.partitionCache.getAllMetaPartitions()
+    resp.Partitions = *ps.partitionCache.getAllMetaPartitions()
 
     return resp, nil
 }
@@ -110,18 +110,18 @@ func (s *RpcServer) PSRegister(ctx context.Context,
 func (s *RpcServer) PSHeartbeat(ctx context.Context,
     request *masterpb.PSHeartbeatRequest) (*masterpb.PSHeartbeatResponse, error) {
     resp := new(masterpb.PSHeartbeatResponse)
+    resp.ResponseHeader = *makeRpcRespHeader(ErrSuc)
 
     psId := request.NodeID
     ps := s.cluster.psCache.findServerById(psId)
     if ps == nil {
         log.Error("ps heartbeat received invalid psid[%v]", psId)
-        resp.ResponseHeader = makeRpcRespHeader(ErrPSNotExists)
+        resp.ResponseHeader = *makeRpcRespHeader(ErrPSNotExists)
         return resp, nil
     }
 
     partitionInfos := request.Partitions
     if partitionInfos == nil {
-        resp.ResponseHeader = makeRpcRespHeader(ErrSuc)
         return resp, nil
     }
 
@@ -130,67 +130,122 @@ func (s *RpcServer) PSHeartbeat(ctx context.Context,
         partitionMS := s.cluster.partitionCache.findPartitionById(partitionId)
         if partitionMS == nil {
             log.Debug("ps heartbeat received a partition[%v] not existed.", partitionId)
+            // delete whole partition or replica
             continue
         }
 
-        //confVerMS :=
-        //partitionMS.Partition.
-            confVerHb := partitionInfo.Epoch.ConfVersion
+        confVerMS := partitionMS.Epoch.ConfVersion
+        confVerHb := partitionInfo.Epoch.ConfVersion
+        if confVerHb > confVerMS {
+            if !partitionInfo.IsLeader {
+                return resp, nil
+            }
 
+            // force to update by leader
+            if err := partitionMS.updateInfo(s.cluster.store, &partitionInfo, request.NodeID); err != nil {
+                log.Error("fail to update partition[%v] info in ps heartbeat. err[%v]", partitionInfo.ID, err)
+                resp.ResponseHeader = *makeRpcRespHeader(ErrInternalError)
+                return resp, nil
+            }
+
+            // add or delete replicas
+            replicaCount := partitionMS.countReplicas()
+            if replicaCount > FIXED_REPLICA_NUM {
+                // the count of heartbeat replicas may be great then 4 when making snapshot.
+                // TODO: check partition status is not transfering replica now, then to delete
+
+                log.Info("To many replicas added. count:[%v]", replicaCount)
+                if !partitionMS.takeChangeMemberTask() {
+                    return resp, nil
+                }
+
+                replica, err := pickReplicaToDelete(&partitionInfo, request.NodeID)
+                if err != nil {
+                    resp.ResponseHeader = *makeRpcRespHeader(err)
+                    return resp, nil
+                }
+
+                PushProcessorEvent(NewPartitionDeleteEvent(partitionId, partitionMS.pickLeaderReplica().NodeID,
+                        replica))
+
+            } else if replicaCount < FIXED_REPLICA_NUM {
+
+                log.Info("To little replicas added. count:[%v]", replicaCount)
+                if !partitionMS.takeChangeMemberTask() {
+                    return resp, nil
+                }
+
+                PushProcessorEvent(NewPartitionCreateEvent(partitionMS))
+
+            } else {
+                log.Info("Normal replica count in heartbeat")
+            }
+
+        } else if confVerHb < confVerMS {
+            if !partitionMS.takeChangeMemberTask() {
+                return resp, nil
+            }
+
+            if !partitionInfo.IsLeader {
+                PushProcessorEvent(NewPartitionDeleteEvent(partitionInfo.ID, partitionMS.pickLeaderReplica().NodeID,
+                    &metapb.Replica{ID: partitionInfo.RaftStatus.ID, NodeID: request.NodeID}))
+
+            } else {
+                // delete members, finally delete leader
+                replica, err := pickReplicaToDelete(&partitionInfo, request.NodeID)
+                if err != nil {
+                    resp.ResponseHeader = *makeRpcRespHeader(err)
+                    return resp, nil
+                }
+
+                PushProcessorEvent(NewPartitionDeleteEvent(partitionInfo.ID, partitionMS.pickLeaderReplica().NodeID,
+                        replica))
+            }
+
+        } else {
+            // timeout delete in same conf version when have been not elected leader in ps at a long time
+
+        }
     }
 
-    replpbs := request.Replicas
-    if replpbs == nil {
-        resp.Header = makeRpcRespHeader(ErrSuc)
-        return resp, nil
-    }
-    for _, replpb := range replpbs {
-        partitionId := replpb.GetPartitionId()
-        partition := rs.cluster.partitionCache.findPartitionById(partitionId)
-        if partition == nil {
-            log.Error("Cannot find partition belong to the replica. partitionId[%v]", partitionId)
-            continue
-        }
-
-        partition.propertyLock.Lock() ////////////////////////////////
-
-        // received heartbeat of an existed replica, do update the replica info
-        replica := partition.replicaGroup.findReplicaById(replpb.GetId())
-        if replica != nil {
-            replica.update(replpb)
-            continue
-        }
-
-        replicaNum := partition.replicaGroup.count()
-        if replicaNum >= FIXED_REPLICA_NUM {
-            log.Warn("The number[%v] of replicas for same one partition exceed fixed replica num", replicaNum)
-            // TODO : delete replica
-            continue
-        }
-
-        // TODO: modify space Status
-
-        newReplica := NewReplica(replpb)
-        if err := newReplica.persistent(rs.cluster.store); err != nil {
-            continue
-        }
-        partition.replicaGroup.addReplica(replica, ps)
-        ps.replicaCache.addReplica(replica)
-    }
-
-    resp.Header = makeRpcRespHeader(ErrSuc)
     return resp, nil
 }
 
-func makeRpcRespHeader(err error) metapb.ResponseHeader {
+func pickReplicaToDelete(info *masterpb.PartitionInfo, leaderNodeId metapb.NodeID) (*metapb.Replica, error) {
+    followers := info.RaftStatus.Followers
+    if followers == nil || len(followers) == 0 {
+        log.Error("!!!Never happened. Cannot report empty replicas in ps heartbeat. info:[%v]", info)
+        return nil, ErrGrpcEmptyFollowers
+    }
+
+    if !info.IsLeader {
+        return &metapb.Replica{ID: followers[0].ID, NodeID: followers[0].NodeID}, nil
+    }
+
+    // firstly pick followers, finally leader
+    if len(followers) > 1 {
+        for _, follower := range followers {
+            if follower.NodeID != leaderNodeId {
+                return &metapb.Replica{ID: follower.ID, NodeID: follower.NodeID}, nil
+            }
+        }
+        log.Error("cannot find leader in followers")
+        return nil, ErrGrpcInvalidFollowers
+
+    } else {
+        return &metapb.Replica{ID: followers[0].ID, NodeID: followers[0].NodeID}, nil
+    }
+}
+
+func makeRpcRespHeader(err error) *metapb.ResponseHeader {
     code, ok := Err2CodeMap[err]
     if ok {
-        return metapb.ResponseHeader{
+        return &metapb.ResponseHeader{
             Code:    metapb.RespCode(code),
             Message: err.Error(),
         }
     } else {
-        return metapb.ResponseHeader{
+        return &metapb.ResponseHeader{
             Code:    ERRCODE_INTERNAL_ERROR,
             Message: ErrInternalError.Error(),
         }

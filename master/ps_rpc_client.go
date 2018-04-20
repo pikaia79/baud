@@ -63,7 +63,7 @@ func (c *PSConn) callRpc(req interface{}, timeout time.Duration) (resp interface
             return nil, ErrGrpcInvokeFailed
         }
 
-        header = out.ResponseHeader
+        header = &out.ResponseHeader
         if header == nil {
             return nil, ErrGrpcInvalidResp
         }
@@ -82,7 +82,7 @@ func (c *PSConn) callRpc(req interface{}, timeout time.Duration) (resp interface
             return nil, ErrGrpcInvokeFailed
         }
 
-        header = out.ResponseHeader
+        header = &out.ResponseHeader
         if header == nil {
             return nil, ErrGrpcInvalidResp
         }
@@ -101,7 +101,7 @@ func (c *PSConn) callRpc(req interface{}, timeout time.Duration) (resp interface
             return nil, ErrGrpcInvokeFailed
         }
 
-        header = out.ResponseHeader
+        header = &out.ResponseHeader
         if header == nil {
             return nil, ErrGrpcInvalidResp
         }
@@ -126,8 +126,8 @@ func (c *PSRpcClient) CreatePartition(addr string, partition *metapb.Partition) 
     }
 
     req := &pspb.CreatePartitionRequest{
-        RequestHeader: new(metapb.RequestHeader),
-        Partition:     partition,
+        RequestHeader: metapb.RequestHeader{},
+        Partition:     *partition,
     }
     _, err = psConn.callRpc(req, GRPC_REQUEST_TIMEOUT)
     if err != nil {
@@ -137,15 +137,15 @@ func (c *PSRpcClient) CreatePartition(addr string, partition *metapb.Partition) 
     return nil
 }
 
-func (c *PSRpcClient) DeletePartition(addr string, partition *metapb.Partition) error {
+func (c *PSRpcClient) DeletePartition(addr string, partitionId metapb.PartitionID) error {
     psConn, err := c.getConn(addr)
     if err != nil {
         return err
     }
 
     req := &pspb.DeletePartitionRequest{
-        RequestHeader: new(metapb.RequestHeader),
-        ID:            partition.ID,
+        RequestHeader: metapb.RequestHeader{},
+        ID:            partitionId,
     }
     _, err = psConn.callRpc(req, GRPC_REQUEST_TIMEOUT)
     if err != nil {
@@ -155,20 +155,20 @@ func (c *PSRpcClient) DeletePartition(addr string, partition *metapb.Partition) 
     return nil
 }
 
-func (c *PSRpcClient) AddReplica(addr string, metaPS *metapb.Node, metaPartition *metapb.Partition,
-            metaReplica *metapb.Replica) error {
+func (c *PSRpcClient) AddReplica(addr string, partitionId metapb.PartitionID, raftAddrs *metapb.RaftAddrs,
+            replicaId metapb.ReplicaID, replicaNodeId metapb.NodeID) error {
     psConn, err := c.getConn(addr)
     if err != nil {
         return err
     }
 
     req := &pspb.ChangeReplicaRequest {
-        RequestHeader: new(metapb.RequestHeader),
+        RequestHeader: metapb.RequestHeader{},
         Type:          pspb.ReplicaChangeType_ReplicaAdd,
-        PartitionID:   metaPartition.ID,
-        ReplicaID:     metaReplica.ID,
-        NodeID:        metaReplica.NodeID,
-        RaftAddrs:     metaPS.RaftAddrs,
+        PartitionID:   partitionId,
+        ReplicaID:     replicaId,
+        NodeID:        replicaNodeId,
+        RaftAddrs:     *raftAddrs,
     }
     _, err = psConn.callRpc(req, GRPC_REQUEST_TIMEOUT)
     if err != nil {
@@ -178,20 +178,20 @@ func (c *PSRpcClient) AddReplica(addr string, metaPS *metapb.Node, metaPartition
     return nil
 }
 
-func (c *PSRpcClient) RemoveReplica(addr string, metaPS *metapb.Node, metaPartition *metapb.Partition,
-    metaReplica *metapb.Replica) error {
+func (c *PSRpcClient) RemoveReplica(addr string, partitionId metapb.PartitionID, raftAddrs *metapb.RaftAddrs,
+        replicaId metapb.ReplicaID, replicaNodeId metapb.NodeID) error {
     psConn, err := c.getConn(addr)
     if err != nil {
         return err
     }
 
     req := &pspb.ChangeReplicaRequest {
-        RequestHeader: new(metapb.RequestHeader),
+        RequestHeader: metapb.RequestHeader{},
         Type:          pspb.ReplicaChangeType_ReplicaRemove,
-        PartitionID:   metaPartition.ID,
-        ReplicaID:     metaReplica.ID,
-        NodeID:        metaReplica.NodeID,
-        RaftAddrs:     metaPS.RaftAddrs,
+        PartitionID:   partitionId,
+        ReplicaID:     replicaId,
+        NodeID:        replicaNodeId,
+        RaftAddrs:     *raftAddrs,
     }
     _, err = psConn.callRpc(req, GRPC_REQUEST_TIMEOUT)
     if err != nil {
