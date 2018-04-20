@@ -2,11 +2,11 @@ package master
 
 import (
     "sync"
-    "proto/metapb"
+    "github.com/tiglabs/baud/proto/metapb"
+    "github.com/tiglabs/baud/proto/masterpb"
     "time"
     "util"
     "util/log"
-    "proto/masterpb"
     "fmt"
     "github.com/gogo/protobuf/proto"
 )
@@ -132,13 +132,13 @@ func (p *PartitionServer) getRpcAddr() string {
 
 type PSCache struct {
     lock       sync.RWMutex
-    id2Servers map[uint32]*PartitionServer
+    id2Servers map[metapb.NodeID]*PartitionServer
     ip2Servers map[string]*PartitionServer
 }
 
 func NewPSCache() *PSCache {
     return &PSCache{
-        id2Servers: make(map[uint32]*PartitionServer),
+        id2Servers: make(map[metapb.NodeID]*PartitionServer),
         ip2Servers: make(map[string]*PartitionServer),
     }
 }

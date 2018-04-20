@@ -1,7 +1,7 @@
 package master
 
 import (
-	"proto/metapb"
+	"github.com/tiglabs/baud/proto/metapb"
 	"github.com/google/btree"
 	"sync"
 	"util/log"
@@ -35,7 +35,7 @@ func NewPartition(dbId, spaceId, startSlot, endSlot uint32) (*Partition, error) 
 	}
 	return &Partition{
 		Partition: &metapb.Partition{
-			ID:        partId,
+			ID:        metapb.PartitionID(partId),
 			DB:        dbId,
 			Space:     spaceId,
 			StartSlot: startSlot,
@@ -198,16 +198,16 @@ func doMetaMarshal(p *metapb.Partition) ([]byte, []byte, error) {
 
 type PartitionCache struct {
 	lock  		 sync.RWMutex
-	partitions   map[uint32]*Partition
+	partitions   map[metapb.PartitionID]*Partition
 }
 
 func NewPartitionCache() *PartitionCache {
 	return &PartitionCache{
-		partitions: make(map[uint32]*Partition),
+		partitions: make(map[metapb.PartitionID]*Partition),
 	}
 }
 
-func (c *PartitionCache) findPartitionById(partitionId uint32) *Partition {
+func (c *PartitionCache) findPartitionById(partitionId metapb.PartitionID) *Partition {
 	c.lock.RLock()
 	defer c.lock.RUnlock()
 

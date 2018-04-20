@@ -5,7 +5,7 @@ import (
 	"sync"
 	"math"
 	"util"
-	"proto/metapb"
+	"github.com/tiglabs/baud/proto/metapb"
 )
 
 type Cluster struct {

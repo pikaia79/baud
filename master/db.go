@@ -4,7 +4,7 @@ import (
 	"sync"
 	"fmt"
 	"util/log"
-	"proto/metapb"
+    "github.com/tiglabs/baud/proto/metapb"
 	"util"
 	"github.com/gogo/protobuf/proto"
 )
@@ -84,14 +84,14 @@ func (db *DB) rename(newDbName string) {
 
 type DBCache struct {
 	lock     sync.RWMutex
-	dbs      map[uint32]*DB
-	name2Ids map[string]uint32
+	dbs      map[metapb.DBID]*DB
+	name2Ids map[string]metapb.DBID
 }
 
 func NewDBCache() *DBCache {
 	return &DBCache{
-		dbs:     make(map[uint32]*DB),
-		name2Ids:make(map[string]uint32),
+		dbs:     make(map[metapb.DBID]*DB),
+		name2Ids:make(map[string]metapb.DBID),
 	}
 }
 

@@ -3,8 +3,8 @@ package master
 import (
     "sync"
     "google.golang.org/grpc"
-    "proto/metapb"
-    "proto/pspb"
+    "github.com/tiglabs/baud/proto/metapb"
+    "github.com/tiglabs/baud/proto/pspb"
     "util/log"
     "time"
     "context"

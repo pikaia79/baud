@@ -3,7 +3,7 @@ package master
 import (
     "context"
     "util/log"
-    "proto/metapb"
+    "github.com/tiglabs/baud/proto/metapb"
     "util/deepcopy"
 )
 
@@ -89,7 +89,6 @@ func (p *PartitionProcessor) doRun() {
                         return
                     }
 
-                    // TODO: to prevent from the new replica as garbage is removed, in the case replica
                     var newMetaReplica = &metapb.Replica{ID: replicaId, NodeID: destPS.ID}
 
                     partitionCopy := deepcopy.Iface(partitionToCreate.Partition).(*metapb.Partition)
@@ -112,11 +111,11 @@ func (p *PartitionProcessor) doRun() {
                         log.Error("Rpc fail to add replica[%v] into leader ps. err[%v]", newMetaReplica, err)
                         return
                     }
-
-                    if err := partitionToCreate.addReplica(p.cluster.store, newMetaReplica); err != nil {
-                        log.Error("partition add new replica err[%v]", err)
-                        return
-                    }
+                    //
+                    //if err := partitionToCreate.addReplica(p.cluster.store, newMetaReplica); err != nil {
+                    //    log.Error("partition add new replica err[%v]", err)
+                    //    return
+                    //}
 
                 }(event.body.(*Partition))
 
