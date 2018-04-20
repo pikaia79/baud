@@ -2,13 +2,14 @@ package rpc
 
 import (
 	"context"
-	"fmt"
 	"math"
 	"sync"
 	"time"
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/keepalive"
+
+	"fmt"
 
 	"github.com/tiglabs/baud/util/log"
 	"github.com/tiglabs/baud/util/routine"
@@ -119,57 +120,58 @@ func (mgr *ConnectionMgr) runHeartbeat(conn *connection, target string, redialCh
 	heartbeatClient := heartbeat.NewHeartbeatClient(conn.grpcConn)
 
 	var heartbeatTimer time.Timer
+	heartbeatTimer.Reset(0)
 	defer heartbeatTimer.Stop()
 
-	heartbeatTimer.Reset(0)
-	succeeded := false
+	var (
+		succeeded = false
+		breakFlag = false
+		err       error
+		response  *heartbeat.PingResponse
+	)
 	for {
 		select {
 		case <-redialChan:
-			conn.heartbeatResult.Store(heartbeatResult{
-				succeeded: succeeded,
-				err:       ErrCannotReuseClientConn,
-			})
-			conn.setInitialHeartbeatDone()
-			return ErrCannotReuseClientConn
+			err = ErrCannotReuseClientConn
+			breakFlag = true
 
 		case <-conn.ctx.Done():
-			conn.heartbeatResult.Store(heartbeatResult{
-				succeeded: succeeded,
-				err:       conn.ctx.Err(),
-			})
-			conn.setInitialHeartbeatDone()
-			return conn.ctx.Err()
+			err = conn.ctx.Err()
+			breakFlag = true
 
 		case <-heartbeatTimer.C:
-		}
+			goCtx := conn.ctx
+			var cancel context.CancelFunc
+			if hbTimeout := mgr.heartbeatTimeout; hbTimeout > 0 {
+				goCtx, cancel = context.WithTimeout(goCtx, hbTimeout)
+			}
+			response, err = heartbeatClient.Ping(goCtx, &request)
+			if cancel != nil {
+				cancel()
+			}
 
-		goCtx := conn.ctx
-		var cancel context.CancelFunc
-		if hbTimeout := mgr.heartbeatTimeout; hbTimeout > 0 {
-			goCtx, cancel = context.WithTimeout(goCtx, hbTimeout)
-		}
-		response, err := heartbeatClient.Ping(goCtx, &request)
-		if cancel != nil {
-			cancel()
-		}
-		if err == nil {
-			if request.ClusterId != response.ClusterId {
-				err = fmt.Errorf("client cluster_id(%s) doesn't match server cluster_id(%s)", request.ClusterId, response.ClusterId)
+			if err == nil {
+				if request.ClusterId != response.ClusterId {
+					err = fmt.Errorf("client cluster_id(%s) doesn't match server cluster_id(%s)", request.ClusterId, response.ClusterId)
+					breakFlag = true
+				}
+			}
+			if err == nil {
+				succeeded = true
+				if cb := mgr.heartbeatCallback; cb != nil {
+					cb()
+				}
 			}
 		}
 
-		if err == nil {
-			succeeded = true
-			if cb := mgr.heartbeatCallback; cb != nil {
-				cb()
-			}
-		}
 		conn.heartbeatResult.Store(heartbeatResult{
 			succeeded: succeeded,
 			err:       err,
 		})
 		conn.setInitialHeartbeatDone()
+		if breakFlag {
+			return err
+		}
 
 		heartbeatTimer.Reset(mgr.heartbeatInterval)
 	}

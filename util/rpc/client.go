@@ -70,6 +70,7 @@ func (c *Client) GetGrpcClient(addr string) (interface{}, error) {
 func (c *Client) Close() error {
 	c.pools.Range(func(k, v interface{}) bool {
 		v.(*clientPool).Close()
+		c.pools.Delete(k)
 		return true
 	})
 
@@ -109,6 +110,7 @@ func (cw *clientWrapper) getClient() (interface{}, error) {
 		if _, err := cw.conn.connect(); err == nil {
 			return cw.clientRaw, nil
 		}
+		cw.option.ConnectMgr.removeConn(cw.key, cw.conn)
 	}
 
 	var cli interface{}
@@ -116,6 +118,9 @@ func (cw *clientWrapper) getClient() (interface{}, error) {
 	grpcConn, err := cw.conn.connect()
 	if err == nil {
 		cli = cw.option.CreateFunc(grpcConn)
+	} else {
+		cw.option.ConnectMgr.removeConn(cw.key, cw.conn)
+		cw.conn = nil
 	}
 	cw.clientRaw = cli
 	cw.rwMutex.Unlock()
