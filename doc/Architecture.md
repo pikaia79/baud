@@ -124,15 +124,21 @@ Several PS nodes form a raft group, partitionserver group (PSG). And one PSG usu
 
 ### Kernel - inside a partition
 
-* storage
+The storage and indexing backend for each partition consists of several B-Tree tables. 
 
-for entity partition, (UID, fieldID) -> a single or multiple packed values of the field
+* FieldTable
+
+for entity partition, (UID, fieldID) -> a single or multiple packed values of the field;
 
 for edge partition, (<UID1, UID2>, fieldID) -> ...
 
-* indexing 
+FieldTables are on the disk. 
+
+* PostingListTable
 
 foreach field, an in-memory B-Tree as the Dictionary, and the leaf values are the pointers to PostingLists. 
+
+one optional implementation is as below: 
 
 type PostingList struct {
     chunks []*PostingChunk
@@ -140,18 +146,27 @@ type PostingList struct {
     numOfPostings int
 }
 
-//each posting is 128 bit
-type Posting struct {
-    slotID uint32
-    autoIncrID uint64
-    location uint32
-}
-
 type PostingChunk struct {
-    postingArray []Posting
+    postingArray []byte
     capx int
     size int
 }
+
+* PositionListTable
+
+foreach field, (docID + term) -> PositionList, in-memory
+
+type PositionList struct {
+    positions []uint32
+    wdf int
+}
+
+* SynonymTable
+
+term synonyms
+
+on-disk store
+
 
 ### Key Operations
 
