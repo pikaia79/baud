@@ -2,6 +2,12 @@
 
 
 [[projects]]
+  branch = "master"
+  name = "github.com/AndreasBriese/bbloom"
+  packages = ["."]
+  revision = "28f7e881ca57bc00e028f9ede9f0d9104cfeef5e"
+
+[[projects]]
   name = "github.com/BurntSushi/toml"
   packages = ["."]
   revision = "b26d9c308763d68093482582cea63d69be07a0f0"
@@ -20,10 +26,23 @@
   version = "v1.3.1"
 
 [[projects]]
+  name = "github.com/dgraph-io/badger"
+  packages = [
+    ".",
+    "options",
+    "protos",
+    "skl",
+    "table",
+    "y"
+  ]
+  revision = "69611218c7078be6de16f4ea13fb256e701b6b73"
+  version = "v1.3.0"
+
+[[projects]]
   branch = "master"
-  name = "github.com/gin-gonic/gin"
-  packages = ["json"]
-  revision = "6ad7b9c9d382844036334ad061b832e56269e14f"
+  name = "github.com/dgryski/go-farm"
+  packages = ["."]
+  revision = "2de33835d10275975374b37b2dcfd22c9020a1f5"
 
 [[projects]]
   name = "github.com/go-ole/go-ole"
@@ -59,6 +78,12 @@
 
 [[projects]]
   branch = "master"
+  name = "github.com/golang/snappy"
+  packages = ["."]
+  revision = "553a641470496b2327abcac10b36396bd98e45c9"
+
+[[projects]]
+  branch = "master"
   name = "github.com/google/btree"
   packages = ["."]
   revision = "e89373fe6b4a7413d7acd6da1725b83ef713e6e4"
@@ -67,7 +92,7 @@
   branch = "master"
   name = "github.com/gopherjs/gopherjs"
   packages = ["js"]
-  revision = "e14987c0ef06db387b90fec85e8d06dc05598e24"
+  revision = "27662f8dae2790b8232164d7570f54ba76144bc3"
 
 [[projects]]
   name = "github.com/json-iterator/go"
@@ -83,6 +108,18 @@
   packages = ["."]
   revision = "77f18212c9c7edc9bd6a33d383a7b545ce62f064"
   version = "v4.2.1"
+
+[[projects]]
+  branch = "master"
+  name = "github.com/juju/errors"
+  packages = ["."]
+  revision = "c7d06af17c68cd34c835053720b21f6549d9b0ee"
+
+[[projects]]
+  name = "github.com/julienschmidt/httprouter"
+  packages = ["."]
+  revision = "8c199fb6259ffc1af525cc3ad52ee60ba8359669"
+  version = "v1.1"
 
 [[projects]]
   name = "github.com/modern-go/concurrent"
@@ -183,7 +220,7 @@
     "unix",
     "windows"
   ]
-  revision = "b126b21c05a91c856b027c16779c12e3bf236954"
+  revision = "a2a45943ae67364d56c5d7d62dee78cff16c8dc8"
 
 [[projects]]
   name = "golang.org/x/text"
@@ -247,6 +284,6 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "b6e8a85f43d91bff36a4c47d26560ba49f7fb58c059073156924ccbe9c220eca"
+  inputs-digest = "8d1eee57bd5d05a8d36255b5f9051cdaa6e6adc524f344736ae42bc28337f25f"
   solver-name = "gps-cdcl"
   solver-version = 1

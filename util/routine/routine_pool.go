@@ -14,13 +14,31 @@ const (
 )
 
 var (
+	capacity int
+	mask     int64
 	count    int64
-	capacity = runtime.NumCPU()
-	mask     = int64(capacity - 1)
-	poolMap  = make([]*pool, capacity)
+	poolMap  []*pool
 )
 
 func init() {
+	n := runtime.NumCPU()
+	if (n & (n - 1)) == 0 {
+		capacity = n
+	} else {
+		switch {
+		case n > 32:
+			capacity = 32
+		case n > 16:
+			capacity = 16
+		case n > 8:
+			capacity = 8
+		default:
+			capacity = 4
+		}
+	}
+
+	mask = int64(capacity - 1)
+	poolMap = make([]*pool, capacity)
 	for i := 0; i < capacity; i++ {
 		poolMap[i] = newPool()
 	}

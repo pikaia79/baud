@@ -6,8 +6,6 @@ import (
 	"github.com/tiglabs/baud/kernel/analysis"
 )
 
-const DefaultTextProperty = IndexField | DocValues
-
 var _ Field = &TextField{}
 
 type TextField struct {
@@ -47,7 +45,7 @@ func (t *TextField) Analyze() (analysis.TokenFrequencies) {
 			},
 		}
 	}
-	tokenFreqs := analysis.TokenFrequency(tokens, nil, t.property.IncludeTermVectors())
+	tokenFreqs := analysis.TokenFrequency(tokens, t.property.IncludeTermVectors())
 	return tokenFreqs
 }
 
@@ -60,8 +58,8 @@ func (t *TextField) String() string {
 		t.name, t.property, t.analyzer, t.value)
 }
 
-func NewTextField(name string, value []byte) *TextField {
-	return NewTextFieldWithIndexingOptions(name, value, DefaultTextProperty)
+func NewTextField(name string, value []byte, property Property) *TextField {
+	return NewTextFieldWithIndexingOptions(name, value, property)
 }
 
 func NewTextFieldWithIndexingOptions(name string, value []byte, property Property) *TextField {
@@ -72,10 +70,10 @@ func NewTextFieldWithIndexingOptions(name string, value []byte, property Propert
 	}
 }
 
-func NewTextFieldWithAnalyzer(name string, value []byte, analyzer analysis.Analyzer) *TextField {
+func NewTextFieldWithAnalyzer(name string, value []byte, property Property, analyzer analysis.Analyzer) *TextField {
 	return &TextField{
 		name:              name,
-		property:          DefaultTextProperty,
+		property:          property,
 		analyzer:          analyzer,
 		value:             value,
 	}

@@ -6,8 +6,6 @@ import (
 	"github.com/tiglabs/baud/kernel/analysis"
 )
 
-const DefaultBooleanProperty = StoreField | IndexField
-
 var _ Field = &BooleanField{}
 
 type BooleanField struct {
@@ -34,7 +32,7 @@ func (b *BooleanField) Analyze() (analysis.TokenFrequencies) {
 		Type:     analysis.Boolean,
 	})
 
-	tokenFreqs := analysis.TokenFrequency(tokens, nil, b.property.IncludeTermVectors())
+	tokenFreqs := analysis.TokenFrequency(tokens, b.property.IncludeTermVectors())
 	return tokenFreqs
 }
 
@@ -53,16 +51,16 @@ func (b *BooleanField) String() string {
 	return fmt.Sprintf("&document.BooleanField{Name:%s, Property: %s, Value: %s}", b.name, b.property, b.value)
 }
 
-func NewBooleanFieldByBytes(name string, value []byte) *BooleanField {
+func NewBooleanFieldByBytes(name string, value []byte, property Property) *BooleanField {
 	return &BooleanField{
 		name:              name,
 		value:             value,
-		property:          DefaultBooleanProperty,
+		property:          property,
 	}
 }
 
-func NewBooleanField(name string, b bool) *BooleanField {
-	return NewBooleanFieldWithProperty(name, b, DefaultBooleanProperty)
+func NewBooleanField(name string, b bool, property Property) *BooleanField {
+	return NewBooleanFieldWithProperty(name, b, property)
 }
 
 func NewBooleanFieldWithProperty(name string, b bool, property Property) *BooleanField {

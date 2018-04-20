@@ -7,8 +7,6 @@ import (
 	"github.com/tiglabs/baud/util"
 )
 
-const DefaultNumericProperty = StoreField | IndexField
-
 const DefaultPrecisionStep uint = 4
 
 var _ Field = &NumericField{}
@@ -17,7 +15,6 @@ type NumericField struct {
 	name              string
 	property          Property
 	value             util.Value
-	numPlainTextBytes uint64
 }
 
 func (n *NumericField) Name() string {
@@ -59,7 +56,7 @@ func (n *NumericField) Analyze() (analysis.TokenFrequencies) {
 		}
 	}
 
-	tokenFreqs := analysis.TokenFrequency(tokens, nil, n.property.IncludeTermVectors())
+	tokenFreqs := analysis.TokenFrequency(tokens, n.property.IncludeTermVectors())
 	return tokenFreqs
 }
 
@@ -79,17 +76,16 @@ func (n *NumericField) String() string {
 	return fmt.Sprintf("&document.NumericField{Name:%s, Property: %s, Value: %s}", n.name, n.property, n.value)
 }
 
-func NewNumericFieldFromBytes(name string, value []byte) *NumericField {
+func NewNumericFieldFromBytes(name string, value []byte, property Property) *NumericField {
 	return &NumericField{
 		name:              name,
 		value:             value,
-		property:          DefaultNumericProperty,
-		numPlainTextBytes: uint64(len(value)),
+		property:          property,
 	}
 }
 
-func NewNumericField(name string, number float64) *NumericField {
-	return NewNumericFieldWithProperty(name, number, DefaultNumericProperty)
+func NewNumericField(name string, number float64, property Property) *NumericField {
+	return NewNumericFieldWithProperty(name, number, property)
 }
 
 func NewNumericFieldWithProperty(name string, number float64, property Property) *NumericField {

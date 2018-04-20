@@ -2,13 +2,17 @@ package kernel
 
 import "github.com/tiglabs/baud/kernel/document"
 
-type Engine interface {
-	AddDocuments(docs []*document.Document) error
-	UpdateDocuments(docs []*document.Document) error
-	DeleteDocuments(docIDs []string) (int, error)
+type Option struct {
 
-	// source set true means need return _source
-	GetDoc(docID string, fields []string, source bool) (document.Document, bool)
+}
+
+type Engine interface {
+	AddDocuments(docs []*document.Document, ops ...*Option) error
+	UpdateDocuments(docs []*document.Document, ops ...*Option) error
+	DeleteDocuments(docIDs []string, ops ...*Option) (int, error)
+
+	// _source, _all as system field
+	GetDocument(docID string, fields []string) (*document.Document, bool)
 
 	// TODO search
 }

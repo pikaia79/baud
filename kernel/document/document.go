@@ -2,27 +2,39 @@ package document
 
 type Document struct {
 	ID              string  `json:"id"`
-	// _version, _source as special field for document
-	Fields          []Field `json:"fields"`
+	// _version, _source, _all as special field for document
+	Fields          map[string][]Field `json:"fields"`
 }
 
 func NewDocument(id string) *Document {
 	return &Document{
 		ID:              id,
-		Fields:          make([]Field, 0),
 	}
 }
 
 func (d *Document) AddField(f Field) *Document {
-	d.Fields = append(d.Fields, f)
+	if d.Fields == nil {
+		d.Fields = make(map[string][]Field)
+	}
+	files := d.Fields[f.Name()]
+	d.Fields[f.Name()] = append(files, f)
 	return d
 }
 
-func (d *Document) FindField(name string) Field {
-	for _, f := range d.Fields {
-		if f.Name() == name {
-			return f
-		}
+func (d *Document) DeleteField(name string) bool {
+	if d.Fields == nil {
+		return true
 	}
-	return nil
+	if _, find := d.Fields[name]; find {
+		delete(d.Fields, name)
+		return true
+	}
+	return false
+}
+
+func (d *Document) FindFields(name string) []Field {
+	if d.Fields == nil {
+		return nil
+	}
+	return d.Fields[name]
 }

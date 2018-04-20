@@ -12,10 +12,10 @@ import (
 	"github.com/tiglabs/baud/proto/metapb"
 	"github.com/tiglabs/baud/proto/pspb"
 	"github.com/tiglabs/baud/ps/metric"
-	"github.com/tiglabs/baud/ps/rpc"
 	"github.com/tiglabs/baud/util/config"
 	"github.com/tiglabs/baud/util/log"
 	"github.com/tiglabs/baud/util/netutil"
+	"github.com/tiglabs/baud/util/rpc"
 	"github.com/tiglabs/raft"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/reflection"
@@ -34,7 +34,7 @@ type Server struct {
 	adminServer *grpc.Server
 	raftServer  *raft.RaftServer
 
-	masterClient masterpb.MasterRpcClient
+	masterClient *rpc.Client
 
 	systemMetric *metric.SystemMetric
 }
@@ -70,9 +70,21 @@ func NewServer(conf *config.Config) (*Server, error) {
 		partitions:   &sync.Map{},
 		quit:         make(chan struct{}),
 		raftServer:   rs,
+		context:      context.WithCancel(context.Background()),
 	}
-	s.apiServer = rpc.CreateGrpcServer(rpc.DefaultOption())
-	s.adminServer = rpc.CreateGrpcServer(rpc.DefaultOption())
+
+	serverOpt := rpc.DefaultServerOption
+	serverOpt.ClusterID = serverConf.ClusterID
+	s.apiServer = rpc.NewGrpcServer(&serverOpt)
+	s.adminServer = rpc.NewGrpcServer(&serverOpt)
+
+	connMgrOpt := rpc.DefaultManagerOption
+	connMgr := rpc.NewConnectionMgr(s.context, &connMgrOpt)
+	clientOpt := rpc.DefaultClientOption
+	clientOpt.ClusterID = serverConf.ClusterID
+	clientOpt.ConnectMgr = connMgr
+	clientOpt.CreateFunc = func(cc *grpc.ClientConn) interface{} { return masterpb.NewMasterRpcClient(cc) }
+	s.masterClient = rpc.NewClient(1, &clientOpt)
 
 	return s, nil
 }
@@ -125,6 +137,6 @@ func (s *Server) closeAllRange() {
 	})
 }
 
-func (s *Server) reset() {
+func (s *Server) resgitry() {
 
 }
