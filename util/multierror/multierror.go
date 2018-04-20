@@ -76,3 +76,19 @@ func (me *MultiError) Error() string {
 	bufalloc.FreeBuffer(buf)
 	return result
 }
+
+type causer interface {
+	Cause() error
+}
+
+// Cause returns the underlying cause of the error.
+func Cause(err error) error {
+	for err != nil {
+		cause, ok := err.(causer)
+		if !ok {
+			break
+		}
+		err = cause.Cause()
+	}
+	return err
+}
