@@ -125,7 +125,7 @@ func (s *Space) putPartition(partition *Partition) {
 	s.propertyLock.Lock()
 	defer s.propertyLock.Unlock()
 
-	s.searchTree.update(partition.Partition)
+	s.searchTree.update(partition)
 }
 
 type SpaceCache struct {
@@ -166,6 +166,18 @@ func (c *SpaceCache) findSpaceById(spaceId uint32) *Space {
 		return nil
 	}
 	return space
+}
+
+func (c *SpaceCache) getAllSpaces() []*Space {
+	c.lock.RLock()
+	defer c.lock.RUnlock()
+
+	spaces := make([]*Space, len(c.spaces))
+	for _, space := range c.spaces {
+		spaces = append(spaces, space)
+	}
+
+	return spaces
 }
 
 func (c *SpaceCache) addSpace(space *Space) {

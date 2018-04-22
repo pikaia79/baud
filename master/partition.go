@@ -134,7 +134,7 @@ func (p *Partition) updateInfo(store Store, info *masterpb.PartitionInfo, nodeId
 	p.Epoch = info.Epoch
 
 	p.taskFlag = false
-	p.taskTimeout = 0
+	p.taskTimeout = time.Time{}
 
 	p.Replicas = make([]metapb.Replica, len(info.RaftStatus.Followers))
 	p.leader = nil
@@ -181,6 +181,17 @@ func (p *Partition) pickLeaderReplica() *metapb.Replica {
 	defer p.propertyLock.RUnlock()
 
 	return p.leader
+}
+
+func (p *Partition) pickLeaderNodeId() metapb.NodeID {
+	p.propertyLock.RLock()
+	defer p.propertyLock.RUnlock()
+
+	if p.leader != nil {
+		return p.leader.NodeID
+	} else {
+		return 0
+	}
 }
 
 func (p *Partition) takeChangeMemberTask() bool {
@@ -322,7 +333,7 @@ func (c *PartitionCache) recovery(store Store) ([]*Partition, error) {
 }
 
 type PartitionItem struct {
-	partition *metapb.Partition
+	partition *Partition
 }
 
 // Less returns true if the region start key is greater than the other.
@@ -357,7 +368,7 @@ func (t *PartitionTree) length() int {
 // update updates the tree with the region.
 // It finds and deletes all the overlapped regions first, and then
 // insert the region.
-func (t *PartitionTree) update(rng *metapb.Partition) {
+func (t *PartitionTree) update(rng *Partition) {
 	item := &PartitionItem{partition: rng}
 
 	result := t.find(rng)
@@ -391,7 +402,7 @@ func (t *PartitionTree) update(rng *metapb.Partition) {
 // remove removes a region if the region is in the tree.
 // It will do nothing if it cannot find the region or the found region
 // is not the same with the region.
-func (t *PartitionTree) remove(rng *metapb.Partition) {
+func (t *PartitionTree) remove(rng *Partition) {
 	result := t.find(rng)
 	if result == nil || result.partition.ID != rng.ID {
 		return
@@ -401,8 +412,12 @@ func (t *PartitionTree) remove(rng *metapb.Partition) {
 }
 
 // search returns a region that contains the key.
-func (t *PartitionTree) search(slot uint32) *metapb.Partition {
-	rng := &metapb.Partition{StartSlot: slot}
+func (t *PartitionTree) search(slot uint32) *Partition {
+	rng := &Partition{
+		Partition: &metapb.Partition{
+			StartSlot: slot,
+		},
+	}
 	log.Debug("################### len=%v", t.tree.Len())
 	result := t.find(rng)
 	if result == nil {
@@ -411,11 +426,14 @@ func (t *PartitionTree) search(slot uint32) *metapb.Partition {
 	return result.partition
 }
 
-func (t *PartitionTree) multipleSearch(slot uint32, num int) []*metapb.Partition {
-	rng := &metapb.Partition{StartSlot: slot}
+func (t *PartitionTree) multipleSearch(slot uint32, num int) []*Partition {
+	rng := &Partition{
+		Partition: &metapb.Partition{
+			StartSlot: slot,
+		},
+	}
 	results := t.ascendScan(rng, num)
-	var ranges []*metapb.Partition
-	ranges = make([]*metapb.Partition, 0, num)
+	var ranges = make([]*Partition, 0, num)
 	var endSlot uint32
 	var isFound = false
 	for _, r := range results {
@@ -434,7 +452,7 @@ func (t *PartitionTree) multipleSearch(slot uint32, num int) []*metapb.Partition
 }
 
 // This is a helper function to find an item.
-func (t *PartitionTree) find(rng *metapb.Partition) *PartitionItem {
+func (t *PartitionTree) find(rng *Partition) *PartitionItem {
 	item := &PartitionItem{partition: rng}
 
 	var result *PartitionItem
@@ -456,7 +474,7 @@ func (t *PartitionTree) find(rng *metapb.Partition) *PartitionItem {
 	return result
 }
 
-func (t *PartitionTree) ascendScan(rng *metapb.Partition, num int) []*PartitionItem {
+func (t *PartitionTree) ascendScan(rng *Partition, num int) []*PartitionItem {
 	result := t.find(rng)
 	if result == nil {
 		return nil

@@ -1,7 +1,6 @@
 package master
 
 import (
-	//"golang.org/x/net/context"
 	"sync"
 	"util/log"
 )

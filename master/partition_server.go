@@ -91,6 +91,10 @@ func (p *PartitionServer) persistent(store Store) error {
 //}
 
 func (p *PartitionServer) addPartition(partition *Partition) {
+	if partition == nil {
+		return
+	}
+
 	p.propertyLock.Lock()
 	defer p.propertyLock.Unlock()
 
@@ -163,6 +167,10 @@ func (c *PSCache) getAllServers() []*PartitionServer {
 }
 
 func (c *PSCache) findServerByAddr(addr string) *PartitionServer {
+	if len(addr) == 0 {
+		return nil
+	}
+
 	c.lock.RLock()
 	defer c.lock.RUnlock()
 
@@ -174,6 +182,10 @@ func (c *PSCache) findServerByAddr(addr string) *PartitionServer {
 }
 
 func (c *PSCache) findServerById(psId uint32) *PartitionServer {
+	if psId == 0 {
+		return nil
+	}
+
 	c.lock.RLock()
 	defer c.lock.RUnlock()
 
@@ -185,6 +197,10 @@ func (c *PSCache) findServerById(psId uint32) *PartitionServer {
 }
 
 func (c *PSCache) addServer(server *PartitionServer) {
+	if server == nil {
+		return
+	}
+
 	c.lock.Lock()
 	defer c.lock.Unlock()
 

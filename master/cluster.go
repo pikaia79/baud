@@ -279,9 +279,9 @@ func (c *Cluster) createSpace(dbName, spaceName, partitionKey, partitionFunc str
 	for _, partition := range partitions {
 		space.putPartition(partition)
 
-		if err := PushProcessorEvent(NewPartitionCreateEvent(partition)); err != nil {
-			log.Error("fail to push event for creating partition[%v].", partition)
-		}
+		//if err := PushProcessorEvent(NewPartitionCreateEvent(partition)); err != nil {
+		//	log.Error("fail to push event for creating partition[%v].", partition)
+		//}
 	}
 
 	return space, nil
