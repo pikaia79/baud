@@ -2,8 +2,8 @@ package master
 
 import (
 	//"golang.org/x/net/context"
-	"util/log"
 	"sync"
+	"util/log"
 )
 
 type Master struct {

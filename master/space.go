@@ -1,17 +1,17 @@
 package master
 
 import (
-	"sync"
-    "github.com/tiglabs/baud/proto/metapb"
-	"util/log"
-	"util/deepcopy"
 	"fmt"
 	"github.com/gogo/protobuf/proto"
+	"github.com/tiglabs/baud/proto/metapb"
+	"sync"
 	"util"
+	"util/deepcopy"
+	"util/log"
 )
 
 const (
-	PREFIX_SPACE   = "schema space "
+	PREFIX_SPACE = "schema space "
 )
 
 type PartitionPolicy struct {
@@ -24,11 +24,11 @@ type Space struct {
 	*metapb.Space
 
 	// TODO:move partitioning to metapb.Space definition
-	partitioning *PartitionPolicy    `json:"-"`
+	partitioning *PartitionPolicy `json:"-"`
 	mapping      []Field
 
-	searchTree   *PartitionTree      `json:"-"`
-	propertyLock sync.RWMutex        `json:"-"`
+	searchTree   *PartitionTree `json:"-"`
+	propertyLock sync.RWMutex   `json:"-"`
 }
 
 type Field struct {
@@ -50,12 +50,12 @@ func NewSpace(dbId metapb.DBID, dbName, spaceName string, policy *PartitionPolic
 		Space: &metapb.Space{
 			Name:   spaceName,
 			ID:     spaceId,
-			DB:   	dbId,
+			DB:     dbId,
 			DbName: dbName,
 			Status: metapb.SS_Init,
 		},
 		partitioning: policy,
-		searchTree: NewPartitionTree(),
+		searchTree:   NewPartitionTree(),
 	}, nil
 }
 

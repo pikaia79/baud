@@ -1,32 +1,31 @@
 package master
 
 import (
-	"github.com/tiglabs/baud/proto/metapb"
-	"github.com/google/btree"
-	"sync"
-	"util/log"
 	"fmt"
-	"time"
 	"github.com/gogo/protobuf/proto"
+	"github.com/google/btree"
+	"github.com/tiglabs/baud/proto/masterpb"
+	"github.com/tiglabs/baud/proto/metapb"
+	"sync"
+	"time"
 	"util"
 	"util/deepcopy"
-	"github.com/tiglabs/baud/proto/masterpb"
+	"util/log"
 )
 
 const (
-	PREFIX_PARTITION    	  = "schema partition "
-	defaultBTreeDegree        = 64
-	FIXED_REPLICA_NUM   	  = 3
+	PREFIX_PARTITION   = "schema partition "
+	defaultBTreeDegree = 64
+	FIXED_REPLICA_NUM  = 3
 )
 
-
 type Partition struct {
-	*metapb.Partition  // !!! Do not directly operate the Replicas，must be firstly take the propertyLock
+	*metapb.Partition // !!! Do not directly operate the Replicas，must be firstly take the propertyLock
 
-	leader        *metapb.Replica
+	leader *metapb.Replica
 
-	taskFlag      bool
-	taskTimeout   time.Time
+	taskFlag    bool
+	taskTimeout time.Time
 
 	lastHeartbeat time.Time
 	propertyLock  sync.RWMutex
@@ -188,7 +187,7 @@ func (p *Partition) takeChangeMemberTask() bool {
 	p.propertyLock.Lock()
 	defer p.propertyLock.Unlock()
 
-	if p.taskFlag == false || time.Now().Sub(p.taskTimeout) >= 30 *time.Second {
+	if p.taskFlag == false || time.Now().Sub(p.taskTimeout) >= 30*time.Second {
 		p.taskFlag = true
 		p.taskTimeout = time.Now()
 		return true
@@ -254,8 +253,8 @@ func doMetaMarshal(p *metapb.Partition) ([]byte, []byte, error) {
 //}
 
 type PartitionCache struct {
-	lock  		 sync.RWMutex
-	partitions   map[metapb.PartitionID]*Partition
+	lock       sync.RWMutex
+	partitions map[metapb.PartitionID]*Partition
 }
 
 func NewPartitionCache() *PartitionCache {
@@ -295,7 +294,6 @@ func (c *PartitionCache) getAllMetaPartitions() *[]metapb.Partition {
 	return &partitions
 }
 
-
 func (c *PartitionCache) recovery(store Store) ([]*Partition, error) {
 	prefix := []byte(PREFIX_PARTITION)
 	startKey, limitKey := util.BytesPrefix(prefix)
@@ -324,7 +322,7 @@ func (c *PartitionCache) recovery(store Store) ([]*Partition, error) {
 }
 
 type PartitionItem struct {
-	partition   *metapb.Partition
+	partition *metapb.Partition
 }
 
 // Less returns true if the region start key is greater than the other.
@@ -343,7 +341,7 @@ func (r *PartitionItem) Contains(slot uint32) bool {
 }
 
 type PartitionTree struct {
-	tree 	*btree.BTree
+	tree *btree.BTree
 }
 
 func NewPartitionTree() *PartitionTree {

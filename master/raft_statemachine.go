@@ -5,11 +5,11 @@ import (
 	"errors"
 
 	"github.com/golang/protobuf/proto"
+	"github.com/tiglabs/baud/proto/masterpb"
 	"github.com/tiglabs/raft"
 	raftproto "github.com/tiglabs/raft/proto"
 	"util/log"
 	"util/raftkvstore"
-	"github.com/tiglabs/baud/proto/masterpb"
 )
 
 var (

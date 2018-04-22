@@ -7,7 +7,6 @@ type DCOS interface {
 }
 
 type JDOS struct {
-
 }
 
 func (d *JDOS) AllocateContainer(zone string, cpu, mem, disk int) (ip string, e error) {
@@ -17,4 +16,3 @@ func (d *JDOS) AllocateContainer(zone string, cpu, mem, disk int) (ip string, e 
 func (d *JDOS) DestroyContainer(ip string) error {
 	return nil
 }
-
