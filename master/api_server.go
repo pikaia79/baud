@@ -196,7 +196,7 @@ func newHttpErrReply(err error) *HttpReply {
 		return newHttpSucReply("")
 	}
 
-	code, ok := Err2CodeMap[err.Error()]
+	code, ok := Err2CodeMap[err]
 	if ok {
 		return &HttpReply{
 			Code: code,
@@ -217,7 +217,7 @@ func checkMissingParam(w http.ResponseWriter, r *http.Request, paramName string)
 		newMsg := fmt.Sprintf("%s. missing[%s]", reply.Msg, paramName)
 		reply.Msg = newMsg
 		sendReply(w, reply)
-		return nil, ErrParamError
+		return "", ErrParamError
 	}
 	return paramVal, nil
 }
@@ -234,7 +234,7 @@ func checkMissingAndNumericParam(w http.ResponseWriter, r *http.Request, paramNa
 		newMsg := fmt.Sprintf("%s, unmatched type[%s]", reply.Msg, paramName)
 		reply.Msg = newMsg
 		sendReply(w, reply)
-		return nil, ErrParamError
+		return 0, ErrParamError
 	}
 	return paramValInt, nil
 }

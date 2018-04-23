@@ -45,7 +45,7 @@ func NewPartition(dbId, spaceId, startSlot, endSlot uint32) (*Partition, error) 
 			StartSlot: startSlot,
 			EndSlot:   endSlot,
 			Replicas:  make([]metapb.Replica, 0),
-			Status:    metapb.PartitionStatus_PA_NOTREAD,
+			Status:    metapb.PA_READONLY,
 		},
 	}, nil
 }

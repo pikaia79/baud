@@ -158,7 +158,7 @@ func (c *Cluster) recoveryPartition() error {
 			continue
 		}
 
-		space.searchTree.update(partition.Partition)
+		space.searchTree.update(partition)
 		c.partitionCache.addPartition(partition)
 
 		var delMetaReplicas = make([]*metapb.Replica, 0)
