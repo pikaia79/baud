@@ -39,7 +39,7 @@ func Recover(handlers ...func(interface{})) {
 			return
 		}
 
-		LogPanic(true)
+		LogPanic(true)(r)
 	}
 }
 

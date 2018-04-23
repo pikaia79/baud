@@ -56,7 +56,7 @@ message Space {
 
 enum PartitionStatus {
     option (gogoproto.goproto_enum_prefix) = false;
-    PA_Invalid      = 0;
+    PA_INVALID      = 0;
     PA_NOTREAD      = 1;
     PA_READONLY     = 2;
     PA_READWRITE    = 3;

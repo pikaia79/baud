@@ -26,14 +26,14 @@ func NewNodeResolver() *NodeResolver {
 	}
 }
 
-func (r *NodeResolver) addNode(node *metapb.Node) {
-	if node == nil {
+func (r *NodeResolver) addNode(id metapb.NodeID, addrs metapb.RaftAddrs) {
+	if id == 0 {
 		return
 	}
 
 	ref := new(nodeRef)
-	ref.RaftAddrs = node.RaftAddrs
-	obj, _ := r.nodes.LoadOrStore(node.ID, ref)
+	ref.RaftAddrs = addrs
+	obj, _ := r.nodes.LoadOrStore(id, ref)
 	atomic.AddInt32(&(obj.(*nodeRef).refCount), 1)
 }
 
