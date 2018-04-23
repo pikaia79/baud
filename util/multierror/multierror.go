@@ -1,8 +1,6 @@
 package multierror
 
-import (
-	"csm/util/bufalloc"
-)
+import "github.com/tiglabs/baud/util/bufalloc"
 
 // Combine merge multiple error and create MultiError
 func Combine(errs ...error) *MultiError {
