@@ -55,6 +55,7 @@ message Space {
 }
 
 enum PartitionStatus {
+    option (gogoproto.goproto_enum_prefix) = false;
     PA_Invalid      = 0;
     PA_NOTREAD      = 1;
     PA_READONLY     = 2;
@@ -80,8 +81,9 @@ message Partition {
 }
 
 message Replica {
-    uint64        id        = 1 [(gogoproto.customname) = "ID", (gogoproto.casttype) = "ReplicaID"];
-    uint32        nodeID    = 2 [(gogoproto.customname) = "NodeID", (gogoproto.casttype) = "NodeID"];
+    uint64        id         = 1 [(gogoproto.customname) = "ID", (gogoproto.casttype) = "ReplicaID"];
+    uint32        nodeID     = 2 [(gogoproto.customname) = "NodeID", (gogoproto.casttype) = "NodeID"];
+    RaftAddrs     raft_addrs = 3 [(gogoproto.nullable) = false];
 }
 
 message Node {
@@ -96,4 +98,44 @@ message Node {
 message RaftAddrs {
     string heartbeat_addr = 1;
     string replicate_addr = 2;
+}
+
+message RequestHeader {
+    string req_id = 1;
+}
+
+message ResponseHeader {
+    string req_id  = 1;
+    uint32 code    = 2 [(gogoproto.casttype) = "RespCode"];
+    string message = 3;
+    Error  error   = 4 [(gogoproto.nullable) = false];
+}
+
+message NotLeader {
+    uint32 partition_id   = 1 [(gogoproto.customname) = "PartitionID", (gogoproto.casttype) = "PartitionID"];
+    uint32 node_id        = 2 [(gogoproto.customname) = "NodeID", (gogoproto.casttype) = "NodeID"];
+    string node_addr      = 3;
+    PartitionEpoch  epoch = 4 [(gogoproto.nullable) = false];
+}
+
+message NoLeader {
+    uint32 partition_id   = 1 [(gogoproto.customname) = "PartitionID", (gogoproto.casttype) = "PartitionID"];
+}
+
+message PartitionNotFound {
+    uint32 partition_id   = 1 [(gogoproto.customname) = "PartitionID", (gogoproto.casttype) = "PartitionID"];
+}
+
+message MsgTooLarge {
+    uint32 partition_id  = 1 [(gogoproto.customname) = "PartitionID", (gogoproto.casttype) = "PartitionID"];
+    uint64 msg_size      = 2;
+}
+
+message Error {
+    option (gogoproto.onlyone) = true;
+
+    NotLeader not_leader                   = 1;
+    NoLeader  no_leader                    = 2;
+    PartitionNotFound partition_not_found  = 3;
+    MsgTooLarge msg_too_large              = 4;
 }

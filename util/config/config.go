@@ -1,11 +1,18 @@
 package config
 
 import (
-	"encoding/json"
 	"io/ioutil"
 	"log"
+	"os"
+	"strconv"
+	"strings"
+
+	"csm/util"
+
+	"github.com/tiglabs/baud/util/json"
 )
 
+// Config configuration information reading tool class
 type Config struct {
 	data map[string]interface{}
 	Raw  []byte
@@ -17,7 +24,7 @@ func newConfig() *Config {
 	return result
 }
 
-// Loads config information from a JSON file
+// LoadConfigFile loads config information from a JSON file
 func LoadConfigFile(filename string) *Config {
 	result := newConfig()
 	err := result.parse(filename)
@@ -27,7 +34,7 @@ func LoadConfigFile(filename string) *Config {
 	return result
 }
 
-// Loads config information from a JSON string
+// LoadConfigString loads config information from a JSON string
 func LoadConfigString(s string) *Config {
 	result := newConfig()
 	err := json.Unmarshal([]byte(s), &result.data)
@@ -46,8 +53,12 @@ func (c *Config) parse(fileName string) error {
 	return err
 }
 
-// Returns a string for the config variable key
+// GetString Returns a string for the config variable key
 func (c *Config) GetString(key string) string {
+	if env := os.Getenv(key); env != "" {
+		return env
+	}
+
 	result, present := c.data[key]
 	if !present {
 		return ""
@@ -55,8 +66,14 @@ func (c *Config) GetString(key string) string {
 	return result.(string)
 }
 
-// Returns a float for the config variable key
+// GetFloat Returns a float for the config variable key
 func (c *Config) GetFloat(key string) float64 {
+	if env := os.Getenv(key); env != "" {
+		if val, err := strconv.ParseFloat(env, 64); err == nil {
+			return val
+		}
+	}
+
 	x, ok := c.data[key]
 	if !ok {
 		return -1
@@ -64,8 +81,15 @@ func (c *Config) GetFloat(key string) float64 {
 	return x.(float64)
 }
 
-// Returns a bool for the config variable key
+// GetBool Returns a bool for the config variable key
 func (c *Config) GetBool(key string) bool {
+	if env := os.Getenv(key); env != "" {
+		if strings.EqualFold(env, "true") {
+			return true
+		}
+		return false
+	}
+
 	x, ok := c.data[key]
 	if !ok {
 		return false
@@ -73,8 +97,15 @@ func (c *Config) GetBool(key string) bool {
 	return x.(bool)
 }
 
-// Returns an array for the config variable key
+// GetArray Returns an array for the config variable key
 func (c *Config) GetArray(key string) []interface{} {
+	if env := os.Getenv(key); env != "" {
+		var data interface{}
+		if err := json.Unmarshal(util.StringToBytes(env), &data); err == nil {
+			return data.([]interface{})
+		}
+	}
+
 	result, present := c.data[key]
 	if !present {
 		return []interface{}(nil)

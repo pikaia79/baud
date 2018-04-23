@@ -3,7 +3,6 @@ syntax = "proto3";
 import "github.com/gogo/protobuf/gogoproto/gogo.proto";
 
 import "github.com/tiglabs/baud/proto/metapb/meta.proto";
-import "github.com/tiglabs/baud/proto/metapb/api.proto";
 
 option go_package = "pspb";
 
@@ -69,6 +68,6 @@ message ChangeLeaderResponse {
 }
 
 enum ReplicaChangeType {
-    ReplicaAdd     = 0;
-    ReplicaRemove  = 1;
+    Add     = 0;
+    Remove  = 1;
 }

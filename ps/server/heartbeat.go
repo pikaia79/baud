@@ -1,12 +1,18 @@
 package server
 
 import (
+	"context"
 	"time"
 
 	"github.com/tiglabs/baud/proto/masterpb"
 	"github.com/tiglabs/baud/proto/metapb"
 	"github.com/tiglabs/baud/util/log"
+	"github.com/tiglabs/baud/util/routine"
 	"github.com/tiglabs/baud/util/uuid"
+)
+
+const (
+	heartbeatTimeout = 10 * time.Second
 )
 
 type heartbeatWork struct {
@@ -15,75 +21,93 @@ type heartbeatWork struct {
 	minInterval    time.Duration
 	lastHeartbeat  time.Time
 	nextHeartbeat  time.Time
-	ticker         *time.Timer
-	triggerChan    chan *struct{}
+	triggerCh      chan *struct{}
+	stopCh         chan *struct{}
 }
 
 func newHeartbeatWork(server *Server) *heartbeatWork {
 	return &heartbeatWork{
 		server:         server,
 		minInterval:    10 * time.Millisecond,
-		tickerInterval: time.Millisecond * time.Duration(server.config.HeartbeatInterval),
-		ticker:         new(time.Timer),
-		triggerChan:    make(chan *struct{}, 1),
+		tickerInterval: time.Millisecond * time.Duration(server.HeartbeatInterval),
+		triggerCh:      make(chan *struct{}, 1),
+		stopCh:         make(chan *struct{}),
 	}
+}
+
+func (h *heartbeatWork) start() {
+	quitCh := make(chan struct{})
+	routine.RunWorkDaemon("MASTER-HEARTBEAT", func() {
+		var heartbeatTimer time.Timer
+		defer heartbeatTimer.Stop()
+
+		h.update(&heartbeatTimer)
+		h.lastHeartbeat = time.Time{}
+		for {
+			select {
+			case <-h.server.ctx.Done():
+				close(quitCh)
+				return
+
+			case <-h.stopCh:
+				close(quitCh)
+				return
+
+			case <-heartbeatTimer.C:
+				h.doHeartbeat()
+				h.update(&heartbeatTimer)
+
+			case <-h.triggerCh:
+				now := time.Now()
+				if h.nextHeartbeat.After(now) && h.nextHeartbeat.Sub(now) <= h.minInterval {
+					break
+				}
+
+				if !h.lastHeartbeat.IsZero() && h.lastHeartbeat.Before(now) && now.Sub(h.lastHeartbeat) <= h.minInterval {
+					heartbeatTimer.Reset(h.minInterval)
+					h.nextHeartbeat = time.Now().Add(h.minInterval)
+					break
+				}
+
+				h.doHeartbeat()
+				h.update(&heartbeatTimer)
+			}
+		}
+	}, quitCh)
+}
+
+func (h *heartbeatWork) stop() {
+	h.stopCh <- nil
 }
 
 func (h *heartbeatWork) trigger() {
 	select {
-	case h.triggerChan <- nil:
+	case h.triggerCh <- nil:
 	default:
 		return
 	}
 }
 
-func (h *heartbeatWork) run() {
-	h.ticker.Reset(h.tickerInterval)
-	h.nextHeartbeat = time.Now().Add(h.tickerInterval)
-
-	for {
-		select {
-		case <-h.server.context.Done():
-			h.ticker.Stop()
-			return
-
-		case <-h.ticker.C:
-			h.doHeartbeat()
-			h.reset()
-
-		case <-h.triggerChan:
-			now := time.Now()
-			if h.nextHeartbeat.After(now) && h.nextHeartbeat.Sub(now) <= h.minInterval {
-				break
-			}
-
-			if !h.lastHeartbeat.IsZero() && h.lastHeartbeat.Before(now) && now.Sub(h.lastHeartbeat) <= h.minInterval {
-				h.ticker.Reset(h.minInterval)
-				h.nextHeartbeat = time.Now().Add(h.minInterval)
-				break
-			}
-
-			h.doHeartbeat()
-			h.reset()
-		}
-	}
-}
-
-func (h *heartbeatWork) reset() {
-	h.ticker.Reset(h.tickerInterval)
+func (h *heartbeatWork) update(timer *time.Timer) {
 	now := time.Now()
+	timer.Reset(h.tickerInterval)
 	h.lastHeartbeat = now
 	h.nextHeartbeat = now.Add(h.tickerInterval)
 }
 
 func (h *heartbeatWork) doHeartbeat() {
+	masterClient, err := h.server.masterClient.GetGrpcClient(h.server.MasterServer)
+	if err != nil {
+		log.Error("get master heartbeat rpc client error: %v", err)
+		return
+	}
+
+	stats, _ := h.server.systemMetric.Export()
 	req := &masterpb.PSHeartbeatRequest{
 		RequestHeader: metapb.RequestHeader{ReqId: uuid.FlakeUUID()},
 		NodeID:        h.server.nodeID,
 		Partitions:    make([]masterpb.PartitionInfo, 0),
 	}
-	stats, _ := h.server.systemMetric.Export()
-
 	h.server.partitions.Range(func(key, value interface{}) bool {
 		pinfo := value.(*partition).getPartitionInfo()
 		req.Partitions = append(req.Partitions, *pinfo)
@@ -92,15 +116,19 @@ func (h *heartbeatWork) doHeartbeat() {
 	})
 	req.SysStats = *stats
 
-	masterClient, _ := h.server.masterClient.GetGrpcClient(h.server.config.MasterServer)
-	resp, err := masterClient.(masterpb.MasterRpcClient).PSHeartbeat(h.server.context, req)
+	goCtx, cancel := context.WithTimeout(h.server.ctx, heartbeatTimeout)
+	resp, err := masterClient.(masterpb.MasterRpcClient).PSHeartbeat(goCtx, req)
+	cancel()
+
 	if err != nil {
-		log.Error("heartbeat failed error: %v", err)
+		log.Error("master heartbeat request[%s] failed error: %v", req.ReqId, err)
 		return
 	}
 
 	if resp.Code == metapb.MASTER_RESP_CODE_HEARTBEAT_REGISTRY {
-		log.Error("heartbeat response reset,then server stating cleanning...")
-		h.server.resgitry()
+		log.Error("master heartbeat request[%s] ack registry, message is: %s", req.ReqId, resp.Message)
+		routine.RunWorkAsync("SERVER-RESTART", func() {
+			h.server.restart()
+		})
 	}
 }
