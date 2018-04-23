@@ -177,7 +177,7 @@ func (s *RpcServer) PSHeartbeat(ctx context.Context,
 					return resp, nil
 				}
 				PushProcessorEvent(NewPartitionDeleteEvent(partitionInfo.ID, partitionMS.pickLeaderNodeId(),
-						replicaToDelete))
+					replicaToDelete))
 
 			} else if replicaCount < FIXED_REPLICA_NUM {
 

@@ -14,10 +14,10 @@ const (
 )
 
 const (
-	EVENT_TYPE_INVALID                 = iota
+	EVENT_TYPE_INVALID = iota
 	EVENT_TYPE_PARTITION_CREATE
-	EVENT_TYPE_PARTITION_DELETE        // partition is in cluster
-	EVENT_TYPE_FORCE_PARTITION_DELETE  // partition is not in cluster
+	EVENT_TYPE_PARTITION_DELETE       // partition is in cluster
+	EVENT_TYPE_FORCE_PARTITION_DELETE // partition is not in cluster
 )
 
 var (
@@ -40,10 +40,10 @@ func NewPartitionCreateEvent(partition *Partition) *ProcessorEvent {
 
 // internal use
 type PartitionDeleteBody struct {
-	partitionId     metapb.PartitionID
-	leaderNodeId    metapb.NodeID
-	replicaRpcAddr  string
-	replica         *metapb.Replica
+	partitionId    metapb.PartitionID
+	leaderNodeId   metapb.NodeID
+	replicaRpcAddr string
+	replica        *metapb.Replica
 }
 
 func NewPartitionDeleteEvent(partitionId metapb.PartitionID, leaderNodeId metapb.NodeID,
@@ -60,13 +60,13 @@ func NewPartitionDeleteEvent(partitionId metapb.PartitionID, leaderNodeId metapb
 
 // internal use
 func NewForcePartitionDeleteEvent(partitionId metapb.PartitionID, replicaRpcAddr string,
-			replica *metapb.Replica) *ProcessorEvent {
+	replica *metapb.Replica) *ProcessorEvent {
 	return &ProcessorEvent{
 		typ: EVENT_TYPE_FORCE_PARTITION_DELETE,
 		body: &PartitionDeleteBody{
-			partitionId:     partitionId,
-			replicaRpcAddr:  replicaRpcAddr,
-			replica:         replica,
+			partitionId:    partitionId,
+			replicaRpcAddr: replicaRpcAddr,
+			replica:        replica,
 		},
 	}
 }
@@ -102,7 +102,7 @@ func (p *PartitionProcessor) doRun() {
 				}
 
 				go func(partitionToCreate *Partition) {
-					leaderPS := p.cluster.psCache.findServerById(partitionToCreate.pickLeaderNodeId()s)
+					leaderPS := p.cluster.psCache.findServerById(partitionToCreate.pickLeaderNodeId())
 					// leaderPS is nil when create first partition
 
 					replicaId, err := idGenerator.GenID()

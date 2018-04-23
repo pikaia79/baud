@@ -5,8 +5,8 @@ import (
 	"github.com/gogo/protobuf/proto"
 	raftproto "github.com/tiglabs/raft/proto"
 	"io"
+	"github.com/tiglabs/baud/proto/masterpb"
 	"util/raftkvstore"
-	"proto/masterpb"
 )
 
 var (
