@@ -21,6 +21,11 @@
 		PSHeartbeatRequest
 		PSHeartbeatResponse
 		PartitionInfo
+		RuntimeInfo
+		RaftStatus
+		RaftFollowerStatus
+		NodeSysStats
+		PartitionStats
 */
 package masterpb
 
@@ -29,13 +34,13 @@ import fmt "fmt"
 import math "math"
 import _ "github.com/gogo/protobuf/gogoproto"
 import meta "github.com/tiglabs/baud/proto/metapb"
-import api "github.com/tiglabs/baud/proto/metapb"
-import stats "."
 
 import github_com_tiglabs_baud_proto_metapb "github.com/tiglabs/baud/proto/metapb"
 
 import context "golang.org/x/net/context"
 import grpc "google.golang.org/grpc"
+
+import binary "encoding/binary"
 
 import strings "strings"
 import reflect "reflect"
@@ -64,8 +69,8 @@ func (*Route) ProtoMessage()               {}
 func (*Route) Descriptor() ([]byte, []int) { return fileDescriptorMaster, []int{0} }
 
 type GetDBRequest struct {
-	api.RequestHeader `protobuf:"bytes,1,opt,name=header,embedded=header" json:"header"`
-	DBName            string `protobuf:"bytes,2,opt,name=DB_name,json=DBName,proto3" json:"DB_name,omitempty"`
+	meta.RequestHeader `protobuf:"bytes,1,opt,name=header,embedded=header" json:"header"`
+	DBName             string `protobuf:"bytes,2,opt,name=DB_name,json=DBName,proto3" json:"DB_name,omitempty"`
 }
 
 func (m *GetDBRequest) Reset()                    { *m = GetDBRequest{} }
@@ -73,8 +78,8 @@ func (*GetDBRequest) ProtoMessage()               {}
 func (*GetDBRequest) Descriptor() ([]byte, []int) { return fileDescriptorMaster, []int{1} }
 
 type GetDBResponse struct {
-	api.ResponseHeader `protobuf:"bytes,1,opt,name=header,embedded=header" json:"header"`
-	Db                 meta.DB `protobuf:"bytes,2,opt,name=db" json:"db"`
+	meta.ResponseHeader `protobuf:"bytes,1,opt,name=header,embedded=header" json:"header"`
+	Db                  meta.DB `protobuf:"bytes,2,opt,name=db" json:"db"`
 }
 
 func (m *GetDBResponse) Reset()                    { *m = GetDBResponse{} }
@@ -82,9 +87,9 @@ func (*GetDBResponse) ProtoMessage()               {}
 func (*GetDBResponse) Descriptor() ([]byte, []int) { return fileDescriptorMaster, []int{2} }
 
 type GetSpaceRequest struct {
-	api.RequestHeader `protobuf:"bytes,1,opt,name=header,embedded=header" json:"header"`
-	ID                DBID   `protobuf:"varint,2,opt,name=db_id,json=dbId,proto3,casttype=DBID" json:"db_id,omitempty"`
-	SpaceName         string `protobuf:"bytes,3,opt,name=Space_name,json=SpaceName,proto3" json:"Space_name,omitempty"`
+	meta.RequestHeader `protobuf:"bytes,1,opt,name=header,embedded=header" json:"header"`
+	ID                 github_com_tiglabs_baud_proto_metapb.DBID `protobuf:"varint,2,opt,name=db_id,json=dbId,proto3,casttype=github.com/tiglabs/baud/proto/metapb.DBID" json:"db_id,omitempty"`
+	SpaceName          string                                    `protobuf:"bytes,3,opt,name=Space_name,json=SpaceName,proto3" json:"Space_name,omitempty"`
 }
 
 func (m *GetSpaceRequest) Reset()                    { *m = GetSpaceRequest{} }
@@ -92,8 +97,8 @@ func (*GetSpaceRequest) ProtoMessage()               {}
 func (*GetSpaceRequest) Descriptor() ([]byte, []int) { return fileDescriptorMaster, []int{3} }
 
 type GetSpaceResponse struct {
-	api.ResponseHeader `protobuf:"bytes,1,opt,name=header,embedded=header" json:"header"`
-	Space              meta.Space `protobuf:"bytes,2,opt,name=space" json:"space"`
+	meta.ResponseHeader `protobuf:"bytes,1,opt,name=header,embedded=header" json:"header"`
+	Space               meta.Space `protobuf:"bytes,2,opt,name=space" json:"space"`
 }
 
 func (m *GetSpaceResponse) Reset()                    { *m = GetSpaceResponse{} }
@@ -101,10 +106,10 @@ func (*GetSpaceResponse) ProtoMessage()               {}
 func (*GetSpaceResponse) Descriptor() ([]byte, []int) { return fileDescriptorMaster, []int{4} }
 
 type GetRouteRequest struct {
-	api.RequestHeader `protobuf:"bytes,1,opt,name=header,embedded=header" json:"header"`
-	DB                github_com_tiglabs_baud_proto_metapb.DBID    `protobuf:"varint,2,opt,name=db,proto3,casttype=github.com/tiglabs/baud/proto/metapb.DBID" json:"db,omitempty"`
-	Space             github_com_tiglabs_baud_proto_metapb.SpaceID `protobuf:"varint,3,opt,name=space,proto3,casttype=github.com/tiglabs/baud/proto/metapb.SpaceID" json:"space,omitempty"`
-	Slot              github_com_tiglabs_baud_proto_metapb.SlotID  `protobuf:"varint,4,opt,name=slot,proto3,casttype=github.com/tiglabs/baud/proto/metapb.SlotID" json:"slot,omitempty"`
+	meta.RequestHeader `protobuf:"bytes,1,opt,name=header,embedded=header" json:"header"`
+	DB                 github_com_tiglabs_baud_proto_metapb.DBID    `protobuf:"varint,2,opt,name=db,proto3,casttype=github.com/tiglabs/baud/proto/metapb.DBID" json:"db,omitempty"`
+	Space              github_com_tiglabs_baud_proto_metapb.SpaceID `protobuf:"varint,3,opt,name=space,proto3,casttype=github.com/tiglabs/baud/proto/metapb.SpaceID" json:"space,omitempty"`
+	Slot               github_com_tiglabs_baud_proto_metapb.SlotID  `protobuf:"varint,4,opt,name=slot,proto3,casttype=github.com/tiglabs/baud/proto/metapb.SlotID" json:"slot,omitempty"`
 }
 
 func (m *GetRouteRequest) Reset()                    { *m = GetRouteRequest{} }
@@ -112,8 +117,8 @@ func (*GetRouteRequest) ProtoMessage()               {}
 func (*GetRouteRequest) Descriptor() ([]byte, []int) { return fileDescriptorMaster, []int{5} }
 
 type GetRouteResponse struct {
-	api.ResponseHeader `protobuf:"bytes,1,opt,name=header,embedded=header" json:"header"`
-	Routes             []Route `protobuf:"bytes,2,rep,name=routes" json:"routes"`
+	meta.ResponseHeader `protobuf:"bytes,1,opt,name=header,embedded=header" json:"header"`
+	Routes              []Route `protobuf:"bytes,2,rep,name=routes" json:"routes"`
 }
 
 func (m *GetRouteResponse) Reset()                    { *m = GetRouteResponse{} }
@@ -121,10 +126,10 @@ func (*GetRouteResponse) ProtoMessage()               {}
 func (*GetRouteResponse) Descriptor() ([]byte, []int) { return fileDescriptorMaster, []int{6} }
 
 type PSRegisterRequest struct {
-	api.RequestHeader `protobuf:"bytes,1,opt,name=header,embedded=header" json:"header"`
-	NodeID            github_com_tiglabs_baud_proto_metapb.NodeID `protobuf:"varint,2,opt,name=nodeID,proto3,casttype=github.com/tiglabs/baud/proto/metapb.NodeID" json:"nodeID,omitempty"`
-	Ip                string                                      `protobuf:"bytes,3,opt,name=ip,proto3" json:"ip,omitempty"`
-	stats.RuntimeInfo `protobuf:"bytes,4,opt,name=runtime_info,json=runtimeInfo,embedded=runtime_info" json:"runtime_info"`
+	meta.RequestHeader `protobuf:"bytes,1,opt,name=header,embedded=header" json:"header"`
+	NodeID             github_com_tiglabs_baud_proto_metapb.NodeID `protobuf:"varint,2,opt,name=nodeID,proto3,casttype=github.com/tiglabs/baud/proto/metapb.NodeID" json:"nodeID,omitempty"`
+	Ip                 string                                      `protobuf:"bytes,3,opt,name=ip,proto3" json:"ip,omitempty"`
+	RuntimeInfo        `protobuf:"bytes,4,opt,name=runtime_info,json=runtimeInfo,embedded=runtime_info" json:"runtime_info"`
 }
 
 func (m *PSRegisterRequest) Reset()                    { *m = PSRegisterRequest{} }
@@ -132,10 +137,10 @@ func (*PSRegisterRequest) ProtoMessage()               {}
 func (*PSRegisterRequest) Descriptor() ([]byte, []int) { return fileDescriptorMaster, []int{7} }
 
 type PSRegisterResponse struct {
-	api.ResponseHeader `protobuf:"bytes,1,opt,name=header,embedded=header" json:"header"`
-	NodeID             github_com_tiglabs_baud_proto_metapb.NodeID `protobuf:"varint,2,opt,name=nodeID,proto3,casttype=github.com/tiglabs/baud/proto/metapb.NodeID" json:"nodeID,omitempty"`
-	PSConfig           `protobuf:"bytes,3,opt,name=config,embedded=config" json:"config"`
-	Partitions         []meta.Partition `protobuf:"bytes,4,rep,name=partitions" json:"partitions"`
+	meta.ResponseHeader `protobuf:"bytes,1,opt,name=header,embedded=header" json:"header"`
+	NodeID              github_com_tiglabs_baud_proto_metapb.NodeID `protobuf:"varint,2,opt,name=nodeID,proto3,casttype=github.com/tiglabs/baud/proto/metapb.NodeID" json:"nodeID,omitempty"`
+	PSConfig            `protobuf:"bytes,3,opt,name=config,embedded=config" json:"config"`
+	Partitions          []meta.Partition `protobuf:"bytes,4,rep,name=partitions" json:"partitions"`
 }
 
 func (m *PSRegisterResponse) Reset()                    { *m = PSRegisterResponse{} }
@@ -159,10 +164,10 @@ func (*PSConfig) ProtoMessage()               {}
 func (*PSConfig) Descriptor() ([]byte, []int) { return fileDescriptorMaster, []int{9} }
 
 type PSHeartbeatRequest struct {
-	api.RequestHeader `protobuf:"bytes,1,opt,name=header,embedded=header" json:"header"`
-	NodeID            github_com_tiglabs_baud_proto_metapb.NodeID `protobuf:"varint,2,opt,name=nodeID,proto3,casttype=github.com/tiglabs/baud/proto/metapb.NodeID" json:"nodeID,omitempty"`
-	Partitions        []PartitionInfo                             `protobuf:"bytes,3,rep,name=partitions" json:"partitions"`
-	SysStats          stats.NodeSysStats                          `protobuf:"bytes,4,opt,name=sys_stats,json=sysStats" json:"sys_stats"`
+	meta.RequestHeader `protobuf:"bytes,1,opt,name=header,embedded=header" json:"header"`
+	NodeID             github_com_tiglabs_baud_proto_metapb.NodeID `protobuf:"varint,2,opt,name=nodeID,proto3,casttype=github.com/tiglabs/baud/proto/metapb.NodeID" json:"nodeID,omitempty"`
+	Partitions         []PartitionInfo                             `protobuf:"bytes,3,rep,name=partitions" json:"partitions"`
+	SysStats           NodeSysStats                                `protobuf:"bytes,4,opt,name=sys_stats,json=sysStats" json:"sys_stats"`
 }
 
 func (m *PSHeartbeatRequest) Reset()                    { *m = PSHeartbeatRequest{} }
@@ -170,7 +175,7 @@ func (*PSHeartbeatRequest) ProtoMessage()               {}
 func (*PSHeartbeatRequest) Descriptor() ([]byte, []int) { return fileDescriptorMaster, []int{10} }
 
 type PSHeartbeatResponse struct {
-	api.ResponseHeader `protobuf:"bytes,1,opt,name=header,embedded=header" json:"header"`
+	meta.ResponseHeader `protobuf:"bytes,1,opt,name=header,embedded=header" json:"header"`
 }
 
 func (m *PSHeartbeatResponse) Reset()                    { *m = PSHeartbeatResponse{} }
@@ -182,13 +187,101 @@ type PartitionInfo struct {
 	IsLeader   bool                                             `protobuf:"varint,2,opt,name=is_leader,json=isLeader,proto3" json:"is_leader,omitempty"`
 	Status     meta.PartitionStatus                             `protobuf:"varint,3,opt,name=status,proto3,enum=PartitionStatus" json:"status,omitempty"`
 	Epoch      meta.PartitionEpoch                              `protobuf:"bytes,4,opt,name=epoch" json:"epoch"`
-	RaftStatus *stats.RaftStatus                                `protobuf:"bytes,5,opt,name=raft_status,json=raftStatus" json:"raft_status,omitempty"`
-	Statistics stats.PartitionStats                             `protobuf:"bytes,6,opt,name=statistics" json:"statistics"`
+	RaftStatus *RaftStatus                                      `protobuf:"bytes,5,opt,name=raft_status,json=raftStatus" json:"raft_status,omitempty"`
+	Statistics PartitionStats                                   `protobuf:"bytes,6,opt,name=statistics" json:"statistics"`
 }
 
 func (m *PartitionInfo) Reset()                    { *m = PartitionInfo{} }
 func (*PartitionInfo) ProtoMessage()               {}
 func (*PartitionInfo) Descriptor() ([]byte, []int) { return fileDescriptorMaster, []int{12} }
+
+type RuntimeInfo struct {
+	AppVersion string `protobuf:"bytes,1,opt,name=app_version,json=appVersion,proto3" json:"app_version,omitempty"`
+	StartTime  string `protobuf:"bytes,2,opt,name=start_time,json=startTime,proto3" json:"start_time,omitempty"`
+	GoVersion  string `protobuf:"bytes,3,opt,name=go_version,json=goVersion,proto3" json:"go_version,omitempty"`
+	Platform   string `protobuf:"bytes,4,opt,name=platform,proto3" json:"platform,omitempty"`
+}
+
+func (m *RuntimeInfo) Reset()                    { *m = RuntimeInfo{} }
+func (*RuntimeInfo) ProtoMessage()               {}
+func (*RuntimeInfo) Descriptor() ([]byte, []int) { return fileDescriptorMaster, []int{13} }
+
+type RaftStatus struct {
+	ID        github_com_tiglabs_baud_proto_metapb.ReplicaID `protobuf:"varint,1,opt,name=id,proto3,casttype=github.com/tiglabs/baud/proto/metapb.ReplicaID" json:"id,omitempty"`
+	Term      uint64                                         `protobuf:"varint,2,opt,name=term,proto3" json:"term,omitempty"`
+	Index     uint64                                         `protobuf:"varint,3,opt,name=index,proto3" json:"index,omitempty"`
+	Commit    uint64                                         `protobuf:"varint,4,opt,name=commit,proto3" json:"commit,omitempty"`
+	Applied   uint64                                         `protobuf:"varint,5,opt,name=applied,proto3" json:"applied,omitempty"`
+	Followers []RaftFollowerStatus                           `protobuf:"bytes,6,rep,name=followers" json:"followers"`
+}
+
+func (m *RaftStatus) Reset()                    { *m = RaftStatus{} }
+func (*RaftStatus) ProtoMessage()               {}
+func (*RaftStatus) Descriptor() ([]byte, []int) { return fileDescriptorMaster, []int{14} }
+
+type RaftFollowerStatus struct {
+	ID          github_com_tiglabs_baud_proto_metapb.ReplicaID `protobuf:"varint,1,opt,name=id,proto3,casttype=github.com/tiglabs/baud/proto/metapb.ReplicaID" json:"id,omitempty"`
+	NodeID      github_com_tiglabs_baud_proto_metapb.NodeID    `protobuf:"varint,2,opt,name=nodeID,proto3,casttype=github.com/tiglabs/baud/proto/metapb.NodeID" json:"nodeID,omitempty"`
+	Match       uint64                                         `protobuf:"varint,3,opt,name=match,proto3" json:"match,omitempty"`
+	Commit      uint64                                         `protobuf:"varint,4,opt,name=commit,proto3" json:"commit,omitempty"`
+	Next        uint64                                         `protobuf:"varint,5,opt,name=next,proto3" json:"next,omitempty"`
+	DownSeconds uint64                                         `protobuf:"varint,6,opt,name=down_seconds,json=downSeconds,proto3" json:"down_seconds,omitempty"`
+	State       string                                         `protobuf:"bytes,7,opt,name=state,proto3" json:"state,omitempty"`
+}
+
+func (m *RaftFollowerStatus) Reset()                    { *m = RaftFollowerStatus{} }
+func (*RaftFollowerStatus) ProtoMessage()               {}
+func (*RaftFollowerStatus) Descriptor() ([]byte, []int) { return fileDescriptorMaster, []int{15} }
+
+type NodeSysStats struct {
+	// Memory
+	MemoryTotal   uint64 `protobuf:"varint,1,opt,name=memory_total,json=memoryTotal,proto3" json:"memory_total,omitempty"`
+	MemoryUsedRss uint64 `protobuf:"varint,2,opt,name=memory_used_rss,json=memoryUsedRss,proto3" json:"memory_used_rss,omitempty"`
+	MemoryUsed    uint64 `protobuf:"varint,3,opt,name=memory_used,json=memoryUsed,proto3" json:"memory_used,omitempty"`
+	MemoryFree    uint64 `protobuf:"varint,4,opt,name=memory_free,json=memoryFree,proto3" json:"memory_free,omitempty"`
+	// double memory_used_percent               = 5;
+	SwapMemoryTotal uint64 `protobuf:"varint,6,opt,name=swap_memory_total,json=swapMemoryTotal,proto3" json:"swap_memory_total,omitempty"`
+	SwapMemoryUsed  uint64 `protobuf:"varint,7,opt,name=swap_memory_used,json=swapMemoryUsed,proto3" json:"swap_memory_used,omitempty"`
+	SwapMemoryFree  uint64 `protobuf:"varint,8,opt,name=swap_memory_free,json=swapMemoryFree,proto3" json:"swap_memory_free,omitempty"`
+	// double swap_memory_used_percent          = 9;
+	// CPU
+	CpuProcRate float64 `protobuf:"fixed64,10,opt,name=cpu_proc_rate,json=cpuProcRate,proto3" json:"cpu_proc_rate,omitempty"`
+	CpuCount    uint32  `protobuf:"varint,11,opt,name=cpu_count,json=cpuCount,proto3" json:"cpu_count,omitempty"`
+	// double load1                             = 12;
+	// double load5                             = 13;
+	// double load15                            = 14;
+	// Disk
+	DiskTotal uint64 `protobuf:"varint,15,opt,name=disk_total,json=diskTotal,proto3" json:"disk_total,omitempty"`
+	DiskUsed  uint64 `protobuf:"varint,16,opt,name=disk_used,json=diskUsed,proto3" json:"disk_used,omitempty"`
+	DiskFree  uint64 `protobuf:"varint,17,opt,name=disk_free,json=diskFree,proto3" json:"disk_free,omitempty"`
+	// double disk_proc_rate                    = 18;
+	// uint64 disk_read_byte_per_sec            = 19;
+	// uint64 disk_write_byte_per_sec           = 20;
+	// Net
+	NetIoInBytePerSec       uint64 `protobuf:"varint,21,opt,name=net_io_in_byte_per_sec,json=netIoInBytePerSec,proto3" json:"net_io_in_byte_per_sec,omitempty"`
+	NetIoOutBytePerSec      uint64 `protobuf:"varint,22,opt,name=net_io_out_byte_per_sec,json=netIoOutBytePerSec,proto3" json:"net_io_out_byte_per_sec,omitempty"`
+	NetTcpConnections       uint32 `protobuf:"varint,23,opt,name=net_tcp_connections,json=netTcpConnections,proto3" json:"net_tcp_connections,omitempty"`
+	NetTcpActiveOpensPerSec uint64 `protobuf:"varint,24,opt,name=net_tcp_active_opens_per_sec,json=netTcpActiveOpensPerSec,proto3" json:"net_tcp_active_opens_per_sec,omitempty"`
+	// server
+	Ops uint64 `protobuf:"varint,25,opt,name=ops,proto3" json:"ops,omitempty"`
+}
+
+func (m *NodeSysStats) Reset()                    { *m = NodeSysStats{} }
+func (*NodeSysStats) ProtoMessage()               {}
+func (*NodeSysStats) Descriptor() ([]byte, []int) { return fileDescriptorMaster, []int{16} }
+
+type PartitionStats struct {
+	Size_                  uint64 `protobuf:"varint,1,opt,name=size,proto3" json:"size,omitempty"`
+	Ops                    uint64 `protobuf:"varint,2,opt,name=ops,proto3" json:"ops,omitempty"`
+	BytesInPerSec          uint64 `protobuf:"varint,3,opt,name=bytes_in_per_sec,json=bytesInPerSec,proto3" json:"bytes_in_per_sec,omitempty"`
+	BytesOutPerSec         uint64 `protobuf:"varint,4,opt,name=bytes_out_per_sec,json=bytesOutPerSec,proto3" json:"bytes_out_per_sec,omitempty"`
+	TotalCommandsProcessed uint64 `protobuf:"varint,5,opt,name=total_commands_processed,json=totalCommandsProcessed,proto3" json:"total_commands_processed,omitempty"`
+	KeyspaceMisses         uint64 `protobuf:"varint,6,opt,name=keyspace_misses,json=keyspaceMisses,proto3" json:"keyspace_misses,omitempty"`
+}
+
+func (m *PartitionStats) Reset()                    { *m = PartitionStats{} }
+func (*PartitionStats) ProtoMessage()               {}
+func (*PartitionStats) Descriptor() ([]byte, []int) { return fileDescriptorMaster, []int{17} }
 
 func init() {
 	proto.RegisterType((*Route)(nil), "Route")
@@ -204,6 +297,11 @@ func init() {
 	proto.RegisterType((*PSHeartbeatRequest)(nil), "PSHeartbeatRequest")
 	proto.RegisterType((*PSHeartbeatResponse)(nil), "PSHeartbeatResponse")
 	proto.RegisterType((*PartitionInfo)(nil), "PartitionInfo")
+	proto.RegisterType((*RuntimeInfo)(nil), "RuntimeInfo")
+	proto.RegisterType((*RaftStatus)(nil), "RaftStatus")
+	proto.RegisterType((*RaftFollowerStatus)(nil), "RaftFollowerStatus")
+	proto.RegisterType((*NodeSysStats)(nil), "NodeSysStats")
+	proto.RegisterType((*PartitionStats)(nil), "PartitionStats")
 }
 func (this *Route) Equal(that interface{}) bool {
 	if that == nil {
@@ -632,6 +730,236 @@ func (this *PartitionInfo) Equal(that interface{}) bool {
 		return false
 	}
 	if !this.Statistics.Equal(&that1.Statistics) {
+		return false
+	}
+	return true
+}
+func (this *RuntimeInfo) Equal(that interface{}) bool {
+	if that == nil {
+		return this == nil
+	}
+
+	that1, ok := that.(*RuntimeInfo)
+	if !ok {
+		that2, ok := that.(RuntimeInfo)
+		if ok {
+			that1 = &that2
+		} else {
+			return false
+		}
+	}
+	if that1 == nil {
+		return this == nil
+	} else if this == nil {
+		return false
+	}
+	if this.AppVersion != that1.AppVersion {
+		return false
+	}
+	if this.StartTime != that1.StartTime {
+		return false
+	}
+	if this.GoVersion != that1.GoVersion {
+		return false
+	}
+	if this.Platform != that1.Platform {
+		return false
+	}
+	return true
+}
+func (this *RaftStatus) Equal(that interface{}) bool {
+	if that == nil {
+		return this == nil
+	}
+
+	that1, ok := that.(*RaftStatus)
+	if !ok {
+		that2, ok := that.(RaftStatus)
+		if ok {
+			that1 = &that2
+		} else {
+			return false
+		}
+	}
+	if that1 == nil {
+		return this == nil
+	} else if this == nil {
+		return false
+	}
+	if this.ID != that1.ID {
+		return false
+	}
+	if this.Term != that1.Term {
+		return false
+	}
+	if this.Index != that1.Index {
+		return false
+	}
+	if this.Commit != that1.Commit {
+		return false
+	}
+	if this.Applied != that1.Applied {
+		return false
+	}
+	if len(this.Followers) != len(that1.Followers) {
+		return false
+	}
+	for i := range this.Followers {
+		if !this.Followers[i].Equal(&that1.Followers[i]) {
+			return false
+		}
+	}
+	return true
+}
+func (this *RaftFollowerStatus) Equal(that interface{}) bool {
+	if that == nil {
+		return this == nil
+	}
+
+	that1, ok := that.(*RaftFollowerStatus)
+	if !ok {
+		that2, ok := that.(RaftFollowerStatus)
+		if ok {
+			that1 = &that2
+		} else {
+			return false
+		}
+	}
+	if that1 == nil {
+		return this == nil
+	} else if this == nil {
+		return false
+	}
+	if this.ID != that1.ID {
+		return false
+	}
+	if this.NodeID != that1.NodeID {
+		return false
+	}
+	if this.Match != that1.Match {
+		return false
+	}
+	if this.Commit != that1.Commit {
+		return false
+	}
+	if this.Next != that1.Next {
+		return false
+	}
+	if this.DownSeconds != that1.DownSeconds {
+		return false
+	}
+	if this.State != that1.State {
+		return false
+	}
+	return true
+}
+func (this *NodeSysStats) Equal(that interface{}) bool {
+	if that == nil {
+		return this == nil
+	}
+
+	that1, ok := that.(*NodeSysStats)
+	if !ok {
+		that2, ok := that.(NodeSysStats)
+		if ok {
+			that1 = &that2
+		} else {
+			return false
+		}
+	}
+	if that1 == nil {
+		return this == nil
+	} else if this == nil {
+		return false
+	}
+	if this.MemoryTotal != that1.MemoryTotal {
+		return false
+	}
+	if this.MemoryUsedRss != that1.MemoryUsedRss {
+		return false
+	}
+	if this.MemoryUsed != that1.MemoryUsed {
+		return false
+	}
+	if this.MemoryFree != that1.MemoryFree {
+		return false
+	}
+	if this.SwapMemoryTotal != that1.SwapMemoryTotal {
+		return false
+	}
+	if this.SwapMemoryUsed != that1.SwapMemoryUsed {
+		return false
+	}
+	if this.SwapMemoryFree != that1.SwapMemoryFree {
+		return false
+	}
+	if this.CpuProcRate != that1.CpuProcRate {
+		return false
+	}
+	if this.CpuCount != that1.CpuCount {
+		return false
+	}
+	if this.DiskTotal != that1.DiskTotal {
+		return false
+	}
+	if this.DiskUsed != that1.DiskUsed {
+		return false
+	}
+	if this.DiskFree != that1.DiskFree {
+		return false
+	}
+	if this.NetIoInBytePerSec != that1.NetIoInBytePerSec {
+		return false
+	}
+	if this.NetIoOutBytePerSec != that1.NetIoOutBytePerSec {
+		return false
+	}
+	if this.NetTcpConnections != that1.NetTcpConnections {
+		return false
+	}
+	if this.NetTcpActiveOpensPerSec != that1.NetTcpActiveOpensPerSec {
+		return false
+	}
+	if this.Ops != that1.Ops {
+		return false
+	}
+	return true
+}
+func (this *PartitionStats) Equal(that interface{}) bool {
+	if that == nil {
+		return this == nil
+	}
+
+	that1, ok := that.(*PartitionStats)
+	if !ok {
+		that2, ok := that.(PartitionStats)
+		if ok {
+			that1 = &that2
+		} else {
+			return false
+		}
+	}
+	if that1 == nil {
+		return this == nil
+	} else if this == nil {
+		return false
+	}
+	if this.Size_ != that1.Size_ {
+		return false
+	}
+	if this.Ops != that1.Ops {
+		return false
+	}
+	if this.BytesInPerSec != that1.BytesInPerSec {
+		return false
+	}
+	if this.BytesOutPerSec != that1.BytesOutPerSec {
+		return false
+	}
+	if this.TotalCommandsProcessed != that1.TotalCommandsProcessed {
+		return false
+	}
+	if this.KeyspaceMisses != that1.KeyspaceMisses {
 		return false
 	}
 	return true
@@ -1400,6 +1728,323 @@ func (m *PartitionInfo) MarshalTo(dAtA []byte) (int, error) {
 	return i, nil
 }
 
+func (m *RuntimeInfo) Marshal() (dAtA []byte, err error) {
+	size := m.Size()
+	dAtA = make([]byte, size)
+	n, err := m.MarshalTo(dAtA)
+	if err != nil {
+		return nil, err
+	}
+	return dAtA[:n], nil
+}
+
+func (m *RuntimeInfo) MarshalTo(dAtA []byte) (int, error) {
+	var i int
+	_ = i
+	var l int
+	_ = l
+	if len(m.AppVersion) > 0 {
+		dAtA[i] = 0xa
+		i++
+		i = encodeVarintMaster(dAtA, i, uint64(len(m.AppVersion)))
+		i += copy(dAtA[i:], m.AppVersion)
+	}
+	if len(m.StartTime) > 0 {
+		dAtA[i] = 0x12
+		i++
+		i = encodeVarintMaster(dAtA, i, uint64(len(m.StartTime)))
+		i += copy(dAtA[i:], m.StartTime)
+	}
+	if len(m.GoVersion) > 0 {
+		dAtA[i] = 0x1a
+		i++
+		i = encodeVarintMaster(dAtA, i, uint64(len(m.GoVersion)))
+		i += copy(dAtA[i:], m.GoVersion)
+	}
+	if len(m.Platform) > 0 {
+		dAtA[i] = 0x22
+		i++
+		i = encodeVarintMaster(dAtA, i, uint64(len(m.Platform)))
+		i += copy(dAtA[i:], m.Platform)
+	}
+	return i, nil
+}
+
+func (m *RaftStatus) Marshal() (dAtA []byte, err error) {
+	size := m.Size()
+	dAtA = make([]byte, size)
+	n, err := m.MarshalTo(dAtA)
+	if err != nil {
+		return nil, err
+	}
+	return dAtA[:n], nil
+}
+
+func (m *RaftStatus) MarshalTo(dAtA []byte) (int, error) {
+	var i int
+	_ = i
+	var l int
+	_ = l
+	if m.ID != 0 {
+		dAtA[i] = 0x8
+		i++
+		i = encodeVarintMaster(dAtA, i, uint64(m.ID))
+	}
+	if m.Term != 0 {
+		dAtA[i] = 0x10
+		i++
+		i = encodeVarintMaster(dAtA, i, uint64(m.Term))
+	}
+	if m.Index != 0 {
+		dAtA[i] = 0x18
+		i++
+		i = encodeVarintMaster(dAtA, i, uint64(m.Index))
+	}
+	if m.Commit != 0 {
+		dAtA[i] = 0x20
+		i++
+		i = encodeVarintMaster(dAtA, i, uint64(m.Commit))
+	}
+	if m.Applied != 0 {
+		dAtA[i] = 0x28
+		i++
+		i = encodeVarintMaster(dAtA, i, uint64(m.Applied))
+	}
+	if len(m.Followers) > 0 {
+		for _, msg := range m.Followers {
+			dAtA[i] = 0x32
+			i++
+			i = encodeVarintMaster(dAtA, i, uint64(msg.Size()))
+			n, err := msg.MarshalTo(dAtA[i:])
+			if err != nil {
+				return 0, err
+			}
+			i += n
+		}
+	}
+	return i, nil
+}
+
+func (m *RaftFollowerStatus) Marshal() (dAtA []byte, err error) {
+	size := m.Size()
+	dAtA = make([]byte, size)
+	n, err := m.MarshalTo(dAtA)
+	if err != nil {
+		return nil, err
+	}
+	return dAtA[:n], nil
+}
+
+func (m *RaftFollowerStatus) MarshalTo(dAtA []byte) (int, error) {
+	var i int
+	_ = i
+	var l int
+	_ = l
+	if m.ID != 0 {
+		dAtA[i] = 0x8
+		i++
+		i = encodeVarintMaster(dAtA, i, uint64(m.ID))
+	}
+	if m.NodeID != 0 {
+		dAtA[i] = 0x10
+		i++
+		i = encodeVarintMaster(dAtA, i, uint64(m.NodeID))
+	}
+	if m.Match != 0 {
+		dAtA[i] = 0x18
+		i++
+		i = encodeVarintMaster(dAtA, i, uint64(m.Match))
+	}
+	if m.Commit != 0 {
+		dAtA[i] = 0x20
+		i++
+		i = encodeVarintMaster(dAtA, i, uint64(m.Commit))
+	}
+	if m.Next != 0 {
+		dAtA[i] = 0x28
+		i++
+		i = encodeVarintMaster(dAtA, i, uint64(m.Next))
+	}
+	if m.DownSeconds != 0 {
+		dAtA[i] = 0x30
+		i++
+		i = encodeVarintMaster(dAtA, i, uint64(m.DownSeconds))
+	}
+	if len(m.State) > 0 {
+		dAtA[i] = 0x3a
+		i++
+		i = encodeVarintMaster(dAtA, i, uint64(len(m.State)))
+		i += copy(dAtA[i:], m.State)
+	}
+	return i, nil
+}
+
+func (m *NodeSysStats) Marshal() (dAtA []byte, err error) {
+	size := m.Size()
+	dAtA = make([]byte, size)
+	n, err := m.MarshalTo(dAtA)
+	if err != nil {
+		return nil, err
+	}
+	return dAtA[:n], nil
+}
+
+func (m *NodeSysStats) MarshalTo(dAtA []byte) (int, error) {
+	var i int
+	_ = i
+	var l int
+	_ = l
+	if m.MemoryTotal != 0 {
+		dAtA[i] = 0x8
+		i++
+		i = encodeVarintMaster(dAtA, i, uint64(m.MemoryTotal))
+	}
+	if m.MemoryUsedRss != 0 {
+		dAtA[i] = 0x10
+		i++
+		i = encodeVarintMaster(dAtA, i, uint64(m.MemoryUsedRss))
+	}
+	if m.MemoryUsed != 0 {
+		dAtA[i] = 0x18
+		i++
+		i = encodeVarintMaster(dAtA, i, uint64(m.MemoryUsed))
+	}
+	if m.MemoryFree != 0 {
+		dAtA[i] = 0x20
+		i++
+		i = encodeVarintMaster(dAtA, i, uint64(m.MemoryFree))
+	}
+	if m.SwapMemoryTotal != 0 {
+		dAtA[i] = 0x30
+		i++
+		i = encodeVarintMaster(dAtA, i, uint64(m.SwapMemoryTotal))
+	}
+	if m.SwapMemoryUsed != 0 {
+		dAtA[i] = 0x38
+		i++
+		i = encodeVarintMaster(dAtA, i, uint64(m.SwapMemoryUsed))
+	}
+	if m.SwapMemoryFree != 0 {
+		dAtA[i] = 0x40
+		i++
+		i = encodeVarintMaster(dAtA, i, uint64(m.SwapMemoryFree))
+	}
+	if m.CpuProcRate != 0 {
+		dAtA[i] = 0x51
+		i++
+		binary.LittleEndian.PutUint64(dAtA[i:], uint64(math.Float64bits(float64(m.CpuProcRate))))
+		i += 8
+	}
+	if m.CpuCount != 0 {
+		dAtA[i] = 0x58
+		i++
+		i = encodeVarintMaster(dAtA, i, uint64(m.CpuCount))
+	}
+	if m.DiskTotal != 0 {
+		dAtA[i] = 0x78
+		i++
+		i = encodeVarintMaster(dAtA, i, uint64(m.DiskTotal))
+	}
+	if m.DiskUsed != 0 {
+		dAtA[i] = 0x80
+		i++
+		dAtA[i] = 0x1
+		i++
+		i = encodeVarintMaster(dAtA, i, uint64(m.DiskUsed))
+	}
+	if m.DiskFree != 0 {
+		dAtA[i] = 0x88
+		i++
+		dAtA[i] = 0x1
+		i++
+		i = encodeVarintMaster(dAtA, i, uint64(m.DiskFree))
+	}
+	if m.NetIoInBytePerSec != 0 {
+		dAtA[i] = 0xa8
+		i++
+		dAtA[i] = 0x1
+		i++
+		i = encodeVarintMaster(dAtA, i, uint64(m.NetIoInBytePerSec))
+	}
+	if m.NetIoOutBytePerSec != 0 {
+		dAtA[i] = 0xb0
+		i++
+		dAtA[i] = 0x1
+		i++
+		i = encodeVarintMaster(dAtA, i, uint64(m.NetIoOutBytePerSec))
+	}
+	if m.NetTcpConnections != 0 {
+		dAtA[i] = 0xb8
+		i++
+		dAtA[i] = 0x1
+		i++
+		i = encodeVarintMaster(dAtA, i, uint64(m.NetTcpConnections))
+	}
+	if m.NetTcpActiveOpensPerSec != 0 {
+		dAtA[i] = 0xc0
+		i++
+		dAtA[i] = 0x1
+		i++
+		i = encodeVarintMaster(dAtA, i, uint64(m.NetTcpActiveOpensPerSec))
+	}
+	if m.Ops != 0 {
+		dAtA[i] = 0xc8
+		i++
+		dAtA[i] = 0x1
+		i++
+		i = encodeVarintMaster(dAtA, i, uint64(m.Ops))
+	}
+	return i, nil
+}
+
+func (m *PartitionStats) Marshal() (dAtA []byte, err error) {
+	size := m.Size()
+	dAtA = make([]byte, size)
+	n, err := m.MarshalTo(dAtA)
+	if err != nil {
+		return nil, err
+	}
+	return dAtA[:n], nil
+}
+
+func (m *PartitionStats) MarshalTo(dAtA []byte) (int, error) {
+	var i int
+	_ = i
+	var l int
+	_ = l
+	if m.Size_ != 0 {
+		dAtA[i] = 0x8
+		i++
+		i = encodeVarintMaster(dAtA, i, uint64(m.Size_))
+	}
+	if m.Ops != 0 {
+		dAtA[i] = 0x10
+		i++
+		i = encodeVarintMaster(dAtA, i, uint64(m.Ops))
+	}
+	if m.BytesInPerSec != 0 {
+		dAtA[i] = 0x18
+		i++
+		i = encodeVarintMaster(dAtA, i, uint64(m.BytesInPerSec))
+	}
+	if m.BytesOutPerSec != 0 {
+		dAtA[i] = 0x20
+		i++
+		i = encodeVarintMaster(dAtA, i, uint64(m.BytesOutPerSec))
+	}
+	if m.TotalCommandsProcessed != 0 {
+		dAtA[i] = 0x28
+		i++
+		i = encodeVarintMaster(dAtA, i, uint64(m.TotalCommandsProcessed))
+	}
+	if m.KeyspaceMisses != 0 {
+		dAtA[i] = 0x30
+		i++
+		i = encodeVarintMaster(dAtA, i, uint64(m.KeyspaceMisses))
+	}
+	return i, nil
+}
+
 func encodeVarintMaster(dAtA []byte, offset int, v uint64) int {
 	for v >= 1<<7 {
 		dAtA[offset] = uint8(v&0x7f | 0x80)
@@ -1428,7 +2073,7 @@ func NewPopulatedRoute(r randyMaster, easy bool) *Route {
 
 func NewPopulatedGetDBRequest(r randyMaster, easy bool) *GetDBRequest {
 	this := &GetDBRequest{}
-	v3 := api.NewPopulatedRequestHeader(r, easy)
+	v3 := meta.NewPopulatedRequestHeader(r, easy)
 	this.RequestHeader = *v3
 	this.DBName = string(randStringMaster(r))
 	if !easy && r.Intn(10) != 0 {
@@ -1438,7 +2083,7 @@ func NewPopulatedGetDBRequest(r randyMaster, easy bool) *GetDBRequest {
 
 func NewPopulatedGetDBResponse(r randyMaster, easy bool) *GetDBResponse {
 	this := &GetDBResponse{}
-	v4 := api.NewPopulatedResponseHeader(r, easy)
+	v4 := meta.NewPopulatedResponseHeader(r, easy)
 	this.ResponseHeader = *v4
 	v5 := meta.NewPopulatedDB(r, easy)
 	this.Db = *v5
@@ -1449,9 +2094,9 @@ func NewPopulatedGetDBResponse(r randyMaster, easy bool) *GetDBResponse {
 
 func NewPopulatedGetSpaceRequest(r randyMaster, easy bool) *GetSpaceRequest {
 	this := &GetSpaceRequest{}
-	v6 := api.NewPopulatedRequestHeader(r, easy)
+	v6 := meta.NewPopulatedRequestHeader(r, easy)
 	this.RequestHeader = *v6
-	this.ID = DBID(r.Uint32())
+	this.ID = github_com_tiglabs_baud_proto_metapb.DBID(r.Uint32())
 	this.SpaceName = string(randStringMaster(r))
 	if !easy && r.Intn(10) != 0 {
 	}
@@ -1460,7 +2105,7 @@ func NewPopulatedGetSpaceRequest(r randyMaster, easy bool) *GetSpaceRequest {
 
 func NewPopulatedGetSpaceResponse(r randyMaster, easy bool) *GetSpaceResponse {
 	this := &GetSpaceResponse{}
-	v7 := api.NewPopulatedResponseHeader(r, easy)
+	v7 := meta.NewPopulatedResponseHeader(r, easy)
 	this.ResponseHeader = *v7
 	v8 := meta.NewPopulatedSpace(r, easy)
 	this.Space = *v8
@@ -1471,7 +2116,7 @@ func NewPopulatedGetSpaceResponse(r randyMaster, easy bool) *GetSpaceResponse {
 
 func NewPopulatedGetRouteRequest(r randyMaster, easy bool) *GetRouteRequest {
 	this := &GetRouteRequest{}
-	v9 := api.NewPopulatedRequestHeader(r, easy)
+	v9 := meta.NewPopulatedRequestHeader(r, easy)
 	this.RequestHeader = *v9
 	this.DB = github_com_tiglabs_baud_proto_metapb.DBID(r.Uint32())
 	this.Space = github_com_tiglabs_baud_proto_metapb.SpaceID(r.Uint32())
@@ -1483,7 +2128,7 @@ func NewPopulatedGetRouteRequest(r randyMaster, easy bool) *GetRouteRequest {
 
 func NewPopulatedGetRouteResponse(r randyMaster, easy bool) *GetRouteResponse {
 	this := &GetRouteResponse{}
-	v10 := api.NewPopulatedResponseHeader(r, easy)
+	v10 := meta.NewPopulatedResponseHeader(r, easy)
 	this.ResponseHeader = *v10
 	if r.Intn(10) != 0 {
 		v11 := r.Intn(5)
@@ -1500,11 +2145,11 @@ func NewPopulatedGetRouteResponse(r randyMaster, easy bool) *GetRouteResponse {
 
 func NewPopulatedPSRegisterRequest(r randyMaster, easy bool) *PSRegisterRequest {
 	this := &PSRegisterRequest{}
-	v13 := api.NewPopulatedRequestHeader(r, easy)
+	v13 := meta.NewPopulatedRequestHeader(r, easy)
 	this.RequestHeader = *v13
 	this.NodeID = github_com_tiglabs_baud_proto_metapb.NodeID(r.Uint32())
 	this.Ip = string(randStringMaster(r))
-	v14 := stats.NewPopulatedRuntimeInfo(r, easy)
+	v14 := NewPopulatedRuntimeInfo(r, easy)
 	this.RuntimeInfo = *v14
 	if !easy && r.Intn(10) != 0 {
 	}
@@ -1513,7 +2158,7 @@ func NewPopulatedPSRegisterRequest(r randyMaster, easy bool) *PSRegisterRequest 
 
 func NewPopulatedPSRegisterResponse(r randyMaster, easy bool) *PSRegisterResponse {
 	this := &PSRegisterResponse{}
-	v15 := api.NewPopulatedResponseHeader(r, easy)
+	v15 := meta.NewPopulatedResponseHeader(r, easy)
 	this.ResponseHeader = *v15
 	this.NodeID = github_com_tiglabs_baud_proto_metapb.NodeID(r.Uint32())
 	v16 := NewPopulatedPSConfig(r, easy)
@@ -1549,7 +2194,7 @@ func NewPopulatedPSConfig(r randyMaster, easy bool) *PSConfig {
 
 func NewPopulatedPSHeartbeatRequest(r randyMaster, easy bool) *PSHeartbeatRequest {
 	this := &PSHeartbeatRequest{}
-	v19 := api.NewPopulatedRequestHeader(r, easy)
+	v19 := meta.NewPopulatedRequestHeader(r, easy)
 	this.RequestHeader = *v19
 	this.NodeID = github_com_tiglabs_baud_proto_metapb.NodeID(r.Uint32())
 	if r.Intn(10) != 0 {
@@ -1560,7 +2205,7 @@ func NewPopulatedPSHeartbeatRequest(r randyMaster, easy bool) *PSHeartbeatReques
 			this.Partitions[i] = *v21
 		}
 	}
-	v22 := stats.NewPopulatedNodeSysStats(r, easy)
+	v22 := NewPopulatedNodeSysStats(r, easy)
 	this.SysStats = *v22
 	if !easy && r.Intn(10) != 0 {
 	}
@@ -1569,7 +2214,7 @@ func NewPopulatedPSHeartbeatRequest(r randyMaster, easy bool) *PSHeartbeatReques
 
 func NewPopulatedPSHeartbeatResponse(r randyMaster, easy bool) *PSHeartbeatResponse {
 	this := &PSHeartbeatResponse{}
-	v23 := api.NewPopulatedResponseHeader(r, easy)
+	v23 := meta.NewPopulatedResponseHeader(r, easy)
 	this.ResponseHeader = *v23
 	if !easy && r.Intn(10) != 0 {
 	}
@@ -1584,10 +2229,95 @@ func NewPopulatedPartitionInfo(r randyMaster, easy bool) *PartitionInfo {
 	v24 := meta.NewPopulatedPartitionEpoch(r, easy)
 	this.Epoch = *v24
 	if r.Intn(10) != 0 {
-		this.RaftStatus = stats.NewPopulatedRaftStatus(r, easy)
+		this.RaftStatus = NewPopulatedRaftStatus(r, easy)
 	}
-	v25 := stats.NewPopulatedPartitionStats(r, easy)
+	v25 := NewPopulatedPartitionStats(r, easy)
 	this.Statistics = *v25
+	if !easy && r.Intn(10) != 0 {
+	}
+	return this
+}
+
+func NewPopulatedRuntimeInfo(r randyMaster, easy bool) *RuntimeInfo {
+	this := &RuntimeInfo{}
+	this.AppVersion = string(randStringMaster(r))
+	this.StartTime = string(randStringMaster(r))
+	this.GoVersion = string(randStringMaster(r))
+	this.Platform = string(randStringMaster(r))
+	if !easy && r.Intn(10) != 0 {
+	}
+	return this
+}
+
+func NewPopulatedRaftStatus(r randyMaster, easy bool) *RaftStatus {
+	this := &RaftStatus{}
+	this.ID = github_com_tiglabs_baud_proto_metapb.ReplicaID(uint64(r.Uint32()))
+	this.Term = uint64(uint64(r.Uint32()))
+	this.Index = uint64(uint64(r.Uint32()))
+	this.Commit = uint64(uint64(r.Uint32()))
+	this.Applied = uint64(uint64(r.Uint32()))
+	if r.Intn(10) != 0 {
+		v26 := r.Intn(5)
+		this.Followers = make([]RaftFollowerStatus, v26)
+		for i := 0; i < v26; i++ {
+			v27 := NewPopulatedRaftFollowerStatus(r, easy)
+			this.Followers[i] = *v27
+		}
+	}
+	if !easy && r.Intn(10) != 0 {
+	}
+	return this
+}
+
+func NewPopulatedRaftFollowerStatus(r randyMaster, easy bool) *RaftFollowerStatus {
+	this := &RaftFollowerStatus{}
+	this.ID = github_com_tiglabs_baud_proto_metapb.ReplicaID(uint64(r.Uint32()))
+	this.NodeID = github_com_tiglabs_baud_proto_metapb.NodeID(r.Uint32())
+	this.Match = uint64(uint64(r.Uint32()))
+	this.Commit = uint64(uint64(r.Uint32()))
+	this.Next = uint64(uint64(r.Uint32()))
+	this.DownSeconds = uint64(uint64(r.Uint32()))
+	this.State = string(randStringMaster(r))
+	if !easy && r.Intn(10) != 0 {
+	}
+	return this
+}
+
+func NewPopulatedNodeSysStats(r randyMaster, easy bool) *NodeSysStats {
+	this := &NodeSysStats{}
+	this.MemoryTotal = uint64(uint64(r.Uint32()))
+	this.MemoryUsedRss = uint64(uint64(r.Uint32()))
+	this.MemoryUsed = uint64(uint64(r.Uint32()))
+	this.MemoryFree = uint64(uint64(r.Uint32()))
+	this.SwapMemoryTotal = uint64(uint64(r.Uint32()))
+	this.SwapMemoryUsed = uint64(uint64(r.Uint32()))
+	this.SwapMemoryFree = uint64(uint64(r.Uint32()))
+	this.CpuProcRate = float64(r.Float64())
+	if r.Intn(2) == 0 {
+		this.CpuProcRate *= -1
+	}
+	this.CpuCount = uint32(r.Uint32())
+	this.DiskTotal = uint64(uint64(r.Uint32()))
+	this.DiskUsed = uint64(uint64(r.Uint32()))
+	this.DiskFree = uint64(uint64(r.Uint32()))
+	this.NetIoInBytePerSec = uint64(uint64(r.Uint32()))
+	this.NetIoOutBytePerSec = uint64(uint64(r.Uint32()))
+	this.NetTcpConnections = uint32(r.Uint32())
+	this.NetTcpActiveOpensPerSec = uint64(uint64(r.Uint32()))
+	this.Ops = uint64(uint64(r.Uint32()))
+	if !easy && r.Intn(10) != 0 {
+	}
+	return this
+}
+
+func NewPopulatedPartitionStats(r randyMaster, easy bool) *PartitionStats {
+	this := &PartitionStats{}
+	this.Size_ = uint64(uint64(r.Uint32()))
+	this.Ops = uint64(uint64(r.Uint32()))
+	this.BytesInPerSec = uint64(uint64(r.Uint32()))
+	this.BytesOutPerSec = uint64(uint64(r.Uint32()))
+	this.TotalCommandsProcessed = uint64(uint64(r.Uint32()))
+	this.KeyspaceMisses = uint64(uint64(r.Uint32()))
 	if !easy && r.Intn(10) != 0 {
 	}
 	return this
@@ -1612,9 +2342,9 @@ func randUTF8RuneMaster(r randyMaster) rune {
 	return rune(ru + 61)
 }
 func randStringMaster(r randyMaster) string {
-	v26 := r.Intn(100)
-	tmps := make([]rune, v26)
-	for i := 0; i < v26; i++ {
+	v28 := r.Intn(100)
+	tmps := make([]rune, v28)
+	for i := 0; i < v28; i++ {
 		tmps[i] = randUTF8RuneMaster(r)
 	}
 	return string(tmps)
@@ -1636,11 +2366,11 @@ func randFieldMaster(dAtA []byte, r randyMaster, fieldNumber int, wire int) []by
 	switch wire {
 	case 0:
 		dAtA = encodeVarintPopulateMaster(dAtA, uint64(key))
-		v27 := r.Int63()
+		v29 := r.Int63()
 		if r.Intn(2) == 0 {
-			v27 *= -1
+			v29 *= -1
 		}
-		dAtA = encodeVarintPopulateMaster(dAtA, uint64(v27))
+		dAtA = encodeVarintPopulateMaster(dAtA, uint64(v29))
 	case 1:
 		dAtA = encodeVarintPopulateMaster(dAtA, uint64(key))
 		dAtA = append(dAtA, byte(r.Intn(256)), byte(r.Intn(256)), byte(r.Intn(256)), byte(r.Intn(256)), byte(r.Intn(256)), byte(r.Intn(256)), byte(r.Intn(256)), byte(r.Intn(256)))
@@ -1879,6 +2609,164 @@ func (m *PartitionInfo) Size() (n int) {
 	return n
 }
 
+func (m *RuntimeInfo) Size() (n int) {
+	var l int
+	_ = l
+	l = len(m.AppVersion)
+	if l > 0 {
+		n += 1 + l + sovMaster(uint64(l))
+	}
+	l = len(m.StartTime)
+	if l > 0 {
+		n += 1 + l + sovMaster(uint64(l))
+	}
+	l = len(m.GoVersion)
+	if l > 0 {
+		n += 1 + l + sovMaster(uint64(l))
+	}
+	l = len(m.Platform)
+	if l > 0 {
+		n += 1 + l + sovMaster(uint64(l))
+	}
+	return n
+}
+
+func (m *RaftStatus) Size() (n int) {
+	var l int
+	_ = l
+	if m.ID != 0 {
+		n += 1 + sovMaster(uint64(m.ID))
+	}
+	if m.Term != 0 {
+		n += 1 + sovMaster(uint64(m.Term))
+	}
+	if m.Index != 0 {
+		n += 1 + sovMaster(uint64(m.Index))
+	}
+	if m.Commit != 0 {
+		n += 1 + sovMaster(uint64(m.Commit))
+	}
+	if m.Applied != 0 {
+		n += 1 + sovMaster(uint64(m.Applied))
+	}
+	if len(m.Followers) > 0 {
+		for _, e := range m.Followers {
+			l = e.Size()
+			n += 1 + l + sovMaster(uint64(l))
+		}
+	}
+	return n
+}
+
+func (m *RaftFollowerStatus) Size() (n int) {
+	var l int
+	_ = l
+	if m.ID != 0 {
+		n += 1 + sovMaster(uint64(m.ID))
+	}
+	if m.NodeID != 0 {
+		n += 1 + sovMaster(uint64(m.NodeID))
+	}
+	if m.Match != 0 {
+		n += 1 + sovMaster(uint64(m.Match))
+	}
+	if m.Commit != 0 {
+		n += 1 + sovMaster(uint64(m.Commit))
+	}
+	if m.Next != 0 {
+		n += 1 + sovMaster(uint64(m.Next))
+	}
+	if m.DownSeconds != 0 {
+		n += 1 + sovMaster(uint64(m.DownSeconds))
+	}
+	l = len(m.State)
+	if l > 0 {
+		n += 1 + l + sovMaster(uint64(l))
+	}
+	return n
+}
+
+func (m *NodeSysStats) Size() (n int) {
+	var l int
+	_ = l
+	if m.MemoryTotal != 0 {
+		n += 1 + sovMaster(uint64(m.MemoryTotal))
+	}
+	if m.MemoryUsedRss != 0 {
+		n += 1 + sovMaster(uint64(m.MemoryUsedRss))
+	}
+	if m.MemoryUsed != 0 {
+		n += 1 + sovMaster(uint64(m.MemoryUsed))
+	}
+	if m.MemoryFree != 0 {
+		n += 1 + sovMaster(uint64(m.MemoryFree))
+	}
+	if m.SwapMemoryTotal != 0 {
+		n += 1 + sovMaster(uint64(m.SwapMemoryTotal))
+	}
+	if m.SwapMemoryUsed != 0 {
+		n += 1 + sovMaster(uint64(m.SwapMemoryUsed))
+	}
+	if m.SwapMemoryFree != 0 {
+		n += 1 + sovMaster(uint64(m.SwapMemoryFree))
+	}
+	if m.CpuProcRate != 0 {
+		n += 9
+	}
+	if m.CpuCount != 0 {
+		n += 1 + sovMaster(uint64(m.CpuCount))
+	}
+	if m.DiskTotal != 0 {
+		n += 1 + sovMaster(uint64(m.DiskTotal))
+	}
+	if m.DiskUsed != 0 {
+		n += 2 + sovMaster(uint64(m.DiskUsed))
+	}
+	if m.DiskFree != 0 {
+		n += 2 + sovMaster(uint64(m.DiskFree))
+	}
+	if m.NetIoInBytePerSec != 0 {
+		n += 2 + sovMaster(uint64(m.NetIoInBytePerSec))
+	}
+	if m.NetIoOutBytePerSec != 0 {
+		n += 2 + sovMaster(uint64(m.NetIoOutBytePerSec))
+	}
+	if m.NetTcpConnections != 0 {
+		n += 2 + sovMaster(uint64(m.NetTcpConnections))
+	}
+	if m.NetTcpActiveOpensPerSec != 0 {
+		n += 2 + sovMaster(uint64(m.NetTcpActiveOpensPerSec))
+	}
+	if m.Ops != 0 {
+		n += 2 + sovMaster(uint64(m.Ops))
+	}
+	return n
+}
+
+func (m *PartitionStats) Size() (n int) {
+	var l int
+	_ = l
+	if m.Size_ != 0 {
+		n += 1 + sovMaster(uint64(m.Size_))
+	}
+	if m.Ops != 0 {
+		n += 1 + sovMaster(uint64(m.Ops))
+	}
+	if m.BytesInPerSec != 0 {
+		n += 1 + sovMaster(uint64(m.BytesInPerSec))
+	}
+	if m.BytesOutPerSec != 0 {
+		n += 1 + sovMaster(uint64(m.BytesOutPerSec))
+	}
+	if m.TotalCommandsProcessed != 0 {
+		n += 1 + sovMaster(uint64(m.TotalCommandsProcessed))
+	}
+	if m.KeyspaceMisses != 0 {
+		n += 1 + sovMaster(uint64(m.KeyspaceMisses))
+	}
+	return n
+}
+
 func sovMaster(x uint64) (n int) {
 	for {
 		n++
@@ -1909,7 +2797,7 @@ func (this *GetDBRequest) String() string {
 		return "nil"
 	}
 	s := strings.Join([]string{`&GetDBRequest{`,
-		`RequestHeader:` + strings.Replace(strings.Replace(this.RequestHeader.String(), "RequestHeader", "api.RequestHeader", 1), `&`, ``, 1) + `,`,
+		`RequestHeader:` + strings.Replace(strings.Replace(this.RequestHeader.String(), "RequestHeader", "meta.RequestHeader", 1), `&`, ``, 1) + `,`,
 		`DBName:` + fmt.Sprintf("%v", this.DBName) + `,`,
 		`}`,
 	}, "")
@@ -1920,7 +2808,7 @@ func (this *GetDBResponse) String() string {
 		return "nil"
 	}
 	s := strings.Join([]string{`&GetDBResponse{`,
-		`ResponseHeader:` + strings.Replace(strings.Replace(this.ResponseHeader.String(), "ResponseHeader", "api.ResponseHeader", 1), `&`, ``, 1) + `,`,
+		`ResponseHeader:` + strings.Replace(strings.Replace(this.ResponseHeader.String(), "ResponseHeader", "meta.ResponseHeader", 1), `&`, ``, 1) + `,`,
 		`Db:` + strings.Replace(strings.Replace(this.Db.String(), "DB", "meta.DB", 1), `&`, ``, 1) + `,`,
 		`}`,
 	}, "")
@@ -1931,7 +2819,7 @@ func (this *GetSpaceRequest) String() string {
 		return "nil"
 	}
 	s := strings.Join([]string{`&GetSpaceRequest{`,
-		`RequestHeader:` + strings.Replace(strings.Replace(this.RequestHeader.String(), "RequestHeader", "api.RequestHeader", 1), `&`, ``, 1) + `,`,
+		`RequestHeader:` + strings.Replace(strings.Replace(this.RequestHeader.String(), "RequestHeader", "meta.RequestHeader", 1), `&`, ``, 1) + `,`,
 		`ID:` + fmt.Sprintf("%v", this.ID) + `,`,
 		`SpaceName:` + fmt.Sprintf("%v", this.SpaceName) + `,`,
 		`}`,
@@ -1943,7 +2831,7 @@ func (this *GetSpaceResponse) String() string {
 		return "nil"
 	}
 	s := strings.Join([]string{`&GetSpaceResponse{`,
-		`ResponseHeader:` + strings.Replace(strings.Replace(this.ResponseHeader.String(), "ResponseHeader", "api.ResponseHeader", 1), `&`, ``, 1) + `,`,
+		`ResponseHeader:` + strings.Replace(strings.Replace(this.ResponseHeader.String(), "ResponseHeader", "meta.ResponseHeader", 1), `&`, ``, 1) + `,`,
 		`Space:` + strings.Replace(strings.Replace(this.Space.String(), "Space", "meta.Space", 1), `&`, ``, 1) + `,`,
 		`}`,
 	}, "")
@@ -1954,7 +2842,7 @@ func (this *GetRouteRequest) String() string {
 		return "nil"
 	}
 	s := strings.Join([]string{`&GetRouteRequest{`,
-		`RequestHeader:` + strings.Replace(strings.Replace(this.RequestHeader.String(), "RequestHeader", "api.RequestHeader", 1), `&`, ``, 1) + `,`,
+		`RequestHeader:` + strings.Replace(strings.Replace(this.RequestHeader.String(), "RequestHeader", "meta.RequestHeader", 1), `&`, ``, 1) + `,`,
 		`DB:` + fmt.Sprintf("%v", this.DB) + `,`,
 		`Space:` + fmt.Sprintf("%v", this.Space) + `,`,
 		`Slot:` + fmt.Sprintf("%v", this.Slot) + `,`,
@@ -1967,7 +2855,7 @@ func (this *GetRouteResponse) String() string {
 		return "nil"
 	}
 	s := strings.Join([]string{`&GetRouteResponse{`,
-		`ResponseHeader:` + strings.Replace(strings.Replace(this.ResponseHeader.String(), "ResponseHeader", "api.ResponseHeader", 1), `&`, ``, 1) + `,`,
+		`ResponseHeader:` + strings.Replace(strings.Replace(this.ResponseHeader.String(), "ResponseHeader", "meta.ResponseHeader", 1), `&`, ``, 1) + `,`,
 		`Routes:` + strings.Replace(strings.Replace(fmt.Sprintf("%v", this.Routes), "Route", "Route", 1), `&`, ``, 1) + `,`,
 		`}`,
 	}, "")
@@ -1978,10 +2866,10 @@ func (this *PSRegisterRequest) String() string {
 		return "nil"
 	}
 	s := strings.Join([]string{`&PSRegisterRequest{`,
-		`RequestHeader:` + strings.Replace(strings.Replace(this.RequestHeader.String(), "RequestHeader", "api.RequestHeader", 1), `&`, ``, 1) + `,`,
+		`RequestHeader:` + strings.Replace(strings.Replace(this.RequestHeader.String(), "RequestHeader", "meta.RequestHeader", 1), `&`, ``, 1) + `,`,
 		`NodeID:` + fmt.Sprintf("%v", this.NodeID) + `,`,
 		`Ip:` + fmt.Sprintf("%v", this.Ip) + `,`,
-		`RuntimeInfo:` + strings.Replace(strings.Replace(this.RuntimeInfo.String(), "RuntimeInfo", "stats.RuntimeInfo", 1), `&`, ``, 1) + `,`,
+		`RuntimeInfo:` + strings.Replace(strings.Replace(this.RuntimeInfo.String(), "RuntimeInfo", "RuntimeInfo", 1), `&`, ``, 1) + `,`,
 		`}`,
 	}, "")
 	return s
@@ -1991,7 +2879,7 @@ func (this *PSRegisterResponse) String() string {
 		return "nil"
 	}
 	s := strings.Join([]string{`&PSRegisterResponse{`,
-		`ResponseHeader:` + strings.Replace(strings.Replace(this.ResponseHeader.String(), "ResponseHeader", "api.ResponseHeader", 1), `&`, ``, 1) + `,`,
+		`ResponseHeader:` + strings.Replace(strings.Replace(this.ResponseHeader.String(), "ResponseHeader", "meta.ResponseHeader", 1), `&`, ``, 1) + `,`,
 		`NodeID:` + fmt.Sprintf("%v", this.NodeID) + `,`,
 		`PSConfig:` + strings.Replace(strings.Replace(this.PSConfig.String(), "PSConfig", "PSConfig", 1), `&`, ``, 1) + `,`,
 		`Partitions:` + strings.Replace(strings.Replace(fmt.Sprintf("%v", this.Partitions), "Partition", "meta.Partition", 1), `&`, ``, 1) + `,`,
@@ -2022,10 +2910,10 @@ func (this *PSHeartbeatRequest) String() string {
 		return "nil"
 	}
 	s := strings.Join([]string{`&PSHeartbeatRequest{`,
-		`RequestHeader:` + strings.Replace(strings.Replace(this.RequestHeader.String(), "RequestHeader", "api.RequestHeader", 1), `&`, ``, 1) + `,`,
+		`RequestHeader:` + strings.Replace(strings.Replace(this.RequestHeader.String(), "RequestHeader", "meta.RequestHeader", 1), `&`, ``, 1) + `,`,
 		`NodeID:` + fmt.Sprintf("%v", this.NodeID) + `,`,
 		`Partitions:` + strings.Replace(strings.Replace(fmt.Sprintf("%v", this.Partitions), "PartitionInfo", "PartitionInfo", 1), `&`, ``, 1) + `,`,
-		`SysStats:` + strings.Replace(strings.Replace(this.SysStats.String(), "NodeSysStats", "stats.NodeSysStats", 1), `&`, ``, 1) + `,`,
+		`SysStats:` + strings.Replace(strings.Replace(this.SysStats.String(), "NodeSysStats", "NodeSysStats", 1), `&`, ``, 1) + `,`,
 		`}`,
 	}, "")
 	return s
@@ -2035,7 +2923,7 @@ func (this *PSHeartbeatResponse) String() string {
 		return "nil"
 	}
 	s := strings.Join([]string{`&PSHeartbeatResponse{`,
-		`ResponseHeader:` + strings.Replace(strings.Replace(this.ResponseHeader.String(), "ResponseHeader", "api.ResponseHeader", 1), `&`, ``, 1) + `,`,
+		`ResponseHeader:` + strings.Replace(strings.Replace(this.ResponseHeader.String(), "ResponseHeader", "meta.ResponseHeader", 1), `&`, ``, 1) + `,`,
 		`}`,
 	}, "")
 	return s
@@ -2049,8 +2937,93 @@ func (this *PartitionInfo) String() string {
 		`IsLeader:` + fmt.Sprintf("%v", this.IsLeader) + `,`,
 		`Status:` + fmt.Sprintf("%v", this.Status) + `,`,
 		`Epoch:` + strings.Replace(strings.Replace(this.Epoch.String(), "PartitionEpoch", "meta.PartitionEpoch", 1), `&`, ``, 1) + `,`,
-		`RaftStatus:` + strings.Replace(fmt.Sprintf("%v", this.RaftStatus), "RaftStatus", "stats.RaftStatus", 1) + `,`,
-		`Statistics:` + strings.Replace(strings.Replace(this.Statistics.String(), "PartitionStats", "stats.PartitionStats", 1), `&`, ``, 1) + `,`,
+		`RaftStatus:` + strings.Replace(fmt.Sprintf("%v", this.RaftStatus), "RaftStatus", "RaftStatus", 1) + `,`,
+		`Statistics:` + strings.Replace(strings.Replace(this.Statistics.String(), "PartitionStats", "PartitionStats", 1), `&`, ``, 1) + `,`,
+		`}`,
+	}, "")
+	return s
+}
+func (this *RuntimeInfo) String() string {
+	if this == nil {
+		return "nil"
+	}
+	s := strings.Join([]string{`&RuntimeInfo{`,
+		`AppVersion:` + fmt.Sprintf("%v", this.AppVersion) + `,`,
+		`StartTime:` + fmt.Sprintf("%v", this.StartTime) + `,`,
+		`GoVersion:` + fmt.Sprintf("%v", this.GoVersion) + `,`,
+		`Platform:` + fmt.Sprintf("%v", this.Platform) + `,`,
+		`}`,
+	}, "")
+	return s
+}
+func (this *RaftStatus) String() string {
+	if this == nil {
+		return "nil"
+	}
+	s := strings.Join([]string{`&RaftStatus{`,
+		`ID:` + fmt.Sprintf("%v", this.ID) + `,`,
+		`Term:` + fmt.Sprintf("%v", this.Term) + `,`,
+		`Index:` + fmt.Sprintf("%v", this.Index) + `,`,
+		`Commit:` + fmt.Sprintf("%v", this.Commit) + `,`,
+		`Applied:` + fmt.Sprintf("%v", this.Applied) + `,`,
+		`Followers:` + strings.Replace(strings.Replace(fmt.Sprintf("%v", this.Followers), "RaftFollowerStatus", "RaftFollowerStatus", 1), `&`, ``, 1) + `,`,
+		`}`,
+	}, "")
+	return s
+}
+func (this *RaftFollowerStatus) String() string {
+	if this == nil {
+		return "nil"
+	}
+	s := strings.Join([]string{`&RaftFollowerStatus{`,
+		`ID:` + fmt.Sprintf("%v", this.ID) + `,`,
+		`NodeID:` + fmt.Sprintf("%v", this.NodeID) + `,`,
+		`Match:` + fmt.Sprintf("%v", this.Match) + `,`,
+		`Commit:` + fmt.Sprintf("%v", this.Commit) + `,`,
+		`Next:` + fmt.Sprintf("%v", this.Next) + `,`,
+		`DownSeconds:` + fmt.Sprintf("%v", this.DownSeconds) + `,`,
+		`State:` + fmt.Sprintf("%v", this.State) + `,`,
+		`}`,
+	}, "")
+	return s
+}
+func (this *NodeSysStats) String() string {
+	if this == nil {
+		return "nil"
+	}
+	s := strings.Join([]string{`&NodeSysStats{`,
+		`MemoryTotal:` + fmt.Sprintf("%v", this.MemoryTotal) + `,`,
+		`MemoryUsedRss:` + fmt.Sprintf("%v", this.MemoryUsedRss) + `,`,
+		`MemoryUsed:` + fmt.Sprintf("%v", this.MemoryUsed) + `,`,
+		`MemoryFree:` + fmt.Sprintf("%v", this.MemoryFree) + `,`,
+		`SwapMemoryTotal:` + fmt.Sprintf("%v", this.SwapMemoryTotal) + `,`,
+		`SwapMemoryUsed:` + fmt.Sprintf("%v", this.SwapMemoryUsed) + `,`,
+		`SwapMemoryFree:` + fmt.Sprintf("%v", this.SwapMemoryFree) + `,`,
+		`CpuProcRate:` + fmt.Sprintf("%v", this.CpuProcRate) + `,`,
+		`CpuCount:` + fmt.Sprintf("%v", this.CpuCount) + `,`,
+		`DiskTotal:` + fmt.Sprintf("%v", this.DiskTotal) + `,`,
+		`DiskUsed:` + fmt.Sprintf("%v", this.DiskUsed) + `,`,
+		`DiskFree:` + fmt.Sprintf("%v", this.DiskFree) + `,`,
+		`NetIoInBytePerSec:` + fmt.Sprintf("%v", this.NetIoInBytePerSec) + `,`,
+		`NetIoOutBytePerSec:` + fmt.Sprintf("%v", this.NetIoOutBytePerSec) + `,`,
+		`NetTcpConnections:` + fmt.Sprintf("%v", this.NetTcpConnections) + `,`,
+		`NetTcpActiveOpensPerSec:` + fmt.Sprintf("%v", this.NetTcpActiveOpensPerSec) + `,`,
+		`Ops:` + fmt.Sprintf("%v", this.Ops) + `,`,
+		`}`,
+	}, "")
+	return s
+}
+func (this *PartitionStats) String() string {
+	if this == nil {
+		return "nil"
+	}
+	s := strings.Join([]string{`&PartitionStats{`,
+		`Size_:` + fmt.Sprintf("%v", this.Size_) + `,`,
+		`Ops:` + fmt.Sprintf("%v", this.Ops) + `,`,
+		`BytesInPerSec:` + fmt.Sprintf("%v", this.BytesInPerSec) + `,`,
+		`BytesOutPerSec:` + fmt.Sprintf("%v", this.BytesOutPerSec) + `,`,
+		`TotalCommandsProcessed:` + fmt.Sprintf("%v", this.TotalCommandsProcessed) + `,`,
+		`KeyspaceMisses:` + fmt.Sprintf("%v", this.KeyspaceMisses) + `,`,
 		`}`,
 	}, "")
 	return s
@@ -2485,7 +3458,7 @@ func (m *GetSpaceRequest) Unmarshal(dAtA []byte) error {
 				}
 				b := dAtA[iNdEx]
 				iNdEx++
-				m.ID |= (DBID(b) & 0x7F) << shift
+				m.ID |= (github_com_tiglabs_baud_proto_metapb.DBID(b) & 0x7F) << shift
 				if b < 0x80 {
 					break
 				}
@@ -3821,7 +4794,7 @@ func (m *PartitionInfo) Unmarshal(dAtA []byte) error {
 				return io.ErrUnexpectedEOF
 			}
 			if m.RaftStatus == nil {
-				m.RaftStatus = &stats.RaftStatus{}
+				m.RaftStatus = &RaftStatus{}
 			}
 			if err := m.RaftStatus.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
 				return err
@@ -3857,6 +4830,1070 @@ func (m *PartitionInfo) Unmarshal(dAtA []byte) error {
 				return err
 			}
 			iNdEx = postIndex
+		default:
+			iNdEx = preIndex
+			skippy, err := skipMaster(dAtA[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if skippy < 0 {
+				return ErrInvalidLengthMaster
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			iNdEx += skippy
+		}
+	}
+
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
+}
+func (m *RuntimeInfo) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
+	iNdEx := 0
+	for iNdEx < l {
+		preIndex := iNdEx
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowMaster
+			}
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := dAtA[iNdEx]
+			iNdEx++
+			wire |= (uint64(b) & 0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: RuntimeInfo: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: RuntimeInfo: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
+		switch fieldNum {
+		case 1:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field AppVersion", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMaster
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= (uint64(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthMaster
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.AppVersion = string(dAtA[iNdEx:postIndex])
+			iNdEx = postIndex
+		case 2:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field StartTime", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMaster
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= (uint64(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthMaster
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.StartTime = string(dAtA[iNdEx:postIndex])
+			iNdEx = postIndex
+		case 3:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field GoVersion", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMaster
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= (uint64(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthMaster
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.GoVersion = string(dAtA[iNdEx:postIndex])
+			iNdEx = postIndex
+		case 4:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Platform", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMaster
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= (uint64(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthMaster
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.Platform = string(dAtA[iNdEx:postIndex])
+			iNdEx = postIndex
+		default:
+			iNdEx = preIndex
+			skippy, err := skipMaster(dAtA[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if skippy < 0 {
+				return ErrInvalidLengthMaster
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			iNdEx += skippy
+		}
+	}
+
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
+}
+func (m *RaftStatus) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
+	iNdEx := 0
+	for iNdEx < l {
+		preIndex := iNdEx
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowMaster
+			}
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := dAtA[iNdEx]
+			iNdEx++
+			wire |= (uint64(b) & 0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: RaftStatus: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: RaftStatus: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
+		switch fieldNum {
+		case 1:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field ID", wireType)
+			}
+			m.ID = 0
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMaster
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				m.ID |= (github_com_tiglabs_baud_proto_metapb.ReplicaID(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+		case 2:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Term", wireType)
+			}
+			m.Term = 0
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMaster
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				m.Term |= (uint64(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+		case 3:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Index", wireType)
+			}
+			m.Index = 0
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMaster
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				m.Index |= (uint64(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+		case 4:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Commit", wireType)
+			}
+			m.Commit = 0
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMaster
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				m.Commit |= (uint64(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+		case 5:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Applied", wireType)
+			}
+			m.Applied = 0
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMaster
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				m.Applied |= (uint64(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+		case 6:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Followers", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMaster
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				msglen |= (int(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthMaster
+			}
+			postIndex := iNdEx + msglen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.Followers = append(m.Followers, RaftFollowerStatus{})
+			if err := m.Followers[len(m.Followers)-1].Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		default:
+			iNdEx = preIndex
+			skippy, err := skipMaster(dAtA[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if skippy < 0 {
+				return ErrInvalidLengthMaster
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			iNdEx += skippy
+		}
+	}
+
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
+}
+func (m *RaftFollowerStatus) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
+	iNdEx := 0
+	for iNdEx < l {
+		preIndex := iNdEx
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowMaster
+			}
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := dAtA[iNdEx]
+			iNdEx++
+			wire |= (uint64(b) & 0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: RaftFollowerStatus: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: RaftFollowerStatus: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
+		switch fieldNum {
+		case 1:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field ID", wireType)
+			}
+			m.ID = 0
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMaster
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				m.ID |= (github_com_tiglabs_baud_proto_metapb.ReplicaID(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+		case 2:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field NodeID", wireType)
+			}
+			m.NodeID = 0
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMaster
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				m.NodeID |= (github_com_tiglabs_baud_proto_metapb.NodeID(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+		case 3:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Match", wireType)
+			}
+			m.Match = 0
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMaster
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				m.Match |= (uint64(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+		case 4:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Commit", wireType)
+			}
+			m.Commit = 0
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMaster
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				m.Commit |= (uint64(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+		case 5:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Next", wireType)
+			}
+			m.Next = 0
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMaster
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				m.Next |= (uint64(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+		case 6:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field DownSeconds", wireType)
+			}
+			m.DownSeconds = 0
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMaster
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				m.DownSeconds |= (uint64(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+		case 7:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field State", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMaster
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= (uint64(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthMaster
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.State = string(dAtA[iNdEx:postIndex])
+			iNdEx = postIndex
+		default:
+			iNdEx = preIndex
+			skippy, err := skipMaster(dAtA[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if skippy < 0 {
+				return ErrInvalidLengthMaster
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			iNdEx += skippy
+		}
+	}
+
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
+}
+func (m *NodeSysStats) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
+	iNdEx := 0
+	for iNdEx < l {
+		preIndex := iNdEx
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowMaster
+			}
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := dAtA[iNdEx]
+			iNdEx++
+			wire |= (uint64(b) & 0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: NodeSysStats: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: NodeSysStats: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
+		switch fieldNum {
+		case 1:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field MemoryTotal", wireType)
+			}
+			m.MemoryTotal = 0
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMaster
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				m.MemoryTotal |= (uint64(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+		case 2:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field MemoryUsedRss", wireType)
+			}
+			m.MemoryUsedRss = 0
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMaster
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				m.MemoryUsedRss |= (uint64(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+		case 3:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field MemoryUsed", wireType)
+			}
+			m.MemoryUsed = 0
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMaster
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				m.MemoryUsed |= (uint64(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+		case 4:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field MemoryFree", wireType)
+			}
+			m.MemoryFree = 0
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMaster
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				m.MemoryFree |= (uint64(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+		case 6:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field SwapMemoryTotal", wireType)
+			}
+			m.SwapMemoryTotal = 0
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMaster
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				m.SwapMemoryTotal |= (uint64(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+		case 7:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field SwapMemoryUsed", wireType)
+			}
+			m.SwapMemoryUsed = 0
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMaster
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				m.SwapMemoryUsed |= (uint64(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+		case 8:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field SwapMemoryFree", wireType)
+			}
+			m.SwapMemoryFree = 0
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMaster
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				m.SwapMemoryFree |= (uint64(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+		case 10:
+			if wireType != 1 {
+				return fmt.Errorf("proto: wrong wireType = %d for field CpuProcRate", wireType)
+			}
+			var v uint64
+			if (iNdEx + 8) > l {
+				return io.ErrUnexpectedEOF
+			}
+			v = uint64(binary.LittleEndian.Uint64(dAtA[iNdEx:]))
+			iNdEx += 8
+			m.CpuProcRate = float64(math.Float64frombits(v))
+		case 11:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field CpuCount", wireType)
+			}
+			m.CpuCount = 0
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMaster
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				m.CpuCount |= (uint32(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+		case 15:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field DiskTotal", wireType)
+			}
+			m.DiskTotal = 0
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMaster
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				m.DiskTotal |= (uint64(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+		case 16:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field DiskUsed", wireType)
+			}
+			m.DiskUsed = 0
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMaster
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				m.DiskUsed |= (uint64(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+		case 17:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field DiskFree", wireType)
+			}
+			m.DiskFree = 0
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMaster
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				m.DiskFree |= (uint64(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+		case 21:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field NetIoInBytePerSec", wireType)
+			}
+			m.NetIoInBytePerSec = 0
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMaster
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				m.NetIoInBytePerSec |= (uint64(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+		case 22:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field NetIoOutBytePerSec", wireType)
+			}
+			m.NetIoOutBytePerSec = 0
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMaster
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				m.NetIoOutBytePerSec |= (uint64(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+		case 23:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field NetTcpConnections", wireType)
+			}
+			m.NetTcpConnections = 0
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMaster
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				m.NetTcpConnections |= (uint32(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+		case 24:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field NetTcpActiveOpensPerSec", wireType)
+			}
+			m.NetTcpActiveOpensPerSec = 0
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMaster
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				m.NetTcpActiveOpensPerSec |= (uint64(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+		case 25:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Ops", wireType)
+			}
+			m.Ops = 0
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMaster
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				m.Ops |= (uint64(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+		default:
+			iNdEx = preIndex
+			skippy, err := skipMaster(dAtA[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if skippy < 0 {
+				return ErrInvalidLengthMaster
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			iNdEx += skippy
+		}
+	}
+
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
+}
+func (m *PartitionStats) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
+	iNdEx := 0
+	for iNdEx < l {
+		preIndex := iNdEx
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowMaster
+			}
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := dAtA[iNdEx]
+			iNdEx++
+			wire |= (uint64(b) & 0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: PartitionStats: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: PartitionStats: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
+		switch fieldNum {
+		case 1:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Size_", wireType)
+			}
+			m.Size_ = 0
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMaster
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				m.Size_ |= (uint64(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+		case 2:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Ops", wireType)
+			}
+			m.Ops = 0
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMaster
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				m.Ops |= (uint64(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+		case 3:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field BytesInPerSec", wireType)
+			}
+			m.BytesInPerSec = 0
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMaster
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				m.BytesInPerSec |= (uint64(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+		case 4:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field BytesOutPerSec", wireType)
+			}
+			m.BytesOutPerSec = 0
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMaster
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				m.BytesOutPerSec |= (uint64(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+		case 5:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field TotalCommandsProcessed", wireType)
+			}
+			m.TotalCommandsProcessed = 0
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMaster
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				m.TotalCommandsProcessed |= (uint64(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+		case 6:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field KeyspaceMisses", wireType)
+			}
+			m.KeyspaceMisses = 0
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMaster
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				m.KeyspaceMisses |= (uint64(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
 		default:
 			iNdEx = preIndex
 			skippy, err := skipMaster(dAtA[iNdEx:])
@@ -3986,79 +6023,118 @@ var (
 func init() { proto.RegisterFile("master.proto", fileDescriptorMaster) }
 
 var fileDescriptorMaster = []byte{
-	// 1179 bytes of a gzipped FileDescriptorProto
-	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0xcc, 0x57, 0x4f, 0x6f, 0x1b, 0x45,
-	0x14, 0xdf, 0x5d, 0xff, 0x89, 0xfd, 0x1c, 0xbb, 0xe9, 0x14, 0xa8, 0x9b, 0x8a, 0x75, 0xb4, 0x20,
-	0x64, 0xd4, 0x76, 0x93, 0xba, 0x40, 0xd4, 0x5e, 0x80, 0x8d, 0x51, 0x63, 0x28, 0x21, 0xac, 0x4f,
-	0x20, 0x21, 0x6b, 0xff, 0x4c, 0x9c, 0x11, 0xf6, 0xee, 0xb2, 0x33, 0x46, 0xe4, 0x06, 0x27, 0xae,
-	0xfd, 0x14, 0x88, 0x0f, 0xc0, 0x81, 0x23, 0xc7, 0x1c, 0x7b, 0xe4, 0x64, 0x35, 0xee, 0x17, 0xe0,
-	0x08, 0x39, 0x20, 0xb4, 0x6f, 0xc7, 0xf6, 0xda, 0x29, 0x92, 0x65, 0x09, 0x89, 0x53, 0xbc, 0x6f,
-	0x7e, 0xef, 0xf7, 0xde, 0xef, 0xcd, 0x9b, 0x99, 0x17, 0xd8, 0x1c, 0x3a, 0x5c, 0xd0, 0xd8, 0x8c,
-	0xe2, 0x50, 0x84, 0xdb, 0xf7, 0xfa, 0x4c, 0x9c, 0x8e, 0x5c, 0xd3, 0x0b, 0x87, 0xbb, 0xfd, 0xb0,
-	0x1f, 0xee, 0xa2, 0xd9, 0x1d, 0x9d, 0xe0, 0x17, 0x7e, 0xe0, 0x2f, 0x09, 0xdf, 0xcd, 0xc0, 0x05,
-	0xeb, 0x0f, 0x1c, 0x97, 0xef, 0xba, 0xce, 0xc8, 0x4f, 0xdd, 0x76, 0x87, 0x54, 0x38, 0x91, 0x8b,
-	0x7f, 0xa4, 0x83, 0xb9, 0x92, 0x83, 0x13, 0x31, 0x89, 0xaf, 0x70, 0xe1, 0x08, 0x9e, 0x7e, 0x18,
-	0xdf, 0x41, 0xc1, 0x0e, 0x47, 0x82, 0x92, 0x16, 0x94, 0x23, 0x27, 0x16, 0x4c, 0xb0, 0x30, 0xa8,
-	0xab, 0x3b, 0x6a, 0xb3, 0xd2, 0x02, 0xf3, 0x78, 0x6a, 0xb1, 0x4a, 0xe7, 0xe3, 0x86, 0xf2, 0x6c,
-	0xdc, 0x50, 0xed, 0x39, 0x8c, 0xdc, 0x86, 0x42, 0x10, 0xfa, 0x94, 0xd7, 0xb5, 0x9d, 0x5c, 0xb3,
-	0xd2, 0x2a, 0x98, 0x47, 0xa1, 0x4f, 0xed, 0xd4, 0x46, 0x74, 0x80, 0x01, 0x75, 0x7c, 0x1a, 0x27,
-	0xc6, 0x7a, 0x6e, 0x47, 0x6d, 0x56, 0xed, 0x8c, 0xc5, 0xf8, 0x02, 0x36, 0x1f, 0x53, 0xd1, 0xb6,
-	0x6c, 0xfa, 0xcd, 0x88, 0x72, 0x41, 0xf6, 0xa0, 0x78, 0x8a, 0xab, 0x32, 0x7a, 0xcd, 0x94, 0x2b,
-	0x87, 0x68, 0xcd, 0x64, 0x20, 0x71, 0xe4, 0x26, 0x6c, 0xb4, 0xad, 0x5e, 0xe0, 0x0c, 0x69, 0x5d,
-	0xdb, 0x51, 0x9b, 0x65, 0xbb, 0xd8, 0xb6, 0x8e, 0x9c, 0x21, 0x35, 0xbe, 0x82, 0xaa, 0xa4, 0xe6,
-	0x51, 0x18, 0x70, 0x4a, 0xee, 0x2f, 0x71, 0x5f, 0x33, 0xa7, 0x4b, 0xff, 0x4a, 0x7e, 0x0b, 0x34,
-	0xdf, 0x45, 0xde, 0x4a, 0x2b, 0x67, 0xb6, 0x2d, 0x2b, 0x9f, 0x40, 0x6c, 0xcd, 0x77, 0x8d, 0x1f,
-	0x55, 0xb8, 0xf6, 0x98, 0x8a, 0x6e, 0xe4, 0x78, 0x74, 0xfd, 0xec, 0xdf, 0x80, 0x82, 0xef, 0xf6,
-	0x98, 0x8f, 0x31, 0xaa, 0x56, 0x6d, 0x32, 0x6e, 0x68, 0x9d, 0xf6, 0xe5, 0xb8, 0x91, 0x6f, 0x5b,
-	0x9d, 0xb6, 0x9d, 0xf7, 0xdd, 0x8e, 0x4f, 0x5e, 0x07, 0xc0, 0x30, 0xa9, 0xca, 0x1c, 0xaa, 0x2c,
-	0xa3, 0x05, 0x85, 0x32, 0xd8, 0x9a, 0x27, 0xb2, 0xbe, 0x56, 0x03, 0x0a, 0x3c, 0xe1, 0x90, 0x72,
-	0x8b, 0x26, 0x32, 0x4a, 0xc5, 0xe9, 0x92, 0xf1, 0x93, 0x86, 0xa2, 0xb1, 0x59, 0xd6, 0x17, 0x7d,
-	0x30, 0xab, 0x6a, 0xd5, 0x7a, 0x90, 0x28, 0x6e, 0x5b, 0x97, 0xe3, 0xc6, 0xdb, 0xab, 0x74, 0xb0,
-	0x89, 0x65, 0xd1, 0x7c, 0x97, 0x7c, 0x36, 0x4d, 0x17, 0x9b, 0xca, 0x7a, 0x38, 0x19, 0x37, 0x0a,
-	0x98, 0xf1, 0xe5, 0xb8, 0x71, 0x77, 0x25, 0x2a, 0x44, 0x77, 0xda, 0x52, 0x1b, 0xf9, 0x04, 0xf2,
-	0x7c, 0x10, 0x8a, 0x7a, 0x1e, 0xf9, 0xf6, 0x27, 0xe3, 0x46, 0xbe, 0x3b, 0x08, 0xc5, 0xe5, 0xb8,
-	0x71, 0x67, 0x35, 0xba, 0x41, 0x28, 0x92, 0x2d, 0x4b, 0x48, 0x8c, 0xaf, 0x71, 0x4f, 0x64, 0x9d,
-	0xd6, 0xdf, 0x93, 0x37, 0xa1, 0x18, 0x27, 0x1c, 0xd3, 0xc3, 0x55, 0x34, 0x91, 0x52, 0x6e, 0x8a,
-	0x5c, 0x33, 0x5e, 0xa8, 0x70, 0xfd, 0xb8, 0x6b, 0xd3, 0x3e, 0x4b, 0x2e, 0x9c, 0xf5, 0xf7, 0xe5,
-	0x73, 0x28, 0x26, 0xa7, 0xb6, 0xd3, 0x96, 0x7b, 0x93, 0xd4, 0xb4, 0x78, 0x84, 0x96, 0x95, 0xab,
-	0x90, 0xc2, 0x6d, 0x49, 0x44, 0x6a, 0xa0, 0xb1, 0x48, 0xb6, 0xac, 0xc6, 0x22, 0xf2, 0x10, 0x36,
-	0xe3, 0x51, 0x20, 0xd8, 0x90, 0xf6, 0x58, 0x70, 0x12, 0x62, 0xb1, 0x2b, 0xad, 0x4d, 0xd3, 0x4e,
-	0x8d, 0x9d, 0xe0, 0x24, 0xcc, 0x24, 0x56, 0x89, 0xe7, 0x66, 0xe3, 0x2f, 0x15, 0x48, 0x56, 0xe5,
-	0xfa, 0x55, 0xfd, 0x0f, 0x74, 0xde, 0x81, 0xa2, 0x17, 0x06, 0x27, 0xac, 0x8f, 0x5a, 0x2b, 0xad,
-	0xb2, 0x79, 0xdc, 0x3d, 0x40, 0x43, 0x36, 0x7e, 0x0a, 0x21, 0x7b, 0x00, 0xb3, 0xeb, 0x93, 0xd7,
-	0xf3, 0xb8, 0xb3, 0xd9, 0x6b, 0x36, 0xdd, 0xdd, 0x0c, 0xc6, 0xf8, 0x3b, 0x07, 0xa5, 0x29, 0x21,
-	0xb9, 0x07, 0xa5, 0x38, 0xf2, 0x7a, 0x51, 0x18, 0x0b, 0xd4, 0x5c, 0xb5, 0xc8, 0x64, 0xdc, 0xd8,
-	0xb0, 0x8f, 0x0f, 0x8e, 0xc3, 0x38, 0xe9, 0xd7, 0x1c, 0x0b, 0x84, 0xbd, 0x11, 0x47, 0x5e, 0xf2,
-	0x4d, 0xde, 0x02, 0x70, 0xfc, 0x21, 0x0b, 0x52, 0x87, 0x54, 0xf1, 0xc6, 0x14, 0x55, 0xc6, 0x25,
-	0xc4, 0xbd, 0x07, 0xe4, 0x94, 0x3a, 0xb1, 0x70, 0xa9, 0x23, 0x7a, 0x2c, 0x10, 0x34, 0xfe, 0xd6,
-	0x19, 0xc8, 0xd3, 0x35, 0xc3, 0x5f, 0x9f, 0x41, 0x3a, 0x12, 0x41, 0xf6, 0xe1, 0x46, 0xec, 0x9c,
-	0x88, 0xde, 0xdc, 0x19, 0x03, 0xe5, 0x97, 0x1c, 0x13, 0xcc, 0xe1, 0x14, 0x82, 0x01, 0xa7, 0x8e,
-	0x31, 0x8d, 0x06, 0xcc, 0x73, 0x04, 0x4d, 0x1d, 0x0b, 0x2f, 0x71, 0xb4, 0xa7, 0x10, 0x74, 0x7c,
-	0x1f, 0x6e, 0x2e, 0x45, 0x9c, 0xa5, 0x5b, 0x5c, 0x74, 0x7e, 0x75, 0x21, 0xea, 0x2c, 0xe5, 0x26,
-	0x6c, 0xc9, 0xc8, 0xc2, 0x61, 0x41, 0x6f, 0x10, 0xf6, 0x79, 0x7d, 0x63, 0x47, 0x6d, 0xe6, 0xed,
-	0x5a, 0x1a, 0x2d, 0x31, 0x3f, 0x09, 0xfb, 0x9c, 0x7c, 0x08, 0xf5, 0x6c, 0x8e, 0x3d, 0x2f, 0x0c,
-	0xbc, 0x51, 0x1c, 0xd3, 0xc0, 0x3b, 0xab, 0x97, 0x16, 0x63, 0xbd, 0x96, 0x49, 0xf4, 0x60, 0x0e,
-	0x23, 0x07, 0x70, 0x0b, 0x29, 0x78, 0xe0, 0x44, 0xfc, 0x34, 0x14, 0x0b, 0x1c, 0xe5, 0x45, 0x0e,
-	0xd4, 0xd5, 0x95, 0xc0, 0x0c, 0x89, 0xf1, 0x83, 0x96, 0x34, 0xff, 0x4c, 0xc9, 0xff, 0xea, 0x8c,
-	0xbf, 0xb3, 0xd0, 0xce, 0x39, 0x6c, 0xe7, 0xda, 0xbc, 0x9d, 0xf1, 0x4c, 0x5f, 0x69, 0x69, 0xb2,
-	0x07, 0x65, 0x7e, 0xc6, 0x7b, 0x38, 0x86, 0xc8, 0x6b, 0xa0, 0x8a, 0xcc, 0xdd, 0x33, 0xde, 0x4d,
-	0x8c, 0xd2, 0xa7, 0xc4, 0xe5, 0xb7, 0x71, 0x08, 0x37, 0x16, 0x4a, 0xb0, 0xf6, 0x05, 0x60, 0xfc,
-	0xa2, 0x41, 0x75, 0x21, 0x3f, 0xf2, 0x31, 0x68, 0xcc, 0x97, 0xa7, 0xe9, 0xd1, 0xec, 0x11, 0xde,
-	0x5b, 0xa9, 0x1c, 0x73, 0xa6, 0xb6, 0xad, 0x31, 0x9f, 0xdc, 0x86, 0x32, 0xe3, 0xbd, 0x74, 0xc8,
-	0xc1, 0x2a, 0x97, 0xec, 0x12, 0xe3, 0x4f, 0xd2, 0xfa, 0x37, 0xa1, 0x98, 0x48, 0x1e, 0x71, 0x3c,
-	0x59, 0xb5, 0xd6, 0xd6, 0xdc, 0xbd, 0x8b, 0x76, 0x5b, 0xae, 0x93, 0x3b, 0x50, 0xa0, 0x51, 0xe8,
-	0x9d, 0xca, 0xe2, 0x5c, 0x9b, 0x03, 0x3f, 0x4a, 0xcc, 0xd3, 0x87, 0x19, 0x31, 0xe4, 0x2e, 0x54,
-	0xd2, 0x26, 0x4b, 0xb9, 0x0b, 0xe8, 0x52, 0x31, 0xed, 0xa4, 0x9d, 0x52, 0x5a, 0x88, 0x67, 0xbf,
-	0xc9, 0xbb, 0x00, 0x09, 0x90, 0x71, 0xc1, 0x3c, 0x8e, 0x67, 0x66, 0x81, 0x3f, 0x5b, 0xfe, 0x0c,
-	0xb0, 0xf5, 0x54, 0x83, 0xf2, 0xa7, 0x38, 0xd4, 0xda, 0x91, 0x47, 0xee, 0x43, 0x69, 0xfa, 0xc4,
-	0x91, 0x2d, 0x73, 0x69, 0x2a, 0xd8, 0xbe, 0x6e, 0x2e, 0xbf, 0x7f, 0x86, 0x42, 0xf6, 0x01, 0xe6,
-	0x37, 0x38, 0x21, 0xe6, 0x95, 0x47, 0x6b, 0xfb, 0x86, 0x79, 0xf5, 0x8a, 0x37, 0x14, 0xf2, 0x08,
-	0x2a, 0x99, 0xad, 0x27, 0x09, 0x6a, 0xf9, 0x2c, 0x6c, 0xbf, 0x62, 0xbe, 0xa4, 0x3b, 0x0c, 0x85,
-	0x34, 0xa1, 0x80, 0x73, 0x20, 0xa9, 0x9a, 0xd9, 0x51, 0x73, 0xbb, 0x66, 0x2e, 0x8c, 0x87, 0x86,
-	0x22, 0x15, 0xe1, 0x58, 0x90, 0x2a, 0xca, 0x0e, 0x77, 0xa9, 0xa2, 0x85, 0x29, 0xcb, 0x50, 0xac,
-	0x0f, 0xce, 0x2f, 0x74, 0xe5, 0xf7, 0x0b, 0x5d, 0x79, 0x7e, 0xa1, 0x2b, 0x7f, 0x5c, 0xe8, 0xca,
-	0x9f, 0x17, 0xba, 0xfa, 0xfd, 0x44, 0x57, 0x7f, 0x9e, 0xe8, 0xea, 0xaf, 0x13, 0x5d, 0xf9, 0x6d,
-	0xa2, 0x2b, 0xe7, 0x13, 0x5d, 0x7d, 0x36, 0xd1, 0xd5, 0xe7, 0x13, 0x5d, 0x7d, 0xfa, 0x42, 0x57,
-	0x0e, 0xd5, 0x2f, 0x4b, 0xe9, 0x3f, 0x07, 0x91, 0xeb, 0x16, 0xb1, 0x97, 0x1e, 0xfc, 0x13, 0x00,
-	0x00, 0xff, 0xff, 0x1b, 0x13, 0x35, 0x8d, 0x2f, 0x0c, 0x00, 0x00,
+	// 1801 bytes of a gzipped FileDescriptorProto
+	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0xcc, 0x58, 0xcf, 0x6f, 0x23, 0x49,
+	0x15, 0x76, 0x3b, 0xb6, 0x63, 0x3f, 0xc7, 0x4e, 0x52, 0x99, 0x4d, 0x3c, 0x19, 0xb0, 0x43, 0x0b,
+	0xed, 0x7a, 0x99, 0xdd, 0xce, 0x4c, 0x06, 0x98, 0xdd, 0x95, 0x10, 0xac, 0x63, 0x76, 0x63, 0xd8,
+	0x99, 0x09, 0xed, 0x01, 0x09, 0x24, 0xd4, 0x6a, 0x77, 0x57, 0x9c, 0xd2, 0xd8, 0x5d, 0x4d, 0x57,
+	0x79, 0x66, 0xc2, 0x09, 0x6e, 0x1c, 0xf7, 0x2f, 0xe0, 0x88, 0x38, 0xec, 0x91, 0x03, 0x47, 0x8e,
+	0x73, 0xdc, 0x23, 0x27, 0x6b, 0xe3, 0x3d, 0x22, 0x24, 0x8e, 0x30, 0x07, 0x84, 0xea, 0x55, 0xb5,
+	0xdd, 0xf6, 0xec, 0x4a, 0x21, 0x62, 0x25, 0x4e, 0xee, 0x7a, 0xef, 0x7b, 0xbf, 0xbe, 0xf7, 0xaa,
+	0x5c, 0xdd, 0xb0, 0x31, 0xf6, 0x85, 0xa4, 0x89, 0x13, 0x27, 0x5c, 0xf2, 0xfd, 0xb7, 0x87, 0x4c,
+	0x9e, 0x4f, 0x06, 0x4e, 0xc0, 0xc7, 0x87, 0x43, 0x3e, 0xe4, 0x87, 0x28, 0x1e, 0x4c, 0xce, 0x70,
+	0x85, 0x0b, 0x7c, 0x32, 0xf0, 0xc3, 0x0c, 0x5c, 0xb2, 0xe1, 0xc8, 0x1f, 0x88, 0xc3, 0x81, 0x3f,
+	0x09, 0xb5, 0xd9, 0xe1, 0x98, 0x4a, 0x3f, 0x1e, 0xe0, 0x8f, 0x36, 0xb0, 0x9f, 0x43, 0xd1, 0xe5,
+	0x13, 0x49, 0xc9, 0x11, 0x54, 0x62, 0x3f, 0x91, 0x4c, 0x32, 0x1e, 0x35, 0xac, 0x03, 0xab, 0x5d,
+	0x3d, 0x02, 0xe7, 0x34, 0x95, 0x74, 0xca, 0x2f, 0xa6, 0xad, 0xdc, 0xa7, 0xd3, 0x96, 0xe5, 0x2e,
+	0x60, 0xe4, 0x16, 0x14, 0x23, 0x1e, 0x52, 0xd1, 0xc8, 0x1f, 0xac, 0xb5, 0xab, 0x47, 0x45, 0xe7,
+	0x21, 0x0f, 0xa9, 0xab, 0x65, 0xa4, 0x09, 0x30, 0xa2, 0x7e, 0x48, 0x13, 0x25, 0x6c, 0xac, 0x1d,
+	0x58, 0xed, 0x9a, 0x9b, 0x91, 0xd8, 0x3f, 0x87, 0x8d, 0x0f, 0xa9, 0xec, 0x76, 0x5c, 0xfa, 0xab,
+	0x09, 0x15, 0x92, 0xdc, 0x81, 0xd2, 0x39, 0x6a, 0x4d, 0xf4, 0xba, 0x63, 0x34, 0x27, 0x28, 0xcd,
+	0x64, 0x60, 0x70, 0x64, 0x0f, 0xd6, 0xbb, 0x1d, 0x2f, 0xf2, 0xc7, 0xb4, 0x91, 0x3f, 0xb0, 0xda,
+	0x15, 0xb7, 0xd4, 0xed, 0x3c, 0xf4, 0xc7, 0xd4, 0xfe, 0x25, 0xd4, 0x8c, 0x6b, 0x11, 0xf3, 0x48,
+	0x50, 0x72, 0x77, 0xc5, 0xf7, 0xa6, 0x93, 0xaa, 0xbe, 0xd4, 0xf9, 0x4d, 0xc8, 0x87, 0x03, 0xf4,
+	0x5b, 0x3d, 0x5a, 0x73, 0xba, 0x9d, 0x4e, 0x41, 0x41, 0xdc, 0x7c, 0x38, 0xb0, 0x3f, 0xb1, 0x60,
+	0xf3, 0x43, 0x2a, 0xfb, 0xb1, 0x1f, 0xd0, 0xeb, 0x67, 0x7f, 0x02, 0xc5, 0x70, 0xe0, 0xb1, 0x10,
+	0x63, 0xd4, 0x3a, 0xf7, 0x66, 0xd3, 0x56, 0xbe, 0xd7, 0x7d, 0x39, 0x6d, 0xbd, 0x79, 0x95, 0x1e,
+	0x3a, 0xdd, 0x4e, 0xaf, 0xeb, 0x16, 0xc2, 0x41, 0x2f, 0x24, 0x5f, 0x07, 0xc0, 0x5c, 0x34, 0x15,
+	0x6b, 0x48, 0x45, 0x05, 0x25, 0xc8, 0x06, 0x83, 0xad, 0x45, 0xb6, 0xd7, 0x27, 0xc4, 0x86, 0xa2,
+	0x50, 0x3e, 0x0c, 0x27, 0x25, 0x07, 0x3d, 0x1a, 0x5a, 0xb4, 0xca, 0xfe, 0x43, 0x1e, 0x99, 0xc1,
+	0x89, 0xba, 0x3e, 0x33, 0xc7, 0x73, 0xea, 0x0d, 0x2d, 0xdd, 0xce, 0x7f, 0x47, 0x4b, 0x3e, 0x1c,
+	0x90, 0x47, 0x69, 0xba, 0x38, 0x79, 0x9d, 0x77, 0x67, 0xd3, 0x56, 0x11, 0x33, 0x7e, 0x39, 0x6d,
+	0xbd, 0x75, 0x25, 0x57, 0x88, 0xee, 0x75, 0x4d, 0x6d, 0xe4, 0xc7, 0x50, 0x10, 0x23, 0x2e, 0x1b,
+	0x05, 0xf4, 0x77, 0x7f, 0x36, 0x6d, 0x15, 0xfa, 0x23, 0x2e, 0x5f, 0x4e, 0x5b, 0xb7, 0xaf, 0xe6,
+	0x6e, 0xc4, 0xa5, 0x6a, 0x99, 0x72, 0x62, 0x3f, 0xc1, 0x9e, 0x18, 0x9e, 0xae, 0xdf, 0x93, 0x6f,
+	0x42, 0x29, 0x51, 0x3e, 0xd2, 0x1d, 0x58, 0x72, 0xd0, 0xa5, 0x69, 0x8a, 0xd1, 0xd9, 0x9f, 0x5b,
+	0xb0, 0x7d, 0xda, 0x77, 0xe9, 0x90, 0xa9, 0x83, 0xe5, 0xfa, 0x7d, 0xf9, 0x09, 0x94, 0xd4, 0xd6,
+	0xee, 0x75, 0x4d, 0x6f, 0x14, 0xa7, 0xa5, 0x87, 0x28, 0xb9, 0x32, 0x0b, 0x1a, 0xee, 0x1a, 0x47,
+	0xa4, 0x0e, 0x79, 0x16, 0x9b, 0x91, 0xcd, 0xb3, 0x98, 0xbc, 0x0b, 0x1b, 0xc9, 0x24, 0x92, 0x6c,
+	0x4c, 0x3d, 0x16, 0x9d, 0x71, 0x24, 0xbb, 0x7a, 0xb4, 0xe1, 0xb8, 0x5a, 0xd8, 0x8b, 0xce, 0x78,
+	0x26, 0xb1, 0x6a, 0xb2, 0x10, 0xdb, 0xff, 0xb2, 0x80, 0x64, 0xab, 0xbc, 0x3e, 0xab, 0x5f, 0x41,
+	0x9d, 0xb7, 0xa1, 0x14, 0xf0, 0xe8, 0x8c, 0x0d, 0xb1, 0xd6, 0xea, 0x51, 0xc5, 0x39, 0xed, 0x1f,
+	0xa3, 0x20, 0x1b, 0x5f, 0x43, 0xc8, 0x1d, 0x80, 0xf9, 0x19, 0x2b, 0x1a, 0x05, 0xec, 0x6c, 0xf6,
+	0x2c, 0xd6, 0xdd, 0xcd, 0x60, 0xec, 0x7f, 0xaf, 0x41, 0x39, 0x75, 0x48, 0xde, 0x86, 0x72, 0x12,
+	0x07, 0x5e, 0xcc, 0x13, 0x89, 0x35, 0xd7, 0x3a, 0x64, 0x36, 0x6d, 0xad, 0xbb, 0xa7, 0xc7, 0xa7,
+	0x3c, 0x51, 0xf3, 0xba, 0xc6, 0x22, 0xe9, 0xae, 0x27, 0x71, 0xa0, 0xd6, 0xe4, 0x75, 0x00, 0x3f,
+	0x1c, 0xb3, 0x48, 0x1b, 0xe8, 0x8a, 0xd7, 0x53, 0x54, 0x05, 0x55, 0x88, 0xfb, 0x2e, 0x90, 0x73,
+	0xea, 0x27, 0x72, 0x40, 0x7d, 0xe9, 0xb1, 0x48, 0xd2, 0xe4, 0xa9, 0x3f, 0x32, 0xbb, 0x6b, 0x8e,
+	0xdf, 0x9e, 0x43, 0x7a, 0x06, 0x41, 0xee, 0xc3, 0x4e, 0xe2, 0x9f, 0x49, 0x6f, 0x61, 0x8c, 0x81,
+	0x0a, 0x2b, 0x86, 0x0a, 0x73, 0x92, 0x42, 0x30, 0x60, 0x6a, 0x98, 0xd0, 0x78, 0xc4, 0x02, 0x5f,
+	0x52, 0x6d, 0x58, 0xfc, 0x02, 0x43, 0x37, 0x85, 0xa0, 0xe1, 0xf7, 0x61, 0x6f, 0x25, 0xe2, 0x3c,
+	0xdd, 0xd2, 0xb2, 0xf1, 0x6b, 0x4b, 0x51, 0xe7, 0x29, 0xb7, 0x61, 0xcb, 0x44, 0x96, 0x3e, 0x8b,
+	0xbc, 0x11, 0x1f, 0x8a, 0xc6, 0xfa, 0x81, 0xd5, 0x2e, 0xb8, 0x75, 0x1d, 0x4d, 0x89, 0x3f, 0xe2,
+	0x43, 0x41, 0xde, 0x87, 0x46, 0x36, 0x47, 0x2f, 0xe0, 0x51, 0x30, 0x49, 0x12, 0x1a, 0x05, 0x17,
+	0x8d, 0xf2, 0x72, 0xac, 0xdd, 0x4c, 0xa2, 0xc7, 0x0b, 0x18, 0x39, 0x86, 0x9b, 0xe8, 0x42, 0x44,
+	0x7e, 0x2c, 0xce, 0xb9, 0x5c, 0xf2, 0x51, 0x59, 0xf6, 0x81, 0x75, 0xf5, 0x0d, 0x30, 0xe3, 0xc4,
+	0xfe, 0x6d, 0x5e, 0x0d, 0xff, 0xbc, 0x92, 0xff, 0xab, 0x3d, 0xfe, 0xed, 0xa5, 0x71, 0x5e, 0xc3,
+	0x71, 0xae, 0x2f, 0xc6, 0x19, 0xf7, 0xf4, 0x2b, 0x23, 0x4d, 0xee, 0x40, 0x45, 0x5c, 0x08, 0x4f,
+	0x48, 0x5f, 0x0a, 0x73, 0x0c, 0xd4, 0xd0, 0x73, 0xff, 0x42, 0xf4, 0x95, 0xd0, 0xd8, 0x94, 0x85,
+	0x59, 0xdb, 0x27, 0xb0, 0xb3, 0x44, 0xc1, 0xb5, 0x0f, 0x00, 0xfb, 0x4f, 0x79, 0xa8, 0x2d, 0xe5,
+	0x47, 0x7e, 0x04, 0x79, 0x16, 0x9a, 0xdd, 0xf4, 0xde, 0xfc, 0x9f, 0xfa, 0xce, 0x95, 0xe8, 0x58,
+	0x78, 0xea, 0xba, 0x79, 0x16, 0x92, 0x5b, 0x50, 0x61, 0xc2, 0xd3, 0x37, 0x21, 0x64, 0xb9, 0xec,
+	0x96, 0x99, 0xf8, 0x48, 0xf3, 0xdf, 0x86, 0x92, 0x2a, 0x79, 0x22, 0x70, 0x67, 0xd5, 0x8f, 0xb6,
+	0x16, 0xe6, 0x7d, 0x94, 0xbb, 0x46, 0x4f, 0x6e, 0x43, 0x91, 0xc6, 0x3c, 0x38, 0x37, 0xe4, 0x6c,
+	0x2e, 0x80, 0x3f, 0x54, 0xe2, 0xf4, 0x8f, 0x19, 0x31, 0xe4, 0x2d, 0xa8, 0xea, 0x21, 0xd3, 0xbe,
+	0x8b, 0x68, 0x52, 0x75, 0x5c, 0x35, 0x4e, 0xda, 0x2d, 0x24, 0xf3, 0x67, 0xf2, 0x1d, 0x00, 0x05,
+	0x64, 0x42, 0xb2, 0x40, 0xe0, 0x9e, 0x59, 0xf2, 0x9f, 0xa5, 0x3f, 0x03, 0xb4, 0x7f, 0x67, 0x41,
+	0x35, 0x73, 0x50, 0x93, 0x16, 0x54, 0xfd, 0x38, 0xf6, 0x9e, 0xd2, 0x44, 0xa4, 0x97, 0xca, 0x8a,
+	0x0b, 0x7e, 0x1c, 0xff, 0x4c, 0x4b, 0xd4, 0xc5, 0x45, 0x48, 0x3f, 0x91, 0x9e, 0x32, 0x31, 0x77,
+	0xb8, 0x0a, 0x4a, 0x1e, 0xb3, 0x31, 0x55, 0xea, 0x21, 0x9f, 0x9b, 0x9b, 0x7b, 0xcd, 0x90, 0xa7,
+	0xd6, 0xfb, 0x50, 0x8e, 0x47, 0xbe, 0x3c, 0xe3, 0xc9, 0x18, 0x39, 0xa8, 0xb8, 0xf3, 0xb5, 0xfd,
+	0x37, 0x0b, 0x60, 0x51, 0x1c, 0x39, 0x99, 0xb7, 0xaf, 0xd0, 0x79, 0x67, 0xde, 0x3e, 0xe7, 0x4a,
+	0xed, 0x33, 0x5b, 0xd6, 0x34, 0x8f, 0x40, 0x41, 0xd2, 0x64, 0x8c, 0xc9, 0x16, 0x5c, 0x7c, 0x26,
+	0x37, 0xa0, 0xc8, 0xa2, 0x90, 0x3e, 0xc7, 0x14, 0x0b, 0xae, 0x5e, 0x90, 0x5d, 0x75, 0xe4, 0x8f,
+	0xc7, 0x4c, 0x1f, 0x75, 0x05, 0xd7, 0xac, 0x48, 0x03, 0xd6, 0xfd, 0x38, 0x1e, 0x31, 0x1a, 0x62,
+	0x1b, 0x0a, 0x6e, 0xba, 0x24, 0xf7, 0xa1, 0x72, 0xc6, 0x47, 0x23, 0xfe, 0x8c, 0x26, 0x8a, 0x75,
+	0xb5, 0x4f, 0x76, 0xb0, 0x45, 0x1f, 0x18, 0xa9, 0xae, 0xc6, 0x30, 0xbf, 0xc0, 0xda, 0x9f, 0xe4,
+	0x81, 0xbc, 0x8a, 0xfb, 0x1f, 0x56, 0xfd, 0x15, 0x9c, 0x0a, 0x37, 0xa0, 0x38, 0xf6, 0x65, 0x70,
+	0x9e, 0x92, 0x86, 0x8b, 0x2f, 0x25, 0x8d, 0x40, 0x21, 0xa2, 0xcf, 0xa5, 0x61, 0x0c, 0x9f, 0xc9,
+	0x37, 0x60, 0x23, 0xe4, 0xcf, 0x22, 0x4f, 0xd0, 0x80, 0x47, 0xa1, 0x9e, 0xd3, 0x82, 0x5b, 0x55,
+	0xb2, 0xbe, 0x16, 0xa9, 0x20, 0x6a, 0x3e, 0x29, 0x9e, 0xde, 0x15, 0x57, 0x2f, 0xec, 0xdf, 0x17,
+	0x61, 0x23, 0x7b, 0x92, 0x28, 0x4f, 0x63, 0x3a, 0xe6, 0xc9, 0x85, 0x27, 0xb9, 0xf4, 0x47, 0x9a,
+	0x32, 0xb7, 0xaa, 0x65, 0x8f, 0x95, 0x88, 0xbc, 0x0e, 0x9b, 0x06, 0x32, 0x11, 0x34, 0xf4, 0x12,
+	0x21, 0xcc, 0x08, 0xd4, 0xb4, 0xf8, 0xa7, 0x82, 0x86, 0xae, 0x10, 0x6a, 0xe6, 0x33, 0x38, 0x53,
+	0x1c, 0x2c, 0x30, 0x19, 0xc0, 0x59, 0x42, 0xa9, 0x29, 0xd3, 0x00, 0x3e, 0x48, 0x28, 0x25, 0xdf,
+	0x82, 0x6d, 0xf1, 0xcc, 0x8f, 0xbd, 0xa5, 0x8c, 0x74, 0x6d, 0x9b, 0x4a, 0xf1, 0x20, 0x93, 0x55,
+	0x1b, 0xb6, 0xb2, 0x58, 0x0c, 0x69, 0xfe, 0xa8, 0x16, 0x50, 0x0c, 0xbb, 0x82, 0xc4, 0xd8, 0xe5,
+	0x55, 0x24, 0xc6, 0xb7, 0xa1, 0x16, 0xc4, 0x13, 0x2f, 0x4e, 0x78, 0xe0, 0x25, 0x8a, 0x3b, 0x38,
+	0xb0, 0xda, 0x96, 0x5b, 0x0d, 0xe2, 0xc9, 0x69, 0xc2, 0x03, 0xd7, 0x97, 0x54, 0x1d, 0x61, 0x0a,
+	0x13, 0xf0, 0x49, 0x24, 0x1b, 0x55, 0x7c, 0xb5, 0x2b, 0x07, 0xf1, 0xe4, 0x58, 0xad, 0xd5, 0xb6,
+	0x0d, 0x99, 0x78, 0x62, 0x32, 0xdf, 0xc4, 0x20, 0x15, 0x25, 0xd1, 0x39, 0xdf, 0x02, 0x5c, 0xe8,
+	0x64, 0xb7, 0x50, 0x5b, 0x56, 0x02, 0x4c, 0x33, 0x55, 0x62, 0x7e, 0xdb, 0x0b, 0x25, 0x66, 0x76,
+	0x17, 0x76, 0x23, 0x2a, 0x3d, 0xc6, 0x3d, 0x16, 0x79, 0x83, 0x0b, 0x75, 0x21, 0xa0, 0x89, 0x6a,
+	0x7f, 0xe3, 0x35, 0x44, 0x6e, 0x47, 0x54, 0xf6, 0x78, 0x2f, 0xea, 0x5c, 0x48, 0x7a, 0x4a, 0x93,
+	0x3e, 0x0d, 0xc8, 0x3d, 0xd8, 0x33, 0x26, 0x7c, 0x22, 0x97, 0x6d, 0x76, 0xd1, 0x86, 0xa0, 0xcd,
+	0xa3, 0x89, 0xcc, 0x18, 0x39, 0xb0, 0xa3, 0x8c, 0x64, 0x10, 0xab, 0xff, 0xe2, 0x88, 0x06, 0xfa,
+	0x9f, 0x6b, 0x0f, 0xeb, 0x54, 0x41, 0x1e, 0x07, 0xf1, 0xf1, 0x42, 0x41, 0xbe, 0x07, 0x5f, 0x4b,
+	0xf1, 0x7e, 0x20, 0xd9, 0x53, 0xea, 0xf1, 0x98, 0x46, 0x62, 0x1e, 0xa9, 0x81, 0x91, 0xf6, 0xb4,
+	0xe1, 0xfb, 0x88, 0x78, 0xa4, 0x00, 0x26, 0xdc, 0x16, 0xac, 0xf1, 0x58, 0x34, 0x6e, 0x22, 0x4a,
+	0x3d, 0xda, 0x7f, 0xb7, 0xa0, 0xbe, 0x7c, 0xda, 0xaa, 0x0d, 0x20, 0xd8, 0xaf, 0xa9, 0x19, 0x4d,
+	0x7c, 0x4e, 0x0d, 0xf3, 0x73, 0x43, 0xf2, 0x06, 0x6c, 0xa9, 0x1a, 0x85, 0x22, 0x28, 0x8d, 0xae,
+	0x47, 0xb0, 0x86, 0xf2, 0x5e, 0x64, 0x62, 0xbe, 0x09, 0xdb, 0x1a, 0xa8, 0x68, 0x49, 0x91, 0x7a,
+	0x16, 0xeb, 0xa8, 0x78, 0x34, 0x91, 0x06, 0xfa, 0x0e, 0x34, 0xb0, 0x93, 0x9e, 0xda, 0x8a, 0x7e,
+	0x14, 0x0a, 0x1c, 0x0d, 0x2a, 0xc4, 0xfc, 0x00, 0xdb, 0x45, 0xfd, 0xb1, 0x51, 0x9f, 0xa6, 0x5a,
+	0xf2, 0x06, 0x6c, 0x3e, 0xa1, 0x17, 0xf8, 0xf6, 0xe4, 0x8d, 0x99, 0x10, 0x34, 0xdd, 0xa3, 0xf5,
+	0x54, 0xfc, 0x00, 0xa5, 0x47, 0x1f, 0xe7, 0xa1, 0xf2, 0x00, 0xbf, 0x7a, 0xb8, 0x71, 0x40, 0xee,
+	0x42, 0x39, 0x7d, 0x37, 0x22, 0x5b, 0xce, 0xca, 0xeb, 0xe4, 0xfe, 0xb6, 0xb3, 0xfa, 0xe2, 0x64,
+	0xe7, 0xc8, 0x7d, 0x80, 0xc5, 0xd5, 0x9f, 0x10, 0xe7, 0x95, 0xb7, 0x9d, 0xfd, 0x1d, 0xe7, 0xd5,
+	0x77, 0x03, 0x3b, 0x47, 0xde, 0x83, 0x6a, 0xe6, 0xce, 0x40, 0x14, 0x6a, 0xf5, 0x12, 0xb5, 0x7f,
+	0xc3, 0xf9, 0x82, 0x6b, 0x85, 0x9d, 0x23, 0x6d, 0x28, 0xe2, 0x57, 0x06, 0x52, 0x73, 0xb2, 0x1f,
+	0x32, 0xf6, 0xeb, 0xce, 0xd2, 0xc7, 0x07, 0x3b, 0x67, 0x2a, 0xc2, 0xf7, 0x49, 0x5d, 0x51, 0xf6,
+	0xd3, 0x81, 0xae, 0x68, 0xe9, 0xf5, 0xdc, 0xce, 0x75, 0x7e, 0xf0, 0xe2, 0xb2, 0x99, 0xfb, 0xeb,
+	0x65, 0x33, 0xf7, 0xd9, 0x65, 0x33, 0xf7, 0x8f, 0xcb, 0x66, 0xee, 0x9f, 0x97, 0x4d, 0xeb, 0x37,
+	0xb3, 0xa6, 0xf5, 0xc7, 0x59, 0xd3, 0xfa, 0xf3, 0xac, 0x99, 0xfb, 0xcb, 0xac, 0x99, 0x7b, 0x31,
+	0x6b, 0x5a, 0x9f, 0xce, 0x9a, 0xd6, 0x67, 0xb3, 0xa6, 0xf5, 0xf1, 0xe7, 0xcd, 0xdc, 0x89, 0xf5,
+	0x8b, 0xb2, 0xfe, 0x7a, 0x14, 0x0f, 0x06, 0x25, 0x3c, 0x7d, 0xef, 0xfd, 0x27, 0x00, 0x00, 0xff,
+	0xff, 0x9f, 0x5e, 0x94, 0xfe, 0x50, 0x12, 0x00, 0x00,
 }
