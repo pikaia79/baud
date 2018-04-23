@@ -3,11 +3,9 @@ package master
 import (
 	"context"
 	"github.com/tiglabs/baud/proto/metapb"
-	"util/deepcopy"
-	"util/log"
-	/*  "util/rpc"
-	    "google.golang.org/grpc"
-	    "proto/pspb"*/)
+	"github.com/tiglabs/baud/util/deepcopy"
+	"github.com/tiglabs/baud/util/log"
+)
 
 const (
 	PARTITION_CHANNEL_LIMIT = 1000

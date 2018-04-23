@@ -8,8 +8,8 @@ import (
 	"github.com/tiglabs/baud/proto/masterpb"
 	"github.com/tiglabs/raft"
 	raftproto "github.com/tiglabs/raft/proto"
-	"util/log"
-	"util/raftkvstore"
+	"github.com/tiglabs/baud/util/log"
+	"github.com/tiglabs/baud/util/raftkvstore"
 )
 
 var (

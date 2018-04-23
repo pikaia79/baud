@@ -8,7 +8,7 @@ import (
 	"google.golang.org/grpc/status"
 	"sync"
 	"time"
-	"util/log"
+	"github.com/tiglabs/baud/util/log"
 )
 
 const (

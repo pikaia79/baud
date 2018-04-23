@@ -7,7 +7,7 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/reflection"
 	"net"
-	"util/log"
+	"github.com/tiglabs/baud/util/log"
 )
 
 type RpcServer struct {

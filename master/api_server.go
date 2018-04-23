@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"net/http"
 	"strconv"
-	"util/log"
-	"util/server"
+	"github.com/tiglabs/baud/util/log"
+	"github.com/tiglabs/baud/util/server"
 )
 
 const (

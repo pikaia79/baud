@@ -2,7 +2,7 @@ package master
 
 import (
 	"sync"
-	"util/log"
+	"github.com/tiglabs/baud/util/log"
 )
 
 type Master struct {

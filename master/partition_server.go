@@ -7,8 +7,8 @@ import (
 	"github.com/tiglabs/baud/proto/metapb"
 	"sync"
 	"time"
-	"util"
-	"util/log"
+	"github.com/tiglabs/baud/util"
+	"github.com/tiglabs/baud/util/log"
 )
 
 const (

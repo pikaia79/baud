@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"sync"
 	"sync/atomic"
-	"util/log"
+	"github.com/tiglabs/baud/util/log"
 )
 
 var (

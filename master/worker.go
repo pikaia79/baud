@@ -5,7 +5,7 @@ import (
 	"github.com/tiglabs/baud/proto/metapb"
 	"sync"
 	"time"
-	"util/log"
+	"github.com/tiglabs/baud/util/log"
 )
 
 type WorkerManager struct {

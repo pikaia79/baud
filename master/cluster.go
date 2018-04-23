@@ -4,8 +4,8 @@ import (
 	"github.com/tiglabs/baud/proto/metapb"
 	"math"
 	"sync"
-	"util"
-	"util/log"
+	"github.com/tiglabs/baud/util/log"
+	"github.com/tiglabs/baud/util"
 )
 
 type Cluster struct {
