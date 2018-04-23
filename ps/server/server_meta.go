@@ -5,88 +5,95 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
-	"sync"
 
 	"github.com/tiglabs/baud/proto/metapb"
 	"github.com/tiglabs/baud/proto/pspb"
 )
 
 type serverMeta struct {
-	fileName string
-	sync.Mutex
-	pspb.MetaInfo
+	rootPath string
+	metaFile string
 }
 
-func newServerMeta(dataPath string) *serverMeta {
-	meta := &serverMeta{
-		fileName: filepath.Join(dataPath, "meta"),
+func newServerMeta(root string) *serverMeta {
+	m := &serverMeta{
+		rootPath: root,
+		metaFile: filepath.Join(root, "meta"),
 	}
+	m.mkMetaFile()
 
-	if _, err := os.Stat(meta.fileName); err != nil {
-		if file, err := os.Create(meta.fileName); err == nil {
-			file.Close()
-		} else {
-			panic(err)
-		}
-	} else {
-		if b, err := ioutil.ReadFile(meta.fileName); err != nil {
-			panic(err)
-		} else if len(b) > 0 {
-			info := new(pspb.MetaInfo)
-			if err := info.Unmarshal(b); err == nil {
-				meta.MetaInfo = *info
-			}
-		}
-	}
-
-	return meta
-}
-
-func (m *serverMeta) getInfo() pspb.MetaInfo {
-	m.Lock()
-	defer m.Unlock()
-
-	return m.MetaInfo
-}
-
-func (m *serverMeta) addPartition(id metapb.PartitionID) {
-	m.Lock()
-	m.MetaInfo.Partitions = append(m.MetaInfo.Partitions, id)
-	if b, err := m.Marshal(); err == nil {
-		ioutil.WriteFile(m.fileName, b, 0666)
-	}
-	m.Unlock()
+	return m
 }
 
 func (m *serverMeta) reset(info *pspb.MetaInfo) {
-	m.Lock()
-	m.MetaInfo = *info
-	if b, err := m.Marshal(); err == nil {
-		ioutil.WriteFile(m.fileName, b, 0666)
+	m.mkMetaFile()
+
+	if b, err := info.Marshal(); err == nil {
+		ioutil.WriteFile(m.metaFile, b, 0666)
 	}
-	m.Unlock()
 }
 
-func getPartitionPath(id metapb.PartitionID, path string) string {
-	dir := filepath.Join(path, fmt.Sprintf("%d", id))
-	if err := os.MkdirAll(dir, os.ModePerm); err != nil {
-		panic(err)
+func (m *serverMeta) getInfo() *pspb.MetaInfo {
+	info := &pspb.MetaInfo{}
+	if b, err := ioutil.ReadFile(m.metaFile); err != nil && len(b) > 0 {
+		info.Unmarshal(b)
 	}
-	return dir
+
+	return info
 }
 
-func getDataPath(id metapb.PartitionID, path string) string {
-	dir := filepath.Join(path, fmt.Sprintf("%d", id), "data")
-	if err := os.MkdirAll(dir, os.ModePerm); err != nil {
+func (m *serverMeta) mkMetaFile() {
+	if err := os.MkdirAll(m.rootPath, os.ModePerm); err != nil {
 		panic(err)
 	}
-	return dir
+
+	if _, err := os.Stat(m.metaFile); err != nil {
+		if !os.IsNotExist(err) {
+			os.Remove(m.metaFile)
+		}
+		if file, err := os.Create(m.metaFile); err == nil {
+			file.Close()
+		}
+	}
 }
 
-func getRaftPath(id metapb.PartitionID, path string) string {
-	dir := filepath.Join(path, fmt.Sprintf("%d", id), "raft")
-	if err := os.MkdirAll(dir, os.ModePerm); err != nil {
-		panic(err)
+func getPartitionPath(id metapb.PartitionID, path string, create bool) (dir string, err error) {
+	dir = filepath.Join(path, fmt.Sprintf("%d", id))
+	if create {
+		err = os.MkdirAll(dir, os.ModePerm)
 	}
-	return dir
+
+	return
+}
+
+func getDataPath(id metapb.PartitionID, path string, create bool) (dir string, err error) {
+	dir = filepath.Join(path, fmt.Sprintf("%d", id), "data")
+	if create {
+		err = os.MkdirAll(dir, os.ModePerm)
+	}
+
+	return
+}
+
+func getRaftPath(id metapb.PartitionID, path string, create bool) (dir string, err error) {
+	dir = filepath.Join(path, fmt.Sprintf("%d", id), "raft")
+	if create {
+		err = os.MkdirAll(dir, os.ModePerm)
+	}
+
+	return
+}
+
+type PartitionByIdSlice []metapb.Partition
+
+func (r PartitionByIdSlice) Len() int {
+	return len(r)
+}
+
+func (r PartitionByIdSlice) Swap(i int, j int) {
+	r[i], r[j] = r[j], r[i]
+}
+
+func (r PartitionByIdSlice) Less(i int, j int) bool {
+	return r[i].ID < r[j].ID
 }

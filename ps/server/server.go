@@ -2,6 +2,7 @@ package server
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net"
 	"sync"
@@ -10,9 +11,8 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/reflection"
 
-	"os"
+	"sort"
 
-	"github.com/pkg/errors"
 	"github.com/tiglabs/baud/proto/masterpb"
 	"github.com/tiglabs/baud/proto/metapb"
 	"github.com/tiglabs/baud/proto/pspb"
@@ -22,6 +22,7 @@ import (
 	"github.com/tiglabs/baud/util/config"
 	"github.com/tiglabs/baud/util/log"
 	"github.com/tiglabs/baud/util/netutil"
+	"github.com/tiglabs/baud/util/routine"
 	"github.com/tiglabs/baud/util/rpc"
 	"github.com/tiglabs/baud/util/timeutil"
 	"github.com/tiglabs/baud/util/uuid"
@@ -58,9 +59,6 @@ type Server struct {
 // NewServer create server instance
 func NewServer(conf *config.Config) *Server {
 	serverConf := loadConfig(conf)
-	if err := os.MkdirAll(serverConf.DataPath, os.ModePerm); err != nil {
-		panic(err)
-	}
 
 	s := &Server{
 		Config:       *serverConf,
@@ -69,7 +67,6 @@ func NewServer(conf *config.Config) *Server {
 		nodeResolver: NewNodeResolver(),
 		systemMetric: metric.NewSystemMetric(serverConf.DataPath, serverConf.DiskQuota),
 	}
-	s.nodeID = s.meta.MetaInfo.NodeID
 	s.ctx, s.ctxCancel = context.WithCancel(context.Background())
 
 	serverOpt := rpc.DefaultServerOption
@@ -94,6 +91,9 @@ func NewServer(conf *config.Config) *Server {
 
 // Start start server
 func (s *Server) Start() error {
+	metaInfo := s.meta.getInfo()
+	s.nodeID = metaInfo.NodeID
+
 	registerResp, err := s.register()
 	if err != nil {
 		return err
@@ -111,24 +111,12 @@ func (s *Server) Start() error {
 	}
 
 	// clear old partition
-	if len(registerResp.Partitions) == 0 {
-		s.destroyAll()
+	if metaInfo.ClusterID != s.ClusterID || len(registerResp.Partitions) == 0 {
+		s.reset()
 	} else {
-		oldPartitions := s.meta.getInfo().Partitions
-		for _, old := range oldPartitions {
-			destroy := true
-			for _, cur := range registerResp.Partitions {
-				if cur.ID == old {
-					destroy = false
-					break
-				}
-			}
-
-			if destroy {
-				s.destroyPartition(old)
-			}
-		}
+		s.destroyExcludePartition(registerResp.Partitions)
 	}
+	s.meta.reset(&pspb.MetaInfo{ClusterID: s.ClusterID, NodeID: s.nodeID})
 
 	// create raft server
 	if s.raftServer == nil {
@@ -158,7 +146,11 @@ func (s *Server) Start() error {
 		s.raftServer = rs
 	}
 
-	if ln, err := net.Listen("tcp", fmt.Sprintf(":%d", s.config.RPCPort)); err != nil {
+	// create and recover partitions
+	s.recoverPartitions(registerResp.Partitions)
+
+	// Start server
+	if ln, err := net.Listen("tcp", fmt.Sprintf(":%d", s.RPCPort)); err != nil {
 		return fmt.Errorf("Server failed to listen api port: %v", err)
 	} else {
 		pspb.RegisterApiGrpcServer(s.apiServer, s)
@@ -170,7 +162,7 @@ func (s *Server) Start() error {
 		}()
 	}
 
-	if ln, err := net.Listen("tcp", fmt.Sprintf(":%d", s.Config.AdminPort)); err != nil {
+	if ln, err := net.Listen("tcp", fmt.Sprintf(":%d", s.AdminPort)); err != nil {
 		return fmt.Errorf("Server failed to listen admin port: %v", err)
 	} else {
 		pspb.RegisterAdminGrpcServer(s.adminServer, s)
@@ -182,19 +174,38 @@ func (s *Server) Start() error {
 		}()
 	}
 
+	s.masterHeartbeat.start()
+	s.masterHeartbeat.trigger()
+
 	return nil
 }
 
 // Stop stop server
 func (s *Server) Stop() {
-	close(s.quit)
+	if s.masterHeartbeat != nil {
+		s.masterHeartbeat.stop()
+	}
+	s.ctxCancel()
+
 	if s.apiServer != nil {
 		s.apiServer.GracefulStop()
 	}
 	if s.adminServer != nil {
 		s.adminServer.GracefulStop()
 	}
+
+	routine.Stop()
 	s.closeAllRange()
+
+	if s.raftServer != nil {
+		s.raftServer.Stop()
+	}
+	if s.masterClient != nil {
+		s.masterClient.Close()
+	}
+	if s.connMgr != nil {
+		s.connMgr.Close()
+	}
 }
 
 func (s *Server) closeAllRange() {
@@ -248,4 +259,22 @@ func (s *Server) register() (*masterpb.PSRegisterResponse, error) {
 	})
 
 	return response, err
+}
+
+func (s *Server) recoverPartitions(partitions []metapb.Partition) {
+	// sort by partition id
+	sort.Sort(PartitionByIdSlice(partitions))
+	wg := new(sync.WaitGroup)
+	wg.Add(len(partitions))
+
+	for i := 0; i < len(partitions); i++ {
+		p := partitions[i]
+		routine.RunWorkAsync("RECOVER-PARTITION", func() {
+			defer wg.Done()
+
+			s.createPartition(p)
+		}, routine.LogPanic(false))
+	}
+
+	wg.Wait()
 }

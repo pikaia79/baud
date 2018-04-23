@@ -21,5 +21,4 @@ option (gogoproto.goproto_getters_all) = false;
 message MetaInfo {
     string   cluster_id         = 1 [(gogoproto.customname) = "ClusterID"];
     uint32   node_id            = 2 [(gogoproto.customname) = "NodeID", (gogoproto.casttype) = "github.com/tiglabs/baud/proto/metapb.NodeID"];
-    repeated uint32 partitions  = 3 [(gogoproto.customname) = "Partitions", (gogoproto.casttype) = "github.com/tiglabs/baud/proto/metapb.PartitionID"];
 }
