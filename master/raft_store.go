@@ -114,7 +114,7 @@ func (rs *RaftStore) Open() error {
 func (rs *RaftStore) Put(key, value []byte) error {
 	req := &masterpb.Request{
 		CmdType: masterpb.CmdType_Put,
-		PutReq: &masterpb.PutRequest{
+		PutReq: &masterpb.RaftPutRequest{
 			Key:   key,
 			Value: value,
 		},
@@ -132,7 +132,7 @@ func (rs *RaftStore) Put(key, value []byte) error {
 func (rs *RaftStore) Delete(key []byte) error {
 	req := &masterpb.Request{
 		CmdType: masterpb.CmdType_Delete,
-		DeleteReq: &masterpb.DeleteRequest{
+		DeleteReq: &masterpb.RaftDeleteRequest{
 			Key: key,
 		},
 	}
@@ -152,7 +152,7 @@ func (rs *RaftStore) Get(key []byte) ([]byte, error) {
 	}
 	req := &masterpb.Request{
 		CmdType: masterpb.CmdType_Get,
-		GetReq: &masterpb.GetRequest{
+		GetReq: &masterpb.RaftGetRequest{
 			Key: key,
 		},
 	}
@@ -428,8 +428,8 @@ func (r *Resolver) NodeAddress(nodeID uint64, stype raft.SocketType) (addr strin
 ////////////////////raft end////////////////////////
 
 /////////////////////callback implement begin///////////////
-func (rs *RaftStore) raftKvRawGet(req *masterpb.GetRequest, raftIndex uint64) (*masterpb.GetResponse, error) {
-	resp := new(masterpb.GetResponse)
+func (rs *RaftStore) raftKvRawGet(req *masterpb.RaftGetRequest, raftIndex uint64) (*masterpb.RaftGetResponse, error) {
+	resp := new(masterpb.RaftGetResponse)
 	//log.Info("raft put")
 	// TODO write in one batch
 	value, err := rs.localStore.Get(req.Key)
@@ -446,8 +446,8 @@ func (rs *RaftStore) raftKvRawGet(req *masterpb.GetRequest, raftIndex uint64) (*
 	return resp, nil
 }
 
-func (rs *RaftStore) raftKvRawPut(req *masterpb.PutRequest, raftIndex uint64) (*masterpb.PutResponse, error) {
-	resp := new(masterpb.PutResponse)
+func (rs *RaftStore) raftKvRawPut(req *masterpb.RaftPutRequest, raftIndex uint64) (*masterpb.RaftPutResponse, error) {
+	resp := new(masterpb.RaftPutResponse)
 	// TODO write in one batch
 	err := rs.localStore.Put(req.Key, req.Value, raftIndex)
 	if err != nil {
@@ -457,8 +457,8 @@ func (rs *RaftStore) raftKvRawPut(req *masterpb.PutRequest, raftIndex uint64) (*
 	return resp, nil
 }
 
-func (rs *RaftStore) raftKvRawDelete(req *masterpb.DeleteRequest, raftIndex uint64) (*masterpb.DeleteResponse, error) {
-	resp := new(masterpb.DeleteResponse)
+func (rs *RaftStore) raftKvRawDelete(req *masterpb.RaftDeleteRequest, raftIndex uint64) (*masterpb.RaftDeleteResponse, error) {
+	resp := new(masterpb.RaftDeleteResponse)
 	err := rs.localStore.Delete(req.Key, raftIndex)
 	if err != nil {
 		return nil, err
