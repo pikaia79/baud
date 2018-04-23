@@ -24,21 +24,17 @@
 */
 package masterpb
 
-import (
-	"fmt"
-	"io"
-	"math"
+import proto "github.com/golang/protobuf/proto"
+import fmt "fmt"
+import math "math"
+import _ "github.com/gogo/protobuf/gogoproto"
 
-	proto "github.com/golang/protobuf/proto"
+import bytes "bytes"
 
-	_ "github.com/gogo/protobuf/gogoproto"
+import strings "strings"
+import reflect "reflect"
 
-	bytes "bytes"
-
-	strings "strings"
-
-	reflect "reflect"
-)
+import io "io"
 
 // Reference imports to suppress errors if they are not otherwise used.
 var _ = proto.Marshal

@@ -29,29 +29,23 @@
 */
 package masterpb
 
-import (
-	"fmt"
-	"io"
-	"math"
+import proto "github.com/golang/protobuf/proto"
+import fmt "fmt"
+import math "math"
+import _ "github.com/gogo/protobuf/gogoproto"
+import meta "github.com/tiglabs/baud/proto/metapb"
 
-	proto "github.com/golang/protobuf/proto"
+import github_com_tiglabs_baud_proto_metapb "github.com/tiglabs/baud/proto/metapb"
 
-	_ "github.com/gogo/protobuf/gogoproto"
+import context "golang.org/x/net/context"
+import grpc "google.golang.org/grpc"
 
-	meta "github.com/tiglabs/baud/proto/metapb"
+import binary "encoding/binary"
 
-	github_com_tiglabs_baud_proto_metapb "github.com/tiglabs/baud/proto/metapb"
+import strings "strings"
+import reflect "reflect"
 
-	context "golang.org/x/net/context"
-
-	grpc "google.golang.org/grpc"
-
-	binary "encoding/binary"
-
-	strings "strings"
-
-	reflect "reflect"
-)
+import io "io"
 
 // Reference imports to suppress errors if they are not otherwise used.
 var _ = proto.Marshal
