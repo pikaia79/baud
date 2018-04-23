@@ -8,7 +8,8 @@ import (
 	"github.com/tiglabs/baud/proto/metapb"
 )
 
-func (s *Server) createPartition(p metapb.Partition) {
+func (s *Server) doPartitionCreate(p metapb.Partition) {
+	partition, ok := s.partitions.Load(p.ID)
 
 }
 
