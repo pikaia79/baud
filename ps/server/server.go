@@ -94,6 +94,7 @@ func (s *Server) Start() error {
 	metaInfo := s.meta.getInfo()
 	s.nodeID = metaInfo.NodeID
 
+	// do register to master
 	registerResp, err := s.register()
 	if err != nil {
 		return err
@@ -174,6 +175,7 @@ func (s *Server) Start() error {
 		}()
 	}
 
+	// start heartbeat to master
 	s.masterHeartbeat.start()
 	s.masterHeartbeat.trigger()
 
@@ -267,12 +269,13 @@ func (s *Server) recoverPartitions(partitions []metapb.Partition) {
 	wg := new(sync.WaitGroup)
 	wg.Add(len(partitions))
 
+	// parallel execution recovery
 	for i := 0; i < len(partitions); i++ {
 		p := partitions[i]
 		routine.RunWorkAsync("RECOVER-PARTITION", func() {
 			defer wg.Done()
 
-			s.createPartition(p)
+			s.doPartitionCreate(p)
 		}, routine.LogPanic(false))
 	}
 
