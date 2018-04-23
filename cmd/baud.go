@@ -2,16 +2,16 @@ package main
 
 import (
 	"flag"
-	"util/log"
+	"github.com/tiglabs/baud/util/log"
 	"net/http"
 	_ "net/http/pprof"
 	"os"
 	"os/signal"
 	"runtime"
 	"syscall"
-	"router"
+	"github.com/tiglabs/baud/router"
 	"sync"
-	"util/config"
+	"github.com/tiglabs/baud/util/config"
 	"fmt"
 )
 

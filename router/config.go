@@ -1,10 +1,9 @@
 package router
 
 import (
-	"github.com/tiglabs/baud/util/log"
 	"github.com/BurntSushi/toml"
+	"github.com/tiglabs/baud/util/log"
 )
-
 
 const defaultConfig = `
 # Router Configuration.
@@ -20,14 +19,14 @@ psConnPoolSize = 10
 `
 
 type Config struct {
-	Role string  `toml:"name,omitempty" json:"name"`
-	Ip string
-	HttpPort uint16
-	Pprof uint16
-	MasterAddr string
-	LogDir string
+	Role               string `toml:"name,omitempty" json:"name"`
+	Ip                 string
+	HttpPort           uint16
+	Pprof              uint16
+	MasterAddr         string
+	LogDir             string
 	masterConnPoolSize uint16
-	psConnPoolSize uint16
+	psConnPoolSize     uint16
 }
 
 func LoadConfig(fileName string) *Config {
@@ -53,5 +52,3 @@ func (config *Config) LoadFromFile(fileName string) error {
 func (config *Config) validate() error {
 	return nil
 }
-
-
