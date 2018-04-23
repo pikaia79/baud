@@ -30,11 +30,11 @@ const (
 	defaultMaxCallRecvMsgSize = math.MaxInt32
 	defaultMaxCallSendMsgSize = math.MaxInt32
 
-	defaultConnectTimeout    = 5 * time.Second
+	defaultConnectTimeout    = 3 * time.Second
 	defaultKeepaliveTime     = 30 * time.Minute
 	defaultKeepaliveTimeout  = time.Minute
-	defaultHeartbeatInterval = 10 * time.Minute
-	defaultHeartbeatTimeout  = 10 * time.Second
+	defaultHeartbeatInterval = 15 * time.Minute
+	defaultHeartbeatTimeout  = 3 * time.Second
 	defaultMaxBackoff        = 30 * time.Millisecond
 
 	defaultCompression = false

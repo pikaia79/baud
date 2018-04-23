@@ -12,6 +12,7 @@ import (
 
 	"github.com/tiglabs/baud/util/log"
 	"github.com/tiglabs/baud/util/netutil"
+	"github.com/tiglabs/baud/util/rpc/heartbeat"
 )
 
 var sourceAddr = func() net.Addr {
@@ -27,11 +28,13 @@ type heartbeatResult struct {
 
 // connection is a wrapper around grpc.ClientConn
 type connection struct {
-	clusterID       string
-	ctx             context.Context
+	addr            string
+	heartbeatReq    heartbeat.PingRequest
+	manager         *ConnectionMgr
 	grpcConn        *grpc.ClientConn
 	dialErr         error        // error while dialing; if set, connection is unusable
 	heartbeatResult atomic.Value // result of latest heartbeat
+	redialChan      <-chan struct{}
 
 	initOnce      sync.Once
 	validatedOnce sync.Once
@@ -40,10 +43,11 @@ type connection struct {
 	closeDone     chan struct{}
 }
 
-func newConnection(ctx context.Context, clusterID string) *connection {
+func newConnection(clusterID, addr string, manager *ConnectionMgr) *connection {
 	c := &connection{
-		ctx:           ctx,
-		clusterID:     clusterID,
+		addr:          addr,
+		heartbeatReq:  heartbeat.PingRequest{Ping: "OK", ClusterId: clusterID},
+		manager:       manager,
 		heartbeatDone: make(chan struct{}),
 		closeDone:     make(chan struct{}),
 	}
@@ -66,8 +70,8 @@ func (c *connection) connect() (*grpc.ClientConn, error) {
 	// Wait for initial heartbeat
 	select {
 	case <-c.heartbeatDone:
-	case <-c.ctx.Done():
-		return nil, c.ctx.Err()
+	case <-c.manager.ctx.Done():
+		return nil, c.manager.ctx.Err()
 	}
 
 	h := c.heartbeatResult.Load().(heartbeatResult)
@@ -85,6 +89,52 @@ func (c *connection) setInitialHeartbeatDone() {
 	c.validatedOnce.Do(func() {
 		close(c.heartbeatDone)
 	})
+}
+
+func (c *connection) heartbeat() error {
+	var err error
+	var response *heartbeat.PingResponse
+	success := c.heartbeatResult.Load().(heartbeatResult).succeeded
+
+	select {
+	case <-c.redialChan:
+		err = ErrCannotReuseClientConn
+
+	case <-c.manager.ctx.Done():
+		err = c.manager.ctx.Err()
+
+	default:
+		goCtx := c.manager.ctx
+		var cancel context.CancelFunc
+		if hbTimeout := c.manager.option.HeartbeatTimeout; hbTimeout > 0 {
+			goCtx, cancel = context.WithTimeout(goCtx, hbTimeout)
+		}
+		heartbeatClient := heartbeat.NewHeartbeatClient(c.grpcConn)
+		response, err = heartbeatClient.Ping(goCtx, &c.heartbeatReq)
+		if cancel != nil {
+			cancel()
+		}
+
+		if err == nil {
+			if c.heartbeatReq.ClusterId != response.ClusterId {
+				err = fmt.Errorf("client cluster_id(%s) doesn't match server cluster_id(%s)", c.heartbeatReq.ClusterId, response.ClusterId)
+			}
+		}
+		if err == nil {
+			success = true
+			if cb := c.manager.option.HeartbeatCallback; cb != nil {
+				cb()
+			}
+		}
+	}
+
+	c.heartbeatResult.Store(heartbeatResult{
+		succeeded: success,
+		err:       err,
+	})
+	c.setInitialHeartbeatDone()
+
+	return err
 }
 
 func (c *connection) Close() error {

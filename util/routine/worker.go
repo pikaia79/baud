@@ -4,14 +4,13 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"io"
 	"runtime"
 	"strings"
 	"sync"
 
-	"csm/util/atomic"
-	"csm/util/log"
-	"csm/util/multierror"
+	"github.com/tiglabs/baud/util/atomic"
+	"github.com/tiglabs/baud/util/log"
+	"github.com/tiglabs/baud/util/multierror"
 )
 
 const (
@@ -23,6 +22,8 @@ var (
 	errUnavailable = errors.New("service is unavailable")
 	globalWorker   *worker
 )
+
+type closeFunc func() error
 
 func init() {
 	globalWorker = newWorker()
@@ -53,7 +54,7 @@ func LogPanic(throw bool) func(interface{}) {
 			}
 			callers = callers + fmt.Sprintf("%v:%v\n", file, line)
 		}
-		log.Errorf("Recovered from panic: %#v (%v)\n%v", r, r, callers)
+		log.Error("Recovered from panic: %#v (%v)\n%v", r, r, callers)
 
 		if throw {
 			panic(r)
@@ -140,7 +141,7 @@ func Stop() error {
 
 	merr := &multierror.MultiError{}
 	for _, c := range globalWorker.closers {
-		merr.Append(c.Close())
+		merr.Append(c())
 	}
 	close(globalWorker.stopped)
 	return merr.ErrorOrNil()
@@ -162,7 +163,7 @@ func WorkNum() int64 {
 }
 
 // AddCloser add close hook
-func AddCloser(c io.Closer) {
+func AddCloser(c closeFunc) {
 	globalWorker.rwMu.Lock()
 	globalWorker.closers = append(globalWorker.closers, c)
 	globalWorker.rwMu.Unlock()
@@ -197,7 +198,7 @@ type worker struct {
 	numWorks *atomic.AtomicInt64
 
 	rwMu    sync.RWMutex
-	closers []io.Closer
+	closers []closeFunc
 	cancels []func()
 }
 
