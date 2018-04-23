@@ -69,6 +69,6 @@ message ChangeLeaderResponse {
 }
 
 enum ReplicaChangeType {
-    ReplicaAdd     = 0;
-    ReplicaRemove  = 1;
+    Add     = 0;
+    Remove  = 1;
 }

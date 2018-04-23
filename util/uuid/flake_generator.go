@@ -52,19 +52,19 @@ func (g *flakeGenerator) GetUUID() string {
 	g.Unlock()
 
 	uuidBuf := bufalloc.AllocBuffer(15)
-	// putting the 1st and 3rd byte of the sequence number so that compression starts to be triggered with smaller block size
-	uuidBuf.WriteByte(byte(seqID))
-	uuidBuf.WriteByte(byte(seqID >> 16))
-	uuidBuf.WriteByte(byte(curTimestamp >> 16))
-	uuidBuf.WriteByte(byte(curTimestamp >> 24))
-	uuidBuf.WriteByte(byte(curTimestamp >> 32))
-	uuidBuf.WriteByte(byte(curTimestamp >> 40))
-	uuidBuf.Write(g.macAddr)
-	uuidBuf.WriteByte(byte(curTimestamp >> 8))
-	uuidBuf.WriteByte(byte(seqID >> 8))
-	uuidBuf.WriteByte(byte(curTimestamp))
 
+	uuidBuf.WriteByte(byte(curTimestamp >> 40))
+	uuidBuf.WriteByte(byte(curTimestamp >> 32))
+	uuidBuf.WriteByte(byte(curTimestamp >> 24))
+	uuidBuf.WriteByte(byte(curTimestamp >> 16))
+	uuidBuf.WriteByte(byte(curTimestamp >> 8))
+	uuidBuf.WriteByte(byte(curTimestamp))
+	uuidBuf.Write(g.macAddr)
+	uuidBuf.WriteByte(byte(seqID >> 16))
+	uuidBuf.WriteByte(byte(seqID >> 8))
+	uuidBuf.WriteByte(byte(seqID))
 	uid := base64.URLEncoding.EncodeToString(uuidBuf.Bytes())
+
 	bufalloc.FreeBuffer(uuidBuf)
 	return uid
 }

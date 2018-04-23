@@ -55,6 +55,7 @@ message Space {
 }
 
 enum PartitionStatus {
+    option (gogoproto.goproto_enum_prefix) = false;
     PA_Invalid      = 0;
     PA_NOTREAD      = 1;
     PA_READONLY     = 2;
@@ -80,8 +81,9 @@ message Partition {
 }
 
 message Replica {
-    uint64        id        = 1 [(gogoproto.customname) = "ID", (gogoproto.casttype) = "ReplicaID"];
-    uint32        nodeID    = 2 [(gogoproto.customname) = "NodeID", (gogoproto.casttype) = "NodeID"];
+    uint64        id         = 1 [(gogoproto.customname) = "ID", (gogoproto.casttype) = "ReplicaID"];
+    uint32        nodeID     = 2 [(gogoproto.customname) = "NodeID", (gogoproto.casttype) = "NodeID"];
+    RaftAddrs     raft_addrs = 3 [(gogoproto.nullable) = false];
 }
 
 message Node {

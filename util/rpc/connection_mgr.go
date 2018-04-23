@@ -14,10 +14,6 @@ import (
 	"github.com/tiglabs/baud/util/routine"
 )
 
-const (
-	heartbeatConcurrent = 63
-)
-
 // DefaultManagerOption create a default option
 var DefaultManagerOption = ManagerOption{
 	HeartbeatInterval: defaultHeartbeatInterval,
@@ -146,7 +142,7 @@ func (mgr *ConnectionMgr) runHeartbeat() {
 				}, routine.LogPanic(false))
 
 				count++
-				if (count & heartbeatConcurrent) == 0 {
+				if (count & 63) == 0 {
 					runtime.Gosched()
 				}
 				return true

@@ -4,8 +4,9 @@ import (
 	"strconv"
 	"strings"
 	"sync"
-	"sync/atomic"
 	"time"
+
+	"sync/atomic"
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/stats"
@@ -79,7 +80,7 @@ func (c *Client) Close() error {
 type clientWrapper struct {
 	key    string
 	addr   string
-	option *ClientOption
+	option ClientOption
 
 	rwMutex   sync.RWMutex
 	conn      *connection
@@ -104,7 +105,7 @@ func (cw *clientWrapper) getClient() (interface{}, error) {
 	}
 
 	var cli interface{}
-	cw.conn = cw.option.ConnectMgr.grpcDial(cw.key, cw.addr, cw.option)
+	cw.conn = cw.option.ConnectMgr.grpcDial(cw.key, cw.addr, &cw.option)
 	grpcConn, err := cw.conn.connect()
 	if err == nil {
 		cli = cw.option.CreateFunc(grpcConn)
@@ -144,19 +145,22 @@ func newClientPool(size uint32, addr string, option *ClientOption) *clientPool {
 	for i := 0; i < int(size); i++ {
 		pool.wrappers[i].key = strings.Join([]string{addr, strconv.Itoa(i)}, "-")
 		pool.wrappers[i].addr = addr
-		pool.wrappers[i].option = option
+		pool.wrappers[i].option = *option
 	}
 
 	return pool
 }
 
 func (p *clientPool) getClient() (interface{}, error) {
+	if p.size == 1 {
+		return p.wrappers[0].getClient()
+	}
+
 	idx := atomic.AddUint32(&p.pos, 1)
 	if idx >= p.size {
 		atomic.StoreUint32(&p.pos, 0)
 		idx = 0
 	}
-
 	return p.wrappers[idx].getClient()
 }
 
