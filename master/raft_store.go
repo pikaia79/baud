@@ -1,7 +1,6 @@
 package master
 
 import (
-	"errors"
 	"fmt"
 	"github.com/tiglabs/raft"
 	raftproto "github.com/tiglabs/raft/proto"
@@ -399,7 +398,9 @@ type Resolver struct {
 }
 
 func NewResolver(peers []*Peer) *Resolver {
-	resolver := new(Resolver)
+	resolver := &Resolver{
+		nodes: make(map[uint64]*Peer),
+	}
 	for _, p := range peers {
 		resolver.nodes[p.NodeId] = p
 	}
@@ -411,17 +412,17 @@ func (r *Resolver) NodeAddress(nodeID uint64, stype raft.SocketType) (addr strin
 	case raft.HeartBeat:
 		node := r.nodes[nodeID]
 		if node == nil {
-			return "", errors.New("invalid raft node")
+			return "", ErrRaftInvalidNode
 		}
 		return node.RaftHeartbeatAddr, nil
 	case raft.Replicate:
 		node := r.nodes[nodeID]
 		if node == nil {
-			return "", errors.New("invalid raft node")
+			return "", ErrRaftInvalidNode
 		}
 		return node.RaftReplicateAddr, nil
 	default:
-		return "", errors.New("unknown raft socket type")
+		return "", ErrRaftUnknownType
 	}
 }
 
