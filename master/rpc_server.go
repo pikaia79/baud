@@ -117,7 +117,7 @@ func (s *RpcServer) GetDB(ctx context.Context, req *masterpb.GetDBRequest) (*mas
 func (s *RpcServer) GetSpace(ctx context.Context, req *masterpb.GetSpaceRequest) (*masterpb.GetSpaceResponse, error) {
 	resp := new(masterpb.GetSpaceResponse)
 
-	db := s.cluster.dbCache.findDbByName(req.ID)
+	db := s.cluster.dbCache.findDbById(req.ID)
 	if db == nil {
 		resp.ResponseHeader = *makeRpcRespHeader(ErrDbNotExists)
 		return resp, nil
