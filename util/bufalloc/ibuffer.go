@@ -4,24 +4,14 @@ import (
 	"bytes"
 	"errors"
 	"io"
-<<<<<<< HEAD
-)
 
-const minRead = 512
-
-var (
-	ErrTooLarge = errors.New("bufalloc.Buffer: too large.")
-=======
-
-	"csm/util"
+	byteutil "github.com/tiglabs/baud/util/bytes"
 )
 
 const minRead = 128
 
 var (
-	// ErrTooLarge buffer size is too large error
-	ErrTooLarge = errors.New("bufalloc.Buffer: too large")
->>>>>>> upstream/master
+	ErrTooLarge = errors.New("bufalloc.Buffer: too large.")
 )
 
 type ibuffer struct {
@@ -105,15 +95,12 @@ func (b *ibuffer) Grow(n int) {
 	b.buf = b.buf[0:m]
 }
 
-<<<<<<< HEAD
-=======
 func (b *ibuffer) WriteString(s string) (n int, err error) {
-	p := util.StringToBytes(s)
+	p := byteutil.StringToByte(s)
 	m := b.grow(len(p))
 	return copy(b.buf[m:], p), nil
 }
 
->>>>>>> upstream/master
 func (b *ibuffer) Write(p []byte) (n int, err error) {
 	m := b.grow(len(p))
 	return copy(b.buf[m:], p), nil

@@ -3,9 +3,6 @@ syntax = "proto3";
 import "github.com/gogo/protobuf/gogoproto/gogo.proto";
 
 import "github.com/tiglabs/baud/proto/metapb/meta.proto";
-import "github.com/tiglabs/baud/proto/metapb/api.proto";
-
-import "stats.proto";
 
 option go_package = "masterpb";
 
@@ -49,7 +46,7 @@ message GetDBResponse {
 
 message GetSpaceRequest {
     RequestHeader header = 1 [(gogoproto.nullable) = false, (gogoproto.embed) = true];
-    uint32        db_id   = 2 [(gogoproto.customname) = "ID", (gogoproto.casttype) = "DBID"];
+    uint32        db_id   = 2 [(gogoproto.customname) = "ID", (gogoproto.casttype) = "github.com/tiglabs/baud/proto/metapb.DBID"];
     string        Space_name = 3;
 }
 
@@ -114,4 +111,72 @@ message PartitionInfo {
     PartitionEpoch   epoch       = 4 [(gogoproto.nullable) = false];
     RaftStatus       raft_status = 5;
     PartitionStats   statistics  = 6 [(gogoproto.nullable) = false];
+}
+
+message RuntimeInfo {
+    string app_version = 1;
+    string start_time  = 2;
+    string go_version  = 3;
+    string platform    = 4;
+}
+
+message RaftStatus {
+    uint64 id                             = 1 [(gogoproto.customname) = "ID", (gogoproto.casttype) = "github.com/tiglabs/baud/proto/metapb.ReplicaID"];
+    uint64 term                           = 2;
+    uint64 index                          = 3;
+    uint64 commit                         = 4;
+    uint64 applied                        = 5;
+    repeated RaftFollowerStatus followers = 6 [(gogoproto.nullable) = false];
+}
+
+message RaftFollowerStatus {
+    uint64 id           = 1 [(gogoproto.customname) = "ID", (gogoproto.casttype) = "github.com/tiglabs/baud/proto/metapb.ReplicaID"];
+    uint32 nodeID       = 2 [(gogoproto.customname) = "NodeID", (gogoproto.casttype) = "github.com/tiglabs/baud/proto/metapb.NodeID"];
+    uint64 match        = 3;
+    uint64 commit       = 4;
+    uint64 next         = 5;
+    uint64 down_seconds = 6;
+    string state        = 7;
+}
+
+message NodeSysStats {
+    // Memory
+    uint64 memory_total                      = 1;
+    uint64 memory_used_rss                   = 2;
+    uint64 memory_used                       = 3;
+    uint64 memory_free                       = 4;
+    //double memory_used_percent               = 5;
+    uint64 swap_memory_total                 = 6;
+    uint64 swap_memory_used                  = 7;
+    uint64 swap_memory_free                  = 8;
+    //double swap_memory_used_percent          = 9;
+    // CPU
+    double cpu_proc_rate                     = 10;
+    uint32 cpu_count                         = 11;
+    //double load1                             = 12;
+    //double load5                             = 13;
+    //double load15                            = 14;
+    // Disk
+    uint64 disk_total                        = 15;
+    uint64 disk_used                         = 16;
+    uint64 disk_free                         = 17;
+    //double disk_proc_rate                    = 18;
+    //uint64 disk_read_byte_per_sec            = 19;
+    //uint64 disk_write_byte_per_sec           = 20;
+    // Net
+    uint64 net_io_in_byte_per_sec            = 21;
+    uint64 net_io_out_byte_per_sec           = 22;
+    uint32 net_tcp_connections               = 23;
+    uint64 net_tcp_active_opens_per_sec      = 24;
+    // server
+    uint64 ops                               = 25;
+}
+
+message PartitionStats {
+    uint64 size                = 1;
+    uint64 ops                 = 2;
+    uint64 bytes_in_per_sec    = 3;
+    uint64 bytes_out_per_sec   = 4;
+    uint64 total_commands_processed = 5;
+    uint64 keyspace_misses     = 6;
 }

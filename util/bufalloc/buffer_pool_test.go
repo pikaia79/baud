@@ -3,11 +3,7 @@ package bufalloc
 import (
 	"testing"
 
-<<<<<<< HEAD
-	"util"
-=======
-	"csm/util"
->>>>>>> upstream/master
+	"github.com/tiglabs/baud/util/bytes"
 )
 
 func TestGetPoolNum(t *testing.T) {
@@ -21,7 +17,7 @@ func TestGetPoolNum(t *testing.T) {
 			t.Errorf("Got %v expected %v", num, i)
 		}
 	}
-	num := buffPool.getPoolNum(2 * util.MB)
+	num := buffPool.getPoolNum(2 * bytes.MB)
 	if num != baseSize {
 		t.Errorf("Got %v expected %v", num, baseSize)
 	}
@@ -35,9 +31,9 @@ func TestGetBuffer(t *testing.T) {
 		}
 		buffPool.putBuffer(buf)
 	}
-	buf := buffPool.getBuffer(2 * util.MB)
-	if buf.Len() != 0 || buf.Cap() != 2*util.MB {
-		t.Errorf("Got %v expected %v", buf.Cap(), 2*util.MB)
+	buf := buffPool.getBuffer(2 * bytes.MB)
+	if buf.Len() != 0 || buf.Cap() != 2*bytes.MB {
+		t.Errorf("Got %v expected %v", buf.Cap(), 2*bytes.MB)
 	}
 	buffPool.putBuffer(buf)
 }
