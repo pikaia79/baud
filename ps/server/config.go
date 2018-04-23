@@ -2,12 +2,10 @@ package server
 
 import (
 	"errors"
+	"strconv"
 
 	"github.com/tiglabs/baud/proto/masterpb"
-	"github.com/tiglabs/baud/util/bytes"
 	"github.com/tiglabs/baud/util/config"
-	"github.com/tiglabs/baud/util/json"
-	"github.com/tiglabs/baud/util/log"
 	"github.com/tiglabs/baud/util/multierror"
 )
 
@@ -18,44 +16,105 @@ type Config struct {
 	ClusterID    string
 	MasterServer string
 	DataPath     string
+	DiskQuota    uint64
 
 	LogDir    string
 	LogModule string
 	LogLevel  string
 }
 
-// LoadConfig load server config
-func LoadConfig(conf *config.Config) (*Config, error) {
+// loadConfig load server config from environment and file
+func loadConfig(conf *config.Config) *Config {
+	c := &Config{}
 	if conf == nil {
-		return nil, errors.New("server config not specified")
+		return c
 	}
 
-	c := &Config{}
+	c.ClusterID = conf.GetString("cluster.id")
+	c.MasterServer = conf.GetString("master.server")
+	c.DataPath = conf.GetString("data.path")
+
+	c.LogDir = conf.GetString("log.dir")
+	c.LogModule = conf.GetString("log.module")
+	c.LogLevel = conf.GetString("log.level")
+
+	if diskQuota := conf.GetString("disk.quota"); diskQuota != "" {
+		c.DiskQuota, _ = strconv.ParseUint(diskQuota, 10, 64)
+	}
+	if rpcPort := conf.GetString("rpc.port"); rpcPort != "" {
+		c.PSConfig.RPCPort, _ = strconv.Atoi(rpcPort)
+	}
+	if adminPort := conf.GetString("admin.port"); adminPort != "" {
+		c.PSConfig.AdminPort, _ = strconv.Atoi(adminPort)
+	}
+	if heartbeat := conf.GetString("heartbeat.interval"); heartbeat != "" {
+		c.PSConfig.HeartbeatInterval, _ = strconv.Atoi(heartbeat)
+	}
+
+	if raftHbPort := conf.GetString("raft.heartbeat.port"); raftHbPort != "" {
+		c.PSConfig.RaftHeartbeatPort, _ = strconv.Atoi(raftHbPort)
+	}
+	if raftReplPort := conf.GetString("raft.repl.port"); raftReplPort != "" {
+		c.PSConfig.RaftReplicatePort, _ = strconv.Atoi(raftReplPort)
+	}
+	if raftHbInterval := conf.GetString("raft.heartbeat.interval"); raftHbInterval != "" {
+		c.PSConfig.RaftHeartbeatInterval, _ = strconv.Atoi(raftHbInterval)
+	}
+	if raftRetainLogs := conf.GetString("raft.retain.logs"); raftRetainLogs != "" {
+		c.PSConfig.RaftRetainLogs, _ = strconv.ParseUint(raftRetainLogs, 10, 64)
+	}
+	if raftRepl := conf.GetString("raft.repl.concurrency"); raftRepl != "" {
+		c.PSConfig.RaftReplicaConcurrency, _ = strconv.Atoi(raftRepl)
+	}
+	if raftSnap := conf.GetString("raft.snap.concurrency"); raftSnap != "" {
+		c.PSConfig.RaftSnapshotConcurrency, _ = strconv.Atoi(raftSnap)
+	}
+
+	return c
+}
+
+func (c *Config) validate() error {
 	multierr := new(multierror.MultiError)
 
-	if c.ClusterID = conf.GetString("cluster.id"); c.ClusterID == "" {
+	if c.ClusterID == "" {
 		multierr.Append(errors.New("cluster.id not specified"))
 	}
-	if c.MasterServer = conf.GetString("master.server"); c.MasterServer == "" {
+	if c.MasterServer == "" {
 		multierr.Append(errors.New("master.server not specified"))
 	}
-	if c.DataPath = conf.GetString("data.path"); c.DataPath == "" {
+	if c.DataPath == "" {
 		multierr.Append(errors.New("data.path not specified"))
 	}
 
-	if c.LogDir = conf.GetString("log.dir"); c.LogDir == "" {
+	if c.LogDir == "" {
 		multierr.Append(errors.New("log.dir not specified"))
 	}
-	if c.LogModule = conf.GetString("log.module"); c.LogModule == "" {
+	if c.LogModule == "" {
 		multierr.Append(errors.New("log.module not specified"))
 	}
-	if c.LogLevel = conf.GetString("log.level"); c.LogLevel == "" {
+	if c.LogLevel == "" {
 		multierr.Append(errors.New("log.level not specified"))
 	}
 
-	if b, err := json.Marshal(c); err == nil {
-		log.Info("[Config] Loaded server config: %v", bytes.ByteToString(b))
+	if c.RPCPort <= 0 {
+		multierr.Append(errors.New("rpc.port not specified"))
+	}
+	if c.AdminPort <= 0 {
+		multierr.Append(errors.New("admin.port not specified"))
+	}
+	if c.HeartbeatInterval <= 0 {
+		multierr.Append(errors.New("heartbeat.interval not specified"))
 	}
 
-	return c, multierr.ErrorOrNil()
+	if c.RaftHeartbeatPort <= 0 {
+		multierr.Append(errors.New("raft.heartbeat.port not specified"))
+	}
+	if c.RaftReplicatePort <= 0 {
+		multierr.Append(errors.New("raft.repl.port not specified"))
+	}
+	if c.RaftHeartbeatInterval <= 0 {
+		multierr.Append(errors.New("raft.heartbeat.interval not specified"))
+	}
+
+	return multierr.ErrorOrNil()
 }

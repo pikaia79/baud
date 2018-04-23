@@ -1,8 +1,6 @@
 package metric
 
 import (
-	"os"
-	"path/filepath"
 	"runtime"
 	"time"
 
@@ -57,7 +55,7 @@ func NewSystemMetric(diskPath string, diskQuota uint64) *SystemMetric {
 		diskPath:    diskPath,
 		diskQuota:   diskQuota,
 		CPUCount:    uint32(runtime.NumCPU()),
-		minInterval: 30 * time.Second,
+		minInterval: 10 * time.Second,
 	}
 }
 
@@ -186,34 +184,20 @@ func (s *SystemMetric) netMetric() {
 
 func (s *SystemMetric) diskMetric() {
 	routine.RunWork("SystemMetric-DISK", func() error {
-		used := dirUsage(s.diskPath)
-		s.DiskTotal = s.diskQuota
-		s.DiskUsed = used
-		s.DiskFree = s.diskQuota - used
+		diskStat, err := disk.Usage(s.diskPath)
+		if err != nil {
+			log.Error("SystemMetric get disk info error: %v", err)
+			return err
+		}
+		s.DiskUsed = diskStat.Used
+		if s.diskQuota == 0 {
+			s.DiskTotal = diskStat.Total
+			s.DiskFree = diskStat.Free
+		} else {
+			s.DiskTotal = s.diskQuota
+			s.DiskFree = s.DiskTotal - s.DiskUsed
+		}
+
 		return nil
 	}, routine.LogPanic(false))
-}
-
-func dirUsage(currPath string) uint64 {
-	var size uint64
-	dir, err := os.Open(currPath)
-	if err != nil {
-		return 0
-	}
-	defer dir.Close()
-
-	files, err := dir.Readdir(-1)
-	if err != nil {
-		return 0
-	}
-
-	for _, file := range files {
-		if file.IsDir() {
-			size += dirUsage(filepath.Join(currPath, file.Name()))
-		} else {
-			size += uint64(file.Size())
-		}
-	}
-
-	return size
 }

@@ -92,7 +92,7 @@
   branch = "master"
   name = "github.com/gopherjs/gopherjs"
   packages = ["js"]
-  revision = "27662f8dae2790b8232164d7570f54ba76144bc3"
+  revision = "1daac00a5961469351b87e7ac223239c37938d2a"
 
 [[projects]]
   name = "github.com/json-iterator/go"
@@ -211,7 +211,7 @@
     "netutil",
     "trace"
   ]
-  revision = "d41e8174641f662c5a2d1c7a5f9e828788eb8706"
+  revision = "5f9ae10d9af5b1c89ae6904293b14b064d4ada23"
 
 [[projects]]
   branch = "master"
@@ -220,7 +220,7 @@
     "unix",
     "windows"
   ]
-  revision = "a2a45943ae67364d56c5d7d62dee78cff16c8dc8"
+  revision = "79b0c6888797020a994db17c8510466c72fe75d9"
 
 [[projects]]
   name = "golang.org/x/text"
@@ -284,6 +284,6 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "8d1eee57bd5d05a8d36255b5f9051cdaa6e6adc524f344736ae42bc28337f25f"
+  inputs-digest = "e255bdc282d687fa660a3cf673c85cf586d8f2862a197b97b3d42fcdce16429e"
   solver-name = "gps-cdcl"
   solver-version = 1
