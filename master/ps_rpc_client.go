@@ -164,7 +164,7 @@ func (c *PSRpcClient) AddReplica(addr string, partitionId metapb.PartitionID, ra
 
 	req := &pspb.ChangeReplicaRequest{
 		RequestHeader: metapb.RequestHeader{},
-		Type:          pspb.ReplicaChangeType_ReplicaAdd,
+		Type:          pspb.ReplicaChangeType_Add,
 		PartitionID:   partitionId,
 		ReplicaID:     replicaId,
 		NodeID:        replicaNodeId,
@@ -187,7 +187,7 @@ func (c *PSRpcClient) RemoveReplica(addr string, partitionId metapb.PartitionID,
 
 	req := &pspb.ChangeReplicaRequest{
 		RequestHeader: metapb.RequestHeader{},
-		Type:          pspb.ReplicaChangeType_ReplicaRemove,
+		Type:          pspb.ReplicaChangeType_Remove,
 		PartitionID:   partitionId,
 		ReplicaID:     replicaId,
 		NodeID:        replicaNodeId,
