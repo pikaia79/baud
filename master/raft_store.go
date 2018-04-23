@@ -12,8 +12,8 @@ import (
 	"path/filepath"
 	"sync"
 	"time"
-	"util/log"
-	"util/raftkvstore"
+	"github.com/tiglabs/baud/util/log"
+	"github.com/tiglabs/baud/util/raftkvstore"
 )
 
 const (

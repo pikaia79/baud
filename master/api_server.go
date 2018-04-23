@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"net/http"
 	"strconv"
-	"util/log"
-	"util/server"
+	"github.com/tiglabs/baud/util/log"
+	"github.com/tiglabs/baud/util/server"
 )
 
 const (
@@ -17,7 +17,7 @@ const (
 	SRC_DB_NAME     = "src_db_name"
 	DEST_DB_NAME    = "dest_db_name"
 	SPACE_NAME      = "space_name"
-	SPACE_ID		= "space_id"
+	SPACE_ID        = "space_id"
 	SRC_SPACE_NAME  = "src_space_name"
 	DEST_SPACE_NAME = "dest_space_name"
 	PARTITION_KEY   = "partition_key"
@@ -204,8 +204,8 @@ func newHttpErrReply(err error) *HttpReply {
 		}
 	} else {
 		return &HttpReply{
-			Code:		ERRCODE_INTERNAL_ERROR,
-			Msg:		ErrInternalError.Error(),
+			Code: ERRCODE_INTERNAL_ERROR,
+			Msg:  ErrInternalError.Error(),
 		}
 	}
 }

@@ -5,12 +5,12 @@ import (
 	"fmt"
 	"sync"
 	"sync/atomic"
-	"util/log"
+	"github.com/tiglabs/baud/util/log"
 )
 
 var (
 	GEN_STEP          uint32 = 10
-	AUTO_INCREMENT_ID string = fmt.Sprintf("$auto_increment_id")
+	AUTO_INCREMENT_ID        = fmt.Sprintf("$auto_increment_id")
 
 	idGeneratorInstance IDGenerator
 	idGeneratorSyncOnce sync.Once

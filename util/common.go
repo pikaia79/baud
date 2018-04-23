@@ -3,7 +3,7 @@ package util
 import (
     "fmt"
     "strings"
-    "util/log"
+    "github.com/tiglabs/baud/util/log"
 )
 
 func BuildAddr(ip string, port int) string {

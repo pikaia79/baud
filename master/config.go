@@ -4,14 +4,14 @@ import (
 	"fmt"
 	"strings"
 	"time"
-	"util"
+	"github.com/tiglabs/baud/util"
 
 	"github.com/BurntSushi/toml"
-	"util/log"
+	"github.com/tiglabs/baud/util/log"
 )
 
 const (
-	defaultServerName           = "ms"
+	defaultServerName           = "master"
 	defaultMaxReplicas          = 3
 	defaultMaxSnapshotCount     = 3
 	defaultMaxNodeDownTime      = time.Hour
@@ -25,7 +25,7 @@ const (
 )
 
 const DefaultConfig = `
-# MS Configuration.
+# Master Configuration.
 
 name = "ms"
 node-id = 1

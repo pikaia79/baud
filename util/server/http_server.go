@@ -11,8 +11,8 @@ import (
 	"sync/atomic"
 
 	"golang.org/x/net/netutil"
-	"util/gogc"
-	"util/log"
+	"github.com/tiglabs/baud/util/gogc"
+	"github.com/tiglabs/baud/util/log"
 )
 
 type ServerConfig struct {

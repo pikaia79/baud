@@ -1,9 +1,8 @@
 package master
 
 import (
-	//"golang.org/x/net/context"
-	"util/log"
 	"sync"
+	"github.com/tiglabs/baud/util/log"
 )
 
 type Master struct {

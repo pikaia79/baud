@@ -5,11 +5,11 @@ import (
 	"errors"
 
 	"github.com/golang/protobuf/proto"
+	"github.com/tiglabs/baud/proto/masterpb"
 	"github.com/tiglabs/raft"
 	raftproto "github.com/tiglabs/raft/proto"
-	"util/log"
-	"util/raftkvstore"
-	"github.com/tiglabs/baud/proto/masterpb"
+	"github.com/tiglabs/baud/util/log"
+	"github.com/tiglabs/baud/util/raftkvstore"
 )
 
 var (
@@ -95,7 +95,7 @@ func (rg *RaftGroup) submit(ctx context.Context, cmd []byte) (interface{}, error
 	return resp, nil
 }
 
-func (rg *RaftGroup) SubmitCommand(ctx context.Context, req *masterraftcmdpb.Request) (*masterraftcmdpb.Response, error) {
+func (rg *RaftGroup) SubmitCommand(ctx context.Context, req *masterpb.Request) (*masterpb.Response, error) {
 	cmd, err := proto.Marshal(req)
 	if err != nil {
 		return nil, err
@@ -104,7 +104,7 @@ func (rg *RaftGroup) SubmitCommand(ctx context.Context, req *masterraftcmdpb.Req
 	if err != nil {
 		return nil, err
 	}
-	if rsp, ok := resp.(*masterraftcmdpb.Response); ok {
+	if rsp, ok := resp.(*masterpb.Response); ok {
 		return rsp, nil
 	}
 	return nil, errUnknownResponseType
@@ -140,7 +140,7 @@ func (rg *RaftGroup) RegisterFatalEventHandle(handler RaftFatalEventHandler) {
 //////////////////////statemachine begin///////////////////
 func (rg *RaftGroup) Apply(command []byte, index uint64) (res interface{}, err error) {
 	//TODO: PUT/DELTE & StoreApplyIndex use WriteBatch?
-	cmd := &masterraftcmdpb.Request{}
+	cmd := &masterpb.Request{}
 	err = proto.Unmarshal(command, cmd)
 	if err != nil {
 		return

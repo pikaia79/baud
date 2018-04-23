@@ -6,29 +6,30 @@ import (
 
 //master global error definitions
 var (
-	ErrSuc			 			= errors.New("success")
-	ErrInternalError 			= errors.New("internal error")
-	ErrSysBusy          		= errors.New("system busy")
-	ErrParamError				= errors.New("param error")
+	ErrSuc           = errors.New("success")
+	ErrInternalError = errors.New("internal error")
+	ErrSysBusy       = errors.New("system busy")
+	ErrParamError    = errors.New("param error")
 
-	ErrDupDb					= errors.New("duplicated database")
-	ErrDbNotExists				= errors.New("db not exists")
-	ErrDupSpace					= errors.New("duplicated space")
-	ErrSpaceNotExists			= errors.New("space not exists")
-	ErrPSNotExists              = errors.New("partition server is not exists")
+	ErrDupDb          = errors.New("duplicated database")
+	ErrDbNotExists    = errors.New("db not exists")
+	ErrDupSpace       = errors.New("duplicated space")
+	ErrSpaceNotExists = errors.New("space not exists")
+	ErrPSNotExists    = errors.New("partition server is not exists")
 
-	ErrGenIdFailed 				= errors.New("generate id is failed")
-	ErrBoltDbOpsFailed			= errors.New("boltdb operation error")
-	ErrUnknownRaftCmdType 		= errors.New("unknown raft command type")
+	ErrGenIdFailed        = errors.New("generate id is failed")
+	ErrBoltDbOpsFailed    = errors.New("boltdb operation error")
+	ErrUnknownRaftCmdType = errors.New("unknown raft command type")
 
+	ErrRouteNotFound      = errors.New("route not found")
 	//ErrEntryNotFound		    = errors.New("storage entry not found")
 
-	ErrGrpcInvalidResp          = errors.New("invalid grpc response")
-	ErrGrpcInvokeFailed			= errors.New("invoke grpc is failed")
+	ErrGrpcInvalidResp  = errors.New("invalid grpc response")
+	ErrGrpcInvokeFailed = errors.New("invoke grpc is failed")
 	//ErrGrpcInvalidReq           = errors.New("invalid grpc request")
-	ErrGrpcParamError           = errors.New("grpc param error")
-	ErrGrpcEmptyFollowers		= errors.New("reported empty followers")
-	ErrGrpcInvalidFollowers		= errors.New("reported invalid followers")
+	ErrGrpcParamError       = errors.New("grpc param error")
+	ErrGrpcEmptyFollowers   = errors.New("reported empty followers")
+	ErrGrpcInvalidFollowers = errors.New("reported invalid followers")
 )
 
 // http response error code and error message definitions
@@ -46,9 +47,11 @@ const (
 
 	ERRCODE_GENID_FAILED
 	ERRCODE_BOLTDB_OPTFAILED
+
 //	ERRCODE_UNKNOWN_RAFTCMDTYPE
 )
-var Err2CodeMap = map[error]int32 {
+
+var Err2CodeMap = map[error]int32{
 	ErrSuc:           ERRCODE_SUCCESS,
 	ErrInternalError: ERRCODE_INTERNAL_ERROR,
 	ErrSysBusy:       ERRCODE_SYSBUSY,
@@ -58,8 +61,8 @@ var Err2CodeMap = map[error]int32 {
 	ErrDbNotExists:    ERRCODE_DB_NOTEXISTS,
 	ErrDupSpace:       ERRCODE_DUP_SPACE,
 	ErrSpaceNotExists: ERRCODE_SPACE_NOTEXISTS,
-	ErrPSNotExists:	   ERRCODE_PS_NOTEXISTS,
+	ErrPSNotExists:    ERRCODE_PS_NOTEXISTS,
 
-	ErrGenIdFailed:		ERRCODE_GENID_FAILED,
-	ErrBoltDbOpsFailed:	ERRCODE_BOLTDB_OPTFAILED,
+	ErrGenIdFailed:     ERRCODE_GENID_FAILED,
+	ErrBoltDbOpsFailed: ERRCODE_BOLTDB_OPTFAILED,
 }

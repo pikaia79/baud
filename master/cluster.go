@@ -1,31 +1,29 @@
 package master
 
 import (
-	"util/log"
-	"sync"
-	"math"
-	"util"
 	"github.com/tiglabs/baud/proto/metapb"
+	"math"
+	"sync"
+	"github.com/tiglabs/baud/util/log"
+	"github.com/tiglabs/baud/util"
 )
 
 type Cluster struct {
-	config 			*Config
-	store 			Store
+	config *Config
+	store  Store
 
-	dbCache 		*DBCache
-	//spaceCache      *SpaceCache
-	psCache 		*PSCache
-	partitionCache  *PartitionCache
+	dbCache        *DBCache
+	psCache        *PSCache
+	partitionCache *PartitionCache
 
-    clusterLock     sync.RWMutex
+	clusterLock sync.RWMutex
 }
 
 func NewCluster(config *Config) *Cluster {
 	return &Cluster{
-		config: 		config,
-		store: 			NewRaftStore(config),
-		dbCache: 		NewDBCache(),
-		//spaceCache: 	NewSpaceCache(),
+		config:         config,
+		store:          NewRaftStore(config),
+		dbCache:        NewDBCache(),
 		psCache:        NewPSCache(),
 		partitionCache: NewPartitionCache(),
 	}
@@ -175,9 +173,9 @@ func (c *Cluster) recoveryPartition() error {
 			ps.addPartition(partition)
 		}
 		if err := partition.deleteReplica(c.store, delMetaReplicas...); err != nil {
-		    log.Error("fail to remove unused replicas when recovery partition[%v]. err[%v]", partition, err)
-		    continue
-        }
+			log.Error("fail to remove unused replicas when recovery partition[%v]. err[%v]", partition, err)
+			continue
+		}
 	}
 
 	return nil
@@ -244,9 +242,9 @@ func (c *Cluster) createSpace(dbName, spaceName, partitionKey, partitionFunc str
 	batch := c.store.NewBatch()
 
 	policy := &PartitionPolicy{
-		Key: partitionKey,
-		Function:partitionFunc,
-		NumPartitions:partitionNum,
+		Key:           partitionKey,
+		Function:      partitionFunc,
+		NumPartitions: partitionNum,
 	}
 	space, err := NewSpace(db.ID, dbName, spaceName, policy)
 	if err != nil {
@@ -256,13 +254,13 @@ func (c *Cluster) createSpace(dbName, spaceName, partitionKey, partitionFunc str
 		return nil, err
 	}
 
-	slots := util.SlotSplit(0, math.MaxUint32, partitionNum + 1)
+	slots := util.SlotSplit(0, math.MaxUint32, partitionNum+1)
 	if slots == nil {
 		log.Error("fail to split slot range [%v-%v]", 0, math.MaxUint32)
 		return nil, ErrInternalError
 	}
 	partitions := make([]*Partition, len(slots))
-	for i := 0; i < len(slots) - 1; i++ {
+	for i := 0; i < len(slots)-1; i++ {
 		partition, err := NewPartition(db.ID, space.ID, slots[i], slots[i+1])
 		if err != nil {
 			return nil, err
@@ -281,9 +279,9 @@ func (c *Cluster) createSpace(dbName, spaceName, partitionKey, partitionFunc str
 	for _, partition := range partitions {
 		space.putPartition(partition)
 
-		if err := PushProcessorEvent(NewPartitionCreateEvent(partition)); err != nil {
-			log.Error("fail to push event for creating partition[%v].", partition)
-		}
+		//if err := PushProcessorEvent(NewPartitionCreateEvent(partition)); err != nil {
+		//	log.Error("fail to push event for creating partition[%v].", partition)
+		//}
 	}
 
 	return space, nil

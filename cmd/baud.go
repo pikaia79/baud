@@ -2,16 +2,15 @@ package main
 
 import (
 	"flag"
-	"util/log"
+	"github.com/tiglabs/baud/util/log"
 	"net/http"
 	_ "net/http/pprof"
 	"os"
 	"os/signal"
 	"runtime"
 	"syscall"
-	"router"
+	"github.com/tiglabs/baud/master"
 	"sync"
-	"util/config"
 	"fmt"
 )
 
@@ -28,7 +27,7 @@ var (
 )
 
 type IServer interface {
-	Start(cfg *config.Config) error
+	Start(cfg *master.Config) error
 	Shutdown()
 }
 
@@ -47,9 +46,9 @@ func interceptSignal(s IServer) {
 func main() {
 	fmt.Println("Hello, Baud!")
 	flag.Parse()
-	cfg := config.LoadConfigFile(*configFile)
-	role := cfg.GetString("role")
-	profPort := cfg.GetString("pprof")
+	cfg := master.NewDefaultConfig()
+	role := "master"
+	profPort := "pprof"
 
 	//for multi-cpu scheduling
 	runtime.GOMAXPROCS(runtime.NumCPU())
@@ -63,11 +62,11 @@ func main() {
 
 	switch role {
 	case "master":
-		//server = master.NewServer()
+		server = master.NewServer()
 	case "ps":
 		//server = partition.NewServer()
 	case "router":
-		server = router.NewServer()
+		//server = router.NewServer()
 
 	default:
 		fmt.Println("Fatal: unmath role: ", role)
