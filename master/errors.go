@@ -21,6 +21,7 @@ var (
 	ErrBoltDbOpsFailed    = errors.New("boltdb operation error")
 	ErrUnknownRaftCmdType = errors.New("unknown raft command type")
 
+	ErrRouteNotFound      = errors.New("route not found")
 	//ErrEntryNotFound		    = errors.New("storage entry not found")
 
 	ErrGrpcInvalidResp  = errors.New("invalid grpc response")

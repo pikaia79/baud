@@ -53,27 +53,96 @@ func (s *RpcServer) Close() {
 }
 
 func (s *RpcServer) GetRoute(ctx context.Context,
-	request *masterpb.GetRouteRequest) (*masterpb.GetRouteResponse, error) {
-	return nil, nil
+	req *masterpb.GetRouteRequest) (*masterpb.GetRouteResponse, error) {
+	resp := new(masterpb.GetRouteResponse)
+
+	db := s.cluster.dbCache.findDbById(req.DB)
+	if db == nil {
+		resp.ResponseHeader = *makeRpcRespHeader(ErrDbNotExists)
+		return resp, nil
+	}
+
+	space := db.spaceCache.findSpaceById(req.Space)
+	if space == nil {
+		resp.ResponseHeader = *makeRpcRespHeader(ErrSpaceNotExists)
+		return resp, nil
+	}
+
+	partitions := space.searchTree.multipleSearch(req.Slot, 10)
+	if partitions == nil || len(partitions) == 0 {
+		resp.ResponseHeader = *makeRpcRespHeader(ErrRouteNotFound)
+		return resp, nil
+	}
+
+	resp.Routes = make([]masterpb.Route, len(partitions))
+	for _, partition := range partitions {
+		route := masterpb.Route{
+			Partition: *partition.Partition,
+			Leader:    partition.pickLeaderNodeId(),
+		}
+
+		replicas := partition.Replicas
+		if replicas != nil || len(replicas) != 0 {
+			nodes := make([]*metapb.Node, len(replicas))
+			for _, replica := range replicas {
+				ps := s.cluster.psCache.findServerById(replica.NodeID)
+				if ps != nil {
+					nodes = append(nodes, ps.Node)
+				}
+			}
+			route.Nodes = nodes
+		}
+
+		resp.Routes = append(resp.Routes, route)
+	}
+	resp.ResponseHeader = *makeRpcRespHeader(ErrSuc)
+
+	return resp, nil
 }
 
 func (s *RpcServer) GetDB(ctx context.Context, req *masterpb.GetDBRequest) (*masterpb.GetDBResponse, error) {
-	return nil, nil
+	resp := new(masterpb.GetDBResponse)
+
+	db := s.cluster.dbCache.findDbByName(req.DBName)
+	if db == nil {
+		resp.ResponseHeader = *makeRpcRespHeader(ErrDbNotExists)
+		return resp, nil
+	}
+
+	resp.Db = *db.DB
+	resp.ResponseHeader = *makeRpcRespHeader(ErrSuc)
+	return resp, nil
 }
 
 func (s *RpcServer) GetSpace(ctx context.Context, req *masterpb.GetSpaceRequest) (*masterpb.GetSpaceResponse, error) {
-	return nil, nil
+	resp := new(masterpb.GetSpaceResponse)
+
+	db := s.cluster.dbCache.findDbByName(req.ID)
+	if db == nil {
+		resp.ResponseHeader = *makeRpcRespHeader(ErrDbNotExists)
+		return resp, nil
+	}
+
+	space := db.spaceCache.findSpaceByName(req.SpaceName)
+	if space == nil {
+		resp.ResponseHeader = *makeRpcRespHeader(ErrSpaceNotExists)
+		return resp, nil
+	}
+
+	resp.Space = *space.Space
+	resp.ResponseHeader = *makeRpcRespHeader(ErrSuc)
+	return resp, nil
 }
 
 func (s *RpcServer) PSRegister(ctx context.Context,
-	request *masterpb.PSRegisterRequest) (*masterpb.PSRegisterResponse, error) {
+	req *masterpb.PSRegisterRequest) (*masterpb.PSRegisterResponse, error) {
 	resp := new(masterpb.PSRegisterResponse)
 
-	nodeId := request.NodeID
+	nodeId := req.NodeID
 
 	if nodeId == 0 {
 		// this is a new ps unregistered never, distribute new psid to it
-		ps, err := NewPartitionServer(request.Ip)
+		ps, err := NewPartitionServer(req.Ip)
 		if err != nil {
 			resp.ResponseHeader = *makeRpcRespHeader(err)
 			return resp, nil
@@ -108,12 +177,12 @@ func (s *RpcServer) PSRegister(ctx context.Context,
 }
 
 func (s *RpcServer) PSHeartbeat(ctx context.Context,
-	request *masterpb.PSHeartbeatRequest) (*masterpb.PSHeartbeatResponse, error) {
+	req *masterpb.PSHeartbeatRequest) (*masterpb.PSHeartbeatResponse, error) {
 	resp := new(masterpb.PSHeartbeatResponse)
 	resp.ResponseHeader = *makeRpcRespHeader(ErrSuc)
 
 	// process ps
-	psId := request.NodeID
+	psId := req.NodeID
 	ps := s.cluster.psCache.findServerById(psId)
 	if ps == nil {
 		log.Error("ps heartbeat received invalid psid[%v]", psId)
@@ -122,7 +191,7 @@ func (s *RpcServer) PSHeartbeat(ctx context.Context,
 	}
 	ps.updateHb()
 
-	partitionInfos := request.Partitions
+	partitionInfos := req.Partitions
 	if partitionInfos == nil {
 		// TODO:check ps status to destroy ps or create new partition to it
 		return resp, nil
@@ -154,7 +223,7 @@ func (s *RpcServer) PSHeartbeat(ctx context.Context,
 			}
 
 			// force to update by leader
-			if err := partitionMS.updateInfo(s.cluster.store, &partitionInfo, request.NodeID); err != nil {
+			if err := partitionMS.updateInfo(s.cluster.store, &partitionInfo, req.NodeID); err != nil {
 				log.Error("fail to update partition[%v] info in ps heartbeat. err[%v]", partitionInfo.ID, err)
 				resp.ResponseHeader = *makeRpcRespHeader(ErrInternalError)
 				return resp, nil
