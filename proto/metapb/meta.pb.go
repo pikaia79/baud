@@ -26,7 +26,7 @@
 */
 package metapb
 
-import proto "github.com/gogo/protobuf/proto"
+import proto "github.com/golang/protobuf/proto"
 import fmt "fmt"
 import math "math"
 import _ "github.com/gogo/protobuf/gogoproto"
@@ -45,7 +45,7 @@ var _ = math.Inf
 // is compatible with the proto package it is being compiled against.
 // A compilation error at this line likely means your copy of the
 // proto package needs to be updated.
-const _ = proto.GoGoProtoPackageIsVersion2 // please upgrade the proto package
+const _ = proto.ProtoPackageIsVersion2 // please upgrade the proto package
 
 type SpaceStatus int32
 
@@ -184,6 +184,7 @@ type Partition struct {
 	EndSlot   SlotID          `protobuf:"varint,5,opt,name=end_slot,json=endSlot,proto3,casttype=SlotID" json:"end_slot,omitempty"`
 	Replicas  []Replica       `protobuf:"bytes,6,rep,name=replicas" json:"replicas"`
 	Status    PartitionStatus `protobuf:"varint,7,opt,name=status,proto3,enum=PartitionStatus" json:"status,omitempty"`
+	Epoch     PartitionEpoch  `protobuf:"bytes,8,opt,name=epoch" json:"epoch"`
 }
 
 func (m *Partition) Reset()                    { *m = Partition{} }
@@ -471,6 +472,9 @@ func (this *Partition) Equal(that interface{}) bool {
 		}
 	}
 	if this.Status != that1.Status {
+		return false
+	}
+	if !this.Epoch.Equal(&that1.Epoch) {
 		return false
 	}
 	return true
@@ -961,6 +965,14 @@ func (m *Partition) MarshalTo(dAtA []byte) (int, error) {
 		i++
 		i = encodeVarintMeta(dAtA, i, uint64(m.Status))
 	}
+	dAtA[i] = 0x42
+	i++
+	i = encodeVarintMeta(dAtA, i, uint64(m.Epoch.Size()))
+	n1, err := m.Epoch.MarshalTo(dAtA[i:])
+	if err != nil {
+		return 0, err
+	}
+	i += n1
 	return i, nil
 }
 
@@ -992,11 +1004,11 @@ func (m *Replica) MarshalTo(dAtA []byte) (int, error) {
 	dAtA[i] = 0x1a
 	i++
 	i = encodeVarintMeta(dAtA, i, uint64(m.RaftAddrs.Size()))
-	n1, err := m.RaftAddrs.MarshalTo(dAtA[i:])
+	n2, err := m.RaftAddrs.MarshalTo(dAtA[i:])
 	if err != nil {
 		return 0, err
 	}
-	i += n1
+	i += n2
 	return i, nil
 }
 
@@ -1045,11 +1057,11 @@ func (m *Node) MarshalTo(dAtA []byte) (int, error) {
 	dAtA[i] = 0x32
 	i++
 	i = encodeVarintMeta(dAtA, i, uint64(m.RaftAddrs.Size()))
-	n2, err := m.RaftAddrs.MarshalTo(dAtA[i:])
+	n3, err := m.RaftAddrs.MarshalTo(dAtA[i:])
 	if err != nil {
 		return 0, err
 	}
-	i += n2
+	i += n3
 	return i, nil
 }
 
@@ -1142,11 +1154,11 @@ func (m *ResponseHeader) MarshalTo(dAtA []byte) (int, error) {
 	dAtA[i] = 0x22
 	i++
 	i = encodeVarintMeta(dAtA, i, uint64(m.Error.Size()))
-	n3, err := m.Error.MarshalTo(dAtA[i:])
+	n4, err := m.Error.MarshalTo(dAtA[i:])
 	if err != nil {
 		return 0, err
 	}
-	i += n3
+	i += n4
 	return i, nil
 }
 
@@ -1184,11 +1196,11 @@ func (m *NotLeader) MarshalTo(dAtA []byte) (int, error) {
 	dAtA[i] = 0x22
 	i++
 	i = encodeVarintMeta(dAtA, i, uint64(m.Epoch.Size()))
-	n4, err := m.Epoch.MarshalTo(dAtA[i:])
+	n5, err := m.Epoch.MarshalTo(dAtA[i:])
 	if err != nil {
 		return 0, err
 	}
-	i += n4
+	i += n5
 	return i, nil
 }
 
@@ -1285,41 +1297,41 @@ func (m *Error) MarshalTo(dAtA []byte) (int, error) {
 		dAtA[i] = 0xa
 		i++
 		i = encodeVarintMeta(dAtA, i, uint64(m.NotLeader.Size()))
-		n5, err := m.NotLeader.MarshalTo(dAtA[i:])
-		if err != nil {
-			return 0, err
-		}
-		i += n5
-	}
-	if m.NoLeader != nil {
-		dAtA[i] = 0x12
-		i++
-		i = encodeVarintMeta(dAtA, i, uint64(m.NoLeader.Size()))
-		n6, err := m.NoLeader.MarshalTo(dAtA[i:])
+		n6, err := m.NotLeader.MarshalTo(dAtA[i:])
 		if err != nil {
 			return 0, err
 		}
 		i += n6
 	}
-	if m.PartitionNotFound != nil {
-		dAtA[i] = 0x1a
+	if m.NoLeader != nil {
+		dAtA[i] = 0x12
 		i++
-		i = encodeVarintMeta(dAtA, i, uint64(m.PartitionNotFound.Size()))
-		n7, err := m.PartitionNotFound.MarshalTo(dAtA[i:])
+		i = encodeVarintMeta(dAtA, i, uint64(m.NoLeader.Size()))
+		n7, err := m.NoLeader.MarshalTo(dAtA[i:])
 		if err != nil {
 			return 0, err
 		}
 		i += n7
 	}
-	if m.MsgTooLarge != nil {
-		dAtA[i] = 0x22
+	if m.PartitionNotFound != nil {
+		dAtA[i] = 0x1a
 		i++
-		i = encodeVarintMeta(dAtA, i, uint64(m.MsgTooLarge.Size()))
-		n8, err := m.MsgTooLarge.MarshalTo(dAtA[i:])
+		i = encodeVarintMeta(dAtA, i, uint64(m.PartitionNotFound.Size()))
+		n8, err := m.PartitionNotFound.MarshalTo(dAtA[i:])
 		if err != nil {
 			return 0, err
 		}
 		i += n8
+	}
+	if m.MsgTooLarge != nil {
+		dAtA[i] = 0x22
+		i++
+		i = encodeVarintMeta(dAtA, i, uint64(m.MsgTooLarge.Size()))
+		n9, err := m.MsgTooLarge.MarshalTo(dAtA[i:])
+		if err != nil {
+			return 0, err
+		}
+		i += n9
 	}
 	return i, nil
 }
@@ -1389,6 +1401,8 @@ func NewPopulatedPartition(r randyMeta, easy bool) *Partition {
 		}
 	}
 	this.Status = PartitionStatus([]int32{0, 1, 2, 3, 4}[r.Intn(5)])
+	v3 := NewPopulatedPartitionEpoch(r, easy)
+	this.Epoch = *v3
 	if !easy && r.Intn(10) != 0 {
 	}
 	return this
@@ -1398,8 +1412,8 @@ func NewPopulatedReplica(r randyMeta, easy bool) *Replica {
 	this := &Replica{}
 	this.ID = ReplicaID(uint64(r.Uint32()))
 	this.NodeID = NodeID(r.Uint32())
-	v3 := NewPopulatedRaftAddrs(r, easy)
-	this.RaftAddrs = *v3
+	v4 := NewPopulatedRaftAddrs(r, easy)
+	this.RaftAddrs = *v4
 	if !easy && r.Intn(10) != 0 {
 	}
 	return this
@@ -1415,8 +1429,8 @@ func NewPopulatedNode(r randyMeta, easy bool) *Node {
 	}
 	this.Zone = string(randStringMeta(r))
 	this.Version = uint32(r.Uint32())
-	v4 := NewPopulatedRaftAddrs(r, easy)
-	this.RaftAddrs = *v4
+	v5 := NewPopulatedRaftAddrs(r, easy)
+	this.RaftAddrs = *v5
 	if !easy && r.Intn(10) != 0 {
 	}
 	return this
@@ -1444,8 +1458,8 @@ func NewPopulatedResponseHeader(r randyMeta, easy bool) *ResponseHeader {
 	this.ReqId = string(randStringMeta(r))
 	this.Code = RespCode(r.Uint32())
 	this.Message = string(randStringMeta(r))
-	v5 := NewPopulatedError(r, easy)
-	this.Error = *v5
+	v6 := NewPopulatedError(r, easy)
+	this.Error = *v6
 	if !easy && r.Intn(10) != 0 {
 	}
 	return this
@@ -1456,8 +1470,8 @@ func NewPopulatedNotLeader(r randyMeta, easy bool) *NotLeader {
 	this.PartitionID = PartitionID(r.Uint32())
 	this.NodeID = NodeID(r.Uint32())
 	this.NodeAddr = string(randStringMeta(r))
-	v6 := NewPopulatedPartitionEpoch(r, easy)
-	this.Epoch = *v6
+	v7 := NewPopulatedPartitionEpoch(r, easy)
+	this.Epoch = *v7
 	if !easy && r.Intn(10) != 0 {
 	}
 	return this
@@ -1523,9 +1537,9 @@ func randUTF8RuneMeta(r randyMeta) rune {
 	return rune(ru + 61)
 }
 func randStringMeta(r randyMeta) string {
-	v7 := r.Intn(100)
-	tmps := make([]rune, v7)
-	for i := 0; i < v7; i++ {
+	v8 := r.Intn(100)
+	tmps := make([]rune, v8)
+	for i := 0; i < v8; i++ {
 		tmps[i] = randUTF8RuneMeta(r)
 	}
 	return string(tmps)
@@ -1547,11 +1561,11 @@ func randFieldMeta(dAtA []byte, r randyMeta, fieldNumber int, wire int) []byte {
 	switch wire {
 	case 0:
 		dAtA = encodeVarintPopulateMeta(dAtA, uint64(key))
-		v8 := r.Int63()
+		v9 := r.Int63()
 		if r.Intn(2) == 0 {
-			v8 *= -1
+			v9 *= -1
 		}
-		dAtA = encodeVarintPopulateMeta(dAtA, uint64(v8))
+		dAtA = encodeVarintPopulateMeta(dAtA, uint64(v9))
 	case 1:
 		dAtA = encodeVarintPopulateMeta(dAtA, uint64(key))
 		dAtA = append(dAtA, byte(r.Intn(256)), byte(r.Intn(256)), byte(r.Intn(256)), byte(r.Intn(256)), byte(r.Intn(256)), byte(r.Intn(256)), byte(r.Intn(256)), byte(r.Intn(256)))
@@ -1666,6 +1680,8 @@ func (m *Partition) Size() (n int) {
 	if m.Status != 0 {
 		n += 1 + sovMeta(uint64(m.Status))
 	}
+	l = m.Epoch.Size()
+	n += 1 + l + sovMeta(uint64(l))
 	return n
 }
 
@@ -1894,6 +1910,7 @@ func (this *Partition) String() string {
 		`EndSlot:` + fmt.Sprintf("%v", this.EndSlot) + `,`,
 		`Replicas:` + strings.Replace(strings.Replace(fmt.Sprintf("%v", this.Replicas), "Replica", "Replica", 1), `&`, ``, 1) + `,`,
 		`Status:` + fmt.Sprintf("%v", this.Status) + `,`,
+		`Epoch:` + strings.Replace(strings.Replace(this.Epoch.String(), "PartitionEpoch", "PartitionEpoch", 1), `&`, ``, 1) + `,`,
 		`}`,
 	}, "")
 	return s
@@ -2687,6 +2704,36 @@ func (m *Partition) Unmarshal(dAtA []byte) error {
 					break
 				}
 			}
+		case 8:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Epoch", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMeta
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				msglen |= (int(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthMeta
+			}
+			postIndex := iNdEx + msglen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			if err := m.Epoch.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
 		default:
 			iNdEx = preIndex
 			skippy, err := skipMeta(dAtA[iNdEx:])

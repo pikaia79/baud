@@ -1,16 +1,11 @@
 package master
 
 import (
-	"errors"
 	"github.com/gogo/protobuf/proto"
-	raftproto "github.com/tiglabs/raft/proto"
-	"io"
 	"github.com/tiglabs/baud/proto/masterpb"
 	"github.com/tiglabs/baud/util/raftkvstore"
-)
-
-var (
-	errCorruptData = errors.New("corrupt data")
+	raftproto "github.com/tiglabs/raft/proto"
+	"io"
 )
 
 type RaftSnapshot struct {

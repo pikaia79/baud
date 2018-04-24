@@ -6,21 +6,10 @@ import (
 
 	"github.com/golang/protobuf/proto"
 	"github.com/tiglabs/baud/proto/masterpb"
-	"github.com/tiglabs/raft"
-	raftproto "github.com/tiglabs/raft/proto"
 	"github.com/tiglabs/baud/util/log"
 	"github.com/tiglabs/baud/util/raftkvstore"
-)
-
-var (
-	errNoApplyHandler         = errors.New("raft group not register apply handler")
-	errNoPeerChangeHandler    = errors.New("raft group not register peer change handler")
-	errNoLeaderChangeHandler  = errors.New("raft group not register leader change handler")
-	errNoFatalEventHandler    = errors.New("raft group not register fatal event handler")
-	errNoSnapshotHandler      = errors.New("raft group not register snapshot handler")
-	errNoApplySnapshotHandler = errors.New("raft group not register apply snapshot handler")
-
-	errUnknownResponseType = errors.New("unknown repsonse type")
+	"github.com/tiglabs/raft"
+	raftproto "github.com/tiglabs/raft/proto"
 )
 
 type RaftApplyHandler func( /*req*/ *masterpb.Request, uint64) ( /*resp*/ *masterpb.Response /*err*/, error)
@@ -107,7 +96,7 @@ func (rg *RaftGroup) SubmitCommand(ctx context.Context, req *masterpb.Request) (
 	if rsp, ok := resp.(*masterpb.Response); ok {
 		return rsp, nil
 	}
-	return nil, errUnknownResponseType
+	return nil, ErrRaftUnknownResponseType
 }
 
 /////////////////////////callback begin////////////////////////////////
@@ -148,7 +137,7 @@ func (rg *RaftGroup) Apply(command []byte, index uint64) (res interface{}, err e
 	if rg.raftApplyHandle != nil {
 		res, err = rg.raftApplyHandle(cmd, index)
 	} else {
-		err = errNoApplyHandler
+		err = ErrRaftNoApplyHandler
 	}
 
 	return
@@ -158,7 +147,7 @@ func (rg *RaftGroup) ApplyMemberChange(confChange *raftproto.ConfChange, index u
 	if rg.raftPeerChangeHandle != nil {
 		res, err = rg.raftPeerChangeHandle(confChange)
 	} else {
-		err = errNoPeerChangeHandler
+		err = ErrRaftNoPeerChangeHandler
 	}
 
 	return
@@ -175,7 +164,7 @@ func (rg *RaftGroup) Snapshot() (raftproto.Snapshot, error) {
 		return NewRaftSnapshot(snap, applyIndex, []byte(rg.startKey), []byte(rg.endKey)), nil
 	}
 	log.Error("not register snap handler")
-	return nil, errNoSnapshotHandler
+	return nil, ErrRaftNoSnapshotHandler
 }
 
 func (rg *RaftGroup) ApplySnapshot(peers []raftproto.Peer, rawIter raftproto.SnapIterator) error {
@@ -184,7 +173,7 @@ func (rg *RaftGroup) ApplySnapshot(peers []raftproto.Peer, rawIter raftproto.Sna
 		return rg.raftApplySnapshotHandle(peers, iter)
 	}
 	log.Error("not register apply snap handler")
-	return errNoApplySnapshotHandler
+	return ErrRaftNoApplySnapshotHandler
 }
 
 func (rg *RaftGroup) HandleLeaderChange(leader uint64) {

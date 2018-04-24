@@ -1,8 +1,8 @@
 package master
 
 import (
-	"sync"
 	"github.com/tiglabs/baud/util/log"
+	"sync"
 )
 
 type Master struct {

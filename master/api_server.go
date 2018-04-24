@@ -3,10 +3,11 @@ package master
 import (
 	"encoding/json"
 	"fmt"
-	"net/http"
-	"strconv"
+	"github.com/tiglabs/baud/util"
 	"github.com/tiglabs/baud/util/log"
 	"github.com/tiglabs/baud/util/server"
+	"net/http"
+	"strconv"
 )
 
 const (
@@ -39,7 +40,7 @@ func NewApiServer(config *Config, cluster *Cluster) *ApiServer {
 	}
 
 	apiServer.httpServer.Init("master-api-server", &server.ServerConfig{
-		Sock:      config.webManageAddr,
+		Sock:      util.BuildAddr("0.0.0.0", int(config.ClusterCfg.CurNode.HttpPort)),
 		Version:   "v1",
 		ConnLimit: DEFAULT_CONN_LIMIT,
 	})
@@ -196,7 +197,7 @@ func newHttpErrReply(err error) *HttpReply {
 		return newHttpSucReply("")
 	}
 
-	code, ok := Err2CodeMap[err.Error()]
+	code, ok := Err2CodeMap[err]
 	if ok {
 		return &HttpReply{
 			Code: code,
@@ -217,7 +218,7 @@ func checkMissingParam(w http.ResponseWriter, r *http.Request, paramName string)
 		newMsg := fmt.Sprintf("%s. missing[%s]", reply.Msg, paramName)
 		reply.Msg = newMsg
 		sendReply(w, reply)
-		return nil, ErrParamError
+		return "", ErrParamError
 	}
 	return paramVal, nil
 }
@@ -234,7 +235,7 @@ func checkMissingAndNumericParam(w http.ResponseWriter, r *http.Request, paramNa
 		newMsg := fmt.Sprintf("%s, unmatched type[%s]", reply.Msg, paramName)
 		reply.Msg = newMsg
 		sendReply(w, reply)
-		return nil, ErrParamError
+		return 0, ErrParamError
 	}
 	return paramValInt, nil
 }

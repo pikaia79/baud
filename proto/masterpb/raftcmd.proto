@@ -30,29 +30,29 @@ message KvPair {
     bytes   value = 2;
 }
 
-message GetRequest {
+message RaftGetRequest {
     bytes key            = 1;
 }
 
-message GetResponse {
+message RaftGetResponse {
     int32  code           = 1;
     bytes  value          = 2;
 }
 
-message PutRequest {
+message RaftPutRequest {
     bytes key            = 1;
     bytes value          = 2;
 }
 
-message PutResponse {
+message RaftPutResponse {
     int32  code           = 1;
 }
 
-message DeleteRequest {
+message RaftDeleteRequest {
     bytes key            = 1;
 }
 
-message DeleteResponse {
+message RaftDeleteResponse {
     int32  code           = 1;
 }
 
@@ -87,18 +87,18 @@ enum CmdType {
 message Request {
     CmdType              cmd_type        = 1;
 
-    GetRequest           get_req         = 2;
-    PutRequest           put_req         = 3;
-    DeleteRequest        delete_req      = 4;
+    RaftGetRequest           get_req         = 2;
+    RaftPutRequest           put_req         = 3;
+    RaftDeleteRequest        delete_req      = 4;
     ExecuteRequest       execute_req     = 5;
 }
 
 message Response {
     CmdType               cmd_type         = 1;
 
-    GetResponse           get_resp         = 2;
-    PutResponse           put_resp         = 3;
-    DeleteResponse        delete_resp      = 4;
+    RaftGetResponse           get_resp         = 2;
+    RaftPutResponse           put_resp         = 3;
+    RaftDeleteResponse        delete_resp      = 4;
     ExecuteResponse       execute_resp     = 5;
 }
 

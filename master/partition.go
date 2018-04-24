@@ -6,11 +6,11 @@ import (
 	"github.com/google/btree"
 	"github.com/tiglabs/baud/proto/masterpb"
 	"github.com/tiglabs/baud/proto/metapb"
-	"sync"
-	"time"
 	"github.com/tiglabs/baud/util"
 	"github.com/tiglabs/baud/util/deepcopy"
 	"github.com/tiglabs/baud/util/log"
+	"sync"
+	"time"
 )
 
 const (
@@ -45,7 +45,7 @@ func NewPartition(dbId, spaceId, startSlot, endSlot uint32) (*Partition, error) 
 			StartSlot: startSlot,
 			EndSlot:   endSlot,
 			Replicas:  make([]metapb.Replica, 0),
-			Status:    metapb.PartitionStatus_PA_NOTREAD,
+			Status:    metapb.PA_READONLY,
 		},
 	}, nil
 }

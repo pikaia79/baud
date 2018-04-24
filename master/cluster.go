@@ -2,10 +2,10 @@ package master
 
 import (
 	"github.com/tiglabs/baud/proto/metapb"
+	"github.com/tiglabs/baud/util"
+	"github.com/tiglabs/baud/util/log"
 	"math"
 	"sync"
-	"github.com/tiglabs/baud/util/log"
-	"github.com/tiglabs/baud/util"
 )
 
 type Cluster struct {
@@ -158,7 +158,7 @@ func (c *Cluster) recoveryPartition() error {
 			continue
 		}
 
-		space.searchTree.update(partition.Partition)
+		space.searchTree.update(partition)
 		c.partitionCache.addPartition(partition)
 
 		var delMetaReplicas = make([]*metapb.Replica, 0)
@@ -283,6 +283,8 @@ func (c *Cluster) createSpace(dbName, spaceName, partitionKey, partitionFunc str
 		//	log.Error("fail to push event for creating partition[%v].", partition)
 		//}
 	}
+
+	// waiting to continues to create partition in ps by the background worker
 
 	return space, nil
 }

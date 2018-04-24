@@ -4,11 +4,11 @@ import (
 	"context"
 	"github.com/tiglabs/baud/proto/metapb"
 	"github.com/tiglabs/baud/proto/pspb"
+	"github.com/tiglabs/baud/util/log"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/status"
 	"sync"
 	"time"
-	"github.com/tiglabs/baud/util/log"
 )
 
 const (
@@ -164,7 +164,7 @@ func (c *PSRpcClient) AddReplica(addr string, partitionId metapb.PartitionID, ra
 
 	req := &pspb.ChangeReplicaRequest{
 		RequestHeader: metapb.RequestHeader{},
-		Type:          pspb.ReplicaChangeType_ReplicaAdd,
+		Type:          pspb.ReplicaChangeType_Add,
 		PartitionID:   partitionId,
 		ReplicaID:     replicaId,
 		NodeID:        replicaNodeId,
@@ -187,7 +187,7 @@ func (c *PSRpcClient) RemoveReplica(addr string, partitionId metapb.PartitionID,
 
 	req := &pspb.ChangeReplicaRequest{
 		RequestHeader: metapb.RequestHeader{},
-		Type:          pspb.ReplicaChangeType_ReplicaRemove,
+		Type:          pspb.ReplicaChangeType_Remove,
 		PartitionID:   partitionId,
 		ReplicaID:     replicaId,
 		NodeID:        replicaNodeId,

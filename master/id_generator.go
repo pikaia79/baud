@@ -3,9 +3,9 @@ package master
 import (
 	"encoding/binary"
 	"fmt"
+	"github.com/tiglabs/baud/util/log"
 	"sync"
 	"sync/atomic"
-	"github.com/tiglabs/baud/util/log"
 )
 
 var (

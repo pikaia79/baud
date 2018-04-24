@@ -5,10 +5,10 @@ import (
 	"github.com/gogo/protobuf/proto"
 	"github.com/tiglabs/baud/proto/masterpb"
 	"github.com/tiglabs/baud/proto/metapb"
-	"sync"
-	"time"
 	"github.com/tiglabs/baud/util"
 	"github.com/tiglabs/baud/util/log"
+	"sync"
+	"time"
 )
 
 const (

@@ -3,9 +3,9 @@ package master
 import (
 	"context"
 	"github.com/tiglabs/baud/proto/metapb"
+	"github.com/tiglabs/baud/util/log"
 	"sync"
 	"time"
-	"github.com/tiglabs/baud/util/log"
 )
 
 type WorkerManager struct {
