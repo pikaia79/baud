@@ -2,7 +2,6 @@ package master
 
 import (
 	"strings"
-	"time"
 	"github.com/tiglabs/baud/util"
 
 	"github.com/BurntSushi/toml"
@@ -159,6 +158,8 @@ type ClusterConfig struct {
 func (cfg *ClusterConfig) adjust() {
 	adjustUint64(&cfg.ClusterID, "no cluster-id")
 	adjustUint64(&cfg.CurNodeId, "no current node-id")
+	adjustDuration(&cfg.RaftHeartbeatInterval, "no raft heartbeat interval")
+	adjustUint64(&cfg.RaftRetainLogsCount, "no raft retain log count")
 
 	if len(cfg.Nodes) == 0 {
 		log.Panic("cluster nodes is empty")
@@ -254,8 +255,8 @@ func adjustUint64(v *uint64, errMsg string) {
 	}
 }
 
-func adjustDuration(v *util.Duration, defValue time.Duration) {
+func adjustDuration(v *util.Duration, errMsg string) {
 	if v.Duration == 0 {
-		v.Duration = defValue
+		log.Panic("Config adjust duration error, %v", errMsg)
 	}
 }
