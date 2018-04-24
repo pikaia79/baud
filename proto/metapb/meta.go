@@ -24,9 +24,11 @@ type (
 const (
 	/** Common Response Code **/
 	RESP_CODE_OK           RespCode = 200
-	RESP_CODE_TIMEOUT      RespCode = 504
-	RESP_CODE_SERVERBUSY   RespCode = 509
 	RESP_CODE_MSG_TOOLARGE RespCode = 414
+	RESP_CODE_SERVER_ERROR RespCode = 500
+	RESP_CODE_TIMEOUT      RespCode = 504
+	RESP_CODE_SERVER_BUSY  RespCode = 509
+	RESP_CODE_SERVER_STOP  RespCode = 511
 
 	/** Master Service Response Code **/
 	MASTER_RESP_CODE_HEARTBEAT_REGISTRY RespCode = 409

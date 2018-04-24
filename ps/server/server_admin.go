@@ -12,8 +12,9 @@ import (
 	"github.com/tiglabs/baud/proto/pspb"
 )
 
+// CreatePartition admin grpc service for create partition
 func (s *Server) CreatePartition(ctx context.Context, request *pspb.CreatePartitionRequest) (*pspb.CreatePartitionResponse, error) {
-	reponse := &pspb.CreatePartitionResponse{
+	response := &pspb.CreatePartitionResponse{
 		ResponseHeader: metapb.ResponseHeader{
 			ReqId: request.ReqId,
 			Code:  metapb.RESP_CODE_OK,
@@ -21,17 +22,18 @@ func (s *Server) CreatePartition(ctx context.Context, request *pspb.CreatePartit
 	}
 
 	if s.stopping.Get() {
-		reponse.Code = metapb.RESP_CODE_SERVERBUSY
-		reponse.Message = "server is stopping"
+		response.Code = metapb.RESP_CODE_SERVER_STOP
+		response.Message = "server is stopping"
 	} else {
 		s.adminEventCh <- request
 	}
 
-	return reponse, nil
+	return response, nil
 }
 
+// DeletePartition admin grpc service for delete partition
 func (s *Server) DeletePartition(ctx context.Context, request *pspb.DeletePartitionRequest) (*pspb.DeletePartitionResponse, error) {
-	reponse := &pspb.DeletePartitionResponse{
+	response := &pspb.DeletePartitionResponse{
 		ResponseHeader: metapb.ResponseHeader{
 			ReqId: request.ReqId,
 			Code:  metapb.RESP_CODE_OK,
@@ -39,13 +41,37 @@ func (s *Server) DeletePartition(ctx context.Context, request *pspb.DeletePartit
 	}
 
 	if s.stopping.Get() {
-		reponse.Code = metapb.RESP_CODE_SERVERBUSY
-		reponse.Message = "server is stopping"
+		response.Code = metapb.RESP_CODE_SERVER_STOP
+		response.Message = "server is stopping"
 	} else {
 		s.adminEventCh <- request
 	}
 
-	return reponse, nil
+	return response, nil
+}
+
+// ChangeReplica admin grpc service for change replica of partition
+func (s *Server) ChangeReplica(ctx context.Context, request *pspb.ChangeReplicaRequest) (*pspb.ChangeReplicaResponse, error) {
+	response := &pspb.ChangeReplicaResponse{
+		ResponseHeader: metapb.ResponseHeader{
+			ReqId: request.ReqId,
+			Code:  metapb.RESP_CODE_OK,
+		},
+	}
+
+	return response, nil
+}
+
+// ChangeLeader admin grpc service for change leader of partition
+func (s *Server) ChangeLeader(ctx context.Context, request *pspb.ChangeLeaderRequest) (*pspb.ChangeLeaderResponse, error) {
+	response := &pspb.ChangeLeaderResponse{
+		ResponseHeader: metapb.ResponseHeader{
+			ReqId: request.ReqId,
+			Code:  metapb.RESP_CODE_OK,
+		},
+	}
+
+	return response, nil
 }
 
 func (s *Server) doPartitionCreate(p metapb.Partition) {
