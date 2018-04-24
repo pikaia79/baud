@@ -50,7 +50,7 @@ func main() {
 
 	cfg := master.NewConfig(*configFile)
 	role := "master"
-	profPort := "80000"
+	profPort := "50000"
 
 	//for multi-cpu scheduling
 	runtime.GOMAXPROCS(runtime.NumCPU())
