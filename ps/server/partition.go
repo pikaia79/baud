@@ -22,7 +22,7 @@ func newPartition(server *Server, meta metapb.Partition) *partition {
 		meta:   meta,
 		server: server,
 	}
-	p.meta.Status = metapb.PA_Invalid
+	p.meta.Status = metapb.PA_NOTREAD
 	p.ctx, p.quit = context.WithCancel(server.ctx)
 
 	return p
