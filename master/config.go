@@ -10,19 +10,19 @@ import (
 	"os"
 )
 
-const (
-	defaultServerName           = "master"
-	defaultMaxReplicas          = 3
-	defaultMaxSnapshotCount     = 3
-	defaultMaxNodeDownTime      = time.Hour
-	defaultLeaderScheduleLimit  = 64
-	defaultRegionScheduleLimit  = 12
-	defaultReplicaScheduleLimit = 16
-	defaultRaftHbInterval       = time.Millisecond * 500
-	defaultRaftRetainLogsCount  = 100
-	defaultMaxTaskWaitTime      = 5 * time.Minute
-	defaultMaxRangeDownTime     = 10 * time.Minute
-)
+//const (
+//	defaultServerName           = "master"
+//	defaultMaxReplicas          = 3
+//	defaultMaxSnapshotCount     = 3
+//	defaultMaxNodeDownTime      = time.Hour
+//	defaultLeaderScheduleLimit  = 64
+//	defaultRegionScheduleLimit  = 12
+//	defaultReplicaScheduleLimit = 16
+//	defaultRaftHbInterval       = time.Millisecond * 500
+//	defaultRaftRetainLogsCount  = 100
+//	defaultMaxTaskWaitTime      = 5 * time.Minute
+//	defaultMaxRangeDownTime     = 10 * time.Minute
+//)
 
 //
 //uint32 rpc_port                  = 1 [(gogoproto.customname) = "RPCPort", (gogoproto.casttype) = "int"];
@@ -35,12 +35,29 @@ const (
 //uint32 raft_replica_concurrency  = 8 [(gogoproto.casttype) = "int"];
 //uint32 raft_snapshot_concurrency = 9 [(gogoproto.casttype) = "int"];
 
+//[cluster.nodes]
+//node-id = 2
+//http-port = 8897
+//rpc-port = 18897
+//raft-heartbeat-port=8896
+//raft-replicate-port=8895
+
+//[ps]
+//rpc-port=8000
+//admin-port=8001
+//heartbeat-interval=100
+//raft-heartbeat-port=8002
+//raft-replicate-port=8003
+//raft_retain_logs
+//raft-replica-concurrency=1
+//raft-snapshot-concurrency=1
+
 const DEFAULT_MASTER_CONFIG = `
 # Master Configuration.
 
 [module]
 name = "master"
-#role = "master"
+role = "master"
 version = "v1"
 # web request request signature key
 signkey = ""
@@ -55,24 +72,23 @@ level = "info"
 cluster-id = 1
 node-id = 1
 # all interval unit is millisecond
-raft-heartbeat-interval = 500 
-raft-retain-logs-count = 100
+raft-heartbeat-interval=500ms
+raft-retain-logs-count=100
 
 [[cluster.nodes]]
 node-id = 1
 http-port = 8887
 rpc-port = 18887
-raft-heartbeat-port=8877
-raft-replicate-port=8876
+raft-heartbeat-port=8886
+raft-replicate-port=8885
 
+[[cluster.nodes]]
+node-id = 2
+http-port = 8897
+rpc-port = 18897
+raft-heartbeat-port=8896
+raft-replicate-port=8895
 `
-
-//[[cluster.node]]
-//node-id = 2
-//http-port = 9887
-//rpc-port = 19887
-//raft_heartbeat_port=9877
-//raft_replicate_port=9876
 
 const (
 	CONFIG_ROLE_MASTER     = "master"
@@ -84,10 +100,9 @@ const (
 )
 
 type Config struct {
-	ModuleCfg ModuleConfig `toml:"module,omitempty" json:"module"`
-	LogCfg    LogConfig    `toml:"log,omitempty" json:"log"`
+	ModuleCfg  ModuleConfig  `toml:"module,omitempty" json:"module"`
+	LogCfg     LogConfig     `toml:"log,omitempty" json:"log"`
 	ClusterCfg ClusterConfig `toml:"cluster,omitempty" json:"cluster"`
-	CurNodeCfg	ClusterNode
 }
 
 func NewConfig(path string) *Config {
@@ -97,9 +112,11 @@ func NewConfig(path string) *Config {
 		log.Panic("fail to decode default config, err[%v]", err)
 	}
 
-	_, err := toml.DecodeFile(path, c)
-	if err != nil {
-		log.Panic("fail to decode config file[%v]. err[v]", path, err)
+	if len(path) != 0 {
+		_, err := toml.DecodeFile(path, c)
+		if err != nil {
+			log.Panic("fail to decode config file[%v]. err[v]", path, err)
+		}
 	}
 
 	c.adjust()
@@ -119,11 +136,6 @@ type ModuleConfig struct {
 	Version  string `toml:"version,omitempty" json:"version"`
 	SignKey  string `toml:"signkey,omitempty" json:"signkey"`
 	DataPath string `toml:"data-path,omitempty" json:"data-path"`
-
-	//raftHeartbeatAddr string
-	//raftReplicaAddr   string
-	//webManageAddr     string
-	//rpcServerAddr     string
 }
 
 func (cfg *ModuleConfig) adjust() {
@@ -230,6 +242,17 @@ func (c *LogConfig) adjust() {
 	}
 }
 
+type PsConfig struct {
+	//rpc-port=8000
+	//admin-port=8001
+	//heartbeat-interval=100
+	//raft-heartbeat-port=8002
+	//raft-replicate-port=8003
+	//raft_retain_logs
+	//raft-replica-concurrency=1
+	//raft-snapshot-concurrency=1
+}
+
 func adjustString(v *string, errMsg string) {
 	if len(*v) == 0 {
 		log.Panic("Config adjust string error, %v", errMsg)
@@ -248,31 +271,7 @@ func adjustUint64(v *uint64, errMsg string) {
 	}
 }
 
-//func adjustStringDef(v *string, defValue string) {
-//	if len(*v) == 0 {
-//		*v = defValue
-//	}
-//}
-//
-//func adjustUint64Def(v *uint64, defValue uint64) {
-//	if *v == 0 {
-//		*v = defValue
-//	}
-//}
-//
-//func adjustInt64(v *int64, defValue int64) {
-//	if *v == 0 {
-//		*v = defValue
-//	}
-//}
-//
-//func adjustFloat64(v *float64, defValue float64) {
-//	if *v == 0 {
-//		*v = defValue
-//	}
-//}
-
-func adjustDurationDef(v *util.Duration, defValue time.Duration) {
+func adjustDuration(v *util.Duration, defValue time.Duration) {
 	if v.Duration == 0 {
 		v.Duration = defValue
 	}

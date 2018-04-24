@@ -14,6 +14,7 @@ import (
 	"github.com/tiglabs/baud/util/log"
 	"github.com/tiglabs/baud/util/raftkvstore"
 	"github.com/tiglabs/baud/proto/masterpb"
+	"github.com/tiglabs/baud/util"
 )
 
 const (
@@ -264,9 +265,9 @@ func (b *SaveBatch) Commit() error {
 ////////////////////raft begin////////////////////////
 func (rs *RaftStore) initRaftStoreCfg() error {
 	raftStoreCfg := new(RaftStoreConfig)
-	raftStoreCfg.NodeId = rs.config.CurNodeCfg.NodeId
+	raftStoreCfg.NodeId = rs.config.ClusterCfg.CurNode.NodeId
 
-	dataRootDir := filepath.Join(rs.config.ModuleCfg.MetaDataPath, "raft")
+	dataRootDir := filepath.Join(rs.config.ModuleCfg.DataPath, "raft")
 	if err := os.MkdirAll(dataRootDir, 0755); err != nil {
 		log.Error("make data root direcotory %rs failed, err[%v]", dataRootDir, err)
 		return err
@@ -274,19 +275,19 @@ func (rs *RaftStore) initRaftStoreCfg() error {
 	raftStoreCfg.DataPath = filepath.Join(dataRootDir, "baud.db")
 	raftStoreCfg.WalPath = filepath.Join(dataRootDir, ".wal")
 
-	raftStoreCfg.RaftRetainLogs = rs.config.Raft.RaftRetainLogsCount
-	raftStoreCfg.RaftHeartbeatInterval = rs.config.Raft.RaftHeartbeatInterval.Duration
-	raftStoreCfg.RaftHeartbeatAddr = rs.config.raftHeartbeatAddr
-	raftStoreCfg.RaftReplicateAddr = rs.config.raftReplicaAddr
+	raftStoreCfg.RaftRetainLogs = rs.config.ClusterCfg.RaftRetainLogsCount
+	raftStoreCfg.RaftHeartbeatInterval = rs.config.ClusterCfg.RaftHeartbeatInterval.Duration
+	raftStoreCfg.RaftHeartbeatAddr = util.BuildAddr("0.0.0.0", int(rs.config.ClusterCfg.CurNode.RaftHeartbeatPort))
+	raftStoreCfg.RaftReplicateAddr = util.BuildAddr("0.0.0.0", int(rs.config.ClusterCfg.CurNode.RaftReplicatePort))
 
 	var peers []*Peer
 	for _, p := range rs.config.ClusterCfg.Nodes {
 		peer := new(Peer)
-		peer.NodeId = p.ID
+		peer.NodeId = p.NodeId
 		//node.WebManageAddr = fmt.Sprintf("%rs:%d", peer.Host, peer.HttpPort)
 		//node.RpcServerAddr = fmt.Sprintf("%rs:%d", peer.Host, peer.RpcPort)
-		peer.RaftHeartbeatAddr = fmt.Sprintf("%s:%d", p.Host, p.RaftPorts[0])
-		peer.RaftReplicateAddr = fmt.Sprintf("%s:%d", p.Host, p.RaftPorts[1])
+		peer.RaftHeartbeatAddr = util.BuildAddr("0.0.0.0", int(p.RaftHeartbeatPort))
+		peer.RaftReplicateAddr = util.BuildAddr("0.0.0.0", int(p.RaftReplicatePort))
 		peers = append(peers, peer)
 	}
 	raftStoreCfg.RaftNodes = peers
