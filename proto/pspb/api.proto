@@ -52,7 +52,7 @@ message ActionRequestHeader {
     uint32  space_id                = 1 [(gogoproto.customname) = "SpaceID", (gogoproto.casttype) = "github.com/tiglabs/baud/proto/metapb.SpaceID"];
     uint32  partition_id            = 2 [(gogoproto.customname) = "PartitionID", (gogoproto.casttype) = "github.com/tiglabs/baud/proto/metapb.PartitionID"];
     string  timeout                 = 3;
-    RequestContentType  content_ype = 4;
+    RequestContentType  content_type = 4;
     string  req_id                  = 5;
 }
 
