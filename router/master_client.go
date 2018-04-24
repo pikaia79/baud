@@ -31,23 +31,33 @@ func NewMasterClient(masterAddr string) *MasterClient {
 
 func (mc *MasterClient) GetRoute(dbId metapb.DBID, spaceId metapb.SpaceID, slotId metapb.SlotID) []masterpb.Route {
 	request := &masterpb.GetRouteRequest{DB: dbId, Space: spaceId, Slot: slotId}
-	resp, err := mc.getClient().GetRoute(mc.context, request)
+	ctx, cancel := mc.getContext()
+	defer cancel()
+	resp, err := mc.getClient().GetRoute(ctx, request)
 	checkResponseOk(&resp.ResponseHeader, err)
 	return resp.Routes
 }
 
 func (mc *MasterClient) GetDB(dbName string) metapb.DB {
 	request := &masterpb.GetDBRequest{DBName: dbName}
-	resp, err := mc.getClient().GetDB(mc.context, request)
+	ctx, cancel := mc.getContext()
+	defer cancel()
+	resp, err := mc.getClient().GetDB(ctx, request)
 	checkResponseOk(&resp.ResponseHeader, err)
 	return resp.Db
 }
 
 func (mc *MasterClient) GetSpace(id metapb.DBID, spaceName string) metapb.Space {
 	request := &masterpb.GetSpaceRequest{ID: id, SpaceName: spaceName}
-	resp, err := mc.getClient().GetSpace(mc.context, request)
+	ctx, cancel := mc.getContext()
+	defer cancel()
+	resp, err := mc.getClient().GetSpace(ctx, request)
 	checkResponseOk(&resp.ResponseHeader, err)
 	return resp.Space
+}
+
+func (mc *MasterClient) getContext() (context.Context, context.CancelFunc) {
+	return context.WithTimeout(mc.context, rpcTimeoutDef)
 }
 
 func (mc *MasterClient) getClient() masterpb.MasterRpcClient {

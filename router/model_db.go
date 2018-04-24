@@ -9,9 +9,8 @@ import (
 type DB struct {
 	meta         metapb.DB
 	masterClient *MasterClient
-	spaceMap     map[string]*Space
+	spaceMap     sync.Map
 	context      context.Context
-	lock         sync.RWMutex
 }
 
 func NewDB(masterClient *MasterClient, meta metapb.DB) *DB {
@@ -19,35 +18,10 @@ func NewDB(masterClient *MasterClient, meta metapb.DB) *DB {
 }
 
 func (db *DB) GetSpace(spaceName string) *Space {
-	space := db.getSpace(spaceName)
-	if space == nil {
+	space, ok := db.spaceMap.Load(spaceName)
+	if !ok {
 		spaceMeta := db.masterClient.GetSpace(db.meta.ID, spaceName)
-		space = db.addSpace(spaceMeta)
+		space, ok = db.spaceMap.LoadOrStore(spaceMeta.Name, NewSpace(db, spaceMeta))
 	}
-
-	return space
-}
-
-func (db *DB) addSpace(space metapb.Space) *Space {
-	db.lock.Lock()
-	defer db.lock.Unlock()
-
-	if newSpace, ok := db.spaceMap[space.Name]; ok {
-		return newSpace
-	} else {
-		newSpace = NewSpace(db, space)
-		db.spaceMap[space.Name] = newSpace
-		return newSpace
-	}
-}
-
-func (db *DB) getSpace(spaceName string) *Space {
-	db.lock.RLock()
-	defer db.lock.RUnlock()
-
-	space, ok := db.spaceMap[spaceName]
-	if ok {
-		return space
-	}
-	return nil
+	return space.(*Space)
 }

@@ -18,6 +18,8 @@ masterConnPoolSize = 10
 psConnPoolSize = 10
 `
 
+const rpcTimeoutDef  = 100
+
 type Config struct {
 	Role               string `toml:"name,omitempty" json:"name"`
 	Ip                 string

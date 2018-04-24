@@ -2,6 +2,7 @@ package router
 
 import (
 	"context"
+	"errors"
 	"github.com/tiglabs/baud/keys"
 	"github.com/tiglabs/baud/proto/masterpb"
 	"github.com/tiglabs/baud/proto/metapb"
@@ -40,7 +41,9 @@ func (partition *Partition) Create(docBody []byte) *metapb.DocID {
 		ActionRequestHeader: partition.requestHeader,
 		Requests:            []pspb.BulkItemRequest{createReq},
 	}
-	resp := partition.getSingleResponse(partition.getClient().BulkWrite(partition.getContext(), request)).Index
+	ctx, cancel := partition.getContext()
+	defer cancel()
+	resp := partition.getSingleResponse(partition.getClient().BulkWrite(ctx, request)).Index
 	docId, err := keys.DecodeDocIDFromString(resp.Id)
 	if err != nil {
 		panic(err)
@@ -49,10 +52,17 @@ func (partition *Partition) Create(docBody []byte) *metapb.DocID {
 }
 
 func (partition *Partition) Read(docId *metapb.DocID) metapb.Value {
-	return nil
+	request := &pspb.GetRequest{ActionRequestHeader: partition.requestHeader, Id:*docId}
+	ctx, cancel := partition.getContext()
+	defer cancel()
+	resp, err := partition.getClient().Get(ctx, request)
+	if err != nil {
+		panic(err)
+	}
+	return resp.Fields
 }
 
-func (partition *Partition) Update(docId *metapb.DocID, docBody []byte) error {
+func (partition *Partition) Update(docId *metapb.DocID, docBody []byte) {
 	createReq := pspb.BulkItemRequest{
 		OpType: pspb.OpType_UPDATE,
 		Update: &pspb.UpdateRequest{Id: *docId, Doc: docBody},
@@ -61,12 +71,13 @@ func (partition *Partition) Update(docId *metapb.DocID, docBody []byte) error {
 		ActionRequestHeader: partition.requestHeader,
 		Requests:            []pspb.BulkItemRequest{createReq},
 	}
-	resp := partition.getSingleResponse(partition.getClient().BulkWrite(partition.getContext(), request)).Index
+	ctx, cancel := partition.getContext()
+	defer cancel()
+	resp := partition.getSingleResponse(partition.getClient().BulkWrite(ctx, request)).Index
 	docId, err := keys.DecodeDocIDFromString(resp.Id)
 	if err != nil {
 		panic(err)
 	}
-	return nil
 }
 
 func (partition *Partition) Delete(docId *metapb.DocID) bool {
@@ -78,7 +89,9 @@ func (partition *Partition) Delete(docId *metapb.DocID) bool {
 		ActionRequestHeader: partition.requestHeader,
 		Requests:            []pspb.BulkItemRequest{deleteReq},
 	}
-	resp := partition.getSingleResponse(partition.getClient().BulkWrite(partition.getContext(), request)).Delete
+	ctx, cancel := partition.getContext()
+	defer cancel()
+	resp := partition.getSingleResponse(partition.getClient().BulkWrite(ctx, request)).Delete
 	if resp.Result != pspb.WriteResult_DELETED {
 		return false
 	}
@@ -90,8 +103,8 @@ func (partition *Partition) getClient() pspb.ApiGrpcClient {
 	return psClient.(pspb.ApiGrpcClient)
 }
 
-func (partition *Partition) getContext() context.Context {
-	return partition.parent.parent.context
+func (partition *Partition) getContext() (context.Context, context.CancelFunc) {
+	return context.WithTimeout(partition.parent.parent.context, rpcTimeoutDef)
 }
 
 func (partition *Partition) getSingleResponse(resp *pspb.BulkResponse, err error) *pspb.BulkItemResponse {

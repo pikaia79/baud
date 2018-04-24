@@ -5,27 +5,25 @@ import (
 	"github.com/julienschmidt/httprouter"
 	"github.com/tiglabs/baud/keys"
 	"github.com/tiglabs/baud/proto/metapb"
-	"github.com/tiglabs/baud/util/config"
 	"net/http"
 	"strconv"
 	"sync"
 )
 
 type Router struct {
-	httpRouter *httprouter.Router
-	httpServer *http.Server
+	httpRouter   *httprouter.Router
+	httpServer   *http.Server
 	masterClient *MasterClient
-	dbMap      map[string]*DB
-	lock       sync.RWMutex
+	dbMap        sync.Map
+	lock         sync.RWMutex
 }
 
 func NewServer() *Router {
 	return new(Router)
 }
 
-func (router *Router) Start(cfg2 *config.Config) error {
-	var cfg *Config
-	router.dbMap = make(map[string]*DB)
+func (router *Router) Start(cfg *Config) error {
+	router.masterClient = NewMasterClient(cfg.MasterAddr)
 	router.httpRouter = httprouter.New()
 
 	router.httpRouter.PUT("/:db/:space/:slot", router.handleCreate)
@@ -138,35 +136,11 @@ func (router *Router) readDocBody(request *http.Request) []byte {
 }
 
 func (router *Router) GetDB(dbName string) *DB {
-	db := router.getDB(dbName)
-	if db == nil {
-		db = router.addDB(router.masterClient.GetDB(dbName))
-	}
-	return db
-}
-
-func (router *Router) addDB(dbMeta metapb.DB) *DB {
-	router.lock.Lock()
-	defer router.lock.Unlock()
-
-	if newDB, ok := router.dbMap[dbMeta.Name]; ok {
-		return newDB
-	} else {
-		newDB = NewDB(router.masterClient, dbMeta)
-		router.dbMap[dbMeta.Name] = newDB
-		return newDB
-	}
-}
-
-func (router *Router) getDB(dbName string) *DB {
-	router.lock.RLock()
-	defer router.lock.RUnlock()
-
-	db, ok := router.dbMap[dbName]
+	db, ok := router.dbMap.Load(dbName)
 	if !ok {
-		return nil
+		db, ok = router.dbMap.LoadOrStore(dbName, NewDB(router.masterClient, router.masterClient.GetDB(dbName)))
 	}
-	return db
+	return db.(*DB)
 }
 
 func (router *Router) catchPanic(writer http.ResponseWriter) {
