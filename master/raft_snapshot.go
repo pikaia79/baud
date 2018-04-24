@@ -2,10 +2,10 @@ package master
 
 import (
 	"github.com/gogo/protobuf/proto"
-	raftproto "github.com/tiglabs/raft/proto"
-	"io"
 	"github.com/tiglabs/baud/proto/masterpb"
 	"github.com/tiglabs/baud/util/raftkvstore"
+	raftproto "github.com/tiglabs/raft/proto"
+	"io"
 )
 
 type RaftSnapshot struct {

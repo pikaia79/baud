@@ -1,8 +1,8 @@
 package master
 
 import (
-	"strings"
 	"github.com/tiglabs/baud/util"
+	"strings"
 
 	"github.com/BurntSushi/toml"
 	"github.com/tiglabs/baud/util/log"
@@ -21,7 +21,7 @@ import (
 //	defaultRaftRetainLogsCount  = 100
 //	defaultMaxTaskWaitTime      = 5 * time.Minute
 //	defaultMaxRangeDownTime     = 10 * time.Minute
-//) 
+//)
 
 const DEFAULT_MASTER_CONFIG = `
 # Master Configuration.
@@ -71,7 +71,7 @@ raft-snapshot-concurrency=1
 `
 
 const (
-	CONFIG_ROLE_MASTER     = "master"
+	CONFIG_ROLE_MASTER = "master"
 
 	CONFIG_LOG_LEVEL_DEBUG = "debug"
 	CONFIG_LOG_LEVEL_INFO  = "info"
@@ -83,7 +83,7 @@ type Config struct {
 	ModuleCfg  ModuleConfig  `toml:"module,omitempty" json:"module"`
 	LogCfg     LogConfig     `toml:"log,omitempty" json:"log"`
 	ClusterCfg ClusterConfig `toml:"cluster,omitempty" json:"cluster"`
-	PsCfg      PsConfig		 `toml:"ps,omitempty" json:"ps"`
+	PsCfg      PsConfig      `toml:"ps,omitempty" json:"ps"`
 }
 
 func NewConfig(path string) *Config {
@@ -138,7 +138,7 @@ func (cfg *ModuleConfig) adjust() {
 }
 
 type ClusterNode struct {
-	NodeId 			  uint64 `toml:"node-id,omitempty" json:"node-id"`
+	NodeId uint64 `toml:"node-id,omitempty" json:"node-id"`
 	//Host      	  string `toml:"host,omitempty" json:"host"`
 	HttpPort          uint32 `toml:"http-port,omitempty" json:"http-port"` // TODO: web admin port only need one in cluster
 	RpcPort           uint32 `toml:"rpc-port,omitempty" json:"rpc-port"`
@@ -152,7 +152,7 @@ type ClusterConfig struct {
 	RaftHeartbeatInterval util.Duration  `toml:"raft-heartbeat-interval,omitempty" json:"raft-heartbeat-interval"`
 	RaftRetainLogsCount   uint64         `toml:"raft-retain-logs-count,omitempty" json:"raft-retain-logs-count"`
 	Nodes                 []*ClusterNode `toml:"nodes,omitempty" json:"nodes"`
-	CurNode 			  *ClusterNode
+	CurNode               *ClusterNode
 }
 
 func (cfg *ClusterConfig) adjust() {

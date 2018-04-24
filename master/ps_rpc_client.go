@@ -4,11 +4,11 @@ import (
 	"context"
 	"github.com/tiglabs/baud/proto/metapb"
 	"github.com/tiglabs/baud/proto/pspb"
+	"github.com/tiglabs/baud/util/log"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/status"
 	"sync"
 	"time"
-	"github.com/tiglabs/baud/util/log"
 )
 
 const (

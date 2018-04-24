@@ -2,10 +2,10 @@ package master
 
 import (
 	"github.com/tiglabs/baud/proto/metapb"
+	"github.com/tiglabs/baud/util"
+	"github.com/tiglabs/baud/util/log"
 	"math"
 	"sync"
-	"github.com/tiglabs/baud/util/log"
-	"github.com/tiglabs/baud/util"
 )
 
 type Cluster struct {

@@ -3,11 +3,11 @@ package master
 import (
 	"encoding/json"
 	"fmt"
-	"net/http"
-	"strconv"
+	"github.com/tiglabs/baud/util"
 	"github.com/tiglabs/baud/util/log"
 	"github.com/tiglabs/baud/util/server"
-	"github.com/tiglabs/baud/util"
+	"net/http"
+	"strconv"
 )
 
 const (

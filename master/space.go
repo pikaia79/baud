@@ -4,10 +4,10 @@ import (
 	"fmt"
 	"github.com/gogo/protobuf/proto"
 	"github.com/tiglabs/baud/proto/metapb"
-	"sync"
 	"github.com/tiglabs/baud/util"
 	"github.com/tiglabs/baud/util/deepcopy"
 	"github.com/tiglabs/baud/util/log"
+	"sync"
 )
 
 const (

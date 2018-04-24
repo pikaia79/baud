@@ -2,6 +2,10 @@ package master
 
 import (
 	"fmt"
+	"github.com/tiglabs/baud/proto/masterpb"
+	"github.com/tiglabs/baud/util"
+	"github.com/tiglabs/baud/util/log"
+	"github.com/tiglabs/baud/util/raftkvstore"
 	"github.com/tiglabs/raft"
 	raftproto "github.com/tiglabs/raft/proto"
 	"github.com/tiglabs/raft/storage/wal"
@@ -11,10 +15,6 @@ import (
 	"path/filepath"
 	"sync"
 	"time"
-	"github.com/tiglabs/baud/util/log"
-	"github.com/tiglabs/baud/util/raftkvstore"
-	"github.com/tiglabs/baud/proto/masterpb"
-	"github.com/tiglabs/baud/util"
 )
 
 const (

@@ -3,12 +3,12 @@ package master
 import (
 	"github.com/tiglabs/baud/proto/masterpb"
 	"github.com/tiglabs/baud/proto/metapb"
+	"github.com/tiglabs/baud/util"
+	"github.com/tiglabs/baud/util/log"
 	"golang.org/x/net/context"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/reflection"
 	"net"
-	"github.com/tiglabs/baud/util/log"
-	"github.com/tiglabs/baud/util"
 )
 
 type RpcServer struct {

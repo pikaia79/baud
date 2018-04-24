@@ -6,12 +6,11 @@ import (
 
 	"github.com/golang/protobuf/proto"
 	"github.com/tiglabs/baud/proto/masterpb"
-	"github.com/tiglabs/raft"
-	raftproto "github.com/tiglabs/raft/proto"
 	"github.com/tiglabs/baud/util/log"
 	"github.com/tiglabs/baud/util/raftkvstore"
+	"github.com/tiglabs/raft"
+	raftproto "github.com/tiglabs/raft/proto"
 )
-
 
 type RaftApplyHandler func( /*req*/ *masterpb.Request, uint64) ( /*resp*/ *masterpb.Response /*err*/, error)
 
