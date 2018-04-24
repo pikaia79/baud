@@ -24,24 +24,6 @@ import (
 //	defaultMaxRangeDownTime     = 10 * time.Minute
 //)
 
-//
-//uint32 rpc_port                  = 1 [(gogoproto.customname) = "RPCPort", (gogoproto.casttype) = "int"];
-//uint32 admin_port                = 2 [(gogoproto.casttype) = "int"];
-//uint32 heartbeat_interval        = 3 [(gogoproto.casttype) = "int"];
-//uint32 raft_heartbeat_port       = 4 [(gogoproto.casttype) = "int"];
-//uint32 raft_replicate_port       = 5 [(gogoproto.casttype) = "int"];
-//uint32 raft_heartbeat_interval   = 6 [(gogoproto.casttype) = "int"];
-//uint64 raft_retain_logs          = 7;
-//uint32 raft_replica_concurrency  = 8 [(gogoproto.casttype) = "int"];
-//uint32 raft_snapshot_concurrency = 9 [(gogoproto.casttype) = "int"];
-
-//[cluster.nodes]
-//node-id = 2
-//http-port = 8897
-//rpc-port = 18897
-//raft-heartbeat-port=8896
-//raft-replicate-port=8895
-
 //[ps]
 //rpc-port=8000
 //admin-port=8001
@@ -71,8 +53,7 @@ level = "info"
 [cluster]
 cluster-id = 1
 node-id = 1
-# all interval unit is millisecond
-raft-heartbeat-interval=500ms
+raft-heartbeat-interval="500ms"
 raft-retain-logs-count=100
 
 [[cluster.nodes]]
@@ -88,6 +69,8 @@ http-port = 8897
 rpc-port = 18897
 raft-heartbeat-port=8896
 raft-replicate-port=8895
+
+
 `
 
 const (
