@@ -21,17 +21,7 @@ import (
 //	defaultRaftRetainLogsCount  = 100
 //	defaultMaxTaskWaitTime      = 5 * time.Minute
 //	defaultMaxRangeDownTime     = 10 * time.Minute
-//)
-
-//[ps]
-//rpc-port=8000
-//admin-port=8001
-//heartbeat-interval=100
-//raft-heartbeat-port=8002
-//raft-replicate-port=8003
-//raft_retain_logs
-//raft-replica-concurrency=1
-//raft-snapshot-concurrency=1
+//) 
 
 const DEFAULT_MASTER_CONFIG = `
 # Master Configuration.
@@ -69,7 +59,15 @@ rpc-port = 18897
 raft-heartbeat-port=8896
 raft-replicate-port=8895
 
-
+[ps]
+rpc-port=8000
+admin-port=8001
+heartbeat-interval="100ms"
+raft-heartbeat-port=8002
+raft-replicate-port=8003
+raft-retain-logs=10000
+raft-replica-concurrency=1
+raft-snapshot-concurrency=1
 `
 
 const (
@@ -85,6 +83,7 @@ type Config struct {
 	ModuleCfg  ModuleConfig  `toml:"module,omitempty" json:"module"`
 	LogCfg     LogConfig     `toml:"log,omitempty" json:"log"`
 	ClusterCfg ClusterConfig `toml:"cluster,omitempty" json:"cluster"`
+	PsCfg      PsConfig		 `toml:"ps,omitempty" json:"ps"`
 }
 
 func NewConfig(path string) *Config {
@@ -110,6 +109,7 @@ func (c *Config) adjust() {
 	c.ModuleCfg.adjust()
 	c.LogCfg.adjust()
 	c.ClusterCfg.adjust()
+	c.PsCfg.adjust()
 }
 
 type ModuleConfig struct {
@@ -227,14 +227,25 @@ func (c *LogConfig) adjust() {
 }
 
 type PsConfig struct {
-	//rpc-port=8000
-	//admin-port=8001
-	//heartbeat-interval=100
-	//raft-heartbeat-port=8002
-	//raft-replicate-port=8003
-	//raft_retain_logs
-	//raft-replica-concurrency=1
-	//raft-snapshot-concurrency=1
+	RpcPort                 uint32        `toml:"rpc-port,omitempty" json:"rpc-port"`
+	AdminPort               uint32        `toml:"admin-port,omitempty" json:"admin-port"`
+	HeartbeatInterval       util.Duration `toml:"heartbeat-interval,omitempty" json:"heartbeat-interval"`
+	RaftHeartbeatPort       uint32        `toml:"raft-heartbeat-port,omitempty" json:"raft-heartbeat-port"`
+	RaftReplicatePort       uint32        `toml:"raft-replicate-port,omitempty" json:"raft-replicate-port"`
+	RaftRetainLogs          uint64        `toml:"raft-retain-logs,omitempty" json:"raft-retain-logs"`
+	RaftReplicaConcurrency  uint32        `toml:"raft-replica-concurrency,omitempty" json:"raft-replica-concurrency"`
+	RaftSnapshotConcurrency uint32        `toml:"raft-snapshot-concurrency,omitempty" json:"raft-snapshot-concurrency"`
+}
+
+func (cfg *PsConfig) adjust() {
+	adjustUint32(&cfg.RpcPort, "no ps raft port")
+	adjustUint32(&cfg.AdminPort, "no ps admin port")
+	adjustDuration(&cfg.HeartbeatInterval, "no ps heartbeat interval")
+	adjustUint32(&cfg.RaftHeartbeatPort, "no ps raft heartbeat port")
+	adjustUint32(&cfg.RaftReplicatePort, "no ps raft replicate port")
+	adjustUint64(&cfg.RaftRetainLogs, "no ps raft retain logs")
+	adjustUint32(&cfg.RaftReplicaConcurrency, "no ps raft replicate concurrency")
+	adjustUint32(&cfg.RaftSnapshotConcurrency, "no ps raft snapshot concurrency")
 }
 
 func adjustString(v *string, errMsg string) {
