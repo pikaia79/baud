@@ -2,8 +2,6 @@ package master
 
 import (
 	"context"
-	"errors"
-
 	"github.com/golang/protobuf/proto"
 	"github.com/tiglabs/baud/proto/masterpb"
 	"github.com/tiglabs/baud/util/log"
@@ -54,7 +52,7 @@ func (rg *RaftGroup) Start(raftConfig *raft.RaftConfig) error {
 	if rg.raftApplyHandle == nil || rg.raftApplySnapshotHandle == nil ||
 		rg.raftFatalEventHandle == nil || rg.raftPeerChangeHandle == nil ||
 		rg.raftGetSnapshotHandle == nil || rg.raftLeaderChangeHandle == nil {
-		return errors.New("register raft handler first")
+		return ErrRaftNotRegHandler
 	}
 
 	err := rg.raftServer.CreateRaft(raftConfig)

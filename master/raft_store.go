@@ -167,7 +167,6 @@ func (rs *RaftStore) Get(key []byte) ([]byte, error) {
 }
 
 func (rs *RaftStore) Scan(startKey, limitKey []byte) raftkvstore.Iterator {
-	// TODO: when localRead is false
 	return rs.localStore.NewIterator(startKey, limitKey)
 }
 
@@ -210,13 +209,13 @@ func NewSaveBatch(raft *RaftGroup) *SaveBatch {
 }
 
 func (b *SaveBatch) Put(key, value []byte) {
-	_key := make([]byte, len(key))
-	_value := make([]byte, len(value))
-	copy(_key, key)
-	copy(_value, value)
+	destKey := make([]byte, len(key))
+	destVal := make([]byte, len(value))
+	copy(destKey, key)
+	copy(destVal, value)
 	exec := &masterpb.KvPairExecute{
 		Do:     masterpb.ExecuteType_ExecPut,
-		KvPair: &masterpb.KvPair{Key: _key, Value: _value},
+		KvPair: &masterpb.KvPair{Key: destKey, Value: destVal},
 	}
 	b.lock.Lock()
 	defer b.lock.Unlock()
@@ -224,11 +223,11 @@ func (b *SaveBatch) Put(key, value []byte) {
 }
 
 func (b *SaveBatch) Delete(key []byte) {
-	_key := make([]byte, len(key))
-	copy(_key, key)
+	destKey := make([]byte, len(key))
+	copy(destKey, key)
 	exec := &masterpb.KvPairExecute{
 		Do:     masterpb.ExecuteType_ExecDelete,
-		KvPair: &masterpb.KvPair{Key: _key},
+		KvPair: &masterpb.KvPair{Key: destKey},
 	}
 	b.lock.Lock()
 	defer b.lock.Unlock()
@@ -331,8 +330,8 @@ func (rs *RaftStore) initRaftServer() error {
 	raftGroup.RegisterPeerChangeHandle(rs.HandlePeerChange)
 	raftGroup.RegisterGetSnapshotHandle(rs.HandleGetSnapshot)
 	raftGroup.RegisterApplySnapshotHandle(rs.HandleApplySnapshot)
-	//raftGroup.RegisterLeaderChangeHandle(conf.LeaderChangeHandler)
-	//raftGroup.RegisterFatalEventHandle(conf.FatalHandler)
+	raftGroup.RegisterLeaderChangeHandle(rs.LeaderChangeHandler)
+	raftGroup.RegisterFatalEventHandle(rs.FatalEventHandler)
 
 	raftPeers := make([]raftproto.Peer, len(cfg.RaftNodes))
 	for _, node := range cfg.RaftNodes {
@@ -525,13 +524,13 @@ func (rs *RaftStore) HandleCmd(req *masterpb.Request, raftIndex uint64) (resp *m
 func (rs *RaftStore) HandlePeerChange(confChange *raftproto.ConfChange) (res interface{}, err error) {
 	switch confChange.Type {
 	case raftproto.ConfAddNode:
-
+		log.Debug("add raft node")
 		res, err = nil, nil
 	case raftproto.ConfRemoveNode:
-
+		log.Debug("remove raft node")
 		res, err = nil, nil
 	case raftproto.ConfUpdateNode:
-		log.Debug("update range peer")
+		log.Debug("update raft node")
 		res, err = nil, nil
 	default:
 		res, err = nil, ErrUnknownRaftCmdType
@@ -592,4 +591,11 @@ func (rs *RaftStore) HandleApplySnapshot(peers []raftproto.Peer, iter *SnapshotK
 	return nil
 }
 
+func (rs *RaftStore) LeaderChangeHandler(leaderId uint64) {
+	log.Info("raft leader had changed to id[%v]", leaderId)
+}
+
+func (rs *RaftStore) FatalEventHandler(err *raft.FatalError) {
+	log.Error("received raft fatal error[%v]", err)
+}
 ///////////////////////callback implement end////////////////
