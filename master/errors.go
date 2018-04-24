@@ -10,6 +10,7 @@ var (
 	ErrInternalError = errors.New("internal error")
 	ErrSysBusy       = errors.New("system busy")
 	ErrParamError    = errors.New("param error")
+	ErrInvalidCfg    = errors.New("config error")
 
 	ErrDupDb              = errors.New("duplicated database")
 	ErrDbNotExists        = errors.New("db not exists")

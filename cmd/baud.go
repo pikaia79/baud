@@ -46,9 +46,11 @@ func interceptSignal(s IServer) {
 func main() {
 	fmt.Println("Hello, Baud!")
 	flag.Parse()
-	cfg := master.NewDefaultConfig()
+	fmt.Printf("configFile=[%v]\n", *configFile)
+
+	cfg := master.NewConfig(*configFile)
 	role := "master"
-	profPort := "pprof"
+	profPort := "80000"
 
 	//for multi-cpu scheduling
 	runtime.GOMAXPROCS(runtime.NumCPU())

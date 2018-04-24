@@ -23,8 +23,8 @@ const (
 )
 
 var (
-	raftBucket []byte = []byte("MasterRaftBucket")
-	dbBucket   []byte = []byte("MasterDbBucket")
+	raftBucket = []byte("MasterRaftBucket")
+	dbBucket   = []byte("MasterDbBucket")
 )
 
 ////////////////////store begin///////////////////
@@ -264,9 +264,9 @@ func (b *SaveBatch) Commit() error {
 ////////////////////raft begin////////////////////////
 func (rs *RaftStore) initRaftStoreCfg() error {
 	raftStoreCfg := new(RaftStoreConfig)
-	raftStoreCfg.NodeId = rs.config.NodeId
+	raftStoreCfg.NodeId = rs.config.CurNodeCfg.NodeId
 
-	dataRootDir := filepath.Join(rs.config.DataPath, "data")
+	dataRootDir := filepath.Join(rs.config.ModuleCfg.MetaDataPath, "raft")
 	if err := os.MkdirAll(dataRootDir, 0755); err != nil {
 		log.Error("make data root direcotory %rs failed, err[%v]", dataRootDir, err)
 		return err
@@ -274,13 +274,13 @@ func (rs *RaftStore) initRaftStoreCfg() error {
 	raftStoreCfg.DataPath = filepath.Join(dataRootDir, "baud.db")
 	raftStoreCfg.WalPath = filepath.Join(dataRootDir, ".wal")
 
-	raftStoreCfg.RaftRetainLogs = rs.config.Raft.RetainLogsCount
-	raftStoreCfg.RaftHeartbeatInterval = rs.config.Raft.HeartbeatInterval.Duration
+	raftStoreCfg.RaftRetainLogs = rs.config.Raft.RaftRetainLogsCount
+	raftStoreCfg.RaftHeartbeatInterval = rs.config.Raft.RaftHeartbeatInterval.Duration
 	raftStoreCfg.RaftHeartbeatAddr = rs.config.raftHeartbeatAddr
 	raftStoreCfg.RaftReplicateAddr = rs.config.raftReplicaAddr
 
 	var peers []*Peer
-	for _, p := range rs.config.Cluster.Peers {
+	for _, p := range rs.config.ClusterCfg.Nodes {
 		peer := new(Peer)
 		peer.NodeId = p.ID
 		//node.WebManageAddr = fmt.Sprintf("%rs:%d", peer.Host, peer.HttpPort)

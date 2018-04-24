@@ -7,6 +7,7 @@ import (
 	"strconv"
 	"github.com/tiglabs/baud/util/log"
 	"github.com/tiglabs/baud/util/server"
+	"github.com/tiglabs/baud/util"
 )
 
 const (
@@ -39,7 +40,7 @@ func NewApiServer(config *Config, cluster *Cluster) *ApiServer {
 	}
 
 	apiServer.httpServer.Init("master-api-server", &server.ServerConfig{
-		Sock:      config.webManageAddr,
+		Sock:      util.BuildAddr("0.0.0.0", int(config.ClusterCfg.CurNode.HttpPort)),
 		Version:   "v1",
 		ConnLimit: DEFAULT_CONN_LIMIT,
 	})

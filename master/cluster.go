@@ -284,6 +284,8 @@ func (c *Cluster) createSpace(dbName, spaceName, partitionKey, partitionFunc str
 		//}
 	}
 
+	// waiting to continues to create partition in ps by the background worker
+
 	return space, nil
 }
 
