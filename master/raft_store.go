@@ -332,7 +332,7 @@ func (rs *RaftStore) initRaftServer() error {
 	raftGroup.RegisterLeaderChangeHandle(rs.LeaderChangeHandler)
 	raftGroup.RegisterFatalEventHandle(rs.FatalEventHandler)
 
-	raftPeers := make([]raftproto.Peer, 0)
+	raftPeers := make([]raftproto.Peer, 0, len(cfg.RaftNodes))
 	for _, node := range cfg.RaftNodes {
 		raftPeer := raftproto.Peer{
 			Type:     raftproto.PeerNormal,

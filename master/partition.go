@@ -229,7 +229,7 @@ func doMetaMarshal(p *metapb.Partition) ([]byte, []byte, error) {
 //	g.lock.RLock()
 //	defer g.lock.RUnlock()
 //
-//	servers := make([]*PartitionServer, 0)
+//	servers := make([]*PartitionServer, 0, len(g.servers))
 //	for _, server := range g.servers {
 //		servers = append(servers, server)
 //	}
