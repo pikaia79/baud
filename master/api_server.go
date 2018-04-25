@@ -11,7 +11,7 @@ import (
 )
 
 const (
-	DEFAULT_CONN_LIMIT = 10000
+	DEFAULT_CONN_LIMIT = 100
 
 	// definition for http url parameter name
 	DB_NAME         = "db_name"
@@ -45,6 +45,8 @@ func NewApiServer(config *Config, cluster *Cluster) *ApiServer {
 		ConnLimit: DEFAULT_CONN_LIMIT,
 	})
 
+	apiServer.initAdminHandler()
+
 	return apiServer
 }
 
@@ -64,14 +66,16 @@ func (s *ApiServer) Close() {
 }
 
 func (s *ApiServer) initAdminHandler() {
-	s.httpServer.Handle("/manage/db/create", s.handleDbCreate)
-	s.httpServer.Handle("/manage/db/delete", s.handleDbDelete)
-	s.httpServer.Handle("/manage/db/rename", s.handleDbRename)
-	s.httpServer.Handle("/manage/space/create", s.handleSpaceCreate)
-	s.httpServer.Handle("/manage/space/delete", s.handleSpaceDelete)
-	s.httpServer.Handle("/manage/space/rename", s.handleSpaceRename)
-	s.httpServer.Handle("/manage/space/detail", s.handleSpaceDetail)
-	s.httpServer.Handle("/manage/index/create", s.handleIndexCreate)
+    s.httpServer.Handle("/manage/db/create", s.handleDbCreate)
+    s.httpServer.Handle("/manage/db/delete", s.handleDbDelete)
+    s.httpServer.Handle("/manage/db/rename", s.handleDbRename)
+    s.httpServer.Handle("/manage/db/list", s.handleDbList)
+    s.httpServer.Handle("/manage/db/detail", s.handleDbDetail)
+    s.httpServer.Handle("/manage/space/create", s.handleSpaceCreate)
+    s.httpServer.Handle("/manage/space/delete", s.handleSpaceDelete)
+    s.httpServer.Handle("/manage/space/rename", s.handleSpaceRename)
+    s.httpServer.Handle("/manage/space/detail", s.handleSpaceDetail)
+    s.httpServer.Handle("/manage/index/create", s.handleIndexCreate)
 }
 
 func (s *ApiServer) handleDbCreate(w http.ResponseWriter, r *http.Request) {
@@ -108,6 +112,32 @@ func (s *ApiServer) handleDbRename(w http.ResponseWriter, r *http.Request) {
 	}
 
 	sendReply(w, newHttpSucReply(""))
+}
+
+
+func (s *ApiServer) handleDbList(w http.ResponseWriter, r *http.Request) {
+	dbs, err := s.cluster.listDBs()
+	if err != nil {
+		sendReply(w, newHttpErrReply(err))
+		return
+	}
+
+	sendReply(w, newHttpSucReply(dbs))
+}
+
+func(s *ApiServer) handleDbDetail(w http.ResponseWriter, r *http.Request) {
+	dbName, err := checkMissingParam(w, r, DB_NAME)
+	if err != nil {
+		return
+	}
+
+	db, err := s.cluster.detailDB(dbName)
+	if err != nil {
+		sendReply(w, newHttpErrReply(err))
+		return
+	}
+
+	sendReply(w, newHttpSucReply(db))
 }
 
 func (s *ApiServer) handleSpaceCreate(w http.ResponseWriter, r *http.Request) {
