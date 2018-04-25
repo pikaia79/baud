@@ -1,97 +1,83 @@
 package main
 
 import (
-	"flag"
-	"github.com/tiglabs/baud/util/log"
-	"net/http"
-	_ "net/http/pprof"
-	"os"
-	"os/signal"
-	"runtime"
-	"syscall"
-	"github.com/tiglabs/baud/master"
-	"github.com/tiglabs/raft/logger"
-	"sync"
-	"fmt"
+    "flag"
+    "github.com/tiglabs/baud/master"
+    "github.com/tiglabs/baud/partition"
+    "github.com/tiglabs/baud/util/config"
+    "log"
+    "net/http"
+    _ "net/http/pprof"
+    "os"
+    "os/signal"
+    "runtime"
+    "syscall"
 )
 
 const (
-	Version     = "0.1"
-	LogicalCPUs = 32
+    Version     = "0.1"
+    LogicalCPUs = 32
 )
 
 var (
-	configFile = flag.String("c", "", "config file path")
-	logLevel   = flag.Int("log", 0, "log level, as DebugLevel = 0")
-
-	mainWg sync.WaitGroup
+    configFile = flag.String("c", "", "config file path")
+    logLevel   = flag.Int("log", 0, "log level, as DebugLevel = 0")
 )
 
 type IServer interface {
-	Start(cfg *master.Config) error
-	Shutdown()
+    Start(cfg *config.Config) error
+    Shutdown()
 }
 
 func interceptSignal(s IServer) {
-	sigs := make(chan os.Signal, 1)
-	signal.Notify(sigs, syscall.SIGINT, syscall.SIGTERM)
+    sigs := make(chan os.Signal, 1)
+    signal.Notify(sigs, syscall.SIGINT, syscall.SIGTERM)
 
-	go func() {
-		<-sigs
-		s.Shutdown()
-		mainWg.Done()
-		os.Exit(0)
-	}()
+    go func() {
+        <-sigs
+        s.Shutdown()
+        os.Exit(0)
+    }()
 }
 
 func main() {
-	fmt.Println("Hello, Baud!")
-	flag.Parse()
-	fmt.Printf("configFile=[%v]\n", *configFile)
+    log.Println("Hello, Baud!")
+    flag.Parse()
+    cfg := config.LoadConfigFile(*configFile)
+    role := cfg.GetString("role")
+    profPort := cfg.GetString("pprof")
 
-	cfg := master.NewConfig(*configFile)
+    //for multi-cpu scheduling
+    runtime.GOMAXPROCS(runtime.NumCPU())
 
-	log.InitFileLog(cfg.LogCfg.LogPath, cfg.ModuleCfg.Name, cfg.LogCfg.Level)
-	logger.SetLogger(log.GetFileLogger().SetRaftLevel(cfg.LogCfg.RaftLevel))
-	log.Debug("log initialized")
+    //init profile server
+    go func() {
+        log.Println(http.ListenAndServe(":"+profPort, nil))
+    }()
 
-	role := "master"
-	profPort := "50000"
+    var server IServer
 
-	//for multi-cpu scheduling
-	runtime.GOMAXPROCS(runtime.NumCPU())
+    switch role {
+    case "master":
+        server = master.NewServer()
+    case "ps":
+        server = partition.NewServer()
+    case "router":
+        server = router.NewServer()
+    case "extent":
+        server = extent.NewServer()
 
-	//init profile server
-	go func() {
-		fmt.Println(http.ListenAndServe(":"+profPort, nil))
-	}()
+    default:
+        log.Println("Fatal: unmath role: ", role)
+        return
+    }
 
-	var server IServer
+    //install the signal handler
+    interceptSignal(server)
 
-	switch role {
-	case "master":
-		server = master.NewServer()
-	case "ps":
-		//server = partition.NewServer()
-	case "router":
-		//server = router.NewServer()
-
-	default:
-		fmt.Println("Fatal: unmath role: ", role)
-		return
-	}
-
-	mainWg.Add(1)
-	//install the signal handler
-	interceptSignal(server)
-
-	//start the server
-	err := server.Start(cfg)
-	if err != nil {
-		log.Fatal("Fatal: failed to start the Baud daemon - ", err)
-	}
-
-	log.Info("master main is running")
-	mainWg.Wait()
-	log.Info("master main exit")
+    //start the server
+    err := server.Start(cfg)
+    if err != nil {
+        log.Fatal("Fatal: failed to start the Baud daemon - ", err)
+    }
 }
