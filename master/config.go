@@ -196,6 +196,8 @@ func (cfg *ClusterConfig) adjust() {
 		if _, ok := tempNodes[node.NodeId]; ok {
 			log.Panic("duplicated node-id[%v]", node.NodeId)
 		}
+		tempNodes[node.NodeId] = node
+		
 		if node.NodeId == cfg.CurNodeId {
 			cfg.CurNode = node
 		}
