@@ -23,7 +23,7 @@ type DB struct {
 func NewDB(dbName string) (*DB, error) {
 	dbId, err := GetIdGeneratorInstance(nil).GenID()
 	if err != nil {
-		log.Error("generate db id is failed. err[%v]", err)
+		log.Error("generate id of db[%v] is failed. err[%v]", dbName, err)
 		return nil, ErrGenIdFailed
 	}
 	db := &DB{
