@@ -136,7 +136,7 @@ func (p *Partition) updateInfo(store Store, info *masterpb.PartitionInfo, nodeId
 	p.taskFlag = false
 	p.taskTimeout = time.Time{}
 
-	p.Replicas = make([]metapb.Replica, len(info.RaftStatus.Followers))
+	p.Replicas = make([]metapb.Replica, 0, len(info.RaftStatus.Followers))
 	p.leader = nil
 
 	for _, follower := range info.RaftStatus.Followers {
@@ -168,7 +168,7 @@ func (p *Partition) getAllReplicas() []*metapb.Replica {
 	p.propertyLock.RLock()
 	defer p.propertyLock.RUnlock()
 
-	replicas := make([]*metapb.Replica, len(p.Replicas))
+	replicas := make([]*metapb.Replica, 0, len(p.Replicas))
 	for _, metaReplica := range p.Replicas {
 		replicas = append(replicas, &metaReplica)
 	}
@@ -297,7 +297,7 @@ func (c *PartitionCache) getAllMetaPartitions() *[]metapb.Partition {
 	c.lock.RLock()
 	defer c.lock.RUnlock()
 
-	partitions := make([]metapb.Partition, len(c.partitions))
+	partitions := make([]metapb.Partition, 0, len(c.partitions))
 	for _, metaPartition := range c.partitions {
 		partitions = append(partitions, *metaPartition.Partition)
 	}

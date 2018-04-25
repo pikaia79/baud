@@ -144,7 +144,7 @@ func (c *DBCache) getAllDBs() []*DB {
 	c.lock.RLock()
 	defer c.lock.RUnlock()
 
-	dbs := make([]*DB, len(c.dbs))
+	dbs := make([]*DB, 0, len(c.dbs))
 	for _, db := range c.dbs {
 		dbs = append(dbs, db)
 	}

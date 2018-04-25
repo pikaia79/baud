@@ -68,7 +68,7 @@ package master
 ////	c.lock.RLock()
 ////	defer c.lock.RUnlock()
 ////
-////	replicas := make([]*Replica, len(c.replicas))
+////	replicas := make([]*Replica, 0)
 ////	for _, replica := range c.replicas {
 ////		replicas = append(replicas, replica)
 ////	}

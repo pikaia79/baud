@@ -6,10 +6,10 @@ role = "master"
 version = "v1"
 # web request request signature key
 signkey = ""
-data-path = "/tmp/baud/master3/data"
+data-path = "/tmp/baud/master1/data"
 
 [log]
-log-path = "/tmp/baud/master3/log"
+log-path = "/tmp/baud/master1/log"
 #debug, info, warn, error
 level="debug"
 #debug, info, warn
@@ -17,7 +17,7 @@ raft-level="debug"
 
 [cluster]
 cluster-id = 1
-node-id = 3
+node-id = 1
 raft-heartbeat-interval="500ms"
 raft-retain-logs-count=100
 

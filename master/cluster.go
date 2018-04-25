@@ -280,7 +280,7 @@ func (c *Cluster) createSpace(dbName, spaceName, partitionKey, partitionFunc str
 		log.Error("fail to split slot range [%v-%v]", 0, math.MaxUint32)
 		return nil, ErrInternalError
 	}
-	partitions := make([]*Partition, len(slots))
+	partitions := make([]*Partition, 0, len(slots))
 	for i := 0; i < len(slots)-1; i++ {
 		partition, err := NewPartition(db.ID, space.ID, slots[i], slots[i+1])
 		if err != nil {

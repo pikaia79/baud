@@ -75,7 +75,7 @@ func (s *RpcServer) GetRoute(ctx context.Context,
 		return resp, nil
 	}
 
-	resp.Routes = make([]masterpb.Route, len(partitions))
+	resp.Routes = make([]masterpb.Route, 0, len(partitions))
 	for _, partition := range partitions {
 		route := masterpb.Route{
 			Partition: *partition.Partition,
@@ -84,7 +84,7 @@ func (s *RpcServer) GetRoute(ctx context.Context,
 
 		replicas := partition.Replicas
 		if replicas != nil || len(replicas) != 0 {
-			nodes := make([]*metapb.Node, len(replicas))
+			nodes := make([]*metapb.Node, 0, len(replicas))
 			for _, replica := range replicas {
 				ps := s.cluster.psCache.findServerById(replica.NodeID)
 				if ps != nil {
