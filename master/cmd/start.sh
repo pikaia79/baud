@@ -2,7 +2,9 @@
 
 source build.sh
 
-nohup ./master -c ./master.toml > nohup.out 2>&1 &
+CURDIR=`pwd`
+echo $CURDIR
+nohup $CURDIR"/master" -c $CURDIR"/master.toml" > nohup.out 2>&1 &
 
 echo "baud master started. pid:[$!]" 
 
