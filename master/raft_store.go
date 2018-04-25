@@ -76,7 +76,6 @@ type RaftStoreConfig struct {
 	RaftHeartbeatAddr     string
 	RaftReplicateAddr     string
 	RaftNodes             []*Peer
-	//RaftLeaderChangeNotifier	[]chan*Peer
 
 	NodeId   uint64
 	DataPath string
@@ -335,7 +334,7 @@ func (rs *RaftStore) initRaftServer() error {
 	raftGroup.RegisterLeaderChangeHandle(rs.LeaderChangeHandler)
 	raftGroup.RegisterFatalEventHandle(rs.FatalEventHandler)
 
-	raftPeers := make([]raftproto.Peer, len(cfg.RaftNodes))
+	raftPeers := make([]raftproto.Peer, 0)
 	for _, node := range cfg.RaftNodes {
 		raftPeer := raftproto.Peer{
 			Type:     raftproto.PeerNormal,
