@@ -265,13 +265,13 @@ func (rs *RaftStore) initRaftStoreCfg() error {
 	raftStoreCfg := new(RaftStoreConfig)
 	raftStoreCfg.NodeId = rs.config.ClusterCfg.CurNode.NodeId
 
-	dataRootDir := filepath.Join(rs.config.ModuleCfg.DataPath, "raft")
-	if err := os.MkdirAll(dataRootDir, 0755); err != nil {
-		log.Error("make data root direcotory %rs failed, err[%v]", dataRootDir, err)
+	raftDataDir := filepath.Join(rs.config.ModuleCfg.DataPath, "raft")
+	if err := os.MkdirAll(raftDataDir, 0755); err != nil {
+		log.Error("make raft data root directory[%v] failed, err[%v]", raftDataDir, err)
 		return err
 	}
-	raftStoreCfg.DataPath = filepath.Join(dataRootDir, "baud.db")
-	raftStoreCfg.WalPath = filepath.Join(dataRootDir, ".wal")
+	raftStoreCfg.DataPath = filepath.Join(rs.config.ModuleCfg.DataPath, "baud.db")
+	raftStoreCfg.WalPath = raftDataDir
 
 	raftStoreCfg.RaftRetainLogs = rs.config.ClusterCfg.RaftRetainLogsCount
 	raftStoreCfg.RaftHeartbeatInterval = rs.config.ClusterCfg.RaftHeartbeatInterval.Duration
@@ -284,8 +284,6 @@ func (rs *RaftStore) initRaftStoreCfg() error {
 	for _, p := range rs.config.ClusterCfg.Nodes {
 		peer := new(Peer)
 		peer.NodeId = p.NodeId
-		//node.WebManageAddr = fmt.Sprintf("%rs:%d", peer.Host, peer.HttpPort)
-		//node.RpcServerAddr = fmt.Sprintf("%rs:%d", peer.Host, peer.RpcPort)
 		peer.RaftHeartbeatAddr = util.BuildAddr(p.Host, int(p.RaftHeartbeatPort))
 		peer.RaftReplicateAddr = util.BuildAddr(p.Host, int(p.RaftReplicatePort))
 		peers = append(peers, peer)
