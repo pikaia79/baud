@@ -226,7 +226,7 @@ func (c *Cluster) renameDb(srcDbName, destDbName string) error {
 	return nil
 }
 
-func (c *Cluster) createSpace(dbName, spaceName, partitionKey, partitionFunc string, partitionNum int) (*Space, error) {
+func (c *Cluster) createSpace(dbName, spaceName, partitionKey, partitionFunc string, partitionNum uint32) (*Space, error) {
 	c.clusterLock.Lock()
 	defer c.clusterLock.Unlock()
 
@@ -254,13 +254,13 @@ func (c *Cluster) createSpace(dbName, spaceName, partitionKey, partitionFunc str
 		return nil, err
 	}
 
-	slots := util.SlotSplit(0, math.MaxUint32, partitionNum+1)
-	if slots == nil {
-		log.Error("fail to split slot range [%v-%v]", 0, math.MaxUint32)
-		return nil, ErrInternalError
-	}
-	partitions := make([]*Partition, 0, len(slots))
-	for i := 0; i < len(slots)-1; i++ {
+    slots := util.SlotSplit(0, math.MaxUint32, uint64(partitionNum)+1)
+    if slots == nil {
+        log.Error("fail to split slot range [%v-%v]", 0, math.MaxUint32)
+        return nil, ErrInternalError
+    }
+    partitions := make([]*Partition, 0, len(slots))
+    for i := 0; i < len(slots)-1; i++ {
 		partition, err := NewPartition(db.ID, space.ID, slots[i], slots[i+1])
 		if err != nil {
 			return nil, err

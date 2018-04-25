@@ -8,6 +8,7 @@ import (
 	"github.com/tiglabs/baud/util/server"
 	"net/http"
 	"strconv"
+    "math"
 )
 
 const (
@@ -153,7 +154,7 @@ func (s *ApiServer) handleSpaceCreate(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		return
 	}
-	partitionNum, err := checkMissingAndNumericParam(w, r, PARTITION_NUM)
+	partitionNum, err := checkMissingAndUint32Param(w, r, PARTITION_NUM)
 	if err != nil {
 		return
 	}
@@ -276,7 +277,7 @@ func checkMissingParam(w http.ResponseWriter, r *http.Request, paramName string)
 	return paramVal, nil
 }
 
-func checkMissingAndNumericParam(w http.ResponseWriter, r *http.Request, paramName string) (int, error) {
+func checkMissingAndUint32Param(w http.ResponseWriter, r *http.Request, paramName string) (uint32, error) {
 	paramValStr, err := checkMissingParam(w, r, paramName)
 	if err != nil {
 		return 0, err
@@ -290,7 +291,14 @@ func checkMissingAndNumericParam(w http.ResponseWriter, r *http.Request, paramNa
 		sendReply(w, reply)
 		return 0, ErrParamError
 	}
-	return paramValInt, nil
+	if paramValInt > math.MaxUint32 {
+	    reply := newHttpErrReply(ErrParamError)
+	    newMsg := fmt.Sprintf("%s, value of [%s] exceed uint32 limit", reply.Msg, paramName)
+	    reply.Msg = newMsg
+	    sendReply(w, reply)
+	    return 0, ErrParamError
+    }
+	return uint32(paramValInt), nil
 }
 
 func sendReply(w http.ResponseWriter, httpReply *HttpReply) {

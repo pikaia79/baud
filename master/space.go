@@ -17,7 +17,7 @@ const (
 type PartitionPolicy struct {
 	Key           string
 	Function      string
-	NumPartitions int
+	NumPartitions uint32
 }
 
 type Space struct {
