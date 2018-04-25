@@ -226,27 +226,6 @@ func (c *Cluster) renameDb(srcDbName, destDbName string) error {
 	return nil
 }
 
-func (c *Cluster) listDBs() ([]*DB, error) {
-	c.clusterLock.RLock()
-	defer c.clusterLock.RUnlock()
-
-	dbs := c.dbCache.getAllDBs()
-
-	return dbs, nil
-}
-
-func (c *Cluster) detailDB(dbName string) (*DB, error) {
-	c.clusterLock.RLock()
-	defer c.clusterLock.RUnlock()
-
-	db := c.dbCache.findDbByName(dbName)
-	if db == nil {
-		return nil, ErrDbNotExists
-	}
-
-	return db, nil
-}
-
 func (c *Cluster) createSpace(dbName, spaceName, partitionKey, partitionFunc string, partitionNum int) (*Space, error) {
 	c.clusterLock.Lock()
 	defer c.clusterLock.Unlock()
@@ -336,8 +315,4 @@ func (c *Cluster) renameSpace(dbName, srcSpaceName, destSpaceName string) error 
 	db.spaceCache.addSpace(srcSpace)
 
 	return nil
-}
-
-func (c *Cluster) detailSpace(spaceId int) (*Space, error) {
-	return nil, nil
 }
