@@ -10,6 +10,7 @@ import (
 	"runtime"
 	"syscall"
 	"github.com/tiglabs/baud/master"
+	"github.com/tiglabs/raft/logger"
 	"sync"
 	"fmt"
 )
@@ -49,6 +50,11 @@ func main() {
 	fmt.Printf("configFile=[%v]\n", *configFile)
 
 	cfg := master.NewConfig(*configFile)
+
+	log.InitFileLog(cfg.LogCfg.LogPath, cfg.ModuleCfg.Name, cfg.LogCfg.Level)
+	logger.SetLogger(log.GetFileLogger().SetRaftLevel(cfg.LogCfg.RaftLevel))
+	log.Debug("log initialized")
+
 	role := "master"
 	profPort := "50000"
 
@@ -75,6 +81,7 @@ func main() {
 		return
 	}
 
+	mainWg.Add(1)
 	//install the signal handler
 	interceptSignal(server)
 
@@ -84,7 +91,7 @@ func main() {
 		log.Fatal("Fatal: failed to start the Baud daemon - ", err)
 	}
 
-	log.Info("main waiting")
+	log.Info("master main is running")
 	mainWg.Wait()
-	log.Info("main exit")
+	log.Info("master main exit")
 }

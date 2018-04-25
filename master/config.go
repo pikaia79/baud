@@ -37,7 +37,9 @@ data-path = "/tmp/baud/master/data"
 [log]
 log-path = "/tmp/baud/master/log"
 #debug, info, warn, error
-level = "info"
+level="debug"
+#debug, info, warn
+raft-level="info"
 
 [cluster]
 cluster-id = 1
@@ -201,8 +203,9 @@ func (cfg *ClusterConfig) adjust() {
 }
 
 type LogConfig struct {
-	LogPath string `toml:"log-path,omitempty" json:"log-path"`
-	Level   string `toml:"level,omitempty" json:"level"`
+    LogPath     string `toml:"log-path,omitempty" json:"log-path"`
+    Level       string `toml:"level,omitempty" json:"level"`
+    RaftLevel   string `toml:"raft-level,omitempty" json:"raft-level"`
 }
 
 func (c *LogConfig) adjust() {
@@ -224,6 +227,16 @@ func (c *LogConfig) adjust() {
 	default:
 		log.Panic("Invalid log level[%v]", c.Level)
 	}
+
+    adjustString(&c.RaftLevel, "no raft log level")
+    c.RaftLevel = strings.ToLower(c.RaftLevel)
+    switch c.RaftLevel {
+    case CONFIG_LOG_LEVEL_DEBUG:
+    case CONFIG_LOG_LEVEL_INFO:
+    case CONFIG_LOG_LEVEL_WARN:
+    default:
+        log.Panic("Invalid raft log level[%v]", c.RaftLevel)
+    }
 }
 
 type PsConfig struct {
