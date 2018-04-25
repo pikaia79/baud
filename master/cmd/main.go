@@ -3,7 +3,6 @@ package main
 import (
 	"flag"
 	"github.com/tiglabs/baud/util/log"
-	"net/http"
 	_ "net/http/pprof"
 	"os"
 	"os/signal"
@@ -13,10 +12,6 @@ import (
 	"sync"
 	"fmt"
 	"runtime"
-)
-
-const (
-	profPort = "50000"
 )
 
 var (
@@ -54,11 +49,6 @@ func main() {
 	log.InitFileLog(cfg.LogCfg.LogPath, cfg.ModuleCfg.Name, cfg.LogCfg.Level)
 	logger.SetLogger(log.GetFileLogger().SetRaftLevel(cfg.LogCfg.RaftLevel))
 	log.Debug("log initialized")
-
-	//init profile server
-	go func() {
-		fmt.Println(http.ListenAndServe(":"+profPort, nil))
-	}()
 
 	server := master.NewServer()
 
