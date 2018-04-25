@@ -6,5 +6,8 @@ if [ ! -e master.pid ]; then
 fi
 
 kill -9 `cat master.pid`
+rm master.pid
+rm master
+rm nohup.out
 
 echo "baud master had stopped."
