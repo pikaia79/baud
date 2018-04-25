@@ -276,8 +276,10 @@ func (rs *RaftStore) initRaftStoreCfg() error {
 
 	raftStoreCfg.RaftRetainLogs = rs.config.ClusterCfg.RaftRetainLogsCount
 	raftStoreCfg.RaftHeartbeatInterval = rs.config.ClusterCfg.RaftHeartbeatInterval.Duration
-	raftStoreCfg.RaftHeartbeatAddr = util.BuildAddr("0.0.0.0", int(rs.config.ClusterCfg.CurNode.RaftHeartbeatPort))
-	raftStoreCfg.RaftReplicateAddr = util.BuildAddr("0.0.0.0", int(rs.config.ClusterCfg.CurNode.RaftReplicatePort))
+	raftStoreCfg.RaftHeartbeatAddr = util.BuildAddr(rs.config.ClusterCfg.CurNode.Host,
+			int(rs.config.ClusterCfg.CurNode.RaftHeartbeatPort))
+	raftStoreCfg.RaftReplicateAddr = util.BuildAddr(rs.config.ClusterCfg.CurNode.Host,
+			int(rs.config.ClusterCfg.CurNode.RaftReplicatePort))
 
 	var peers []*Peer
 	for _, p := range rs.config.ClusterCfg.Nodes {
@@ -285,8 +287,8 @@ func (rs *RaftStore) initRaftStoreCfg() error {
 		peer.NodeId = p.NodeId
 		//node.WebManageAddr = fmt.Sprintf("%rs:%d", peer.Host, peer.HttpPort)
 		//node.RpcServerAddr = fmt.Sprintf("%rs:%d", peer.Host, peer.RpcPort)
-		peer.RaftHeartbeatAddr = util.BuildAddr("0.0.0.0", int(p.RaftHeartbeatPort))
-		peer.RaftReplicateAddr = util.BuildAddr("0.0.0.0", int(p.RaftReplicatePort))
+		peer.RaftHeartbeatAddr = util.BuildAddr(p.Host, int(p.RaftHeartbeatPort))
+		peer.RaftReplicateAddr = util.BuildAddr(p.Host, int(p.RaftReplicatePort))
 		peers = append(peers, peer)
 	}
 	raftStoreCfg.RaftNodes = peers
@@ -356,11 +358,6 @@ func (rs *RaftStore) initRaftServer() error {
 
 	return nil
 }
-
-//func (rs *RaftStore) registerLeaderChangeNotifier(notifier chan*Peer) {
-//	rs.raftStoreConfig.RaftLeaderChangeNotifier = append(rs.raftStoreConfig.RaftLeaderChangeNotifier, notifier)
-//}
-
 func (rs *RaftStore) raftLogCleanup() {
 	defer rs.wg.Done()
 	ticker := time.NewTicker(time.Minute * 5)

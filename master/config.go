@@ -140,8 +140,8 @@ func (cfg *ModuleConfig) adjust() {
 }
 
 type ClusterNode struct {
-	NodeId uint64 `toml:"node-id,omitempty" json:"node-id"`
-	//Host      	  string `toml:"host,omitempty" json:"host"`
+	NodeId            uint64 `toml:"node-id,omitempty" json:"node-id"`
+	Host              string `toml:"host,omitempty" json:"host"`
 	HttpPort          uint32 `toml:"http-port,omitempty" json:"http-port"` // TODO: web admin port only need one in cluster
 	RpcPort           uint32 `toml:"rpc-port,omitempty" json:"rpc-port"`
 	RaftHeartbeatPort uint32 `toml:"raft-heartbeat-port,omitempty" json:"raft-heartbeat-port"`
@@ -172,6 +172,7 @@ func (cfg *ClusterConfig) adjust() {
 
 	for _, node := range cfg.Nodes {
 		adjustUint64(&node.NodeId, "no node-id")
+		adjustString(&node.Host, "no node host")
 
 		adjustUint32(&node.HttpPort, "no node http port")
 		if node.HttpPort <= 1024 || node.HttpPort > 65535 {
