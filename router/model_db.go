@@ -1,24 +1,27 @@
 package router
 
 import (
+	"context"
 	"github.com/tiglabs/baud/proto/metapb"
 	"sync"
 )
 
 type DB struct {
-	meta metapb.DB
+	meta         metapb.DB
 	masterClient *MasterClient
-	spaceMap map[string]*Space
-	lock     sync.RWMutex
+	spaceMap     sync.Map
+	context      context.Context
+}
+
+func NewDB(masterClient *MasterClient, meta metapb.DB) *DB {
+	return &DB{meta: meta, masterClient: masterClient}
 }
 
 func (db *DB) GetSpace(spaceName string) *Space {
-	db.lock.RLock()
-	defer db.lock.RUnlock()
-
-	space, ok := db.spaceMap[spaceName]
-	if ok {
-		return space
+	space, ok := db.spaceMap.Load(spaceName)
+	if !ok {
+		spaceMeta := db.masterClient.GetSpace(db.meta.ID, spaceName)
+		space, ok = db.spaceMap.LoadOrStore(spaceMeta.Name, NewSpace(db, spaceMeta))
 	}
-	return nil
+	return space.(*Space)
 }

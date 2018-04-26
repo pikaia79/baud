@@ -34,6 +34,9 @@ func(m *mockIndexMapping) DateTimeParserNamed(name string) analysis.DateTimePars
 	return &mockAnalyzer{}
 }
 
+func(m *mockIndexMapping) RebuildAllField(doc *document.Document) error {return nil}
+func(m *mockIndexMapping) MergeDocument(doc *document.Document, source []byte) error {return nil}
+
 func TestTextFieldMapping(t *testing.T) {
 	context := &parseContext{
 		doc: document.NewDocument("1"),

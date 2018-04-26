@@ -64,7 +64,8 @@ func (c *CompositeField) MergeAll(field string, value []byte, freq analysis.Toke
 			c.compositeFrequencies.MergeAll(field, freq)
 		}
 		if c.property.IsStored() && len(value) > 0 {
-			c.value = append(c.value, space, value...)
+			c.value = append(c.value, space)
+			c.value = append(c.value, value...)
 		}
 	}
 }

@@ -107,8 +107,7 @@ func (mgr *ConnectionMgr) grpcDialRaw(target string, option *ClientOption) (*grp
 }
 
 func (mgr *ConnectionMgr) runHeartbeat() {
-	var heartbeatTimer time.Timer
-	heartbeatTimer.Reset(mgr.option.HeartbeatInterval)
+	heartbeatTimer := time.NewTimer(mgr.option.HeartbeatInterval)
 	defer heartbeatTimer.Stop()
 
 	for {
