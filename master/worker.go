@@ -12,15 +12,17 @@ type WorkerManager struct {
 	ctx    context.Context
 	cancel context.CancelFunc
 
-	workers *sync.Map
-	wg      sync.WaitGroup
+	workers     map[string]Worker
+	workersLock sync.RWMutex
+	wg          sync.WaitGroup
 
 	cluster *Cluster
 }
 
-func NewWorkerManager() *WorkerManager {
+func NewWorkerManager(cluster *Cluster) *WorkerManager {
 	wm := &WorkerManager{
-		workers: new(sync.Map),
+		workers: make(map[string]Worker),
+		cluster: cluster,
 	}
 	wm.ctx, wm.cancel = context.WithCancel(context.Background())
 
@@ -30,10 +32,12 @@ func NewWorkerManager() *WorkerManager {
 func (wm *WorkerManager) Start() error {
 	wm.addWorker(NewSpaceStateTransitionWorker(wm.cluster))
 
-	wm.workers.Range(func(name, worker interface{}) bool {
-		wm.runWorker(worker.(Worker))
-		return true
-	})
+	wm.workersLock.RLock()
+	defer wm.workersLock.RUnlock()
+
+	for _, worker := range wm.workers {
+		wm.runWorker(worker)
+	}
 
 	return nil
 }
@@ -44,10 +48,19 @@ func (wm *WorkerManager) Shutdown() {
 }
 
 func (wm *WorkerManager) addWorker(worker Worker) {
-	if _, loaded := wm.workers.LoadOrStore(worker.getName(), worker); loaded {
-		log.Error("worker[%v] have already added in worker manager.", worker.getName())
+	if worker == nil {
 		return
 	}
+
+	wm.workersLock.Lock()
+	defer wm.workersLock.Unlock()
+
+	if _, ok := wm.workers[worker.getName()]; ok {
+		log.Error("worker[%v] have already existed in worker manager.", worker.getName())
+		return
+	}
+
+	wm.workers[worker.getName()] = worker
 }
 
 func (wm *WorkerManager) runWorker(worker Worker) {
@@ -89,7 +102,7 @@ func NewSpaceStateTransitionWorker(cluster *Cluster) *SpaceStateTransitionWorker
 }
 
 func (w *SpaceStateTransitionWorker) getName() string {
-	return "space_state_transition_worker"
+	return "Space State Transition Worker"
 }
 
 func (w *SpaceStateTransitionWorker) getInterval() time.Duration {
