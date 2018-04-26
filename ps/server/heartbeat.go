@@ -38,10 +38,10 @@ func newHeartbeatWork(server *Server) *heartbeatWork {
 func (h *heartbeatWork) start() {
 	quitCh := make(chan struct{})
 	routine.RunWorkDaemon("MASTER-HEARTBEAT", func() {
-		var heartbeatTimer time.Timer
+		heartbeatTimer := time.NewTimer(h.tickerInterval)
 		defer heartbeatTimer.Stop()
 
-		h.update(&heartbeatTimer)
+		h.update(heartbeatTimer)
 		h.lastHeartbeat = time.Time{}
 		for {
 			select {
