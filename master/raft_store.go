@@ -76,7 +76,6 @@ type RaftStoreConfig struct {
 	RaftHeartbeatAddr     string
 	RaftReplicateAddr     string
 	RaftNodes             []*Peer
-	//RaftLeaderChangeNotifier	[]chan*Peer
 
 	NodeId   uint64
 	DataPath string
@@ -167,7 +166,6 @@ func (rs *RaftStore) Get(key []byte) ([]byte, error) {
 }
 
 func (rs *RaftStore) Scan(startKey, limitKey []byte) raftkvstore.Iterator {
-	// TODO: when localRead is false
 	return rs.localStore.NewIterator(startKey, limitKey)
 }
 
@@ -210,13 +208,13 @@ func NewSaveBatch(raft *RaftGroup) *SaveBatch {
 }
 
 func (b *SaveBatch) Put(key, value []byte) {
-	_key := make([]byte, len(key))
-	_value := make([]byte, len(value))
-	copy(_key, key)
-	copy(_value, value)
+	destKey := make([]byte, len(key))
+	destVal := make([]byte, len(value))
+	copy(destKey, key)
+	copy(destVal, value)
 	exec := &masterpb.KvPairExecute{
 		Do:     masterpb.ExecuteType_ExecPut,
-		KvPair: &masterpb.KvPair{Key: _key, Value: _value},
+		KvPair: &masterpb.KvPair{Key: destKey, Value: destVal},
 	}
 	b.lock.Lock()
 	defer b.lock.Unlock()
@@ -224,11 +222,11 @@ func (b *SaveBatch) Put(key, value []byte) {
 }
 
 func (b *SaveBatch) Delete(key []byte) {
-	_key := make([]byte, len(key))
-	copy(_key, key)
+	destKey := make([]byte, len(key))
+	copy(destKey, key)
 	exec := &masterpb.KvPairExecute{
 		Do:     masterpb.ExecuteType_ExecDelete,
-		KvPair: &masterpb.KvPair{Key: _key},
+		KvPair: &masterpb.KvPair{Key: destKey},
 	}
 	b.lock.Lock()
 	defer b.lock.Unlock()
@@ -267,27 +265,27 @@ func (rs *RaftStore) initRaftStoreCfg() error {
 	raftStoreCfg := new(RaftStoreConfig)
 	raftStoreCfg.NodeId = rs.config.ClusterCfg.CurNode.NodeId
 
-	dataRootDir := filepath.Join(rs.config.ModuleCfg.DataPath, "raft")
-	if err := os.MkdirAll(dataRootDir, 0755); err != nil {
-		log.Error("make data root direcotory %rs failed, err[%v]", dataRootDir, err)
+	raftDataDir := filepath.Join(rs.config.ModuleCfg.DataPath, "raft")
+	if err := os.MkdirAll(raftDataDir, 0755); err != nil {
+		log.Error("make raft data root directory[%v] failed, err[%v]", raftDataDir, err)
 		return err
 	}
-	raftStoreCfg.DataPath = filepath.Join(dataRootDir, "baud.db")
-	raftStoreCfg.WalPath = filepath.Join(dataRootDir, ".wal")
+	raftStoreCfg.DataPath = filepath.Join(rs.config.ModuleCfg.DataPath, "baud.db")
+	raftStoreCfg.WalPath = raftDataDir
 
 	raftStoreCfg.RaftRetainLogs = rs.config.ClusterCfg.RaftRetainLogsCount
 	raftStoreCfg.RaftHeartbeatInterval = rs.config.ClusterCfg.RaftHeartbeatInterval.Duration
-	raftStoreCfg.RaftHeartbeatAddr = util.BuildAddr("0.0.0.0", int(rs.config.ClusterCfg.CurNode.RaftHeartbeatPort))
-	raftStoreCfg.RaftReplicateAddr = util.BuildAddr("0.0.0.0", int(rs.config.ClusterCfg.CurNode.RaftReplicatePort))
+	raftStoreCfg.RaftHeartbeatAddr = util.BuildAddr(rs.config.ClusterCfg.CurNode.Host,
+			int(rs.config.ClusterCfg.CurNode.RaftHeartbeatPort))
+	raftStoreCfg.RaftReplicateAddr = util.BuildAddr(rs.config.ClusterCfg.CurNode.Host,
+			int(rs.config.ClusterCfg.CurNode.RaftReplicatePort))
 
 	var peers []*Peer
 	for _, p := range rs.config.ClusterCfg.Nodes {
 		peer := new(Peer)
 		peer.NodeId = p.NodeId
-		//node.WebManageAddr = fmt.Sprintf("%rs:%d", peer.Host, peer.HttpPort)
-		//node.RpcServerAddr = fmt.Sprintf("%rs:%d", peer.Host, peer.RpcPort)
-		peer.RaftHeartbeatAddr = util.BuildAddr("0.0.0.0", int(p.RaftHeartbeatPort))
-		peer.RaftReplicateAddr = util.BuildAddr("0.0.0.0", int(p.RaftReplicatePort))
+		peer.RaftHeartbeatAddr = util.BuildAddr(p.Host, int(p.RaftHeartbeatPort))
+		peer.RaftReplicateAddr = util.BuildAddr(p.Host, int(p.RaftReplicatePort))
 		peers = append(peers, peer)
 	}
 	raftStoreCfg.RaftNodes = peers
@@ -331,10 +329,10 @@ func (rs *RaftStore) initRaftServer() error {
 	raftGroup.RegisterPeerChangeHandle(rs.HandlePeerChange)
 	raftGroup.RegisterGetSnapshotHandle(rs.HandleGetSnapshot)
 	raftGroup.RegisterApplySnapshotHandle(rs.HandleApplySnapshot)
-	//raftGroup.RegisterLeaderChangeHandle(conf.LeaderChangeHandler)
-	//raftGroup.RegisterFatalEventHandle(conf.FatalHandler)
+	raftGroup.RegisterLeaderChangeHandle(rs.LeaderChangeHandler)
+	raftGroup.RegisterFatalEventHandle(rs.FatalEventHandler)
 
-	raftPeers := make([]raftproto.Peer, len(cfg.RaftNodes))
+	raftPeers := make([]raftproto.Peer, 0, len(cfg.RaftNodes))
 	for _, node := range cfg.RaftNodes {
 		raftPeer := raftproto.Peer{
 			Type:     raftproto.PeerNormal,
@@ -357,11 +355,6 @@ func (rs *RaftStore) initRaftServer() error {
 
 	return nil
 }
-
-//func (rs *RaftStore) registerLeaderChangeNotifier(notifier chan*Peer) {
-//	rs.raftStoreConfig.RaftLeaderChangeNotifier = append(rs.raftStoreConfig.RaftLeaderChangeNotifier, notifier)
-//}
-
 func (rs *RaftStore) raftLogCleanup() {
 	defer rs.wg.Done()
 	ticker := time.NewTicker(time.Minute * 5)
@@ -525,13 +518,13 @@ func (rs *RaftStore) HandleCmd(req *masterpb.Request, raftIndex uint64) (resp *m
 func (rs *RaftStore) HandlePeerChange(confChange *raftproto.ConfChange) (res interface{}, err error) {
 	switch confChange.Type {
 	case raftproto.ConfAddNode:
-
+		log.Debug("add raft node")
 		res, err = nil, nil
 	case raftproto.ConfRemoveNode:
-
+		log.Debug("remove raft node")
 		res, err = nil, nil
 	case raftproto.ConfUpdateNode:
-		log.Debug("update range peer")
+		log.Debug("update raft node")
 		res, err = nil, nil
 	default:
 		res, err = nil, ErrUnknownRaftCmdType
@@ -592,4 +585,11 @@ func (rs *RaftStore) HandleApplySnapshot(peers []raftproto.Peer, iter *SnapshotK
 	return nil
 }
 
+func (rs *RaftStore) LeaderChangeHandler(leaderId uint64) {
+	log.Info("raft leader had changed to id[%v]", leaderId)
+}
+
+func (rs *RaftStore) FatalEventHandler(err *raft.FatalError) {
+	log.Error("received raft fatal error[%v]", err)
+}
 ///////////////////////callback implement end////////////////

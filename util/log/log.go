@@ -9,6 +9,7 @@ import (
 	"runtime"
 	"sync"
 	"time"
+	"strings"
 )
 
 const (
@@ -201,6 +202,7 @@ type Log struct {
 	dir       string
 	module    string
 	level     int
+	raftLevel int
 	startTime time.Time
 	flag      int
 	err       *logWriter
@@ -225,6 +227,7 @@ func NewLog(dir, module, level string) (*Log, error) {
 	lg.dir = dir
 	lg.module = module
 	lg.SetLevel(level)
+	lg.SetRaftLevel("info")
 	if err := lg.initLog(dir, module); err != nil {
 		return nil, err
 	}
@@ -281,7 +284,7 @@ func (l *Log) initLog(logDir, module string) error {
 	return nil
 }
 
-func (l *Log) SetLevel(level string) {
+func (l *Log) SetLevel(level string) *Log {
 	switch level {
 	case "TRACE", "trace", "Trace":
 		l.level = TraceLevel
@@ -296,6 +299,28 @@ func (l *Log) SetLevel(level string) {
 	default:
 		l.level = InfoLevel
 	}
+
+	return l
+}
+
+func (l *Log) SetRaftLevel(level string) *Log {
+	if len(level) == 0 {
+		panic("set empty raft level")
+	}
+
+	switch strings.ToLower(level) {
+	case "debug":
+		l.raftLevel = DebugLevel
+	case "info":
+		l.raftLevel = InfoLevel
+	case "warn":
+		l.raftLevel = WarnLevel
+	default:
+		fmt.Printf("set invalid raft level[%v]\n", level)
+		l.level = InfoLevel
+	}
+
+	return l
 }
 
 func (l *Log) SetPrefix(s, level string) string {
@@ -303,20 +328,13 @@ func (l *Log) SetPrefix(s, level string) string {
 }
 
 func (l *Log) IsEnableDebug() bool {
-	return l.level <= DebugLevel
+	return l.raftLevel <= DebugLevel
 }
 func (l *Log) IsEnableInfo() bool {
-	return l.level <= InfoLevel
+	return l.raftLevel <= InfoLevel
 }
 func (l *Log) IsEnableWarn() bool {
-	return l.level <= WarnLevel
-}
-func (l *Log) IsEnableError() bool {
-	return l.level <= ErrorLevel
-}
-
-func (l *Log) IsEnableTrace() bool {
-	return l.level <= TraceLevel
+	return l.raftLevel <= WarnLevel
 }
 
 func (l *Log) Output(calldepth int, s string, sync bool) {

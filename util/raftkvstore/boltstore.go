@@ -5,7 +5,6 @@ import (
 	"encoding/binary"
 	"fmt"
 	"time"
-
 	"github.com/boltdb/bolt"
 )
 
@@ -55,7 +54,7 @@ func NewBoltStore(dbBucket, raftBucket []byte, path string) (Store, uint64, erro
 	} else {
 		applyId = binary.BigEndian.Uint64(value)
 	}
-	store := &BoltStore{db: db}
+	store := &BoltStore{db: db, dbBucket: dbBucket, raftBucket: raftBucket}
 	return store, applyId, nil
 }
 

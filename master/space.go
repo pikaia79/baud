@@ -17,7 +17,7 @@ const (
 type PartitionPolicy struct {
 	Key           string
 	Function      string
-	NumPartitions int
+	NumPartitions uint32
 }
 
 type Space struct {
@@ -172,7 +172,7 @@ func (c *SpaceCache) getAllSpaces() []*Space {
 	c.lock.RLock()
 	defer c.lock.RUnlock()
 
-	spaces := make([]*Space, len(c.spaces))
+	spaces := make([]*Space, 0, len(c.spaces))
 	for _, space := range c.spaces {
 		spaces = append(spaces, space)
 	}

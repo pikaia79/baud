@@ -29,6 +29,7 @@ var (
 	ErrGrpcEmptyFollowers   = errors.New("reported empty followers")
 	ErrGrpcInvalidFollowers = errors.New("reported invalid followers")
 
+	ErrRaftNotRegHandler          = errors.New("have no register raft handler")
 	ErrRaftInvalidNode            = errors.New("invalid raft node")
 	ErrRaftUnknownType            = errors.New("unknown raft socket type")
 	ErrRaftNoApplyHandler         = errors.New("raft group not register apply handler")
@@ -37,7 +38,7 @@ var (
 	ErrRaftNoFatalEventHandler    = errors.New("raft group not register fatal event handler")
 	ErrRaftNoSnapshotHandler      = errors.New("raft group not register snapshot handler")
 	ErrRaftNoApplySnapshotHandler = errors.New("raft group not register apply snapshot handler")
-	ErrRaftUnknownResponseType    = errors.New("unknown repsonse type")
+	ErrRaftUnknownResponseType    = errors.New("unknown response type")
 )
 
 // http response error code and error message definitions

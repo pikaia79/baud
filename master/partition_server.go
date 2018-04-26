@@ -158,7 +158,7 @@ func (c *PSCache) getAllServers() []*PartitionServer {
 	c.lock.RLock()
 	defer c.lock.RUnlock()
 
-	servers := make([]*PartitionServer, len(c.id2Servers))
+	servers := make([]*PartitionServer, 0, len(c.id2Servers))
 	for _, ps := range c.id2Servers {
 		servers = append(servers, ps)
 	}

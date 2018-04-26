@@ -37,7 +37,9 @@ data-path = "/tmp/baud/master/data"
 [log]
 log-path = "/tmp/baud/master/log"
 #debug, info, warn, error
-level = "info"
+level="debug"
+#debug, info, warn
+raft-level="info"
 
 [cluster]
 cluster-id = 1
@@ -138,8 +140,8 @@ func (cfg *ModuleConfig) adjust() {
 }
 
 type ClusterNode struct {
-	NodeId uint64 `toml:"node-id,omitempty" json:"node-id"`
-	//Host      	  string `toml:"host,omitempty" json:"host"`
+	NodeId            uint64 `toml:"node-id,omitempty" json:"node-id"`
+	Host              string `toml:"host,omitempty" json:"host"`
 	HttpPort          uint32 `toml:"http-port,omitempty" json:"http-port"` // TODO: web admin port only need one in cluster
 	RpcPort           uint32 `toml:"rpc-port,omitempty" json:"rpc-port"`
 	RaftHeartbeatPort uint32 `toml:"raft-heartbeat-port,omitempty" json:"raft-heartbeat-port"`
@@ -170,6 +172,7 @@ func (cfg *ClusterConfig) adjust() {
 
 	for _, node := range cfg.Nodes {
 		adjustUint64(&node.NodeId, "no node-id")
+		adjustString(&node.Host, "no node host")
 
 		adjustUint32(&node.HttpPort, "no node http port")
 		if node.HttpPort <= 1024 || node.HttpPort > 65535 {
@@ -194,6 +197,8 @@ func (cfg *ClusterConfig) adjust() {
 		if _, ok := tempNodes[node.NodeId]; ok {
 			log.Panic("duplicated node-id[%v]", node.NodeId)
 		}
+		tempNodes[node.NodeId] = node
+		
 		if node.NodeId == cfg.CurNodeId {
 			cfg.CurNode = node
 		}
@@ -201,8 +206,9 @@ func (cfg *ClusterConfig) adjust() {
 }
 
 type LogConfig struct {
-	LogPath string `toml:"log-path,omitempty" json:"log-path"`
-	Level   string `toml:"level,omitempty" json:"level"`
+    LogPath     string `toml:"log-path,omitempty" json:"log-path"`
+    Level       string `toml:"level,omitempty" json:"level"`
+    RaftLevel   string `toml:"raft-level,omitempty" json:"raft-level"`
 }
 
 func (c *LogConfig) adjust() {
@@ -224,6 +230,16 @@ func (c *LogConfig) adjust() {
 	default:
 		log.Panic("Invalid log level[%v]", c.Level)
 	}
+
+    adjustString(&c.RaftLevel, "no raft log level")
+    c.RaftLevel = strings.ToLower(c.RaftLevel)
+    switch c.RaftLevel {
+    case CONFIG_LOG_LEVEL_DEBUG:
+    case CONFIG_LOG_LEVEL_INFO:
+    case CONFIG_LOG_LEVEL_WARN:
+    default:
+        log.Panic("Invalid raft log level[%v]", c.RaftLevel)
+    }
 }
 
 type PsConfig struct {

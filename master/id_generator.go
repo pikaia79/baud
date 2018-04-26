@@ -22,6 +22,10 @@ type IDGenerator interface {
 
 func GetIdGeneratorInstance(store Store) IDGenerator {
 	idGeneratorSyncOnce.Do(func() {
+		if store == nil {
+			log.Error("store should not be nil at first time")
+			return
+		}
 		idGeneratorInstance = NewIDGenerator([]byte(AUTO_INCREMENT_ID), GEN_STEP, store)
 	})
 	return idGeneratorInstance

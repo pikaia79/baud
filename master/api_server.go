@@ -8,17 +8,17 @@ import (
 	"github.com/tiglabs/baud/util/server"
 	"net/http"
 	"strconv"
+    "math"
 )
 
 const (
-	DEFAULT_CONN_LIMIT = 10000
+	DEFAULT_CONN_LIMIT = 100
 
 	// definition for http url parameter name
 	DB_NAME         = "db_name"
 	SRC_DB_NAME     = "src_db_name"
 	DEST_DB_NAME    = "dest_db_name"
 	SPACE_NAME      = "space_name"
-	SPACE_ID        = "space_id"
 	SRC_SPACE_NAME  = "src_space_name"
 	DEST_SPACE_NAME = "dest_space_name"
 	PARTITION_KEY   = "partition_key"
@@ -45,6 +45,8 @@ func NewApiServer(config *Config, cluster *Cluster) *ApiServer {
 		ConnLimit: DEFAULT_CONN_LIMIT,
 	})
 
+	apiServer.initAdminHandler()
+
 	return apiServer
 }
 
@@ -64,14 +66,16 @@ func (s *ApiServer) Close() {
 }
 
 func (s *ApiServer) initAdminHandler() {
-	s.httpServer.Handle("/manage/db/create", s.handleDbCreate)
-	s.httpServer.Handle("/manage/db/delete", s.handleDbDelete)
-	s.httpServer.Handle("/manage/db/rename", s.handleDbRename)
-	s.httpServer.Handle("/manage/space/create", s.handleSpaceCreate)
-	s.httpServer.Handle("/manage/space/delete", s.handleSpaceDelete)
-	s.httpServer.Handle("/manage/space/rename", s.handleSpaceRename)
-	s.httpServer.Handle("/manage/space/detail", s.handleSpaceDetail)
-	s.httpServer.Handle("/manage/index/create", s.handleIndexCreate)
+    s.httpServer.Handle("/manage/db/create", s.handleDbCreate)
+    s.httpServer.Handle("/manage/db/delete", s.handleDbDelete)
+    s.httpServer.Handle("/manage/db/rename", s.handleDbRename)
+    s.httpServer.Handle("/manage/db/list", s.handleDbList)
+    s.httpServer.Handle("/manage/db/detail", s.handleDbDetail)
+    s.httpServer.Handle("/manage/space/create", s.handleSpaceCreate)
+    s.httpServer.Handle("/manage/space/delete", s.handleSpaceDelete)
+    s.httpServer.Handle("/manage/space/rename", s.handleSpaceRename)
+	s.httpServer.Handle("/manage/space/list", s.handleSpaceList)
+    s.httpServer.Handle("/manage/space/detail", s.handleSpaceDetail)
 }
 
 func (s *ApiServer) handleDbCreate(w http.ResponseWriter, r *http.Request) {
@@ -110,6 +114,28 @@ func (s *ApiServer) handleDbRename(w http.ResponseWriter, r *http.Request) {
 	sendReply(w, newHttpSucReply(""))
 }
 
+
+func (s *ApiServer) handleDbList(w http.ResponseWriter, r *http.Request) {
+	dbs := s.cluster.dbCache.getAllDBs()
+
+	sendReply(w, newHttpSucReply(dbs))
+}
+
+func(s *ApiServer) handleDbDetail(w http.ResponseWriter, r *http.Request) {
+	dbName, err := checkMissingParam(w, r, DB_NAME)
+	if err != nil {
+		return
+	}
+
+	db := s.cluster.dbCache.findDbByName(dbName)
+	if db == nil {
+		sendReply(w, newHttpErrReply(ErrDbNotExists))
+		return
+	}
+
+	sendReply(w, newHttpSucReply(db))
+}
+
 func (s *ApiServer) handleSpaceCreate(w http.ResponseWriter, r *http.Request) {
 	dbName, err := checkMissingParam(w, r, DB_NAME)
 	if err != nil {
@@ -128,7 +154,7 @@ func (s *ApiServer) handleSpaceCreate(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		return
 	}
-	partitionNum, err := checkMissingAndNumericParam(w, r, PARTITION_NUM)
+	partitionNum, err := checkMissingAndUint32Param(w, r, PARTITION_NUM)
 	if err != nil {
 		return
 	}
@@ -167,15 +193,43 @@ func (s *ApiServer) handleSpaceRename(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *ApiServer) handleSpaceDetail(w http.ResponseWriter, r *http.Request) {
-	spaceId, err := checkMissingAndNumericParam(w, r, SPACE_ID)
+	dbName, err := checkMissingParam(w, r, DB_NAME)
+	if err != nil {
+		return
+	}
+	spaceName, err := checkMissingParam(w, r, SPACE_NAME)
 	if err != nil {
 		return
 	}
 
-	s.cluster.detailSpace(spaceId)
+	db := s.cluster.dbCache.findDbByName(dbName)
+	if db == nil {
+		sendReply(w, newHttpErrReply(ErrDbNotExists))
+		return
+	}
+
+	space := db.spaceCache.findSpaceByName(spaceName)
+	if space == nil {
+		sendReply(w, newHttpErrReply(ErrSpaceNotExists))
+		return
+	}
+
+	sendReply(w, newHttpSucReply(space))
 }
 
-func (s *ApiServer) handleIndexCreate(w http.ResponseWriter, r *http.Request) {
+func (s *ApiServer) handleSpaceList(w http.ResponseWriter, r *http.Request) {
+	dbName, err := checkMissingParam(w, r, DB_NAME)
+	if err != nil {
+		return
+	}
+
+	db := s.cluster.dbCache.findDbByName(dbName)
+	if db == nil {
+		sendReply(w, newHttpErrReply(ErrDbNotExists))
+		return
+	}
+
+	sendReply(w, newHttpSucReply(db.spaceCache.getAllSpaces()))
 }
 
 type HttpReply struct {
@@ -223,7 +277,7 @@ func checkMissingParam(w http.ResponseWriter, r *http.Request, paramName string)
 	return paramVal, nil
 }
 
-func checkMissingAndNumericParam(w http.ResponseWriter, r *http.Request, paramName string) (int, error) {
+func checkMissingAndUint32Param(w http.ResponseWriter, r *http.Request, paramName string) (uint32, error) {
 	paramValStr, err := checkMissingParam(w, r, paramName)
 	if err != nil {
 		return 0, err
@@ -237,7 +291,14 @@ func checkMissingAndNumericParam(w http.ResponseWriter, r *http.Request, paramNa
 		sendReply(w, reply)
 		return 0, ErrParamError
 	}
-	return paramValInt, nil
+	if paramValInt > math.MaxUint32 {
+	    reply := newHttpErrReply(ErrParamError)
+	    newMsg := fmt.Sprintf("%s, value of [%s] exceed uint32 limit", reply.Msg, paramName)
+	    reply.Msg = newMsg
+	    sendReply(w, reply)
+	    return 0, ErrParamError
+    }
+	return uint32(paramValInt), nil
 }
 
 func sendReply(w http.ResponseWriter, httpReply *HttpReply) {
