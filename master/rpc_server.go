@@ -79,7 +79,7 @@ func (s *RpcServer) GetRoute(ctx context.Context,
 	for _, partition := range partitions {
 		route := masterpb.Route{
 			Partition: *partition.Partition,
-			Leader:    partition.pickLeaderNodeId(),
+			NodeID:    partition.pickLeaderNodeId(), // Leader NodeId
 		}
 
 		replicas := partition.Replicas
