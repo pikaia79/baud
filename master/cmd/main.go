@@ -48,7 +48,7 @@ func main() {
 
 	log.InitFileLog(cfg.LogCfg.LogPath, cfg.ModuleCfg.Name, cfg.LogCfg.Level)
 	logger.SetLogger(log.GetFileLogger().SetRaftLevel(cfg.LogCfg.RaftLevel))
-	log.Debug("log initialized")
+	log.Debug("log has been initialized")
 
 	server := master.NewServer()
 

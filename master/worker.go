@@ -6,21 +6,24 @@ import (
 	"github.com/tiglabs/baud/util/log"
 	"sync"
 	"time"
+	"runtime/debug"
 )
 
 type WorkerManager struct {
 	ctx    context.Context
 	cancel context.CancelFunc
 
-	workers *sync.Map
-	wg      sync.WaitGroup
+	workers     map[string]Worker
+	workersLock sync.RWMutex
+	wg          sync.WaitGroup
 
 	cluster *Cluster
 }
 
-func NewWorkerManager() *WorkerManager {
+func NewWorkerManager(cluster *Cluster) *WorkerManager {
 	wm := &WorkerManager{
-		workers: new(sync.Map),
+		workers: make(map[string]Worker),
+		cluster: cluster,
 	}
 	wm.ctx, wm.cancel = context.WithCancel(context.Background())
 
@@ -30,10 +33,12 @@ func NewWorkerManager() *WorkerManager {
 func (wm *WorkerManager) Start() error {
 	wm.addWorker(NewSpaceStateTransitionWorker(wm.cluster))
 
-	wm.workers.Range(func(name, worker interface{}) bool {
-		wm.runWorker(worker.(Worker))
-		return true
-	})
+	wm.workersLock.RLock()
+	defer wm.workersLock.RUnlock()
+
+	for _, worker := range wm.workers {
+		wm.runWorker(worker)
+	}
 
 	return nil
 }
@@ -44,10 +49,19 @@ func (wm *WorkerManager) Shutdown() {
 }
 
 func (wm *WorkerManager) addWorker(worker Worker) {
-	if _, loaded := wm.workers.LoadOrStore(worker.getName(), worker); loaded {
-		log.Error("worker[%v] have already added in worker manager.", worker.getName())
+	if worker == nil {
 		return
 	}
+
+	wm.workersLock.Lock()
+	defer wm.workersLock.Unlock()
+
+	if _, ok := wm.workers[worker.getName()]; ok {
+		log.Error("worker[%v] have already existed in worker manager.", worker.getName())
+		return
+	}
+
+	wm.workers[worker.getName()] = worker
 }
 
 func (wm *WorkerManager) runWorker(worker Worker) {
@@ -63,8 +77,19 @@ func (wm *WorkerManager) runWorker(worker Worker) {
 			case <-wm.ctx.Done():
 				return
 			case <-timer.C:
-				log.Debug("worker[%v] is running.", worker.getName())
-				worker.run()
+
+				func() {
+					log.Info("worker[%v] is running.", worker.getName())
+
+					defer func() {
+						if e := recover(); e != nil {
+							log.Error("recover worker panic. e[%s] \nstack:[%s]", e, debug.Stack())
+						}
+					}()
+
+					worker.run()
+				}()
+
 				timer.Reset(worker.getInterval())
 			}
 		}
@@ -75,7 +100,6 @@ type Worker interface {
 	getName() string
 	getInterval() time.Duration
 	run()
-	stop()
 }
 
 type SpaceStateTransitionWorker struct {
@@ -89,7 +113,7 @@ func NewSpaceStateTransitionWorker(cluster *Cluster) *SpaceStateTransitionWorker
 }
 
 func (w *SpaceStateTransitionWorker) getName() string {
-	return "space_state_transition_worker"
+	return "Space State Transition Worker"
 }
 
 func (w *SpaceStateTransitionWorker) getInterval() time.Duration {
@@ -102,48 +126,50 @@ func (w *SpaceStateTransitionWorker) run() {
 		spaces := db.spaceCache.getAllSpaces()
 		for _, space := range spaces {
 
-			space.propertyLock.Lock()
-			if space.Status == metapb.SS_Init {
+			func () {
+				space.propertyLock.Lock()
+				defer space.propertyLock.Unlock()
 
-				var zeroReplicaFound = false
+				if space.Status == metapb.SS_Init {
 
-				p := &Partition{
-					Partition: &metapb.Partition{
-						StartSlot: 0,
-					},
-				}
-				for {
-					items := space.searchTree.ascendScan(p, 100)
-					if items == nil || len(items) == 0 {
-						break
-					}
-
-					for i := 0; i < len(items); i++ {
-						itemP := items[i].partition
-						if len(itemP.Replicas) == 0 {
-							zeroReplicaFound = true
-
-							if err := PushProcessorEvent(NewPartitionCreateEvent(itemP)); err != nil {
-								log.Error("fail to push event for creating partition[%v].", itemP)
+					var noReplica = false
+					var searchPivot *Partition
+					var searchNum = 100
+					for {
+						if searchPivot == nil {
+							searchPivot = &Partition{
+								Partition: &metapb.Partition{
+									StartSlot: 0,
+								},
 							}
 						}
+						items := space.searchTree.ascendScan(searchPivot, searchNum)
+						if items == nil || len(items) == 0 {
+							break
+						}
+
+						for i := 0; i < len(items); i++ {
+							itemPartition := items[i].partition
+							if len(itemPartition.Replicas) == 0 {
+								noReplica = true
+
+								if err := GetPMSingle(nil).PushEvent(NewPartitionCreateEvent(itemPartition)); err != nil {
+									log.Error("fail to push event for creating partition[%v].", itemPartition)
+								}
+							}
+						}
+
+						if len(items) < searchNum {
+							break
+						}
+						searchPivot = items[len(items)-1].partition
 					}
 
-					if len(items) < 100 {
-						break
+					if !noReplica {
+						space.Status = metapb.SS_Running
 					}
-					p = items[len(items)-1].partition
 				}
-
-				if !zeroReplicaFound {
-					space.Status = metapb.SS_Running
-				}
-			}
-			space.propertyLock.Unlock()
+			}()
 		}
 	}
-}
-
-func (w *SpaceStateTransitionWorker) stop() {
-
 }

@@ -12,8 +12,9 @@ type Master struct {
 	apiServer *ApiServer
 	rpcServer *RpcServer
 
-	createProcessor *PartitionProcessor
-	wg              sync.WaitGroup
+	processorManager *ProcessorManager
+	workerManager    *WorkerManager
+	wg               sync.WaitGroup
 }
 
 func NewServer() *Master {
@@ -28,6 +29,7 @@ func (ms *Master) Start(config *Config) error {
 		log.Error("fail to start cluster. err:[%v]", err)
 		return err
 	}
+	log.Info("Cluster has started")
 
 	ms.rpcServer = NewRpcServer(config, ms.cluster)
 	if err := ms.rpcServer.Start(); err != nil {
@@ -35,6 +37,7 @@ func (ms *Master) Start(config *Config) error {
 		ms.cluster.Close()
 		return err
 	}
+	log.Info("RPC server has started")
 
 	ms.apiServer = NewApiServer(config, ms.cluster)
 	if err := ms.apiServer.Start(); err != nil {
@@ -43,8 +46,18 @@ func (ms *Master) Start(config *Config) error {
 		ms.cluster.Close()
 		return err
 	}
+	log.Info("Api server has started")
+	
+	ms.processorManager = GetPMSingle(ms.cluster)
+	ms.processorManager.Start()
+	log.Info("Processor manager has started")
 
-	ProcessorStart(ms.cluster)
+	ms.workerManager = NewWorkerManager(ms.cluster)
+	if err := ms.workerManager.Start(); err != nil {
+		log.Error("fail to start worker manager. err:[%v]", err)
+		return err
+	}
+	log.Info("Worker manager has started")
 
 	return nil
 }
@@ -56,8 +69,13 @@ func (ms *Master) Shutdown() {
 	if ms.rpcServer != nil {
 		ms.rpcServer.Close()
 	}
+	if ms.workerManager != nil {
+		ms.workerManager.Shutdown()
+	}
+	if ms.processorManager != nil {
+		ms.processorManager.Stop()
+	}
 	if ms.cluster != nil {
 		ms.cluster.Close()
 	}
-	ProcessorStop()
 }

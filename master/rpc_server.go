@@ -211,7 +211,7 @@ func (s *RpcServer) PSHeartbeat(ctx context.Context,
 				resp.ResponseHeader = *makeRpcRespHeader(err)
 				return resp, nil
 			}
-			PushProcessorEvent(NewForcePartitionDeleteEvent(partitionId, ps.getRpcAddr(), replicaToDelete))
+			GetPMSingle(nil).PushEvent(NewForcePartitionDeleteEvent(partitionId, ps.getRpcAddr(), replicaToDelete))
 
 			continue
 		}
@@ -246,7 +246,8 @@ func (s *RpcServer) PSHeartbeat(ctx context.Context,
 					resp.ResponseHeader = *makeRpcRespHeader(err)
 					return resp, nil
 				}
-				PushProcessorEvent(NewPartitionDeleteEvent(partitionInfo.ID, partitionMS.pickLeaderNodeId(),
+
+				GetPMSingle(nil).PushEvent(NewPartitionDeleteEvent(partitionInfo.ID, partitionMS.pickLeaderNodeId(),
 					replicaToDelete))
 
 			} else if replicaCount < FIXED_REPLICA_NUM {
@@ -256,7 +257,7 @@ func (s *RpcServer) PSHeartbeat(ctx context.Context,
 					return resp, nil
 				}
 
-				PushProcessorEvent(NewPartitionCreateEvent(partitionMS))
+				GetPMSingle(nil).PushEvent(NewPartitionCreateEvent(partitionMS))
 
 			} else {
 				log.Info("Normal replica count in heartbeat")
@@ -273,7 +274,7 @@ func (s *RpcServer) PSHeartbeat(ctx context.Context,
 				resp.ResponseHeader = *makeRpcRespHeader(err)
 				return resp, nil
 			}
-			PushProcessorEvent(NewPartitionDeleteEvent(partitionInfo.ID, partitionMS.pickLeaderNodeId(),
+			GetPMSingle(nil).PushEvent(NewPartitionDeleteEvent(partitionInfo.ID, partitionMS.pickLeaderNodeId(),
 				replicaToDelete))
 
 		} else {

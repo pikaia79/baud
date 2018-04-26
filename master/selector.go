@@ -18,26 +18,11 @@ func NewIdleSelector() Selector {
 }
 
 func (s *IdleSelector) SelectTarget(servers []*PartitionServer) *PartitionServer {
-	if servers == nil {
+	if servers == nil || len(servers) == 0 {
 		return nil
 	}
 
-	// prevent form selecting same one server at many times
 	startIdx := rand.Intn(len(servers))
-	//for idx := startIdx; idx < len(servers); idx++ {
-	//	server := servers[idx]
-	//	if !server.isReplicaFull() {
-	//		return server
-	//	}
-	//}
-	//for idx := 0; idx < startIdx; idx++ {
-	//	server := servers[idx]
-	//	if !server.isReplicaFull() {
-	//		return server
-	//	}
-	//}
-
-	//return nil
 
 	return servers[startIdx]
 }
