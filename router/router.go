@@ -6,8 +6,11 @@ import (
 	"github.com/tiglabs/baud/keys"
 	"github.com/tiglabs/baud/proto/metapb"
 	"net/http"
-	"strconv"
 	"sync"
+	"strconv"
+	"github.com/pkg/errors"
+	"github.com/spaolacci/murmur3"
+	"github.com/tiglabs/raft/util/log"
 )
 
 type Router struct {
@@ -18,6 +21,12 @@ type Router struct {
 	lock         sync.RWMutex
 }
 
+type HttpReply struct {
+	Code int32       `json:"code"`
+	Msg  string      `json:"msg"`
+	Data interface{} `json:"data"`
+}
+
 func NewServer() *Router {
 	return new(Router)
 }
@@ -26,7 +35,7 @@ func (router *Router) Start(cfg *Config) error {
 	router.masterClient = NewMasterClient(cfg.MasterAddr)
 	router.httpRouter = httprouter.New()
 
-	router.httpRouter.PUT("/:db/:space/:slot", router.handleCreate)
+	router.httpRouter.PUT("/:db/:space", router.handleCreate)
 	router.httpRouter.GET("/:db/:space/:docId", router.handleRead)
 	router.httpRouter.POST("/:db/:space/:docId", router.handleUpdate)
 	router.httpRouter.DELETE("/:db/:space/:docId", router.handleDelete)
@@ -48,8 +57,27 @@ func (router *Router) Shutdown() {
 func (router *Router) handleCreate(writer http.ResponseWriter, request *http.Request, params httprouter.Params) {
 	defer router.catchPanic(writer)
 
-	db, space, partition, _ := router.getParams(params, true)
+	db, space, _, _ := router.getParams(params, true)
 	docBody := router.readDocBody(request)
+	var partition *Partition
+	keyField := space.GetKeyField()
+	if keyField != "" {
+		var docObj map[string]string
+		if err := json.Unmarshal(docBody, docObj); err != nil {
+			panic(err)
+		}
+		if slotData, ok := docObj[keyField]; ok {
+			h32 := murmur3.New32()
+			h32.Write([]byte(slotData))
+			partition = space.GetPartition(h32.Sum32())
+		} else {
+			panic(errors.New("cannot get slot data"))
+		}
+	} else {
+		h32 := murmur3.New32()
+		h32.Write(docBody)
+		partition = space.GetPartition(h32.Sum32())
+	}
 	docId := partition.Create(docBody)
 
 	respMap := map[string]interface{}{
@@ -59,10 +87,7 @@ func (router *Router) handleCreate(writer http.ResponseWriter, request *http.Req
 		"_docId": docId,
 	}
 
-	if data, err := json.Marshal(respMap); err == nil {
-		writer.WriteHeader(200)
-		writer.Write(data)
-	}
+	sendReply(writer, &HttpReply{ERRCODE_SUCCESS, ErrSuccess.Error(), respMap})
 }
 
 func (router *Router) handleRead(writer http.ResponseWriter, request *http.Request, params httprouter.Params) {
@@ -70,8 +95,7 @@ func (router *Router) handleRead(writer http.ResponseWriter, request *http.Reque
 
 	_, _, partition, docId := router.getParams(params, false)
 	docBody := partition.Read(docId)
-	writer.WriteHeader(200)
-	writer.Write(docBody)
+	sendReply(writer, &HttpReply{ERRCODE_SUCCESS, ErrSuccess.Error(), docBody})
 }
 
 func (router *Router) handleUpdate(writer http.ResponseWriter, request *http.Request, params httprouter.Params) {
@@ -80,8 +104,7 @@ func (router *Router) handleUpdate(writer http.ResponseWriter, request *http.Req
 	_, _, partition, docId := router.getParams(params, false)
 	docBody := router.readDocBody(request)
 	partition.Update(docId, docBody)
-	writer.WriteHeader(200)
-	writer.Write([]byte("{status: 0, message: \"update success\"}"))
+	sendReply(writer, &HttpReply{ERRCODE_SUCCESS, ErrSuccess.Error(), nil})
 }
 
 func (router *Router) handleDelete(writer http.ResponseWriter, request *http.Request, params httprouter.Params) {
@@ -89,11 +112,9 @@ func (router *Router) handleDelete(writer http.ResponseWriter, request *http.Req
 
 	_, _, partition, docId := router.getParams(params, false)
 	if ok := partition.Delete(docId); ok {
-		writer.WriteHeader(200)
-		writer.Write([]byte("{status: 0, message: \"delete success\"}"))
+		sendReply(writer, &HttpReply{ERRCODE_SUCCESS, ErrSuccess.Error(), nil})
 	} else {
-		writer.WriteHeader(400)
-		writer.Write([]byte("{status: -1, message: \"delete failed\"}"))
+		sendReply(writer, &HttpReply{ERRCODE_INTERNAL_ERROR, "Cannot delete doc", nil})
 	}
 }
 
@@ -145,11 +166,24 @@ func (router *Router) GetDB(dbName string) *DB {
 
 func (router *Router) catchPanic(writer http.ResponseWriter) {
 	if p := recover(); p != nil {
-		writer.WriteHeader(400)
-		if err, ok := p.(error); ok {
-			writer.Write([]byte(err.Error()))
-		} else {
-			writer.Write([]byte("unknown error"))
+		err, ok := p.(error)
+		if !ok {
+			err = ErrInternalError
 		}
+		sendReply(writer, &HttpReply{ERRCODE_INTERNAL_ERROR, err.Error(), nil})
+	}
+}
+
+func sendReply(writer http.ResponseWriter, httpReply *HttpReply) {
+	writer.WriteHeader(200)
+	reply, err := json.Marshal(httpReply)
+	if err != nil {
+		log.Error("fail to marshal http reply[%v]. err:[%v]", httpReply, err)
+		reply, _ = json.Marshal(HttpReply{ERRCODE_INTERNAL_ERROR, "json.Marshal() failed", nil})
+	}
+	writer.Header().Set("content-type", "application/json")
+	writer.Header().Set("Content-Length", strconv.Itoa(len(reply)))
+	if _, err := writer.Write(reply); err != nil {
+		log.Error("fail to write http reply[%s] len[%d]. err:[%v]", string(reply), len(reply), err)
 	}
 }

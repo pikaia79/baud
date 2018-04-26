@@ -11,6 +11,11 @@ import (
 	"google.golang.org/grpc"
 )
 
+const (
+	RESPCODE_NOLEADER    = 1
+	RESPCODE_NOPARTITION = 2
+)
+
 type Partition struct {
 	meta          metapb.Partition
 	route         masterpb.Route
@@ -112,6 +117,9 @@ func (partition *Partition) getSingleResponse(resp *pspb.BulkResponse, err error
 		panic(err)
 	}
 	if resp.Code != 0 {
+		if (resp.Code == RESPCODE_NOLEADER || resp.Code == RESPCODE_NOPARTITION) {
+			partition.parent.Delete(partition.meta)
+		}
 		panic(errors.New(resp.Message))
 	}
 	if len(resp.Responses) != 1 || resp.Responses[0].OpType != pspb.OpType_CREATE {

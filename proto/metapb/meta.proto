@@ -45,6 +45,11 @@ enum SpaceType {
     ST_BLOB   = 2;
 }
 
+message KeyPolicy {
+    string key_field = 1; // witch field will be generated for key
+    string key_func = 2; // witch function will be used when generating key
+}
+
 message Space {
     uint32      id      = 1 [(gogoproto.customname) = "ID", (gogoproto.casttype) = "SpaceID"];
     uint32      db      = 2 [(gogoproto.customname) = "DB", (gogoproto.casttype) = "DBID"];
@@ -52,6 +57,7 @@ message Space {
     string      name    = 4;
     SpaceType   type    = 5;
     SpaceStatus status  = 6;
+    KeyPolicy   key_policy = 7;
 }
 
 enum PartitionStatus {

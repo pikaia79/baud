@@ -20,11 +20,11 @@ func NewSpace(parent *DB, meta metapb.Space) *Space {
 }
 
 func (space *Space) GetPartition(slotId metapb.SlotID) *Partition {
-	partition := space.getPartition(slotId)
+	partition, _ := space.getPartition(slotId)
 	if partition == nil {
 		routes := space.parent.masterClient.GetRoute(space.meta.DB, space.meta.ID, slotId)
 		space.addRoutes(routes)
-		partition = space.getPartition(slotId)
+		partition, _ = space.getPartition(slotId)
 	}
 	if partition == nil {
 		panic(errors.Errorf("cannot get partition for slot %d", slotId))
@@ -32,7 +32,7 @@ func (space *Space) GetPartition(slotId metapb.SlotID) *Partition {
 	return partition
 }
 
-func (space *Space) getPartition(slotId metapb.SlotID) *Partition {
+func (space *Space) getPartition(slotId metapb.SlotID) (*Partition, int) {
 	space.lock.RLock()
 	defer space.lock.RUnlock()
 
@@ -40,9 +40,9 @@ func (space *Space) getPartition(slotId metapb.SlotID) *Partition {
 		return space.partitions[i].meta.EndSlot >= slotId
 	})
 	if pos >= len(space.partitions) || slotId < space.partitions[pos].meta.StartSlot {
-		return nil
+		return nil, -1
 	}
-	return space.partitions[pos]
+	return space.partitions[pos], pos
 }
 
 func (space *Space) addRoutes(routes []masterpb.Route) {
@@ -59,5 +59,19 @@ func (space *Space) addRoutes(routes []masterpb.Route) {
 		} else if space.partitions[pos].meta.EndSlot >= route.StartSlot {
 			space.partitions = append(space.partitions[:pos], append([]*Partition{newPartition}, space.partitions[pos:]...)...)
 		}
+	}
+}
+
+func (space *Space) GetKeyField() string {
+	return space.meta.KeyPolicy.KeyField
+}
+
+func (space *Space) Delete(partition metapb.Partition) {
+	_, pos := space.getPartition(partition.StartSlot)
+	if pos >= 0 {
+		space.lock.Lock()
+		defer space.lock.Unlock()
+
+		space.partitions = append(space.partitions[:pos], space.partitions[pos + 1:]...)
 	}
 }
