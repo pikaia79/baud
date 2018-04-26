@@ -2,6 +2,8 @@ package mapping
 
 import (
 	"testing"
+	"strings"
+	"fmt"
 )
 
 func TestParseTextFieldMapping(t *testing.T) {
@@ -195,5 +197,240 @@ func TestParseObjectFieldMapping(t *testing.T) {
 		t.Fatalf("parse object fielld failed %v", err)
 		return
 	}
-	t.Log(field)
+	if f, ok := field.Properties["boolField"]; ok {
+		if f.Type() != "boolean" {
+			t.Fatalf("parse object field failed %s", f.Type())
+		}
+		if f.ID() != 2 {
+			t.Fatalf("parse object field failed %d", f.ID())
+		}
+	} else {
+		t.Fatal("parse object field failed")
+	}
+
+	if f, ok := field.Properties["dateField"]; ok {
+		if f.ID() != 3 {
+			t.Fatalf("parse object field failed %d", f.ID())
+		}
+	} else {
+		t.Fatal("parse object field failed")
+	}
+
+	if f, ok := field.Properties["kwField"]; ok {
+		if f.ID() != 4 {
+			t.Fatalf("parse object field failed %d", f.ID())
+		}
+	} else {
+		t.Fatal("parse object field failed")
+	}
+
+	if f, ok := field.Properties["numField"]; ok {
+		if f.ID() != 5 {
+			t.Fatalf("parse object field failed %d", f.ID())
+		}
+	} else {
+		t.Fatal("parse object field failed")
+	}
+
+	if f, ok := field.Properties["textField"]; ok {
+		if f.ID() != 6 {
+			t.Fatalf("parse object field failed %d", f.ID())
+		}
+	} else {
+		t.Fatal("parse object field failed")
+	}
+}
+
+func TestParseSchema(t *testing.T) {
+	schema := `{
+  "mappings": {
+    "_doc": {
+      "properties": {
+        "region": {
+          "type": "keyword"
+        },
+        "is_published": {
+          "type": "boolean"
+        },
+        "title": {
+          "type": "text",
+          "store": true
+        },
+        "date": {
+          "type": "date",
+          "store": true
+        },
+        "content": {
+          "type": "text"
+        },
+        "city": {
+          "type": "text",
+          "fields": {
+            "raw": {
+              "type":  "keyword"
+            }
+          }
+        },
+        "manager": {
+          "properties": {
+            "age":  { "type": "integer" },
+            "name": {
+              "properties": {
+                "first": { "type": "text" },
+                "last":  { "type": "text" }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
+`
+	//level0FieldNames := []string{"region", "is_published", "title", "date", "content", "city", "manager"}
+	dm, err := parseSchema([]byte(schema))
+	if err != nil {
+		t.Fatal("parseSchema failed ", err)
+		return
+	}
+	if len(dm.Mapping) != 7 {
+		t.Fatalf("parse failed %v", dm.Mapping)
+	}
+	for fn, field := range dm.Mapping {
+		switch fn {
+		case "region":
+			if f, ok := field.(*KeywordFieldMapping); !ok {
+				t.Fatal("invalid field")
+				return
+			} else {
+				if f.Type() != "keyword" {
+					t.Fatal("invalid field")
+					return
+				}
+				t.Log(f)
+			}
+		case "is_published":
+			if f, ok := field.(*BooleanFieldMapping); !ok {
+				t.Fatal("invalid field")
+				return
+			} else {
+				if f.Type() != "boolean" {
+					t.Fatal("invalid field")
+					return
+				}
+				t.Log(f)
+			}
+		case "title":
+			if f, ok := field.(*TextFieldMapping); !ok {
+				t.Fatal("invalid field")
+				return
+			} else {
+				if f.Type() != "text" {
+					t.Fatal("invalid field")
+					return
+				}
+				if f.Store() != true {
+					t.Fatal("invalid field")
+					return
+				}
+				t.Log(f)
+			}
+		case "date":
+			if f, ok := field.(*DateFieldMapping); !ok {
+				t.Fatal("invalid field")
+				return
+			} else {
+				if f.Type() != "date" {
+					t.Fatal("invalid field")
+					return
+				}
+				if f.Store() != true {
+					t.Fatal("invalid field")
+					return
+				}
+				t.Log(f)
+			}
+		case "content":
+			if f, ok := field.(*TextFieldMapping); !ok {
+				t.Fatal("invalid field")
+				return
+			} else {
+				if f.Type() != "text" {
+					t.Fatal("invalid field")
+					return
+				}
+				t.Log(f)
+			}
+		case "city":
+			if f, ok := field.(*TextFieldMapping); !ok {
+				t.Fatal("invalid field")
+				return
+			} else {
+				if f.Type() != "text" {
+					t.Fatal("invalid field")
+					return
+				}
+				if f.ID() != 2 {
+					t.Fatal("invalid field")
+					return
+				}
+				if subf, ok := f.Fields["raw"]; !ok {
+					t.Fatal("invalid field")
+					return
+				} else {
+					if sf, ok := subf.(*KeywordFieldMapping); !ok {
+						t.Fatal("invalid field")
+						return
+					} else {
+						if sf.ID() != 3 {
+							t.Fatal("invalid field")
+							return
+						}
+						t.Log(sf)
+					}
+				}
+				t.Log(f)
+			}
+		case "manager":
+			if f, ok := field.(*ObjectFieldMapping); !ok {
+				t.Fatal("invalid field")
+				return
+			} else {
+				if f.Type() != "object" {
+					t.Fatal("invalid field")
+					return
+				}
+				t.Log(f)
+				for subf, f := range f.Properties {
+					switch subf {
+					case "age":
+						if field, ok := f.(*NumericFieldMapping); !ok {
+							t.Fatal("invalid field")
+							return
+						} else {
+							if field.ID() != 8 {
+								t.Fatal("invalid field")
+								return
+							}
+						}
+					case "name":
+						if field, ok := f.(*ObjectFieldMapping); !ok {
+							t.Fatal("invalid field")
+							return
+						} else {
+							if field.ID() != 9 {
+								t.Fatal("invalid field")
+								return
+							}
+						}
+					}
+				}
+			}
+
+		default:
+			t.Fatalf("invalid field name %s", fn)
+			return
+		}
+	}
+	fmt.Println(strings.Compare("_all", "a"))
 }
