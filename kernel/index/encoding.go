@@ -71,9 +71,9 @@ func encodeStoreField(docID string, fields []document.Field) (key []byte, row []
 				return
 			}
 			key = encodeStoreFieldKey(docID, field.Name())
-			row = append(row, fieldType, byte(field.Property()))
+			row = append(row, byte(fieldType), byte(field.Property()))
 		}
-		row = encoding.EncodeBytesValue(row, i, field.Value())
+		row = encoding.EncodeBytesValue(row, uint32(i), field.Value())
 	}
 	return
 }

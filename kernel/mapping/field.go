@@ -77,13 +77,13 @@ type SourceFieldMapping struct {
 }
 
 func NewSourceFieldMapping(id uint64) *SourceFieldMapping {
-	return &SourceFieldMapping{Name_: "_source", Id: id, Store_: true}
+	return &SourceFieldMapping{Name_: "_source", Id: id, Store_: true, Type_: "text"}
 }
 
 func(f *SourceFieldMapping) Name() string {return f.Name_}
 func(f *SourceFieldMapping) Type() string {return f.Type_}
 func(f *SourceFieldMapping) ID()   uint64 {return f.Id}
-func(f *SourceFieldMapping) Store() bool {return true}
+func(f *SourceFieldMapping) Store() bool {return f.Store_}
 func(f *SourceFieldMapping) Index() bool {return false}
 func(f *SourceFieldMapping) Enabled() bool {return false}
 func(f *SourceFieldMapping) ParseField(data interface{}, path []string, context *parseContext) error {
