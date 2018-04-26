@@ -12,9 +12,9 @@ type Master struct {
 	apiServer *ApiServer
 	rpcServer *RpcServer
 
-	createProcessor *PartitionProcessor
-	workerManager   *WorkerManager
-	wg              sync.WaitGroup
+	processorManager *ProcessorManager
+	workerManager    *WorkerManager
+	wg               sync.WaitGroup
 }
 
 func NewServer() *Master {
@@ -48,7 +48,8 @@ func (ms *Master) Start(config *Config) error {
 	}
 	log.Info("Api server has started")
 	
-	ProcessorStart(ms.cluster)
+	ms.processorManager = GetPMSingle(ms.cluster)
+	ms.processorManager.Start()
 	log.Info("Processor manager has started")
 
 	ms.workerManager = NewWorkerManager(ms.cluster)
@@ -68,8 +69,13 @@ func (ms *Master) Shutdown() {
 	if ms.rpcServer != nil {
 		ms.rpcServer.Close()
 	}
+	if ms.workerManager != nil {
+		ms.workerManager.Shutdown()
+	}
+	if ms.processorManager != nil {
+		ms.processorManager.Stop()
+	}
 	if ms.cluster != nil {
 		ms.cluster.Close()
 	}
-	ProcessorStop()
 }

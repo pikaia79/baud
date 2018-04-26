@@ -117,7 +117,7 @@ func (w *SpaceStateTransitionWorker) getName() string {
 }
 
 func (w *SpaceStateTransitionWorker) getInterval() time.Duration {
-	return time.Second * 1
+	return time.Second * 60
 }
 
 func (w *SpaceStateTransitionWorker) run() {
@@ -153,7 +153,7 @@ func (w *SpaceStateTransitionWorker) run() {
 							if len(itemPartition.Replicas) == 0 {
 								noReplica = true
 
-								if err := PushProcessorEvent(NewPartitionCreateEvent(itemPartition)); err != nil {
+								if err := GetPMSingle(nil).PushEvent(NewPartitionCreateEvent(itemPartition)); err != nil {
 									log.Error("fail to push event for creating partition[%v].", itemPartition)
 								}
 							}

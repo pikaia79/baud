@@ -5,6 +5,8 @@ import (
 	"github.com/tiglabs/baud/proto/metapb"
 	"github.com/tiglabs/baud/util/deepcopy"
 	"github.com/tiglabs/baud/util/log"
+	"sync"
+	"runtime/debug"
 )
 
 const (
@@ -19,10 +21,91 @@ const (
 )
 
 var (
-	processorStarted = false
-
-	partitionProcessor *PartitionProcessor
+	processorManagerSingle                    *ProcessorManager
+	processorManagerSingleLock 				  sync.Once
 )
+
+type ProcessorManager struct {
+	ctx       context.Context
+	cancel    context.CancelFunc
+
+	pp *PartitionProcessor
+
+	isStarted bool
+	wg        sync.WaitGroup
+}
+
+func GetPMSingle(cluster *Cluster) *ProcessorManager {
+	if processorManagerSingle == nil {
+		processorManagerSingleLock.Do(func() {
+			if cluster == nil {
+				log.Panic("cluster should not be empty when create processor manager firstly")
+			}
+
+			pm := new(ProcessorManager)
+			pm.ctx, pm.cancel = context.WithCancel(context.Background())
+			pm.pp = NewPartitionProcessor(pm.ctx, pm.cancel, cluster)
+
+			processorManagerSingle = pm
+		})
+	}
+
+	return processorManagerSingle
+}
+
+
+func (pm *ProcessorManager) Start() {
+	pm.wg.Add(1)
+	go func() {
+		defer pm.wg.Done()
+		defer func() {
+			if e := recover(); e != nil {
+				log.Error("recover partition processor panic. e:[%s]\n stack:[%s]", e, debug.Stack())
+			}
+		}()
+
+		pm.pp.run()
+	}()
+
+	pm.isStarted = true
+}
+
+func (pm *ProcessorManager) Stop() {
+	pm.isStarted = false
+
+	pm.cancel()
+	pm.wg.Wait()
+}
+
+func (pm *ProcessorManager) PushEvent(event *ProcessorEvent) error {
+	if event == nil {
+		log.Error("empty event")
+		return ErrInternalError
+	}
+
+	if !pm.isStarted {
+		log.Error("processor manager is not started")
+		return ErrInternalError
+	}
+
+	if event.typ == EVENT_TYPE_PARTITION_CREATE ||
+			event.typ == EVENT_TYPE_PARTITION_DELETE ||
+			event.typ == EVENT_TYPE_FORCE_PARTITION_DELETE {
+
+		if len(pm.pp.eventCh) >= PARTITION_CHANNEL_LIMIT*0.9 {
+			log.Error("partition channel will full, reject event[%v]", event)
+			return ErrSysBusy
+		}
+
+		pm.pp.eventCh <- event
+
+	} else {
+		log.Error("processor received invalid event type[%v]", event.typ)
+		return ErrInternalError
+	}
+
+	return nil
+}
 
 type ProcessorEvent struct {
 	typ  int
@@ -56,7 +139,6 @@ func NewPartitionDeleteEvent(partitionId metapb.PartitionID, leaderNodeId metapb
 	}
 }
 
-// internal use
 func NewForcePartitionDeleteEvent(partitionId metapb.PartitionID, replicaRpcAddr string,
 	replica *metapb.Replica) *ProcessorEvent {
 	return &ProcessorEvent{
@@ -69,12 +151,15 @@ func NewForcePartitionDeleteEvent(partitionId metapb.PartitionID, replicaRpcAddr
 	}
 }
 
+type Processor interface {
+	run()
+}
+
 type PartitionProcessor struct {
 	ctx        context.Context
 	cancelFunc context.CancelFunc
 
-	eventCh chan *ProcessorEvent
-
+	eventCh        chan *ProcessorEvent
 	cluster        *Cluster
 	serverSelector Selector
 	jdos           DCOS
@@ -82,12 +167,37 @@ type PartitionProcessor struct {
 	// psRpcClient    *rpc.Client
 }
 
-func (p *PartitionProcessor) doRun() {
+func NewPartitionProcessor(ctx context.Context, cancel context.CancelFunc, cluster *Cluster) *PartitionProcessor {
+
+	p := &PartitionProcessor{
+		ctx:            ctx,
+		cancelFunc:     cancel,
+		eventCh:        make(chan *ProcessorEvent, PARTITION_CHANNEL_LIMIT),
+		cluster:        cluster,
+		serverSelector: NewIdleSelector(),
+		jdos:           new(JDOS),
+	}
+
+	//connMgrOpt := rpc.DefaultManagerOption
+	//connMgr := rpc.NewConnectionMgr(p.ctx, &connMgrOpt)
+	//clientOpt := rpc.DefaultClientOption
+	//clientOpt.ClusterID = "1"
+	//clientOpt.ConnectMgr = connMgr
+	//clientOpt.CreateFunc = func(cc *grpc.ClientConn) interface{} { return pspb.NewAdminGrpcClient(cc) }
+	//p.psRpcClient = rpc.NewClient(1, &clientOpt)
+
+	return p
+}
+
+func (p *PartitionProcessor) run() {
+	log.Info("Partition Processor is running")
+
 	idGenerator := GetIdGeneratorInstance(nil)
 
 	for {
 		select {
 		case <-p.ctx.Done():
+			log.Info("Partition Processor exit")
 			return
 		case event := <-p.eventCh:
 
@@ -172,70 +282,7 @@ func (p *PartitionProcessor) doRun() {
 	}
 }
 
-func createPartitionProcessor(cluster *Cluster) {
 
-	p := &PartitionProcessor{
-		eventCh:        make(chan *ProcessorEvent, PARTITION_CHANNEL_LIMIT),
-		cluster:        cluster,
-		serverSelector: NewIdleSelector(),
-		jdos:           new(JDOS),
-	}
-	p.ctx, p.cancelFunc = context.WithCancel(context.Background())
 
-	//connMgrOpt := rpc.DefaultManagerOption
-	//connMgr := rpc.NewConnectionMgr(p.ctx, &connMgrOpt)
-	//clientOpt := rpc.DefaultClientOption
-	//clientOpt.ClusterID = "1"
-	//clientOpt.ConnectMgr = connMgr
-	//clientOpt.CreateFunc = func(cc *grpc.ClientConn) interface{} { return pspb.NewAdminGrpcClient(cc) }
-	//p.psRpcClient = rpc.NewClient(1, &clientOpt)
 
-	partitionProcessor = p
-}
 
-type PartitionDeleteProcessor struct {
-	ctx        context.Context
-	cancelFunc context.CancelFunc
-
-	PartitionEventCh chan *Partition
-}
-
-// background partitionProcessor
-func ProcessorStart(cluster *Cluster) {
-	createPartitionProcessor(cluster)
-	go func() {
-		partitionProcessor.doRun()
-	}()
-
-	processorStarted = true
-}
-
-func ProcessorStop() {
-	if partitionProcessor != nil && partitionProcessor.cancelFunc != nil {
-		partitionProcessor.cancelFunc()
-	}
-
-	processorStarted = false
-}
-
-func PushProcessorEvent(event *ProcessorEvent) error {
-	if event == nil {
-		log.Error("empty event")
-		return ErrInternalError
-	}
-
-	if event.typ == EVENT_TYPE_PARTITION_CREATE || event.typ == EVENT_TYPE_PARTITION_DELETE {
-		if len(partitionProcessor.eventCh) >= PARTITION_CHANNEL_LIMIT*0.9 {
-			log.Error("partition channel will full, reject event[%v]", event)
-			return ErrSysBusy
-		}
-
-		partitionProcessor.eventCh <- event
-
-	} else {
-		log.Error("processor received invalid event type[%v]", event.typ)
-		return ErrInternalError
-	}
-
-	return nil
-}
