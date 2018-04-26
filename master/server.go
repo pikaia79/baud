@@ -1,8 +1,7 @@
 package master
 
 import (
-	//"golang.org/x/net/context"
-	"util/log"
+	"github.com/tiglabs/baud/util/log"
 	"sync"
 )
 

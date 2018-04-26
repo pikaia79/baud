@@ -1,31 +1,29 @@
 package master
 
 import (
-	"util/log"
-	"sync"
-	"math"
-	"util"
 	"github.com/tiglabs/baud/proto/metapb"
+	"github.com/tiglabs/baud/util"
+	"github.com/tiglabs/baud/util/log"
+	"math"
+	"sync"
 )
 
 type Cluster struct {
-	config 			*Config
-	store 			Store
+	config *Config
+	store  Store
 
-	dbCache 		*DBCache
-	//spaceCache      *SpaceCache
-	psCache 		*PSCache
-	partitionCache  *PartitionCache
+	dbCache        *DBCache
+	psCache        *PSCache
+	partitionCache *PartitionCache
 
-    clusterLock     sync.RWMutex
+	clusterLock sync.RWMutex
 }
 
 func NewCluster(config *Config) *Cluster {
 	return &Cluster{
-		config: 		config,
-		store: 			NewRaftStore(config),
-		dbCache: 		NewDBCache(),
-		//spaceCache: 	NewSpaceCache(),
+		config:         config,
+		store:          NewRaftStore(config),
+		dbCache:        NewDBCache(),
 		psCache:        NewPSCache(),
 		partitionCache: NewPartitionCache(),
 	}
@@ -160,7 +158,7 @@ func (c *Cluster) recoveryPartition() error {
 			continue
 		}
 
-		space.searchTree.update(partition.Partition)
+		space.searchTree.update(partition)
 		c.partitionCache.addPartition(partition)
 
 		var delMetaReplicas = make([]*metapb.Replica, 0)
@@ -175,9 +173,9 @@ func (c *Cluster) recoveryPartition() error {
 			ps.addPartition(partition)
 		}
 		if err := partition.deleteReplica(c.store, delMetaReplicas...); err != nil {
-		    log.Error("fail to remove unused replicas when recovery partition[%v]. err[%v]", partition, err)
-		    continue
-        }
+			log.Error("fail to remove unused replicas when recovery partition[%v]. err[%v]", partition, err)
+			continue
+		}
 	}
 
 	return nil
@@ -228,7 +226,7 @@ func (c *Cluster) renameDb(srcDbName, destDbName string) error {
 	return nil
 }
 
-func (c *Cluster) createSpace(dbName, spaceName, partitionKey, partitionFunc string, partitionNum int) (*Space, error) {
+func (c *Cluster) createSpace(dbName, spaceName, partitionKey, partitionFunc string, partitionNum uint32) (*Space, error) {
 	c.clusterLock.Lock()
 	defer c.clusterLock.Unlock()
 
@@ -244,9 +242,9 @@ func (c *Cluster) createSpace(dbName, spaceName, partitionKey, partitionFunc str
 	batch := c.store.NewBatch()
 
 	policy := &PartitionPolicy{
-		Key: partitionKey,
-		Function:partitionFunc,
-		NumPartitions:partitionNum,
+		Key:           partitionKey,
+		Function:      partitionFunc,
+		NumPartitions: partitionNum,
 	}
 	space, err := NewSpace(db.ID, dbName, spaceName, policy)
 	if err != nil {
@@ -256,13 +254,13 @@ func (c *Cluster) createSpace(dbName, spaceName, partitionKey, partitionFunc str
 		return nil, err
 	}
 
-	slots := util.SlotSplit(0, math.MaxUint32, partitionNum + 1)
-	if slots == nil {
-		log.Error("fail to split slot range [%v-%v]", 0, math.MaxUint32)
-		return nil, ErrInternalError
-	}
-	partitions := make([]*Partition, len(slots))
-	for i := 0; i < len(slots) - 1; i++ {
+    slots := util.SlotSplit(0, math.MaxUint32, uint64(partitionNum)+1)
+    if slots == nil {
+        log.Error("fail to split slot range [%v-%v]", 0, math.MaxUint32)
+        return nil, ErrInternalError
+    }
+    partitions := make([]*Partition, 0, len(slots))
+    for i := 0; i < len(slots)-1; i++ {
 		partition, err := NewPartition(db.ID, space.ID, slots[i], slots[i+1])
 		if err != nil {
 			return nil, err
@@ -281,10 +279,12 @@ func (c *Cluster) createSpace(dbName, spaceName, partitionKey, partitionFunc str
 	for _, partition := range partitions {
 		space.putPartition(partition)
 
-		if err := PushProcessorEvent(NewPartitionCreateEvent(partition)); err != nil {
-			log.Error("fail to push event for creating partition[%v].", partition)
-		}
+		//if err := PushProcessorEvent(NewPartitionCreateEvent(partition)); err != nil {
+		//	log.Error("fail to push event for creating partition[%v].", partition)
+		//}
 	}
+
+	// waiting to continues to create partition in ps by the background worker
 
 	return space, nil
 }
@@ -315,8 +315,4 @@ func (c *Cluster) renameSpace(dbName, srcSpaceName, destSpaceName string) error 
 	db.spaceCache.addSpace(srcSpace)
 
 	return nil
-}
-
-func (c *Cluster) detailSpace(spaceId int) (*Space, error) {
-	return nil, nil
 }

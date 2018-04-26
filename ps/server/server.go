@@ -13,11 +13,13 @@ import (
 
 	"sort"
 
+	"github.com/gogo/protobuf/proto"
 	"github.com/tiglabs/baud/proto/masterpb"
 	"github.com/tiglabs/baud/proto/metapb"
 	"github.com/tiglabs/baud/proto/pspb"
 	"github.com/tiglabs/baud/ps/metric"
 	"github.com/tiglabs/baud/util"
+	"github.com/tiglabs/baud/util/atomic"
 	"github.com/tiglabs/baud/util/build"
 	"github.com/tiglabs/baud/util/config"
 	"github.com/tiglabs/baud/util/log"
@@ -54,6 +56,9 @@ type Server struct {
 
 	meta       *serverMeta
 	partitions sync.Map
+
+	stopping     atomic.AtomicBool
+	adminEventCh chan proto.Message
 }
 
 // NewServer create server instance
@@ -66,6 +71,7 @@ func NewServer(conf *config.Config) *Server {
 		meta:         newServerMeta(serverConf.DataPath),
 		nodeResolver: NewNodeResolver(),
 		systemMetric: metric.NewSystemMetric(serverConf.DataPath, serverConf.DiskQuota),
+		adminEventCh: make(chan proto.Message, 64),
 	}
 	s.ctx, s.ctxCancel = context.WithCancel(context.Background())
 
@@ -85,14 +91,25 @@ func NewServer(conf *config.Config) *Server {
 	s.masterClient = rpc.NewClient(1, &clientOpt)
 
 	s.masterHeartbeat = newHeartbeatWork(s)
+	routine.RunWorkDaemon("ADMIN-EVENTHANDLER", s.adminEventHandler, s.ctx.Done())
 	return s
 
 }
 
 // Start start server
 func (s *Server) Start() error {
-	metaInfo := s.meta.getInfo()
-	s.nodeID = metaInfo.NodeID
+	return s.doStart(true)
+}
+
+func (s *Server) doStart(init bool) error {
+	// load meta data
+	if init {
+		metaInfo := s.meta.getInfo()
+		s.nodeID = metaInfo.NodeID
+		if metaInfo.ClusterID != s.ClusterID {
+			s.reset()
+		}
+	}
 
 	// do register to master
 	registerResp, err := s.register()
@@ -112,7 +129,7 @@ func (s *Server) Start() error {
 	}
 
 	// clear old partition
-	if metaInfo.ClusterID != s.ClusterID || len(registerResp.Partitions) == 0 {
+	if len(registerResp.Partitions) == 0 {
 		s.reset()
 	} else {
 		s.destroyExcludePartition(registerResp.Partitions)
@@ -151,31 +168,34 @@ func (s *Server) Start() error {
 	s.recoverPartitions(registerResp.Partitions)
 
 	// Start server
-	if ln, err := net.Listen("tcp", fmt.Sprintf(":%d", s.RPCPort)); err != nil {
-		return fmt.Errorf("Server failed to listen api port: %v", err)
-	} else {
-		pspb.RegisterApiGrpcServer(s.apiServer, s)
-		reflection.Register(s.apiServer)
-		go func() {
-			if err = s.apiServer.Serve(ln); err != nil {
-				log.Fatal("Server failed to start api grpc: %v", err)
-			}
-		}()
-	}
+	if init {
+		if ln, err := net.Listen("tcp", fmt.Sprintf(":%d", s.RPCPort)); err != nil {
+			return fmt.Errorf("Server failed to listen api port: %v", err)
+		} else {
+			pspb.RegisterApiGrpcServer(s.apiServer, s)
+			reflection.Register(s.apiServer)
+			go func() {
+				if err = s.apiServer.Serve(ln); err != nil {
+					log.Fatal("Server failed to start api grpc: %v", err)
+				}
+			}()
+		}
 
-	if ln, err := net.Listen("tcp", fmt.Sprintf(":%d", s.AdminPort)); err != nil {
-		return fmt.Errorf("Server failed to listen admin port: %v", err)
-	} else {
-		pspb.RegisterAdminGrpcServer(s.adminServer, s)
-		reflection.Register(s.adminServer)
-		go func() {
-			if err = s.adminServer.Serve(ln); err != nil {
-				log.Fatal("Server failed to start admin grpc: %v", err)
-			}
-		}()
+		if ln, err := net.Listen("tcp", fmt.Sprintf(":%d", s.AdminPort)); err != nil {
+			return fmt.Errorf("Server failed to listen admin port: %v", err)
+		} else {
+			pspb.RegisterAdminGrpcServer(s.adminServer, s)
+			reflection.Register(s.adminServer)
+			go func() {
+				if err = s.adminServer.Serve(ln); err != nil {
+					log.Fatal("Server failed to start admin grpc: %v", err)
+				}
+			}()
+		}
 	}
 
 	// start heartbeat to master
+	s.stopping.Set(false)
 	s.masterHeartbeat.start()
 	s.masterHeartbeat.trigger()
 
@@ -184,11 +204,12 @@ func (s *Server) Start() error {
 
 // Stop stop server
 func (s *Server) Stop() {
+	s.stopping.Set(true)
+	s.ctxCancel()
+
 	if s.masterHeartbeat != nil {
 		s.masterHeartbeat.stop()
 	}
-	s.ctxCancel()
-
 	if s.apiServer != nil {
 		s.apiServer.GracefulStop()
 	}
@@ -212,7 +233,13 @@ func (s *Server) Stop() {
 
 func (s *Server) closeAllRange() {
 	s.partitions.Range(func(key, value interface{}) bool {
-		value.(*partition).Close()
+		p := value.(*partition)
+		p.Close()
+		s.partitions.Delete(p.meta.ID)
+
+		for _, r := range p.meta.Replicas {
+			s.nodeResolver.deleteNode(r.NodeID)
+		}
 		return true
 	})
 }
@@ -280,4 +307,31 @@ func (s *Server) recoverPartitions(partitions []metapb.Partition) {
 	}
 
 	wg.Wait()
+}
+
+func (s *Server) restart() {
+	// do close
+	s.stopping.Set(true)
+	s.masterHeartbeat.stop()
+	s.masterClient.Close()
+
+	// clear admin event channel
+	endFlag := false
+	for {
+		select {
+		case <-s.adminEventCh:
+		default:
+			endFlag = true
+		}
+
+		if endFlag {
+			break
+		}
+	}
+
+	// do start
+	s.closeAllRange()
+	if err := s.doStart(false); err != nil {
+		panic(fmt.Errorf("restart error: %v", err))
+	}
 }

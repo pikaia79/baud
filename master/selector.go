@@ -14,8 +14,7 @@ type IdleSelector struct {
 
 func NewIdleSelector() Selector {
 	rand.Seed(time.Now().UnixNano())
-	return &IdleSelector{
-	}
+	return &IdleSelector{}
 }
 
 func (s *IdleSelector) SelectTarget(servers []*PartitionServer) *PartitionServer {

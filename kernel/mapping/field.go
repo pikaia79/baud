@@ -65,6 +65,31 @@ func(f *DynamicFieldMapping) ParseField(data interface{}, path []string, context
 	return nil
 }
 
+type SourceFieldMapping struct {
+	Name_ string                   `json:"name,omitempty"`
+	// field ID
+	Id  uint64                     `json:"id,omitempty"`
+	Type_ string                   `json:"type,omitempty"`
+	Store_ bool                    `json:"stroe,omitempty"`
+	Enabled_ bool                  `json:"enabled,omitempty"`
+	Includes []string              `json:"includes,omitempty"`
+	Excludes []string              `json:"excludes,omitempty"`
+}
+
+func NewSourceFieldMapping(id uint64) *SourceFieldMapping {
+	return &SourceFieldMapping{Name_: "_source", Id: id, Store_: true}
+}
+
+func(f *SourceFieldMapping) Name() string {return f.Name_}
+func(f *SourceFieldMapping) Type() string {return f.Type_}
+func(f *SourceFieldMapping) ID()   uint64 {return f.Id}
+func(f *SourceFieldMapping) Store() bool {return true}
+func(f *SourceFieldMapping) Index() bool {return false}
+func(f *SourceFieldMapping) Enabled() bool {return false}
+func(f *SourceFieldMapping) ParseField(data interface{}, path []string, context *parseContext) error {
+	return nil
+}
+
 type ObjectFieldMapping struct {
 	Name_ string                   `json:"name,omitempty"`
 	// field ID
@@ -89,7 +114,7 @@ func NewObjectFieldMapping(name string, id uint64) *ObjectFieldMapping {
 
 func(f *ObjectFieldMapping) Name() string {return f.Name_}
 func(f *ObjectFieldMapping) Type() string {return "object"}
-func(f *ObjectFieldMapping) ID()   uint64 {return 0}
+func(f *ObjectFieldMapping) ID()   uint64 {return f.Id}
 func(f *ObjectFieldMapping) Store() bool {return false}
 func(f *ObjectFieldMapping) Index() bool {return true}
 func(f *ObjectFieldMapping) Enabled() bool {return true}
@@ -244,8 +269,8 @@ func NewTextFieldMapping(name string, id uint64) *TextFieldMapping {
 		Norms: true,
 		PositionIncrementGap: 100,
 		Store_: false,
-		SearchAnalyzer: "standard",
-		SearchQuoteAnalyzer: "standard",
+		SearchAnalyzer: "",
+		SearchQuoteAnalyzer: "",
 		Similarity: "BM25",
 		TermVector: "no",
 	}
@@ -675,7 +700,7 @@ type BooleanFieldMapping struct {
 	Boost float64                  `json:"boost,omitempty"`
 	DocValues bool                 `json:"doc_values,omitempty"`
 	Index_ bool                    `json:"index,omitempty"`
-	NullValue float64              `json:"null_value,omitempty"`
+	NullValue bool                 `json:"null_value,omitempty"`
 	Store_ bool                    `json:"store,omitempty"`
 }
 

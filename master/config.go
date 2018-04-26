@@ -1,457 +1,289 @@
 package master
 
 import (
-	"fmt"
+	"github.com/tiglabs/baud/util"
 	"strings"
-	"time"
-	"util"
 
 	"github.com/BurntSushi/toml"
-	"util/log"
+	"github.com/tiglabs/baud/util/log"
+	"os"
 )
 
-const (
-	defaultServerName           = "ms"
-	defaultMaxReplicas          = 3
-	defaultMaxSnapshotCount     = 3
-	defaultMaxNodeDownTime      = time.Hour
-	defaultLeaderScheduleLimit  = 64
-	defaultRegionScheduleLimit  = 12
-	defaultReplicaScheduleLimit = 16
-	defaultRaftHbInterval       = time.Millisecond * 500
-	defaultRaftRetainLogsCount  = 100
-	defaultMaxTaskWaitTime      = 5 * time.Minute
-	defaultMaxRangeDownTime     = 10 * time.Minute
-)
+//const (
+//	defaultServerName           = "master"
+//	defaultMaxReplicas          = 3
+//	defaultMaxSnapshotCount     = 3
+//	defaultMaxNodeDownTime      = time.Hour
+//	defaultLeaderScheduleLimit  = 64
+//	defaultRegionScheduleLimit  = 12
+//	defaultReplicaScheduleLimit = 16
+//	defaultRaftHbInterval       = time.Millisecond * 500
+//	defaultRaftRetainLogsCount  = 100
+//	defaultMaxTaskWaitTime      = 5 * time.Minute
+//	defaultMaxRangeDownTime     = 10 * time.Minute
+//)
 
-const DefaultConfig = `
-# MS Configuration.
+const DEFAULT_MASTER_CONFIG = `
+# Master Configuration.
 
-name = "ms"
-node-id = 1
-# process role is master or metric
+[module]
+name = "master"
 role = "master"
 version = "v1"
-# secret key for master, leaves it empty will ignore http request signature verification
-secret-key = ""
+# web request request signature key
+signkey = ""
+data-path = "/tmp/baud/master/data"
 
-# cluster meta data store path
-data-dir = "/tmp/sharkstore/data"
+[log]
+log-path = "/tmp/baud/master/log"
+#debug, info, warn, error
+level="debug"
+#debug, info, warn
+raft-level="info"
 
 [cluster]
 cluster-id = 1
+node-id = 1
+raft-heartbeat-interval="500ms"
+raft-retain-logs-count=100
 
-[[cluster.peer]]
-id = 1
-host = "127.0.0.1"
+[[cluster.nodes]]
+node-id = 1
 http-port = 8887
 rpc-port = 18887
-raft-ports = [8877,8867]
+raft-heartbeat-port=8886
+raft-replicate-port=8885
 
-[raft]
-heartbeat-interval = "500ms"
-retain-logs-count = 100
+[[cluster.nodes]]
+node-id = 2
+http-port = 8897
+rpc-port = 18897
+raft-heartbeat-port=8896
+raft-replicate-port=8895
 
-[log]
-dir = "/tmp/sharkstore/log"
-module = "master"
-# log level debug, info, warn, error
-level = "info"
-
-[metric]
-# metric client push interval, set "0s" to disable metric.
-interval = "15s"
-# metric address, leaves it empty will disable metric.
-address = ""
-
-[metric.server]
-address = "127.0.0.1:8887"
-queue-num = 100
-db-url = ["http://192.168.182.11:20001","http://192.168.182.12:20001","http://192.168.182.13:20001"]
-
-[schedule]
-max-snapshot-count = 3
-max-node-down-time = "1h"
-max-range-down-time = "600s"
-leader-schedule-limit = 64
-region-schedule-limit = 16
-replica-schedule-limit = 24
-
-[replication]
-# The number of replicas for each region.
-max-replicas = 3
-# The label keys specified the location of a node.
-# The placement priorities is implied by the order of label keys.
-# For example, ["zone", "rack"] means that we should place replicas to
-# different zones first, then to different racks if we don't have enough zones.
-location-labels = []
+[ps]
+rpc-port=8000
+admin-port=8001
+heartbeat-interval="100ms"
+raft-heartbeat-port=8002
+raft-replicate-port=8003
+raft-retain-logs=10000
+raft-replica-concurrency=1
+raft-snapshot-concurrency=1
 `
 
-type Config struct {
-	Name              string `toml:"name,omitempty" json:"name"`
-	NodeId            uint64 `toml:"node-id,omitempty" json:"node-id"`
-	raftHeartbeatAddr string
-	raftReplicaAddr   string
-	webManageAddr     string
-	rpcServerAddr     string
-	Role              string `toml:"role,omitempty" json:"role"`
-	Version           string `toml:"version,omitempty" json:"version"`
-	SecretKey         string `toml:"secret-key,omitempty" json:"secret-key"`
-	DataPath          string `toml:"data-dir,omitempty" json:"data-dir"`
+const (
+	CONFIG_ROLE_MASTER = "master"
 
-	Cluster     ClusterConfig     `toml:"cluster,omitempty" json:"cluster"`
-	Raft        RaftConfig        `toml:"raft,omitempty" json:"raft"`
-	Log         LogConfig         `toml:"log,omitempty" json:"log"`
-	Metric      MetricConfig      `toml:"metric,omitempty" json:"metric"`
-	Schedule    ScheduleConfig    `toml:"schedule,omitempty" json:"schedule"`
-	Replication ReplicationConfig `toml:"replication,omitempty" json:"replication"`
+	CONFIG_LOG_LEVEL_DEBUG = "debug"
+	CONFIG_LOG_LEVEL_INFO  = "info"
+	CONFIG_LOG_LEVEL_WARN  = "warn"
+	CONFIG_LOG_LEVEL_ERROR = "error"
+)
+
+type Config struct {
+	ModuleCfg  ModuleConfig  `toml:"module,omitempty" json:"module"`
+	LogCfg     LogConfig     `toml:"log,omitempty" json:"log"`
+	ClusterCfg ClusterConfig `toml:"cluster,omitempty" json:"cluster"`
+	PsCfg      PsConfig      `toml:"ps,omitempty" json:"ps"`
 }
 
-func NewDefaultConfig() *Config {
-	c := &Config{}
-	if _, err := toml.Decode(DefaultConfig, c); err != nil {
-		log.Panic("decode toml failed, err %v", err)
+func NewConfig(path string) *Config {
+	c := new(Config)
+
+	if _, err := toml.Decode(DEFAULT_MASTER_CONFIG, c); err != nil {
+		log.Panic("fail to decode default config, err[%v]", err)
 	}
-	if err := c.adjust(); err != nil {
-		log.Panic("validate config failed, err %v", err)
+
+	if len(path) != 0 {
+		_, err := toml.DecodeFile(path, c)
+		if err != nil {
+			log.Panic("fail to decode config file[%v]. err[v]", path, err)
+		}
 	}
+
+	c.adjust()
+
 	return c
 }
 
-func (c *Config) LoadFromFile(path string) error {
-	_, err := toml.DecodeFile(path, c)
-	if err != nil {
-		return err
-	}
-	return c.adjust()
+func (c *Config) adjust() {
+	c.ModuleCfg.adjust()
+	c.LogCfg.adjust()
+	c.ClusterCfg.adjust()
+	c.PsCfg.adjust()
 }
 
-func (c *Config) adjust() error {
-	adjustString(&c.Role, "master")
-	adjustString(&c.Version, "v1")
-	if strings.Compare(c.Role, "master") != 0 && strings.Compare(c.Role, "metric") != 0 {
-		return fmt.Errorf("invalid role %s", c.Role)
-	}
-
-	var err error
-	err = c.Log.adjust()
-	if err != nil {
-		return err
-	}
-	err = c.Metric.adjust(c.Role)
-	if err != nil {
-		return err
-	}
-	switch c.Role {
-	case "master":
-		if c.DataPath == "" {
-			return fmt.Errorf("invalid data path")
-		}
-		err = c.Cluster.adjust()
-		if err != nil {
-			return err
-		}
-		if c.NodeId == 0 {
-		LocalIPs:
-			for _, ip := range util.GetLocalIps() {
-				for _, peer := range c.Cluster.Peers {
-					if peer.Host == ip {
-						c.NodeId = peer.ID
-						break LocalIPs
-					}
-				}
-			}
-		}
-		for _, peer := range c.Cluster.Peers {
-			if peer.ID == c.NodeId {
-				c.webManageAddr = fmt.Sprintf("%s:%d", peer.Host, peer.HttpPort)
-				c.rpcServerAddr = fmt.Sprintf("%s:%d", peer.Host, peer.RpcPort)
-				c.raftHeartbeatAddr = fmt.Sprintf("%s:%d", peer.Host, peer.RaftPorts[0])
-				c.raftReplicaAddr = fmt.Sprintf("%s:%d", peer.Host, peer.RaftPorts[1])
-				break
-			}
-		}
-		if c.NodeId == 0 || c.rpcServerAddr == "" {
-			return fmt.Errorf("invalid node ID %d", c.NodeId)
-		}
-		err = c.Raft.adjust()
-		if err != nil {
-			return err
-		}
-		c.Schedule.adjust()
-		c.Replication.adjust()
-	}
-	return nil
+type ModuleConfig struct {
+	Name     string `toml:"name,omitempty" json:"name"`
+	Role     string `toml:"role,omitempty" json:"role"`
+	Version  string `toml:"version,omitempty" json:"version"`
+	SignKey  string `toml:"signkey,omitempty" json:"signkey"`
+	DataPath string `toml:"data-path,omitempty" json:"data-path"`
 }
 
-type ClusterPeer struct {
-	ID        uint64 `toml:"id,omitempty" json:"id"`
-	Host      string `toml:"host,omitempty" json:"host"`
-	HttpPort  int    `toml:"http-port,omitempty" json:"http-port"`
-	RpcPort   int    `toml:"rpc-port,omitempty" json:"rpc-port"`
-	RaftPorts []int  `toml:"raft-ports,omitempty" json:"raft-ports"`
+func (cfg *ModuleConfig) adjust() {
+	adjustString(&cfg.Name, "no module name")
+
+	adjustString(&cfg.Role, "no role")
+	if strings.Compare(cfg.Role, CONFIG_ROLE_MASTER) != 0 {
+		log.Panic("invalid role[%v]", cfg.Role)
+	}
+
+	adjustString(&cfg.DataPath, "no data path")
+	_, err := os.Stat(cfg.DataPath)
+	if os.IsNotExist(err) {
+		if err := os.MkdirAll(cfg.DataPath, os.ModePerm); err != nil {
+			log.Panic("fail to create meta data path[%v]. err[%v]", cfg.DataPath, err)
+		}
+	}
+}
+
+type ClusterNode struct {
+	NodeId            uint64 `toml:"node-id,omitempty" json:"node-id"`
+	Host              string `toml:"host,omitempty" json:"host"`
+	HttpPort          uint32 `toml:"http-port,omitempty" json:"http-port"` // TODO: web admin port only need one in cluster
+	RpcPort           uint32 `toml:"rpc-port,omitempty" json:"rpc-port"`
+	RaftHeartbeatPort uint32 `toml:"raft-heartbeat-port,omitempty" json:"raft-heartbeat-port"`
+	RaftReplicatePort uint32 `toml:"raft-replicate-port,omitempty" json:"raft-replicate-port"`
 }
 
 type ClusterConfig struct {
-	ClusterID uint64         `toml:"cluster-id,omitempty" json:"cluster-id"`
-	Peers     []*ClusterPeer `toml:"peer,omitempty" json:"peer"`
+	ClusterID             uint64         `toml:"cluster-id,omitempty" json:"cluster-id"`
+	CurNodeId             uint64         `toml:"node-id,omitempty" json:"node-id"`
+	RaftHeartbeatInterval util.Duration  `toml:"raft-heartbeat-interval,omitempty" json:"raft-heartbeat-interval"`
+	RaftRetainLogsCount   uint64         `toml:"raft-retain-logs-count,omitempty" json:"raft-retain-logs-count"`
+	Nodes                 []*ClusterNode `toml:"nodes,omitempty" json:"nodes"`
+	CurNode               *ClusterNode
 }
 
-func (c *ClusterConfig) adjust() error {
-	if c.ClusterID <= 0 {
-		return fmt.Errorf("invalid cluster ID %d", c.ClusterID)
-	}
-	if len(c.Peers) == 0 {
-		return fmt.Errorf("invalid cluster peers")
-	}
-	for _, peer := range c.Peers {
-		if peer.ID <= 0 {
-			return fmt.Errorf("invalid cluster peer ID %d", peer.ID)
-		}
-		if peer.Host == "" {
-			return fmt.Errorf("invalid cluster peer host")
-		}
-		if peer.HttpPort <= 1024 || peer.HttpPort > 65535 {
-			return fmt.Errorf("invalid cluster peer http port %d", peer.HttpPort)
-		}
-		if peer.RpcPort <= 1024 || peer.RpcPort > 65535 {
-			return fmt.Errorf("invalid cluster peer rpc port %d", peer.RpcPort)
-		}
-		if len(peer.RaftPorts) != 2 {
-			return fmt.Errorf("invalid cluster peer raft ports %v", peer.RaftPorts)
-		}
-		for _, port := range peer.RaftPorts {
-			if port <= 1024 || port > 65535 {
-				return fmt.Errorf("invalid cluster peer raft port %d", port)
-			}
-		}
-	}
-	return nil
-}
+func (cfg *ClusterConfig) adjust() {
+	adjustUint64(&cfg.ClusterID, "no cluster-id")
+	adjustUint64(&cfg.CurNodeId, "no current node-id")
+	adjustDuration(&cfg.RaftHeartbeatInterval, "no raft heartbeat interval")
+	adjustUint64(&cfg.RaftRetainLogsCount, "no raft retain log count")
 
-type RaftConfig struct {
-	HeartbeatInterval util.Duration `toml:"heartbeat-interval,omitempty" json:"heartbeat-interval"`
-	RetainLogsCount   uint64        `toml:"retain-logs-count,omitempty" json:"retain-logs-count"`
-}
+	if len(cfg.Nodes) == 0 {
+		log.Panic("cluster nodes is empty")
+	}
 
-func (c *RaftConfig) adjust() error {
-	adjustDuration(&c.HeartbeatInterval, defaultRaftHbInterval)
-	adjustUint64(&c.RetainLogsCount, defaultRaftRetainLogsCount)
-	return nil
+	// validate whether is node-id duplicated
+	tempNodes := make(map[uint64]*ClusterNode)
+
+	for _, node := range cfg.Nodes {
+		adjustUint64(&node.NodeId, "no node-id")
+		adjustString(&node.Host, "no node host")
+
+		adjustUint32(&node.HttpPort, "no node http port")
+		if node.HttpPort <= 1024 || node.HttpPort > 65535 {
+			log.Panic("out of node http port %d", node.HttpPort)
+		}
+
+		adjustUint32(&node.RpcPort, "no node rpc port")
+		if node.RpcPort <= 1024 || node.RpcPort > 65535 {
+			log.Panic("out of node rpc port %d", node.RpcPort)
+		}
+
+		adjustUint32(&node.RaftHeartbeatPort, "no node raft heartbeat port")
+		if node.RaftHeartbeatPort <= 1024 || node.RaftHeartbeatPort > 65535 {
+			log.Panic("out of node raft heartbeat port %d", node.RaftHeartbeatPort)
+		}
+
+		adjustUint32(&node.RaftReplicatePort, "no node raft replicate port")
+		if node.RaftReplicatePort <= 1024 || node.RaftReplicatePort > 65535 {
+			log.Panic("out of node raft replicate port %d", node.RaftReplicatePort)
+		}
+
+		if _, ok := tempNodes[node.NodeId]; ok {
+			log.Panic("duplicated node-id[%v]", node.NodeId)
+		}
+		tempNodes[node.NodeId] = node
+		
+		if node.NodeId == cfg.CurNodeId {
+			cfg.CurNode = node
+		}
+	}
 }
 
 type LogConfig struct {
-	Dir    string `toml:"dir,omitempty" json:"dir"`
-	Module string `toml:"module,omitempty" json:"module"`
-	Level  string `toml:"level,omitempty" json:"level"`
+    LogPath     string `toml:"log-path,omitempty" json:"log-path"`
+    Level       string `toml:"level,omitempty" json:"level"`
+    RaftLevel   string `toml:"raft-level,omitempty" json:"raft-level"`
 }
 
-func (c *LogConfig) adjust() error {
-	if c.Dir == "" {
-		return fmt.Errorf("invalid log dir")
+func (c *LogConfig) adjust() {
+	adjustString(&c.LogPath, "no log path")
+	_, err := os.Stat(c.LogPath)
+	if os.IsNotExist(err) {
+		if err := os.MkdirAll(c.LogPath, os.ModePerm); err != nil {
+			log.Panic("fail to create log path[%v]. err[%v]", c.LogPath, err)
+		}
 	}
-	adjustString(&c.Module, defaultServerName)
-	adjustString(&c.Level, "debug")
+
+	adjustString(&c.Level, "no log level")
+	c.Level = strings.ToLower(c.Level)
 	switch c.Level {
-	case "TRACE", "trace", "Trace":
-	case "debug", "Debug", "DEBUG":
-	case "info", "Info", "INFO":
-	case "warn", "Warn", "WARN":
-	case "error", "Error", "ERROR":
+	case CONFIG_LOG_LEVEL_DEBUG:
+	case CONFIG_LOG_LEVEL_INFO:
+	case CONFIG_LOG_LEVEL_WARN:
+	case CONFIG_LOG_LEVEL_ERROR:
 	default:
-		c.Level = "debug"
+		log.Panic("Invalid log level[%v]", c.Level)
 	}
-	return nil
+
+    adjustString(&c.RaftLevel, "no raft log level")
+    c.RaftLevel = strings.ToLower(c.RaftLevel)
+    switch c.RaftLevel {
+    case CONFIG_LOG_LEVEL_DEBUG:
+    case CONFIG_LOG_LEVEL_INFO:
+    case CONFIG_LOG_LEVEL_WARN:
+    default:
+        log.Panic("Invalid raft log level[%v]", c.RaftLevel)
+    }
 }
 
-type MetricServer struct {
-	Address   string   `toml:"address,omitempty" json:"address"`
-	QueueNum  uint64   `toml:"queue-num,omitempty" json:"queue-num"`
-	StoreType string   `toml:"store-type,omitempty" json:"store-type"`
-	StoreUrl  []string `toml:"store-url,omitempty" json:"store-url"`
+type PsConfig struct {
+	RpcPort                 uint32        `toml:"rpc-port,omitempty" json:"rpc-port"`
+	AdminPort               uint32        `toml:"admin-port,omitempty" json:"admin-port"`
+	HeartbeatInterval       util.Duration `toml:"heartbeat-interval,omitempty" json:"heartbeat-interval"`
+	RaftHeartbeatPort       uint32        `toml:"raft-heartbeat-port,omitempty" json:"raft-heartbeat-port"`
+	RaftReplicatePort       uint32        `toml:"raft-replicate-port,omitempty" json:"raft-replicate-port"`
+	RaftRetainLogs          uint64        `toml:"raft-retain-logs,omitempty" json:"raft-retain-logs"`
+	RaftReplicaConcurrency  uint32        `toml:"raft-replica-concurrency,omitempty" json:"raft-replica-concurrency"`
+	RaftSnapshotConcurrency uint32        `toml:"raft-snapshot-concurrency,omitempty" json:"raft-snapshot-concurrency"`
 }
 
-type MetricConfig struct {
-	Interval util.Duration `toml:"interval,omitempty" json:"interval"`
-	Address  string        `toml:"address,omitempty" json:"address"`
-
-	Server MetricServer `toml:"server,omitempty" json:"server"`
+func (cfg *PsConfig) adjust() {
+	adjustUint32(&cfg.RpcPort, "no ps raft port")
+	adjustUint32(&cfg.AdminPort, "no ps admin port")
+	adjustDuration(&cfg.HeartbeatInterval, "no ps heartbeat interval")
+	adjustUint32(&cfg.RaftHeartbeatPort, "no ps raft heartbeat port")
+	adjustUint32(&cfg.RaftReplicatePort, "no ps raft replicate port")
+	adjustUint64(&cfg.RaftRetainLogs, "no ps raft retain logs")
+	adjustUint32(&cfg.RaftReplicaConcurrency, "no ps raft replicate concurrency")
+	adjustUint32(&cfg.RaftSnapshotConcurrency, "no ps raft snapshot concurrency")
 }
 
-func (c *MetricConfig) adjust(role string) error {
-	if role == "metric" {
-		if c.Server.Address == "" {
-			return fmt.Errorf("invalid metric server address")
-		}
-		adjustUint64(&c.Server.QueueNum, 100)
-		if len(c.Server.StoreUrl) == 0 {
-			return fmt.Errorf("invalid metric server db url")
-		}
-	}
-	return nil
-}
-
-// ScheduleConfig is the schedule configuration.
-type ScheduleConfig struct {
-	// If the snapshot count of one store is greater than this value,
-	// it will never be used as a source or target store.
-	MaxSnapshotCount uint64 `toml:"max-snapshot-count,omitempty" json:"max-snapshot-count"`
-	// MaxStoreDownTime is the max duration after which
-	// a store will be considered to be down if it hasn't reported heartbeats.
-	MaxNodeDownTime util.Duration `toml:"max-node-down-time,omitempty" json:"max-node-down-time"`
-	// LeaderScheduleLimit is the max coexist leader schedules.
-	LeaderScheduleLimit uint64 `toml:"leader-schedule-limit,omitempty" json:"leader-schedule-limit"`
-	// RegionScheduleLimit is the max coexist region schedules.
-	RegionScheduleLimit uint64 `toml:"region-schedule-limit,omitempty" json:"region-schedule-limit"`
-	// ReplicaScheduleLimit is the max coexist replica schedules.
-	ReplicaScheduleLimit uint64        `toml:"replica-schedule-limit,omitempty" json:"replica-schedule-limit"`
-	MaxTaskTimeout       util.Duration `toml:"max-task-timeout,omitempty" json:"max-task-timeout"`
-	MaxRangeDownTime     util.Duration `toml:"max-range-down-time,omitempty" json:"max-range-down-time"`
-}
-
-func (c *ScheduleConfig) adjust() {
-	adjustUint64(&c.MaxSnapshotCount, defaultMaxSnapshotCount)
-	adjustDuration(&c.MaxNodeDownTime, defaultMaxNodeDownTime)
-	adjustUint64(&c.LeaderScheduleLimit, defaultLeaderScheduleLimit)
-	adjustUint64(&c.RegionScheduleLimit, defaultRegionScheduleLimit)
-	adjustUint64(&c.ReplicaScheduleLimit, defaultReplicaScheduleLimit)
-	adjustDuration(&c.MaxTaskTimeout, defaultMaxTaskWaitTime)
-	adjustDuration(&c.MaxRangeDownTime, defaultMaxRangeDownTime)
-}
-
-// ReplicationConfig is the replication configuration.
-type ReplicationConfig struct {
-	// MaxReplicas is the number of replicas for each region.
-	MaxReplicas uint64 `toml:"max-replicas,omitempty" json:"max-replicas"`
-
-	// The label keys specified the location of a store.
-	// The placement priorities is implied by the order of label keys.
-	// For example, ["zone", "rack"] means that we should place replicas to
-	// different zones first, then to different racks if we don't have enough zones.
-	LocationLabels util.StringSlice `toml:"location-labels,omitempty" json:"location-labels"`
-}
-
-func (c *ReplicationConfig) clone() *ReplicationConfig {
-	locationLabels := make(util.StringSlice, 0, len(c.LocationLabels))
-	copy(locationLabels, c.LocationLabels)
-	return &ReplicationConfig{
-		MaxReplicas:    c.MaxReplicas,
-		LocationLabels: locationLabels,
-	}
-}
-
-func (c *ReplicationConfig) adjust() {
-	adjustUint64(&c.MaxReplicas, defaultMaxReplicas)
-}
-
-// scheduleOption is a wrapper to access the configuration safely.
-//type scheduleOption struct {
-//	MaxSnapshotCount uint64
-//	MaxNodeDownTime time.Duration
-//	MaxRangeDownTime time.Duration
-//	MaxReplicaDownTime time.Duration
-//	MaxTaskTimeout  time.Duration
-//	LeaderScheduleLimit uint64
-//	RegionScheduleLimit uint64
-//	ReplicaScheduleLimit uint64
-//	rep *Replication
-//
-//	MetricAddr  string
-//	MetricInterval time.Duration
-//}
-//
-//func newScheduleOption(cfg *Config) *scheduleOption {
-//	o := &scheduleOption{
-//		MaxSnapshotCount: cfg.Schedule.MaxSnapshotCount,
-//		MaxNodeDownTime: cfg.Schedule.MaxNodeDownTime.Duration,
-//		MaxRangeDownTime: cfg.Schedule.MaxRangeDownTime.Duration,
-//		LeaderScheduleLimit: cfg.Schedule.LeaderScheduleLimit,
-//		RegionScheduleLimit: cfg.Schedule.RegionScheduleLimit,
-//		ReplicaScheduleLimit: cfg.Schedule.ReplicaScheduleLimit,
-//		MaxTaskTimeout: cfg.Schedule.MaxTaskTimeout.Duration,
-//
-//
-//		MetricAddr: cfg.Metric.Address,
-//		MetricInterval: cfg.Metric.Interval.Duration,
-//	}
-//	o.rep = newReplication(&cfg.Replication)
-//	return o
-//}
-//
-//func (o *scheduleOption) GetReplication() *Replication {
-//	return o.rep
-//}
-//
-//func (o *scheduleOption) GetMaxReplicas() int {
-//	return o.rep.GetMaxReplicas()
-//}
-//
-//func (o *scheduleOption) SetMaxReplicas(replicas int) {
-//	o.rep.SetMaxReplicas(replicas)
-//}
-//
-//func (o *scheduleOption) GetMaxSnapshotCount() uint64 {
-//	return o.MaxSnapshotCount
-//}
-//
-//func (o *scheduleOption) GetMaxNodeDownTime() time.Duration {
-//	return o.MaxNodeDownTime
-//}
-//
-//func (o *scheduleOption) GetMaxRangeDownTime() time.Duration {
-//	return o.MaxRangeDownTime
-//}
-//
-//func (o *scheduleOption) GetMaxTaskTimeout() time.Duration {
-//	return o.MaxTaskTimeout
-//}
-//
-//func (o *scheduleOption) GetLeaderScheduleLimit() uint64 {
-//	return o.LeaderScheduleLimit
-//}
-//
-//func (o *scheduleOption) GetRegionScheduleLimit() uint64 {
-//	return o.RegionScheduleLimit
-//}
-//
-//func (o *scheduleOption) GetReplicaScheduleLimit() uint64 {
-//	return o.ReplicaScheduleLimit
-//}
-//
-//func (o *scheduleOption) GetMetricAddress() string {
-//	return o.MetricAddr
-//}
-//
-//func (o *scheduleOption) GetMetricInterval() time.Duration {
-//	return o.MetricInterval
-//}
-
-func adjustString(v *string, defValue string) {
+func adjustString(v *string, errMsg string) {
 	if len(*v) == 0 {
-		*v = defValue
+		log.Panic("Config adjust string error, %v", errMsg)
 	}
 }
 
-func adjustUint64(v *uint64, defValue uint64) {
+func adjustUint32(v *uint32, errMsg string) {
 	if *v == 0 {
-		*v = defValue
+		log.Panic("Config adjust uint32 error, %v", errMsg)
 	}
 }
 
-func adjustInt64(v *int64, defValue int64) {
+func adjustUint64(v *uint64, errMsg string) {
 	if *v == 0 {
-		*v = defValue
+		log.Panic("Config adjust uint64 error, %v", errMsg)
 	}
 }
 
-func adjustFloat64(v *float64, defValue float64) {
-	if *v == 0 {
-		*v = defValue
-	}
-}
-
-func adjustDuration(v *util.Duration, defValue time.Duration) {
+func adjustDuration(v *util.Duration, errMsg string) {
 	if v.Duration == 0 {
-		v.Duration = defValue
+		log.Panic("Config adjust duration error, %v", errMsg)
 	}
 }

@@ -1,29 +1,29 @@
 package master
 
 import (
-	"sync"
 	"fmt"
-	"util/log"
-    "github.com/tiglabs/baud/proto/metapb"
-	"util"
 	"github.com/gogo/protobuf/proto"
+	"github.com/tiglabs/baud/proto/metapb"
+	"github.com/tiglabs/baud/util"
+	"github.com/tiglabs/baud/util/log"
+	"sync"
 )
 
 const (
-	PREFIX_DB 		 = "scheme db "
+	PREFIX_DB = "scheme db "
 )
 
 type DB struct {
 	*metapb.DB
 
-	spaceCache   *SpaceCache        `json:"-"`
-	propertyLock sync.RWMutex           `json:"-"`
+	spaceCache   *SpaceCache  `json:"-"`
+	propertyLock sync.RWMutex `json:"-"`
 }
 
 func NewDB(dbName string) (*DB, error) {
 	dbId, err := GetIdGeneratorInstance(nil).GenID()
 	if err != nil {
-		log.Error("generate db id is failed. err[%v]", err)
+		log.Error("generate id of db[%v] is failed. err[%v]", dbName, err)
 		return nil, ErrGenIdFailed
 	}
 	db := &DB{
@@ -65,7 +65,7 @@ func (db *DB) persistent(store Store) error {
 func (db *DB) erase(store Store) error {
 	db.propertyLock.Lock()
 	defer db.propertyLock.Unlock()
-	
+
 	dbKey := []byte(fmt.Sprintf("%s%d", PREFIX_DB, db.DB.ID))
 	if err := store.Delete(dbKey); err != nil {
 		log.Error("fail to delete db[%v] from store. err:[%v]", db.DB, err)
@@ -90,8 +90,8 @@ type DBCache struct {
 
 func NewDBCache() *DBCache {
 	return &DBCache{
-		dbs:     make(map[metapb.DBID]*DB),
-		name2Ids:make(map[string]metapb.DBID),
+		dbs:      make(map[metapb.DBID]*DB),
+		name2Ids: make(map[string]metapb.DBID),
 	}
 }
 
@@ -140,11 +140,11 @@ func (c *DBCache) deleteDb(db *DB) {
 	delete(c.name2Ids, db.Name)
 }
 
-func (c *DBCache) getAllDBs() ([]*DB) {
+func (c *DBCache) getAllDBs() []*DB {
 	c.lock.RLock()
 	defer c.lock.RUnlock()
 
-	dbs := make([]*DB, len(c.dbs))
+	dbs := make([]*DB, 0, len(c.dbs))
 	for _, db := range c.dbs {
 		dbs = append(dbs, db)
 	}

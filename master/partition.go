@@ -1,32 +1,31 @@
 package master
 
 import (
-	"github.com/tiglabs/baud/proto/metapb"
-	"github.com/google/btree"
-	"sync"
-	"util/log"
 	"fmt"
-	"time"
 	"github.com/gogo/protobuf/proto"
-	"util"
-	"util/deepcopy"
+	"github.com/google/btree"
 	"github.com/tiglabs/baud/proto/masterpb"
+	"github.com/tiglabs/baud/proto/metapb"
+	"github.com/tiglabs/baud/util"
+	"github.com/tiglabs/baud/util/deepcopy"
+	"github.com/tiglabs/baud/util/log"
+	"sync"
+	"time"
 )
 
 const (
-	PREFIX_PARTITION    	  = "schema partition "
-	defaultBTreeDegree        = 64
-	FIXED_REPLICA_NUM   	  = 3
+	PREFIX_PARTITION   = "schema partition "
+	defaultBTreeDegree = 64
+	FIXED_REPLICA_NUM  = 3
 )
 
-
 type Partition struct {
-	*metapb.Partition  // !!! Do not directly operate the Replicas，must be firstly take the propertyLock
+	*metapb.Partition // !!! Do not directly operate the Replicas，must be firstly take the propertyLock
 
-	leader        *metapb.Replica
+	leader *metapb.Replica
 
-	taskFlag      bool
-	taskTimeout   time.Time
+	taskFlag    bool
+	taskTimeout time.Time
 
 	lastHeartbeat time.Time
 	propertyLock  sync.RWMutex
@@ -46,7 +45,7 @@ func NewPartition(dbId, spaceId, startSlot, endSlot uint32) (*Partition, error) 
 			StartSlot: startSlot,
 			EndSlot:   endSlot,
 			Replicas:  make([]metapb.Replica, 0),
-			Status:    metapb.PartitionStatus_PA_NOTREAD,
+			Status:    metapb.PA_READONLY,
 		},
 	}, nil
 }
@@ -135,9 +134,9 @@ func (p *Partition) updateInfo(store Store, info *masterpb.PartitionInfo, nodeId
 	p.Epoch = info.Epoch
 
 	p.taskFlag = false
-	p.taskTimeout = 0
+	p.taskTimeout = time.Time{}
 
-	p.Replicas = make([]metapb.Replica, len(info.RaftStatus.Followers))
+	p.Replicas = make([]metapb.Replica, 0, len(info.RaftStatus.Followers))
 	p.leader = nil
 
 	for _, follower := range info.RaftStatus.Followers {
@@ -169,7 +168,7 @@ func (p *Partition) getAllReplicas() []*metapb.Replica {
 	p.propertyLock.RLock()
 	defer p.propertyLock.RUnlock()
 
-	replicas := make([]*metapb.Replica, len(p.Replicas))
+	replicas := make([]*metapb.Replica, 0, len(p.Replicas))
 	for _, metaReplica := range p.Replicas {
 		replicas = append(replicas, &metaReplica)
 	}
@@ -184,11 +183,22 @@ func (p *Partition) pickLeaderReplica() *metapb.Replica {
 	return p.leader
 }
 
+func (p *Partition) pickLeaderNodeId() metapb.NodeID {
+	p.propertyLock.RLock()
+	defer p.propertyLock.RUnlock()
+
+	if p.leader != nil {
+		return p.leader.NodeID
+	} else {
+		return 0
+	}
+}
+
 func (p *Partition) takeChangeMemberTask() bool {
 	p.propertyLock.Lock()
 	defer p.propertyLock.Unlock()
 
-	if p.taskFlag == false || time.Now().Sub(p.taskTimeout) >= 30 *time.Second {
+	if p.taskFlag == false || time.Now().Sub(p.taskTimeout) >= 30*time.Second {
 		p.taskFlag = true
 		p.taskTimeout = time.Now()
 		return true
@@ -219,7 +229,7 @@ func doMetaMarshal(p *metapb.Partition) ([]byte, []byte, error) {
 //	g.lock.RLock()
 //	defer g.lock.RUnlock()
 //
-//	servers := make([]*PartitionServer, 0)
+//	servers := make([]*PartitionServer, 0, len(g.servers))
 //	for _, server := range g.servers {
 //		servers = append(servers, server)
 //	}
@@ -254,8 +264,8 @@ func doMetaMarshal(p *metapb.Partition) ([]byte, []byte, error) {
 //}
 
 type PartitionCache struct {
-	lock  		 sync.RWMutex
-	partitions   map[metapb.PartitionID]*Partition
+	lock       sync.RWMutex
+	partitions map[metapb.PartitionID]*Partition
 }
 
 func NewPartitionCache() *PartitionCache {
@@ -287,14 +297,13 @@ func (c *PartitionCache) getAllMetaPartitions() *[]metapb.Partition {
 	c.lock.RLock()
 	defer c.lock.RUnlock()
 
-	partitions := make([]metapb.Partition, len(c.partitions))
+	partitions := make([]metapb.Partition, 0, len(c.partitions))
 	for _, metaPartition := range c.partitions {
 		partitions = append(partitions, *metaPartition.Partition)
 	}
 
 	return &partitions
 }
-
 
 func (c *PartitionCache) recovery(store Store) ([]*Partition, error) {
 	prefix := []byte(PREFIX_PARTITION)
@@ -324,7 +333,7 @@ func (c *PartitionCache) recovery(store Store) ([]*Partition, error) {
 }
 
 type PartitionItem struct {
-	partition   *metapb.Partition
+	partition *Partition
 }
 
 // Less returns true if the region start key is greater than the other.
@@ -343,7 +352,7 @@ func (r *PartitionItem) Contains(slot uint32) bool {
 }
 
 type PartitionTree struct {
-	tree 	*btree.BTree
+	tree *btree.BTree
 }
 
 func NewPartitionTree() *PartitionTree {
@@ -359,7 +368,7 @@ func (t *PartitionTree) length() int {
 // update updates the tree with the region.
 // It finds and deletes all the overlapped regions first, and then
 // insert the region.
-func (t *PartitionTree) update(rng *metapb.Partition) {
+func (t *PartitionTree) update(rng *Partition) {
 	item := &PartitionItem{partition: rng}
 
 	result := t.find(rng)
@@ -393,7 +402,7 @@ func (t *PartitionTree) update(rng *metapb.Partition) {
 // remove removes a region if the region is in the tree.
 // It will do nothing if it cannot find the region or the found region
 // is not the same with the region.
-func (t *PartitionTree) remove(rng *metapb.Partition) {
+func (t *PartitionTree) remove(rng *Partition) {
 	result := t.find(rng)
 	if result == nil || result.partition.ID != rng.ID {
 		return
@@ -403,8 +412,12 @@ func (t *PartitionTree) remove(rng *metapb.Partition) {
 }
 
 // search returns a region that contains the key.
-func (t *PartitionTree) search(slot uint32) *metapb.Partition {
-	rng := &metapb.Partition{StartSlot: slot}
+func (t *PartitionTree) search(slot uint32) *Partition {
+	rng := &Partition{
+		Partition: &metapb.Partition{
+			StartSlot: slot,
+		},
+	}
 	log.Debug("################### len=%v", t.tree.Len())
 	result := t.find(rng)
 	if result == nil {
@@ -413,11 +426,14 @@ func (t *PartitionTree) search(slot uint32) *metapb.Partition {
 	return result.partition
 }
 
-func (t *PartitionTree) multipleSearch(slot uint32, num int) []*metapb.Partition {
-	rng := &metapb.Partition{StartSlot: slot}
+func (t *PartitionTree) multipleSearch(slot uint32, num int) []*Partition {
+	rng := &Partition{
+		Partition: &metapb.Partition{
+			StartSlot: slot,
+		},
+	}
 	results := t.ascendScan(rng, num)
-	var ranges []*metapb.Partition
-	ranges = make([]*metapb.Partition, 0, num)
+	var ranges = make([]*Partition, 0, num)
 	var endSlot uint32
 	var isFound = false
 	for _, r := range results {
@@ -436,7 +452,7 @@ func (t *PartitionTree) multipleSearch(slot uint32, num int) []*metapb.Partition
 }
 
 // This is a helper function to find an item.
-func (t *PartitionTree) find(rng *metapb.Partition) *PartitionItem {
+func (t *PartitionTree) find(rng *Partition) *PartitionItem {
 	item := &PartitionItem{partition: rng}
 
 	var result *PartitionItem
@@ -458,7 +474,7 @@ func (t *PartitionTree) find(rng *metapb.Partition) *PartitionItem {
 	return result
 }
 
-func (t *PartitionTree) ascendScan(rng *metapb.Partition, num int) []*PartitionItem {
+func (t *PartitionTree) ascendScan(rng *Partition, num int) []*PartitionItem {
 	result := t.find(rng)
 	if result == nil {
 		return nil
