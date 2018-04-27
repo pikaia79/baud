@@ -3,10 +3,10 @@ package master
 import (
 	"fmt"
 	"github.com/gogo/protobuf/proto"
-	"github.com/tiglabs/baud/proto/metapb"
-	"github.com/tiglabs/baud/util"
-	"github.com/tiglabs/baud/util/deepcopy"
-	"github.com/tiglabs/baud/util/log"
+	"github.com/tiglabs/baudengine/proto/metapb"
+	"github.com/tiglabs/baudengine/util"
+	"github.com/tiglabs/baudengine/util/deepcopy"
+	"github.com/tiglabs/baudengine/util/log"
 	"sync"
 )
 
@@ -40,7 +40,7 @@ type Field struct {
 }
 
 func NewSpace(dbId metapb.DBID, dbName, spaceName string, policy *PartitionPolicy) (*Space, error) {
-	spaceId, err := GetIdGeneratorInstance(nil).GenID()
+	spaceId, err := GetIdGeneratorSingle(nil).GenID()
 	if err != nil {
 		log.Error("generate space id is failed. err:[%v]", err)
 		return nil, ErrGenIdFailed
@@ -79,7 +79,7 @@ func (s *Space) persistent(store Store) error {
 	spaceKey := []byte(fmt.Sprintf("%s%d", PREFIX_SPACE, copy.ID))
 	if err := store.Put(spaceKey, spaceVal); err != nil {
 		log.Error("fail to put space[%v] into store. err:[%v]", copy, err)
-		return ErrBoltDbOpsFailed
+		return ErrLocalDbOpsFailed
 	}
 
 	return nil
@@ -108,7 +108,7 @@ func (s *Space) erase(store Store) error {
 	spaceKey := []byte(fmt.Sprintf("%s%d", PREFIX_SPACE, s.ID))
 	if err := store.Delete(spaceKey); err != nil {
 		log.Error("fail to delete space[%v] from store. err:[%v]", s.Space, err)
-		return ErrBoltDbOpsFailed
+		return ErrLocalDbOpsFailed
 	}
 
 	return nil

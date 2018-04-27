@@ -3,7 +3,7 @@ package bufalloc
 import (
 	"sync"
 
-	"github.com/tiglabs/baud/util/bytes"
+	"github.com/tiglabs/baudengine/util/bytes"
 )
 
 const (

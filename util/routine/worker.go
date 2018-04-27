@@ -8,9 +8,9 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/tiglabs/baud/util/atomic"
-	"github.com/tiglabs/baud/util/log"
-	"github.com/tiglabs/baud/util/multierror"
+	"github.com/tiglabs/baudengine/util/atomic"
+	"github.com/tiglabs/baudengine/util/log"
+	"github.com/tiglabs/baudengine/util/multierror"
 )
 
 const (

@@ -3,9 +3,9 @@ package master
 import (
 	"context"
 	"github.com/golang/protobuf/proto"
-	"github.com/tiglabs/baud/proto/masterpb"
-	"github.com/tiglabs/baud/util/log"
-	"github.com/tiglabs/baud/util/raftkvstore"
+	"github.com/tiglabs/baudengine/proto/masterpb"
+	"github.com/tiglabs/baudengine/util/log"
+	"github.com/tiglabs/baudengine/util/raftkvstore"
 	"github.com/tiglabs/raft"
 	raftproto "github.com/tiglabs/raft/proto"
 )

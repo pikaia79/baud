@@ -3,7 +3,7 @@ package heartbeat
 import (
 	"context"
 
-	"github.com/tiglabs/baud/util/log"
+	"github.com/tiglabs/baudengine/util/log"
 )
 
 // HeartbeatService exposes a method to echo its request params.

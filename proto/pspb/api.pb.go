@@ -28,9 +28,9 @@ import proto "github.com/gogo/protobuf/proto"
 import fmt "fmt"
 import math "math"
 import _ "github.com/gogo/protobuf/gogoproto"
-import meta "github.com/tiglabs/baud/proto/metapb"
+import meta "github.com/tiglabs/baudengine/proto/metapb"
 
-import github_com_tiglabs_baud_proto_metapb "github.com/tiglabs/baud/proto/metapb"
+import github_com_tiglabs_baud_proto_metapb "github.com/tiglabs/baudengine/proto/metapb"
 
 import bytes "bytes"
 
@@ -133,8 +133,8 @@ func (x WriteResult) String() string {
 func (WriteResult) EnumDescriptor() ([]byte, []int) { return fileDescriptorApi, []int{2} }
 
 type ActionRequestHeader struct {
-	SpaceID     github_com_tiglabs_baud_proto_metapb.SpaceID     `protobuf:"varint,1,opt,name=space_id,json=spaceId,proto3,casttype=github.com/tiglabs/baud/proto/metapb.SpaceID" json:"space_id,omitempty"`
-	PartitionID github_com_tiglabs_baud_proto_metapb.PartitionID `protobuf:"varint,2,opt,name=partition_id,json=partitionId,proto3,casttype=github.com/tiglabs/baud/proto/metapb.PartitionID" json:"partition_id,omitempty"`
+	SpaceID     github_com_tiglabs_baud_proto_metapb.SpaceID     `protobuf:"varint,1,opt,name=space_id,json=spaceId,proto3,casttype=github.com/tiglabs/baudengine/proto/metapb.SpaceID" json:"space_id,omitempty"`
+	PartitionID github_com_tiglabs_baud_proto_metapb.PartitionID `protobuf:"varint,2,opt,name=partition_id,json=partitionId,proto3,casttype=github.com/tiglabs/baudengine/proto/metapb.PartitionID" json:"partition_id,omitempty"`
 	Timeout     string                                           `protobuf:"bytes,3,opt,name=timeout,proto3" json:"timeout,omitempty"`
 	ContentType RequestContentType                               `protobuf:"varint,4,opt,name=content_type,json=contentType,proto3,enum=RequestContentType" json:"content_type,omitempty"`
 	ReqId       string                                           `protobuf:"bytes,5,opt,name=req_id,json=reqId,proto3" json:"req_id,omitempty"`
@@ -203,7 +203,7 @@ func (*IndexResponse) ProtoMessage()               {}
 func (*IndexResponse) Descriptor() ([]byte, []int) { return fileDescriptorApi, []int{6} }
 
 type UpdateRequest struct {
-	Id          github_com_tiglabs_baud_proto_metapb.DocID `protobuf:"bytes,1,opt,name=id,casttype=github.com/tiglabs/baud/proto/metapb.DocID" json:"id"`
+	Id          github_com_tiglabs_baud_proto_metapb.DocID `protobuf:"bytes,1,opt,name=id,casttype=github.com/tiglabs/baudengine/proto/metapb.DocID" json:"id"`
 	Doc         []byte                                     `protobuf:"bytes,2,opt,name=doc,proto3" json:"doc,omitempty"`
 	DocAsUpsert bool                                       `protobuf:"varint,3,opt,name=doc_as_upsert,json=docAsUpsert,proto3" json:"doc_as_upsert,omitempty"`
 }
@@ -222,7 +222,7 @@ func (*UpdateResponse) ProtoMessage()               {}
 func (*UpdateResponse) Descriptor() ([]byte, []int) { return fileDescriptorApi, []int{8} }
 
 type DeleteRequest struct {
-	Id github_com_tiglabs_baud_proto_metapb.DocID `protobuf:"bytes,1,opt,name=id,casttype=github.com/tiglabs/baud/proto/metapb.DocID" json:"id"`
+	Id github_com_tiglabs_baud_proto_metapb.DocID `protobuf:"bytes,1,opt,name=id,casttype=github.com/tiglabs/baudengine/proto/metapb.DocID" json:"id"`
 }
 
 func (m *DeleteRequest) Reset()                    { *m = DeleteRequest{} }
@@ -240,7 +240,7 @@ func (*DeleteResponse) Descriptor() ([]byte, []int) { return fileDescriptorApi, 
 
 type GetRequest struct {
 	ActionRequestHeader `protobuf:"bytes,1,opt,name=header,embedded=header" json:"header"`
-	Id                  github_com_tiglabs_baud_proto_metapb.DocID `protobuf:"bytes,2,opt,name=id,casttype=github.com/tiglabs/baud/proto/metapb.DocID" json:"id"`
+	Id                  github_com_tiglabs_baud_proto_metapb.DocID `protobuf:"bytes,2,opt,name=id,casttype=github.com/tiglabs/baudengine/proto/metapb.DocID" json:"id"`
 	StoredFields        []string                                   `protobuf:"bytes,3,rep,name=stored_fields,json=storedFields" json:"stored_fields,omitempty"`
 }
 

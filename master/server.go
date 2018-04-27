@@ -1,7 +1,7 @@
 package master
 
 import (
-	"github.com/tiglabs/baud/util/log"
+	"github.com/tiglabs/baudengine/util/log"
 	"sync"
 )
 
@@ -47,10 +47,11 @@ func (ms *Master) Start(config *Config) error {
 		return err
 	}
 	log.Info("Api server has started")
-	
-	ms.processorManager = GetPMSingle(ms.cluster)
-	ms.processorManager.Start()
+
+	GetPMSingle(ms.cluster).Start()
 	log.Info("Processor manager has started")
+
+	GetPSRpcClientSingle(config)
 
 	ms.workerManager = NewWorkerManager(ms.cluster)
 	if err := ms.workerManager.Start(); err != nil {
@@ -72,9 +73,9 @@ func (ms *Master) Shutdown() {
 	if ms.workerManager != nil {
 		ms.workerManager.Shutdown()
 	}
-	if ms.processorManager != nil {
-		ms.processorManager.Stop()
-	}
+	GetPMSingle(nil).Stop()
+	GetPSRpcClientSingle(nil).Close()
+
 	if ms.cluster != nil {
 		ms.cluster.Close()
 	}

@@ -16,7 +16,7 @@ import (
 	"google.golang.org/grpc/status"
 	"google.golang.org/grpc/transport"
 
-	"github.com/tiglabs/baud/util/multierror"
+	"github.com/tiglabs/baudengine/util/multierror"
 )
 
 const (

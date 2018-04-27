@@ -46,7 +46,7 @@ package master
 //	replKey := []byte(fmt.Sprintf("%s%d", PREFIX_REPLICA, copy.ID))
 //	if err := store.Put(replKey, replVal); err != nil {
 //		log.Error("fail to put replica[%v] into store. err:[%v]", copy, err)
-//		return ErrBoltDbOpsFailed
+//		return ErrLocalDbOpsFailed
 //	}
 //
 //	return nil

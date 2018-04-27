@@ -10,8 +10,8 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/keepalive"
 
-	"github.com/tiglabs/baud/util/log"
-	"github.com/tiglabs/baud/util/routine"
+	"github.com/tiglabs/baudengine/util/log"
+	"github.com/tiglabs/baudengine/util/routine"
 )
 
 // DefaultManagerOption create a default option

@@ -3,7 +3,7 @@ package bufalloc
 import (
 	"testing"
 
-	"github.com/tiglabs/baud/util/bytes"
+	"github.com/tiglabs/baudengine/util/bytes"
 )
 
 func TestGetPoolNum(t *testing.T) {

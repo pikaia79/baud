@@ -10,4 +10,4 @@ rm master.pid
 rm master
 rm nohup.out
 
-echo "baud master had stopped."
+echo "baudengine master had stopped."
