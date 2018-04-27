@@ -1,34 +1,34 @@
 package master
 
 import (
-	"encoding/binary"
 	"fmt"
 	"github.com/tiglabs/baud/util/log"
 	"sync"
 	"sync/atomic"
+	"github.com/tiglabs/baud/util"
 )
 
 var (
 	GEN_STEP          uint32 = 10
 	AUTO_INCREMENT_ID        = fmt.Sprintf("$auto_increment_id")
 
-	idGeneratorInstance IDGenerator
-	idGeneratorSyncOnce sync.Once
+	idGeneratorSingle     IDGenerator
+	idGeneratorSingleLock sync.Once
 )
 
 type IDGenerator interface {
 	GenID() (uint32, error)
 }
 
-func GetIdGeneratorInstance(store Store) IDGenerator {
-	idGeneratorSyncOnce.Do(func() {
+func GetIdGeneratorSingle(store Store) IDGenerator {
+	idGeneratorSingleLock.Do(func() {
 		if store == nil {
-			log.Error("store should not be nil at first time")
+			log.Error("store should not be nil at first time when create single idGenerator")
 			return
 		}
-		idGeneratorInstance = NewIDGenerator([]byte(AUTO_INCREMENT_ID), GEN_STEP, store)
+		idGeneratorSingle = NewIDGenerator([]byte(AUTO_INCREMENT_ID), GEN_STEP, store)
 	})
-	return idGeneratorInstance
+	return idGeneratorSingle
 }
 
 type idGenerator struct {
@@ -91,34 +91,18 @@ func (id *idGenerator) generate() (uint32, error) {
 		return 0, err
 	}
 
-	var end uint32
-
-	if value != nil {
-		end, err = bytesToUint32(value)
-		if err != nil {
-			return 0, err
-		}
+	if value == nil || len(value) != 4 {
+		log.Error("invalid data, must 4 bytes, but %d", len(value))
+		return 0, ErrInternalError
 	}
+
+	end := util.BytesToUint32(value)
 	end += id.step
-	value = uint32ToBytes(end)
+	value = util.Uint32ToBytes(end)
 	err = id.put(id.key, value)
 	if err != nil {
 		return 0, err
 	}
 
 	return end, nil
-}
-
-func bytesToUint32(b []byte) (uint32, error) {
-	if len(b) != 4 {
-		return 0, fmt.Errorf("invalid data, must 4 bytes, but %d", len(b))
-	}
-
-	return binary.BigEndian.Uint32(b), nil
-}
-
-func uint32ToBytes(v uint32) []byte {
-	b := make([]byte, 4)
-	binary.BigEndian.PutUint32(b, v)
-	return b
 }

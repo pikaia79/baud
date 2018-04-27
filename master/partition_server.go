@@ -38,7 +38,7 @@ type PartitionServer struct {
 }
 
 func NewPartitionServer(ip string) (*PartitionServer, error) {
-	newId, err := GetIdGeneratorInstance(nil).GenID()
+	newId, err := GetIdGeneratorSingle(nil).GenID()
 	if err != nil {
 		log.Error("fail to generate ps id. err[%v]", err)
 		return nil, ErrGenIdFailed
@@ -77,18 +77,11 @@ func (p *PartitionServer) persistent(store Store) error {
 	key := []byte(fmt.Sprintf("%s%d", PREFIX_PARTITION_SERVER, p.Node.ID))
 	if err := store.Put(key, val); err != nil {
 		log.Error("fail to store ps into store. err[%v]", err)
-		return ErrBoltDbOpsFailed
+		return ErrLocalDbOpsFailed
 	}
 
 	return nil
 }
-
-//func (p *PartitionServer) isReplicaFull() bool {
-//    p.propertyLock.RLock()
-//    defer p.propertyLock.RUnlock()
-//
-//    return p.replicaCache.count() == DEFAULT_REPLICA_LIMIT_PER_PS
-//}
 
 func (p *PartitionServer) addPartition(partition *Partition) {
 	if partition == nil {

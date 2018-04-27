@@ -21,7 +21,7 @@ type DB struct {
 }
 
 func NewDB(dbName string) (*DB, error) {
-	dbId, err := GetIdGeneratorInstance(nil).GenID()
+	dbId, err := GetIdGeneratorSingle(nil).GenID()
 	if err != nil {
 		log.Error("generate id of db[%v] is failed. err[%v]", dbName, err)
 		return nil, ErrGenIdFailed
@@ -56,7 +56,7 @@ func (db *DB) persistent(store Store) error {
 	dbKey := []byte(fmt.Sprintf("%s%d", PREFIX_DB, db.ID))
 	if err := store.Put(dbKey, dbVal); err != nil {
 		log.Error("fail to put db[%v] into store. err:[%v]", db.DB, err)
-		return ErrBoltDbOpsFailed
+		return ErrLocalDbOpsFailed
 	}
 
 	return nil
@@ -69,7 +69,7 @@ func (db *DB) erase(store Store) error {
 	dbKey := []byte(fmt.Sprintf("%s%d", PREFIX_DB, db.DB.ID))
 	if err := store.Delete(dbKey); err != nil {
 		log.Error("fail to delete db[%v] from store. err:[%v]", db.DB, err)
-		return ErrBoltDbOpsFailed
+		return ErrLocalDbOpsFailed
 	}
 
 	return nil

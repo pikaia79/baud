@@ -1,9 +1,9 @@
 package util
 
 import (
-    "fmt"
     "strings"
-    "github.com/tiglabs/baud/util/log"
+    "encoding/binary"
+    "fmt"
 )
 
 func BuildAddr(ip string, port int) string {
@@ -13,7 +13,6 @@ func BuildAddr(ip string, port int) string {
 func ParseAddr(addr string) ([]string) {
     pair := strings.Split(addr, ":")
     if len(pair) != 2 {
-        log.Error("try to parse invalid address:[%v]", addr)
         return nil
     }
     return pair
@@ -67,5 +66,20 @@ func SlotSplit(start, end uint32, n uint64) []uint32 {
     }
 
     return ret
+}
+
+
+func BytesToUint32(b []byte) (uint32) {
+    if len(b) != 4 {
+        return 0
+    }
+
+    return binary.BigEndian.Uint32(b)
+}
+
+func Uint32ToBytes(v uint32) []byte {
+    b := make([]byte, 4)
+    binary.BigEndian.PutUint32(b, v)
+    return b
 }
 

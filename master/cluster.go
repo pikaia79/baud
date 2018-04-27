@@ -35,7 +35,7 @@ func (c *Cluster) Start() error {
 		return err
 	}
 
-	GetIdGeneratorInstance(c.store)
+	GetIdGeneratorSingle(c.store)
 
 	// recovery memory meta data
 	if err := c.recoveryPSCache(); err != nil {
@@ -271,7 +271,7 @@ func (c *Cluster) createSpace(dbName, spaceName, partitionKey, partitionFunc str
 		}
 	}
 	if err := batch.Commit(); err != nil {
-		return nil, ErrBoltDbOpsFailed
+		return nil, ErrLocalDbOpsFailed
 	}
 
 	// update memory and send event

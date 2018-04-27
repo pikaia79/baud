@@ -39,7 +39,7 @@ func GetPMSingle(cluster *Cluster) *ProcessorManager {
 	if processorManagerSingle == nil {
 		processorManagerSingleLock.Do(func() {
 			if cluster == nil {
-				log.Panic("cluster should not be empty when create processor manager firstly")
+				log.Panic("cluster should not be nil at first time when create single processorManager")
 			}
 
 			pm := new(ProcessorManager)
@@ -71,6 +71,9 @@ func (pm *ProcessorManager) Start() {
 }
 
 func (pm *ProcessorManager) Stop() {
+	if !pm.isStarted {
+		return
+	}
 	pm.isStarted = false
 
 	pm.cancel()
@@ -163,8 +166,6 @@ type PartitionProcessor struct {
 	cluster        *Cluster
 	serverSelector Selector
 	jdos           DCOS
-	psRpcClient    *PSRpcClient
-	// psRpcClient    *rpc.Client
 }
 
 func NewPartitionProcessor(ctx context.Context, cancel context.CancelFunc, cluster *Cluster) *PartitionProcessor {
@@ -178,21 +179,13 @@ func NewPartitionProcessor(ctx context.Context, cancel context.CancelFunc, clust
 		jdos:           new(JDOS),
 	}
 
-	//connMgrOpt := rpc.DefaultManagerOption
-	//connMgr := rpc.NewConnectionMgr(p.ctx, &connMgrOpt)
-	//clientOpt := rpc.DefaultClientOption
-	//clientOpt.ClusterID = "1"
-	//clientOpt.ConnectMgr = connMgr
-	//clientOpt.CreateFunc = func(cc *grpc.ClientConn) interface{} { return pspb.NewAdminGrpcClient(cc) }
-	//p.psRpcClient = rpc.NewClient(1, &clientOpt)
+
 
 	return p
 }
 
 func (p *PartitionProcessor) run() {
 	log.Info("Partition Processor is running")
-
-	idGenerator := GetIdGeneratorInstance(nil)
 
 	for {
 		select {
@@ -213,7 +206,7 @@ func (p *PartitionProcessor) run() {
 					leaderPS := p.cluster.psCache.findServerById(partitionToCreate.pickLeaderNodeId())
 					// leaderPS is nil when create first partition
 
-					replicaId, err := idGenerator.GenID()
+					replicaId, err := GetIdGeneratorSingle(nil).GenID()
 					if err != nil {
 						log.Error("fail to generate new replica ßid. err:[%v]", err)
 						return
@@ -222,15 +215,16 @@ func (p *PartitionProcessor) run() {
 
 					partitionCopy := deepcopy.Iface(partitionToCreate.Partition).(*metapb.Partition)
 					partitionCopy.Replicas = append(partitionCopy.Replicas, *newMetaReplica)
-					if err := p.psRpcClient.CreatePartition(psToCreate.getRpcAddr(), partitionCopy); err != nil {
+					if err := GetPSRpcClientSingle(nil).CreatePartition(psToCreate.getRpcAddr(),
+							partitionCopy); err != nil {
 						log.Error("Rpc fail to create partition[%v] into ps. err:[%v]",
 							partitionToCreate.Partition, err)
 						return
 					}
 
 					if leaderPS != nil {
-						if err := p.psRpcClient.AddReplica(leaderPS.getRpcAddr(), partitionToCreate.ID, &psToCreate.RaftAddrs,
-							newMetaReplica.ID, newMetaReplica.NodeID); err != nil {
+						if err := GetPSRpcClientSingle(nil).AddReplica(leaderPS.getRpcAddr(), partitionToCreate.ID,
+								&psToCreate.RaftAddrs, newMetaReplica.ID, newMetaReplica.NodeID); err != nil {
 							log.Error("Rpc fail to add replica[%v] into leader ps. err[%v]", newMetaReplica, err)
 							return
 						}
@@ -254,13 +248,14 @@ func (p *PartitionProcessor) run() {
 						return
 					}
 
-					if err := p.psRpcClient.RemoveReplica(leaderPS.getRpcAddr(), partitionId, &psToDelete.RaftAddrs,
-						replica.ID, replica.NodeID); err != nil {
+					if err := GetPSRpcClientSingle(nil).RemoveReplica(leaderPS.getRpcAddr(), partitionId,
+							&psToDelete.RaftAddrs, replica.ID, replica.NodeID); err != nil {
 						log.Error("Rpc fail to remove replica[%v] from ps. err[%v]", replica.ID, err)
 						return
 					}
 
-					if err := p.psRpcClient.DeletePartition(psToDelete.getRpcAddr(), partitionId); err != nil {
+					if err := GetPSRpcClientSingle(nil).DeletePartition(psToDelete.getRpcAddr(),
+							partitionId); err != nil {
 						log.Error("Rpc fail to delete partition[%v] from ps. err:[%v]", partitionId, err)
 						return
 					}
@@ -272,7 +267,7 @@ func (p *PartitionProcessor) run() {
 				body := event.body.(*PartitionDeleteBody)
 
 				go func(partitionId metapb.PartitionID, replicaRpcAddr string, replica *metapb.Replica) {
-					if err := p.psRpcClient.DeletePartition(replicaRpcAddr, partitionId); err != nil {
+					if err := GetPSRpcClientSingle(nil).DeletePartition(replicaRpcAddr, partitionId); err != nil {
 						log.Error("Rpc fail to delete partition[%v] from ps. err:[%v]", partitionId, err)
 						return
 					}

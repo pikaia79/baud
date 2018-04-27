@@ -290,7 +290,7 @@ func pickReplicaToDelete(info *masterpb.PartitionInfo, leaderNodeId metapb.NodeI
 	followers := info.RaftStatus.Followers
 	if followers == nil || len(followers) == 0 {
 		log.Error("!!!Never happened. Cannot report empty replicas in ps heartbeat. info:[%v]", info)
-		return nil, ErrGrpcEmptyFollowers
+		return nil, ErrRpcEmptyFollowers
 	}
 
 	var replicaToDelete *metapb.Replica
@@ -311,7 +311,7 @@ func pickReplicaToDelete(info *masterpb.PartitionInfo, leaderNodeId metapb.NodeI
 			}
 
 			log.Error("cannot find leader in followers")
-			return nil, ErrGrpcInvalidFollowers
+			return nil, ErrRpcInvalidFollowers
 
 		} else {
 			replicaToDelete = &metapb.Replica{ID: followers[0].ID, NodeID: followers[0].NodeID}
