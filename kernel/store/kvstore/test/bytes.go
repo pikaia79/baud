@@ -5,7 +5,7 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/tiglabs/baud/kernel/store/kvstore"
+	"github.com/tiglabs/baudengine/kernel/store/kvstore"
 )
 
 // tests which focus on the byte ownership

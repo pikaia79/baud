@@ -6,8 +6,8 @@ import (
 	"time"
 	"errors"
 
-	"github.com/tiglabs/baud/kernel/analysis"
-	"github.com/tiglabs/baud/util"
+	"github.com/tiglabs/baudengine/kernel/analysis"
+	"github.com/tiglabs/baudengine/util"
 )
 
 var MinTime = time.Unix(0, math.MinInt64)

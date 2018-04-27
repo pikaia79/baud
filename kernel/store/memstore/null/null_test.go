@@ -3,7 +3,7 @@ package null
 import (
 	"testing"
 
-	"github.com/tiglabs/baud/kernel/store/memstore"
+	"github.com/tiglabs/baudengine/kernel/store/memstore"
 )
 
 func TestStore(t *testing.T) {

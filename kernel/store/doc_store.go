@@ -1,8 +1,8 @@
 package store
 
 import (
-	"github.com/tiglabs/baud/kernel/document"
-	"github.com/tiglabs/baud/kernel/store/kvstore"
+	"github.com/tiglabs/baudengine/kernel/document"
+	"github.com/tiglabs/baudengine/kernel/store/kvstore"
 )
 
 type DocStore struct {

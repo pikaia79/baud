@@ -3,8 +3,8 @@ package llrbdb
 import (
 	"testing"
 
-	"github.com/tiglabs/baud/kernel/store/memstore"
-	"github.com/tiglabs/baud/kernel/store/memstore/test"
+	"github.com/tiglabs/baudengine/kernel/store/memstore"
+	"github.com/tiglabs/baudengine/kernel/store/memstore/test"
 )
 
 func open(t *testing.T) memstore.MemStore {

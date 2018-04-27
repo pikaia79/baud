@@ -4,11 +4,11 @@ import (
 	"errors"
 	"bytes"
 
-	"github.com/tiglabs/baud/kernel/document"
-	"github.com/tiglabs/baud/kernel/store/kvstore"
-	"github.com/tiglabs/baud/kernel/util"
-	"github.com/tiglabs/baud/kernel/mapping"
-	"github.com/tiglabs/baud/kernel"
+	"github.com/tiglabs/baudengine/kernel/document"
+	"github.com/tiglabs/baudengine/kernel/store/kvstore"
+	"github.com/tiglabs/baudengine/kernel/util"
+	"github.com/tiglabs/baudengine/kernel/mapping"
+	"github.com/tiglabs/baudengine/kernel"
 )
 
 type IndexDriver struct {

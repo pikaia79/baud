@@ -3,7 +3,7 @@ package test
 import (
 	"testing"
 
-	"github.com/tiglabs/baud/kernel/store/memstore"
+	"github.com/tiglabs/baudengine/kernel/store/memstore"
 )
 
 // basic crud tests

@@ -3,8 +3,8 @@ package document
 import (
 	"fmt"
 
-	"github.com/tiglabs/baud/kernel/analysis"
-	"github.com/tiglabs/baud/util"
+	"github.com/tiglabs/baudengine/kernel/analysis"
+	"github.com/tiglabs/baudengine/util"
 )
 
 const DefaultPrecisionStep uint = 4

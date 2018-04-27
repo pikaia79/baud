@@ -1,8 +1,8 @@
 package kernel
 
 import (
-	"github.com/tiglabs/baud/kernel/document"
-	"github.com/tiglabs/baud/proto/metapb"
+	"github.com/tiglabs/baudengine/kernel/document"
+	"github.com/tiglabs/baudengine/proto/metapb"
 )
 
 type Option struct {
