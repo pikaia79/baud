@@ -13,7 +13,7 @@ log-path = "/tmp/baud/master1/log"
 #debug, info, warn, error
 level="debug"
 #debug, info, warn
-raft-level="debug"
+raft-level="info"
 
 [cluster]
 cluster-id = 1

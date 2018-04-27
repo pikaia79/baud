@@ -5,8 +5,8 @@ import (
 	"github.com/tiglabs/baud/proto/metapb"
 	"github.com/tiglabs/baud/util/deepcopy"
 	"github.com/tiglabs/baud/util/log"
-	"sync"
 	"runtime/debug"
+	"sync"
 )
 
 const (
@@ -21,13 +21,13 @@ const (
 )
 
 var (
-	processorManagerSingle                    *ProcessorManager
-	processorManagerSingleLock 				  sync.Once
+	processorManagerSingle     *ProcessorManager
+	processorManagerSingleLock sync.Once
 )
 
 type ProcessorManager struct {
-	ctx       context.Context
-	cancel    context.CancelFunc
+	ctx    context.Context
+	cancel context.CancelFunc
 
 	pp *PartitionProcessor
 
@@ -52,7 +52,6 @@ func GetPMSingle(cluster *Cluster) *ProcessorManager {
 
 	return processorManagerSingle
 }
-
 
 func (pm *ProcessorManager) Start() {
 	pm.wg.Add(1)
@@ -92,8 +91,8 @@ func (pm *ProcessorManager) PushEvent(event *ProcessorEvent) error {
 	}
 
 	if event.typ == EVENT_TYPE_PARTITION_CREATE ||
-			event.typ == EVENT_TYPE_PARTITION_DELETE ||
-			event.typ == EVENT_TYPE_FORCE_PARTITION_DELETE {
+		event.typ == EVENT_TYPE_PARTITION_DELETE ||
+		event.typ == EVENT_TYPE_FORCE_PARTITION_DELETE {
 
 		if len(pm.pp.eventCh) >= PARTITION_CHANNEL_LIMIT*0.9 {
 			log.Error("partition channel will full, reject event[%v]", event)
@@ -179,8 +178,6 @@ func NewPartitionProcessor(ctx context.Context, cancel context.CancelFunc, clust
 		jdos:           new(JDOS),
 	}
 
-
-
 	return p
 }
 
@@ -216,7 +213,7 @@ func (p *PartitionProcessor) run() {
 					partitionCopy := deepcopy.Iface(partitionToCreate.Partition).(*metapb.Partition)
 					partitionCopy.Replicas = append(partitionCopy.Replicas, *newMetaReplica)
 					if err := GetPSRpcClientSingle(nil).CreatePartition(psToCreate.getRpcAddr(),
-							partitionCopy); err != nil {
+						partitionCopy); err != nil {
 						log.Error("Rpc fail to create partition[%v] into ps. err:[%v]",
 							partitionToCreate.Partition, err)
 						return
@@ -224,7 +221,7 @@ func (p *PartitionProcessor) run() {
 
 					if leaderPS != nil {
 						if err := GetPSRpcClientSingle(nil).AddReplica(leaderPS.getRpcAddr(), partitionToCreate.ID,
-								&psToCreate.RaftAddrs, newMetaReplica.ID, newMetaReplica.NodeID); err != nil {
+							&psToCreate.RaftAddrs, newMetaReplica.ID, newMetaReplica.NodeID); err != nil {
 							log.Error("Rpc fail to add replica[%v] into leader ps. err[%v]", newMetaReplica, err)
 							return
 						}
@@ -249,13 +246,13 @@ func (p *PartitionProcessor) run() {
 					}
 
 					if err := GetPSRpcClientSingle(nil).RemoveReplica(leaderPS.getRpcAddr(), partitionId,
-							&psToDelete.RaftAddrs, replica.ID, replica.NodeID); err != nil {
+						&psToDelete.RaftAddrs, replica.ID, replica.NodeID); err != nil {
 						log.Error("Rpc fail to remove replica[%v] from ps. err[%v]", replica.ID, err)
 						return
 					}
 
 					if err := GetPSRpcClientSingle(nil).DeletePartition(psToDelete.getRpcAddr(),
-							partitionId); err != nil {
+						partitionId); err != nil {
 						log.Error("Rpc fail to delete partition[%v] from ps. err:[%v]", partitionId, err)
 						return
 					}
@@ -276,8 +273,3 @@ func (p *PartitionProcessor) run() {
 		}
 	}
 }
-
-
-
-
-

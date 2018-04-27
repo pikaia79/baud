@@ -2,10 +2,10 @@ package master
 
 import (
 	"fmt"
+	"github.com/tiglabs/baud/util"
 	"github.com/tiglabs/baud/util/log"
 	"sync"
 	"sync/atomic"
-	"github.com/tiglabs/baud/util"
 )
 
 var (

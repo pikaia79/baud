@@ -5,11 +5,11 @@ import (
 	"github.com/tiglabs/baud/proto/metapb"
 	"github.com/tiglabs/baud/proto/pspb"
 	"github.com/tiglabs/baud/util/log"
+	"github.com/tiglabs/baud/util/rpc"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/status"
 	"sync"
 	"time"
-	"github.com/tiglabs/baud/util/rpc"
 )
 
 const (
@@ -22,8 +22,8 @@ var (
 )
 
 type PSRpcClient struct {
-	ctx    context.Context
-	cancel context.CancelFunc
+	ctx       context.Context
+	cancel    context.CancelFunc
 	rpcClient *rpc.Client
 }
 
