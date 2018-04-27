@@ -31,7 +31,7 @@ service MasterRpc {
 message Route {
     Partition       partition  = 1 [(gogoproto.nullable) = false, (gogoproto.embed) = true];
     repeated Node   nodes = 2;
-    uint32          leader = 3 [(gogoproto.customname) = "NodeID", (gogoproto.casttype) = "github.com/tiglabs/baud/proto/metapb.NodeID"];
+    uint32          leader = 3 [(gogoproto.customname) = "leader", (gogoproto.casttype) = "github.com/tiglabs/baud/proto/metapb.NodeID"];
 }
 
 message GetDBRequest {

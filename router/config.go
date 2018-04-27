@@ -2,17 +2,15 @@ package router
 
 import (
 	"github.com/BurntSushi/toml"
-	"github.com/tiglabs/baud/util/log"
+	"github.com/tiglabs/baudengine/util/log"
 )
 
 const defaultConfig = `
-# Router Configuration.
-
-role = router
-ip = 0.0.0.0
-httpPort = 1023
+role = "router"
+ip = "0.0.0.0"
+httpPort = 9000
 pprof = 10088
-masterAddr = 1:10.1.86.118:3456
+masterAddr = "10.1.86.118:3456"
 logDir = "/export/log/ps"
 masterConnPoolSize = 10
 psConnPoolSize = 10
@@ -21,7 +19,7 @@ psConnPoolSize = 10
 const rpcTimeoutDef  = 100
 
 type Config struct {
-	Role               string `toml:"name,omitempty" json:"name"`
+	Role               string `toml:"role,omitempty" json:"role"`
 	Ip                 string
 	HttpPort           uint16
 	Pprof              uint16
