@@ -2,23 +2,23 @@ package metapb
 
 type (
 	// DBID is a custom type for database ID
-	DBID = uint32
+	DBID  uint32
 	// SpaceID is a custom type for space ID
-	SpaceID = uint32
+	SpaceID  uint32
 	// PartitionID is a custom type for partition ID
-	PartitionID = uint64
+	PartitionID  uint64
 	// SlotID is a custom type for slot ID
-	SlotID = uint32
+	SlotID  uint32
 	// ReplicaID is a custom type for repl ID
-	ReplicaID = uint64
+	ReplicaID  uint64
 	// NodeID is a custom type for node ID
-	NodeID = uint32
+	NodeID  uint32
 	// Key is a custom type for key
-	Key = []byte
+	Key  []byte
 	// Value is a custom type for key
-	Value = []byte
+	Value  []byte
 	// RespCode Response code
-	RespCode = uint16
+	RespCode  uint16
 )
 
 const (

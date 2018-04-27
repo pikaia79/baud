@@ -5,23 +5,24 @@ import (
 	"reflect"
 	"fmt"
 	"errors"
-	"sync/atomic"
-
-	"github.com/tiglabs/baud/kernel/document"
 	"strconv"
 	"strings"
 	"sort"
+	"sync/atomic"
+
+	"github.com/tiglabs/baud/kernel/document"
 )
 
 type DocumentMapping struct {
+	Name string                            `json:"name,omitempty"`
 	Enabled_ bool                          `json:"enabled,omitempty"`
 	Dynamic bool                           `json:"dynamic,omitempty"`
 	Mapping map[string]FieldMapping        `json:"mappings"`
 	StructTagKey string                    `json:"-"`
 }
 
-func NewDocumentMapping(mapping map[string]FieldMapping) *DocumentMapping {
-	doc := &DocumentMapping{StructTagKey: "json", Mapping: mapping, Enabled_: true, Dynamic: false}
+func NewDocumentMapping(name string, mapping map[string]FieldMapping) *DocumentMapping {
+	doc := &DocumentMapping{Name:name, StructTagKey: "json", Mapping: mapping, Enabled_: true, Dynamic: false}
 	return doc
 }
 
@@ -116,6 +117,24 @@ func parseString(val interface{}) (string, error) {
 	}
 }
 
+func parseArrayString(val interface{}) ([]string, error) {
+	_val := reflect.ValueOf(val)
+	typ := _val.Type()
+	switch typ.Kind() {
+	case reflect.Slice, reflect.Array:
+		var arrayStr []string
+		for i := 0; i < _val.Len(); i++ {
+			if _val.Index(i).CanInterface() {
+				strVal := reflect.ValueOf(_val.Index(i).Interface()).String()
+				arrayStr = append(arrayStr, strVal)
+			}
+		}
+		return arrayStr, nil
+	default:
+		return nil, fmt.Errorf("invalid string value %v", val)
+	}
+}
+
 func parseFloat(val interface{}) (float64, error) {
 	var valFloat float64
 	var err error
@@ -203,7 +222,9 @@ func parseFields(val interface{}, index *uint64, enable, includeInAll bool) ([]F
 	if typ.Kind() == reflect.Map {
 		if typ.Key().Kind() == reflect.String {
 			var fields []FieldMapping
-			for _, key := range _val.MapKeys() {
+			keys := valSlice(_val.MapKeys())
+			sort.Sort(keys)
+			for _, key := range keys {
 				// TODO keyword field
 				field, err := parseStringFieldMapping(key.String(), _val.MapIndex(key).Interface(), index, enable, includeInAll)
 				if err != nil {
@@ -281,9 +302,7 @@ func parseStringFieldMapping(name string, obj interface{}, index *uint64, enable
 func parseTextFieldMapping(name string, obj interface{}, index *uint64, enable, includeInAll bool) (*TextFieldMapping, error) {
 	val := reflect.ValueOf(obj)
 	typ := val.Type()
-	fmt.Println("parseTextFieldMapping kind ", typ.Kind().String(), " ", val)
 	if typ.Kind() == reflect.Map {
-		fmt.Println("parseTextFieldMapping key kind ", typ.Key().Kind().String())
 		if typ.Key().Kind() == reflect.String {
 			filedMapping := NewTextFieldMapping(name, atomic.AddUint64(index, 1))
 			filedMapping.Enabled_ = enable
@@ -744,16 +763,73 @@ func parseBooleanFieldMapping(name string, obj interface{}, index *uint64, enabl
 	return nil, errors.New("invalid boolean field")
 }
 
-func parseObjectFieldMapping(name string, schema interface{}, index *uint64, enable, includeInAll bool) (FieldMapping, error) {
+func parseSourceFieldMapping(obj interface{}, index *uint64) (*SourceFieldMapping, error) {
+	val := reflect.ValueOf(obj)
+	typ := val.Type()
+	if typ.Kind() == reflect.Map {
+		if typ.Key().Kind() == reflect.String {
+			filedMapping := NewSourceFieldMapping(atomic.AddUint64(index, 1))
+			filedMapping.Enabled_ = true
+			for _, key := range val.MapKeys() {
+				switch key.String() {
+				case "enabled":
+					b, err := parseBool(val.MapIndex(key).Interface())
+					if err != nil {
+						return nil, err
+					}
+					filedMapping.Enabled_ = b
+				case "includes":
+					ss, err := parseArrayString(val.MapIndex(key).Interface())
+					if err != nil {
+						return nil, err
+					}
+					filedMapping.Includes = ss
+				case "excludes":
+					ss, err := parseArrayString(val.MapIndex(key).Interface())
+					if err != nil {
+						return nil, err
+					}
+					filedMapping.Excludes = ss
+				}
+			}
+			return filedMapping, nil
+		}
+	}
+	return nil, errors.New("invalid boolean field")
+}
+
+func parseObjectFieldMapping(name string, schema interface{}, index *uint64, enable, includeInAll, root bool) (*ObjectFieldMapping, error) {
 	val := reflect.ValueOf(schema)
 	typ := val.Type()
 	switch typ.Kind() {
 	case reflect.Map:
 		if typ.Key().Kind() == reflect.String {
 			fieldMapping := NewObjectFieldMapping(name, atomic.AddUint64(index, 1))
-			sort.Sort(valSlice(val.MapKeys()))
-			for _, key := range val.MapKeys() {
+			keys := valSlice(val.MapKeys())
+			sort.Sort(keys)
+			for _, key := range keys {
 				switch key.String() {
+				case "_all":
+					if root {
+						field, err := parseTextFieldMapping("_all", val.MapIndex(key).Interface(), index, enable, includeInAll)
+						if err != nil {
+							return nil, err
+						}
+						fieldMapping.AddFileMapping(field)
+						includeInAll = field.Enabled()
+					} else {
+						// TODO error???
+					}
+				case "_source":
+					if root {
+						field, err := parseSourceFieldMapping(val.MapIndex(key).Interface(), index)
+						if err != nil {
+							return nil, err
+						}
+						fieldMapping.AddFileMapping(field)
+					} else {
+						// TODO error???
+					}
 				case "enabled":
 					b, err := parseBool(val.MapIndex(key).Interface())
 					if err != nil {
@@ -766,14 +842,11 @@ func parseObjectFieldMapping(name string, schema interface{}, index *uint64, ena
 						return nil, err
 					}
 					includeInAll = b
-				}
-			}
-			for _, key := range val.MapKeys() {
-				fVal := val.MapIndex(key).Interface()
-				_fVal := reflect.ValueOf(fVal)
-				if _fVal.Type().Kind() == reflect.Map {
-					// TODO object
-					if key.String() == "properties" {
+				case "properties":
+					// already sort element, so this is the last case
+					fVal := val.MapIndex(key).Interface()
+					_fVal := reflect.ValueOf(fVal)
+					if _fVal.Type().Kind() == reflect.Map {
 						_fields, err := parseFieldMapping(fVal, index, enable, includeInAll)
 						if err != nil {
 							return nil, err
@@ -782,54 +855,10 @@ func parseObjectFieldMapping(name string, schema interface{}, index *uint64, ena
 							fieldMapping.AddFileMapping(field)
 						}
 					}
-				} else if _fVal.Type().Kind() == reflect.String {
-					if key.String() == "type" {
-						switch _fVal.String() {
-						case "text":
-							fmt.Println("text ", name, val)
-							field, err := parseTextFieldMapping(name, schema, index, enable, includeInAll)
-							if err != nil {
-								return nil, err
-							}
-							fieldMapping.AddFileMapping(field)
-						case "keyword":
-							fmt.Println("keyword ", name, val)
-							field, err := parseKeyWordFieldMapping(name, schema, index, enable, includeInAll)
-							if err != nil {
-								return nil, err
-							}
-							fieldMapping.AddFileMapping(field)
-						case "long", "integer", "short", "byte", "double", "float", "half_float", "scaled_float":
-							fmt.Println("number ", name, val)
-							field, err := parseNumericFieldMapping(name, schema, index, enable, includeInAll)
-							if err != nil {
-								return nil, err
-							}
-							fieldMapping.AddFileMapping(field)
-						case "date":
-							fmt.Println("date ", name, val)
-							field, err := parseDateFieldMapping(name, schema, index, enable, includeInAll)
-							if err != nil {
-								return nil, err
-							}
-							fieldMapping.AddFileMapping(field)
-						case "boolean":
-							fmt.Println("boolean ", name, val)
-							field, err := parseBooleanFieldMapping(name, schema, index, enable, includeInAll)
-							if err != nil {
-								return nil, err
-							}
-							fieldMapping.AddFileMapping(field)
-						case "object":
-							continue
-						case "nested":
-						// TODO nested
-						default:
-							return nil, fmt.Errorf("invalid filed type %s", _fVal.String())
-						}
-					}
 				}
 			}
+			fieldMapping.Enabled_ = enable
+			fieldMapping.IncludeInAll = includeInAll
 			return fieldMapping, nil
 		}
 	}
@@ -843,38 +872,108 @@ func parseFieldMapping(schema interface{}, index *uint64, enable, includeInAll b
 	case reflect.Map:
 		if typ.Key().Kind() == reflect.String {
 			var fields []FieldMapping
-			for _, key := range val.MapKeys() {
-				fmt.Println("parseFieldMapping ", key.String(), val.MapIndex(key).Interface())
-				field, err := parseObjectFieldMapping(key.String(), val.MapIndex(key).Interface(), index, enable, includeInAll)
-				if err != nil {
-					fmt.Println("parse object field err ", err)
-					return nil, err
+			fieldNames := valSlice(val.MapKeys())
+			sort.Sort(fieldNames)
+			for _, fieldName := range fieldNames {
+				fieldVal := val.MapIndex(fieldName).Interface()
+				fVal := reflect.ValueOf(fieldVal)
+				if fVal.Type().Kind() == reflect.Map && fVal.Type().Key().Kind() == reflect.String {
+					elementNames := valSlice(fVal.MapKeys())
+					sort.Sort(elementNames)
+					for _, elementName := range elementNames {
+						elementVal := fVal.MapIndex(elementName).Interface()
+						_elementVal := reflect.ValueOf(elementVal)
+						if _elementVal.Type().Kind() == reflect.Map {
+							if elementName.String() == "properties" {
+								field, err := parseObjectFieldMapping(fieldName.String(), fieldVal, index, enable, includeInAll, false)
+								if err != nil {
+									return nil, err
+								}
+								fields = append(fields, field)
+							}
+						} else if _elementVal.Type().Kind() == reflect.String {
+							if elementName.String() == "type" {
+								switch _elementVal.String() {
+								case "text":
+									field, err := parseTextFieldMapping(fieldName.String(), fieldVal, index, enable, includeInAll)
+									if err != nil {
+										return nil, err
+									}
+									fields = append(fields, field)
+								case "keyword":
+									field, err := parseKeyWordFieldMapping(fieldName.String(), fieldVal, index, enable, includeInAll)
+									if err != nil {
+										return nil, err
+									}
+									fields = append(fields, field)
+								case "long", "integer", "short", "byte", "double", "float", "half_float", "scaled_float":
+									field, err := parseNumericFieldMapping(fieldName.String(), fieldVal, index, enable, includeInAll)
+									if err != nil {
+										return nil, err
+									}
+									fields = append(fields, field)
+								case "date":
+									field, err := parseDateFieldMapping(fieldName.String(), fieldVal, index, enable, includeInAll)
+									if err != nil {
+										return nil, err
+									}
+									fields = append(fields, field)
+								case "boolean":
+									field, err := parseBooleanFieldMapping(fieldName.String(), fieldVal, index, enable, includeInAll)
+									if err != nil {
+										return nil, err
+									}
+									fields = append(fields, field)
+								case "object":
+								case "nested":
+								// TODO nested
+								default:
+									return nil, fmt.Errorf("invalid filed type %s", _elementVal.String())
+								}
+							}
+						}
+					}
 				}
-				fields =  append(fields, field)
 			}
 			return fields, nil
 		}
 	}
-	return nil, errors.New("invalid schema")
+	return nil, errors.New("invalid field")
 }
 
-func parseSchema(data []byte) (*DocumentMapping, error) {
+func parseSchema(data []byte) ([]*DocumentMapping, error) {
 	schema := make(map[string]interface{})
 	err := json.Unmarshal(data, &schema)
 	if err != nil {
 		return nil, err
 	}
-	if val, ok := schema["mapping"]; ok {
+	if val, ok := schema["mappings"]; ok {
 		var index uint64
-		filedMappings, err := parseFieldMapping(val, &index, true, true)
-		if err != nil {
-			return nil, err
+		docVal := reflect.ValueOf(val)
+		typ := docVal.Type()
+		switch typ.Kind() {
+		case reflect.Map:
+			if typ.Key().Kind() == reflect.String {
+				var docMappings []*DocumentMapping
+				for _, docName := range docVal.MapKeys() {
+					docMapping := docVal.MapIndex(docName).Interface()
+					dMapping := reflect.ValueOf(docMapping)
+					if dMapping.Type().Kind() == reflect.Map && dMapping.Type().Key().Kind() == reflect.String {
+						objectFieldMapping, err := parseObjectFieldMapping(docName.String(), docMapping, &index, true, true, true)
+						if err != nil {
+							return nil, err
+						}
+						// _all check
+						if _, ok := objectFieldMapping.Properties["_all"]; !ok {
+							NewTextFieldMapping("_all", atomic.AddUint64(&index, 1))
+						}
+						// _source check
+						docMappings = append(docMappings, NewDocumentMapping(docName.String(), objectFieldMapping.Properties))
+					}
+				}
+				return docMappings, nil
+			}
 		}
-		mapping := make(map[string]FieldMapping)
-		for _, f := range filedMappings {
-			mapping[f.Name()] = f
-		}
-		return NewDocumentMapping(mapping), nil
 	}
 	return nil, errors.New("invalid schema")
 }

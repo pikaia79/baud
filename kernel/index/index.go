@@ -101,7 +101,7 @@ func (id *IndexDriver) UpdateDocuments(docs []*document.Document, ops ...*kernel
 func (id *IndexDriver) DeleteDocuments(docIDs []string, ops ...*kernel.Option) (int, error) {
 	tx, err := id.store.NewTransaction(true)
 	if err != nil {
-		return err
+		return 0, err
 	}
 	var count int
 	for _, docID := range docIDs {
@@ -133,13 +133,13 @@ func (id *IndexDriver) GetDocument(docID string, fields []string) (*document.Doc
 	for i, fieldName := range fields {
 		fs, err := decodeStoreField(fieldName, values[i])
 		if err != nil {
-			return nil, err
+			return nil, false
 		}
 		for _, f := range fs {
 			doc.AddField(f)
 		}
 	}
-	return doc, nil
+	return doc, true
 }
 
 func (id *IndexDriver) deleteDocument(tx kvstore.Transaction, docID string) (int, error) {
@@ -148,22 +148,24 @@ func (id *IndexDriver) deleteDocument(tx kvstore.Transaction, docID string) (int
 	if !iter.Valid() {
 		return 0, nil
 	}
+	count := 0
 	for iter.Valid() {
 		key, _, has := iter.Current()
 		if !has {
-			return nil, errors.New("document not exist")
+			return 0, errors.New("document not exist")
 		}
 		err := tx.Delete(key)
 		if err != nil {
-			return err
+			return 0, err
 		}
+		count++
 		iter.Next()
 	}
-	return nil
+	return count, nil
 }
 
 // TODO
-func (id *IndexDriver) deleteDocumentIndex(doc document.Document) error {
+func (id *IndexDriver) deleteDocumentIndex(doc *document.Document) error {
 	return nil
 }
 
