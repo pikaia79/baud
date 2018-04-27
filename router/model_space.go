@@ -2,8 +2,8 @@ package router
 
 import (
 	"github.com/pkg/errors"
-	"github.com/tiglabs/baud/proto/masterpb"
-	"github.com/tiglabs/baud/proto/metapb"
+	"github.com/tiglabs/baudengine/proto/masterpb"
+	"github.com/tiglabs/baudengine/proto/metapb"
 	"sort"
 	"sync"
 )

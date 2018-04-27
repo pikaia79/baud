@@ -17,7 +17,7 @@ const (
 )
 
 var Err2CodeMap = map[error]int32 {
-	ErrSuc:           ERRCODE_SUCCESS,
+	ErrSuccess:       ERRCODE_SUCCESS,
 	ErrInternalError: ERRCODE_INTERNAL_ERROR,
 	ErrSysBusy:       ERRCODE_SYSBUSY,
 	ErrParamError:    ERRCODE_PARAM_ERROR,

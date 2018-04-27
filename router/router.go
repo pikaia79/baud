@@ -3,14 +3,14 @@ package router
 import (
 	"encoding/json"
 	"github.com/julienschmidt/httprouter"
-	"github.com/tiglabs/baud/keys"
-	"github.com/tiglabs/baud/proto/metapb"
-	"net/http"
-	"sync"
-	"strconv"
 	"github.com/pkg/errors"
 	"github.com/spaolacci/murmur3"
+	"github.com/tiglabs/baudengine/keys"
+	"github.com/tiglabs/baudengine/proto/metapb"
 	"github.com/tiglabs/raft/util/log"
+	"net/http"
+	"strconv"
+	"sync"
 )
 
 type Router struct {
@@ -24,7 +24,7 @@ type Router struct {
 type HttpReply struct {
 	Code int32       `json:"code"`
 	Msg  string      `json:"msg"`
-	Data interface{} `json:"data"`
+	Data interface{} `json:"data,omitempty"`
 }
 
 func NewServer() *Router {
@@ -35,10 +35,10 @@ func (router *Router) Start(cfg *Config) error {
 	router.masterClient = NewMasterClient(cfg.MasterAddr)
 	router.httpRouter = httprouter.New()
 
-	router.httpRouter.PUT("/:db/:space", router.handleCreate)
-	router.httpRouter.GET("/:db/:space/:docId", router.handleRead)
-	router.httpRouter.POST("/:db/:space/:docId", router.handleUpdate)
-	router.httpRouter.DELETE("/:db/:space/:docId", router.handleDelete)
+	router.httpRouter.PUT("/doc/:db/:space", router.handleCreate)
+	router.httpRouter.GET("/doc/:db/:space/:docId", router.handleRead)
+	router.httpRouter.POST("/doc/:db/:space/:docId", router.handleUpdate)
+	router.httpRouter.DELETE("/doc/:db/:space/:docId", router.handleDelete)
 
 	router.httpRouter.GET("/status", router.handleStatus)
 	router.httpRouter.GET("/debug/ppro", router.handlePprof)
@@ -121,6 +121,7 @@ func (router *Router) handleDelete(writer http.ResponseWriter, request *http.Req
 func (router *Router) handleStatus(writer http.ResponseWriter, request *http.Request, params httprouter.Params) {
 	defer router.catchPanic(writer)
 
+	panic(errors.New("test"))
 }
 
 func (router *Router) handlePprof(writer http.ResponseWriter, request *http.Request, params httprouter.Params) {
@@ -129,6 +130,12 @@ func (router *Router) handlePprof(writer http.ResponseWriter, request *http.Requ
 }
 
 func (router *Router) getParams(params httprouter.Params, decodeSlot bool) (db *DB, space *Space, partition *Partition, docId *metapb.DocID) {
+	defer func() {
+		if p := recover(); p != nil {
+			panic(&HttpReply{ERRCODE_PARAM_ERROR, ErrParamError.Error(), nil})
+		}
+	}()
+
 	db = router.GetDB(params.ByName("db"))
 	space = db.GetSpace(params.ByName("space"))
 	if decodeSlot {
@@ -166,11 +173,14 @@ func (router *Router) GetDB(dbName string) *DB {
 
 func (router *Router) catchPanic(writer http.ResponseWriter) {
 	if p := recover(); p != nil {
-		err, ok := p.(error)
-		if !ok {
-			err = ErrInternalError
+		switch t := p.(type) {
+		case *HttpReply:
+			sendReply(writer, t)
+		case error:
+			sendReply(writer, &HttpReply{ERRCODE_INTERNAL_ERROR, t.Error(), nil})
+		default:
+			sendReply(writer, &HttpReply{ERRCODE_INTERNAL_ERROR, ErrInternalError.Error(), nil})
 		}
-		sendReply(writer, &HttpReply{ERRCODE_INTERNAL_ERROR, err.Error(), nil})
 	}
 }
 

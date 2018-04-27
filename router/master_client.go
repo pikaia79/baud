@@ -3,9 +3,9 @@ package router
 import (
 	"context"
 	"github.com/pkg/errors"
-	"github.com/tiglabs/baud/proto/masterpb"
-	"github.com/tiglabs/baud/proto/metapb"
-	"github.com/tiglabs/baud/util/rpc"
+	"github.com/tiglabs/baudengine/proto/masterpb"
+	"github.com/tiglabs/baudengine/proto/metapb"
+	"github.com/tiglabs/baudengine/util/rpc"
 	"google.golang.org/grpc"
 )
 
@@ -13,13 +13,13 @@ type MasterClient struct {
 	client     *rpc.Client
 	masterAddr string
 	context    context.Context
-	cancel     context.CancelFunc
+	cancelFunc context.CancelFunc
 }
 
 func NewMasterClient(masterAddr string) *MasterClient {
 	mc := &MasterClient{masterAddr: masterAddr}
 	connMgrOpt := rpc.DefaultManagerOption
-	mc.context, mc.cancel = context.WithCancel(context.Background())
+	mc.context, mc.cancelFunc = context.WithCancel(context.Background())
 	connMgr := rpc.NewConnectionMgr(mc.context, &connMgrOpt)
 	clientOpt := rpc.DefaultClientOption
 	//clientOpt.ClusterID = serverConf.ClusterID
