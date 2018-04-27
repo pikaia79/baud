@@ -28,7 +28,7 @@ func NewDB(dbName string) (*DB, error) {
 	}
 	db := &DB{
 		DB: &metapb.DB{
-			ID:   dbId,
+			ID:   metapb.DBID(dbId),
 			Name: dbName,
 		},
 		spaceCache: NewSpaceCache(),
@@ -112,7 +112,7 @@ func (c *DBCache) findDbByName(dbName string) *DB {
 	return db
 }
 
-func (c *DBCache) findDbById(dbId uint32) *DB {
+func (c *DBCache) findDbById(dbId metapb.DBID) *DB {
 	c.lock.RLock()
 	defer c.lock.RUnlock()
 

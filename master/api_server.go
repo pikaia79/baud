@@ -56,6 +56,8 @@ func (s *ApiServer) Start() error {
 			log.Error("api server run error[%v]", err)
 		}
 	}()
+
+	log.Info("ApiServer has started")
 	return nil
 }
 
@@ -63,6 +65,8 @@ func (s *ApiServer) Close() {
 	if s.httpServer != nil {
 		s.httpServer.Close()
 	}
+
+	log.Info("ApiServer has closed")
 }
 
 func (s *ApiServer) initAdminHandler() {

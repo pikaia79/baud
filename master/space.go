@@ -49,7 +49,7 @@ func NewSpace(dbId metapb.DBID, dbName, spaceName string, policy *PartitionPolic
 	return &Space{
 		Space: &metapb.Space{
 			Name:   spaceName,
-			ID:     spaceId,
+			ID:     metapb.SpaceID(spaceId),
 			DB:     dbId,
 			DbName: dbName,
 			Status: metapb.SS_Init,
@@ -157,7 +157,7 @@ func (c *SpaceCache) findSpaceByName(spaceName string) *Space {
 	return space
 }
 
-func (c *SpaceCache) findSpaceById(spaceId uint32) *Space {
+func (c *SpaceCache) findSpaceById(spaceId metapb.SpaceID) *Space {
 	c.lock.RLock()
 	defer c.lock.RUnlock()
 

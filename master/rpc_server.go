@@ -44,6 +44,7 @@ func (s *RpcServer) Start() error {
 		}
 	}()
 
+	log.Info("RPC server has started")
 	return nil
 }
 
@@ -51,6 +52,7 @@ func (s *RpcServer) Close() {
 	if s.grpcServer != nil {
 		s.grpcServer.GracefulStop()
 	}
+	log.Info("RPC server has closed")
 }
 
 func (s *RpcServer) GetRoute(ctx context.Context,

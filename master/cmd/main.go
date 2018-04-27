@@ -37,7 +37,7 @@ func interceptSignal(s IServer) {
 }
 
 func main() {
-	fmt.Println("Hello, Baud Master!")
+	fmt.Println("Hello, BaudEsngine Master!")
 	flag.Parse()
 	fmt.Printf("configfile=[%v]\n", *configFile)
 

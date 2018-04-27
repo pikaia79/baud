@@ -31,7 +31,7 @@ type Partition struct {
 	propertyLock  sync.RWMutex
 }
 
-func NewPartition(dbId, spaceId, startSlot, endSlot uint32) (*Partition, error) {
+func NewPartition(dbId metapb.DBID, spaceId metapb.SpaceID, startSlot, endSlot uint32) (*Partition, error) {
 	partId, err := GetIdGeneratorSingle(nil).GenID()
 	if err != nil {
 		log.Error("generate partition id is failed. err:[%v]", err)
@@ -42,8 +42,8 @@ func NewPartition(dbId, spaceId, startSlot, endSlot uint32) (*Partition, error) 
 			ID:        metapb.PartitionID(partId),
 			DB:        dbId,
 			Space:     spaceId,
-			StartSlot: startSlot,
-			EndSlot:   endSlot,
+			StartSlot: metapb.SlotID(startSlot),
+			EndSlot:   metapb.SlotID(endSlot),
 			Replicas:  make([]metapb.Replica, 0),
 			Status:    metapb.PA_READONLY,
 		},
@@ -345,7 +345,7 @@ func (r *PartitionItem) Less(other btree.Item) bool {
 	return left > right
 }
 
-func (r *PartitionItem) Contains(slot uint32) bool {
+func (r *PartitionItem) Contains(slot metapb.SlotID) bool {
 	start, end := r.partition.StartSlot, r.partition.EndSlot
 	//return bytes.Compare(key, start) >= 0 && bytes.Compare(key, end) < 0
 	return slot >= start && slot < end
@@ -412,7 +412,7 @@ func (t *PartitionTree) remove(rng *Partition) {
 }
 
 // search returns a region that contains the key.
-func (t *PartitionTree) search(slot uint32) *Partition {
+func (t *PartitionTree) search(slot metapb.SlotID) *Partition {
 	rng := &Partition{
 		Partition: &metapb.Partition{
 			StartSlot: slot,
@@ -426,7 +426,7 @@ func (t *PartitionTree) search(slot uint32) *Partition {
 	return result.partition
 }
 
-func (t *PartitionTree) multipleSearch(slot uint32, num int) []*Partition {
+func (t *PartitionTree) multipleSearch(slot metapb.SlotID, num int) []*Partition {
 	rng := &Partition{
 		Partition: &metapb.Partition{
 			StartSlot: slot,
@@ -434,7 +434,7 @@ func (t *PartitionTree) multipleSearch(slot uint32, num int) []*Partition {
 	}
 	results := t.ascendScan(rng, num)
 	var ranges = make([]*Partition, 0, num)
-	var endSlot uint32
+	var endSlot metapb.SlotID
 	var isFound = false
 	for _, r := range results {
 		//if len(endKey) != 0 {

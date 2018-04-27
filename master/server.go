@@ -29,7 +29,6 @@ func (ms *Master) Start(config *Config) error {
 		log.Error("fail to start cluster. err:[%v]", err)
 		return err
 	}
-	log.Info("Cluster has started")
 
 	ms.rpcServer = NewRpcServer(config, ms.cluster)
 	if err := ms.rpcServer.Start(); err != nil {
@@ -37,7 +36,6 @@ func (ms *Master) Start(config *Config) error {
 		ms.cluster.Close()
 		return err
 	}
-	log.Info("RPC server has started")
 
 	ms.apiServer = NewApiServer(config, ms.cluster)
 	if err := ms.apiServer.Start(); err != nil {
@@ -46,11 +44,8 @@ func (ms *Master) Start(config *Config) error {
 		ms.cluster.Close()
 		return err
 	}
-	log.Info("Api server has started")
 
 	GetPMSingle(ms.cluster).Start()
-	log.Info("Processor manager has started")
-
 	GetPSRpcClientSingle(config)
 
 	ms.workerManager = NewWorkerManager(ms.cluster)
@@ -58,7 +53,6 @@ func (ms *Master) Start(config *Config) error {
 		log.Error("fail to start worker manager. err:[%v]", err)
 		return err
 	}
-	log.Info("Worker manager has started")
 
 	return nil
 }

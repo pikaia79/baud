@@ -97,12 +97,9 @@ func (s *Server) Close() {
 		return
 	}
 
-	log.Info("closing server")
 	if s.l != nil {
 		s.l.Close()
 	}
-
-	log.Info("close server")
 }
 
 // isClosed checks whether server is closed or not.

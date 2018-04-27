@@ -40,12 +40,15 @@ func (wm *WorkerManager) Start() error {
 		wm.runWorker(worker)
 	}
 
+	log.Info("Worker manager has started")
 	return nil
 }
 
 func (wm *WorkerManager) Shutdown() {
 	wm.cancel()
 	wm.wg.Wait()
+
+	log.Info("Worker manager has closed")
 }
 
 func (wm *WorkerManager) addWorker(worker Worker) {
