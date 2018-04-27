@@ -33,9 +33,9 @@ import proto "github.com/gogo/protobuf/proto"
 import fmt "fmt"
 import math "math"
 import _ "github.com/gogo/protobuf/gogoproto"
-import meta "github.com/tiglabs/baud/proto/metapb"
+import meta "github.com/tiglabs/baudengine/proto/metapb"
 
-import github_com_tiglabs_baud_proto_metapb "github.com/tiglabs/baud/proto/metapb"
+import github_com_tiglabs_baud_proto_metapb "github.com/tiglabs/baudengine/proto/metapb"
 
 import context "golang.org/x/net/context"
 import grpc "google.golang.org/grpc"
@@ -61,7 +61,7 @@ const _ = proto.GoGoProtoPackageIsVersion2 // please upgrade the proto package
 type Route struct {
 	meta.Partition `protobuf:"bytes,1,opt,name=partition,embedded=partition" json:"partition"`
 	Nodes          []*meta.Node                                `protobuf:"bytes,2,rep,name=nodes" json:"nodes,omitempty"`
-	NodeID         github_com_tiglabs_baud_proto_metapb.NodeID `protobuf:"varint,3,opt,name=leader,proto3,casttype=github.com/tiglabs/baud/proto/metapb.NodeID" json:"leader,omitempty"`
+	NodeID         github_com_tiglabs_baud_proto_metapb.NodeID `protobuf:"varint,3,opt,name=leader,proto3,casttype=github.com/tiglabs/baudengine/proto/metapb.NodeID" json:"leader,omitempty"`
 }
 
 func (m *Route) Reset()                    { *m = Route{} }
@@ -88,7 +88,7 @@ func (*GetDBResponse) Descriptor() ([]byte, []int) { return fileDescriptorMaster
 
 type GetSpaceRequest struct {
 	meta.RequestHeader `protobuf:"bytes,1,opt,name=header,embedded=header" json:"header"`
-	ID                 github_com_tiglabs_baud_proto_metapb.DBID `protobuf:"varint,2,opt,name=db_id,json=dbId,proto3,casttype=github.com/tiglabs/baud/proto/metapb.DBID" json:"db_id,omitempty"`
+	ID                 github_com_tiglabs_baud_proto_metapb.DBID `protobuf:"varint,2,opt,name=db_id,json=dbId,proto3,casttype=github.com/tiglabs/baudengine/proto/metapb.DBID" json:"db_id,omitempty"`
 	SpaceName          string                                    `protobuf:"bytes,3,opt,name=Space_name,json=SpaceName,proto3" json:"Space_name,omitempty"`
 }
 
@@ -107,9 +107,9 @@ func (*GetSpaceResponse) Descriptor() ([]byte, []int) { return fileDescriptorMas
 
 type GetRouteRequest struct {
 	meta.RequestHeader `protobuf:"bytes,1,opt,name=header,embedded=header" json:"header"`
-	DB                 github_com_tiglabs_baud_proto_metapb.DBID    `protobuf:"varint,2,opt,name=db,proto3,casttype=github.com/tiglabs/baud/proto/metapb.DBID" json:"db,omitempty"`
-	Space              github_com_tiglabs_baud_proto_metapb.SpaceID `protobuf:"varint,3,opt,name=space,proto3,casttype=github.com/tiglabs/baud/proto/metapb.SpaceID" json:"space,omitempty"`
-	Slot               github_com_tiglabs_baud_proto_metapb.SlotID  `protobuf:"varint,4,opt,name=slot,proto3,casttype=github.com/tiglabs/baud/proto/metapb.SlotID" json:"slot,omitempty"`
+	DB                 github_com_tiglabs_baud_proto_metapb.DBID    `protobuf:"varint,2,opt,name=db,proto3,casttype=github.com/tiglabs/baudengine/proto/metapb.DBID" json:"db,omitempty"`
+	Space              github_com_tiglabs_baud_proto_metapb.SpaceID `protobuf:"varint,3,opt,name=space,proto3,casttype=github.com/tiglabs/baudengine/proto/metapb.SpaceID" json:"space,omitempty"`
+	Slot               github_com_tiglabs_baud_proto_metapb.SlotID  `protobuf:"varint,4,opt,name=slot,proto3,casttype=github.com/tiglabs/baudengine/proto/metapb.SlotID" json:"slot,omitempty"`
 }
 
 func (m *GetRouteRequest) Reset()                    { *m = GetRouteRequest{} }
@@ -127,7 +127,7 @@ func (*GetRouteResponse) Descriptor() ([]byte, []int) { return fileDescriptorMas
 
 type PSRegisterRequest struct {
 	meta.RequestHeader `protobuf:"bytes,1,opt,name=header,embedded=header" json:"header"`
-	NodeID             github_com_tiglabs_baud_proto_metapb.NodeID `protobuf:"varint,2,opt,name=nodeID,proto3,casttype=github.com/tiglabs/baud/proto/metapb.NodeID" json:"nodeID,omitempty"`
+	NodeID             github_com_tiglabs_baud_proto_metapb.NodeID `protobuf:"varint,2,opt,name=nodeID,proto3,casttype=github.com/tiglabs/baudengine/proto/metapb.NodeID" json:"nodeID,omitempty"`
 	Ip                 string                                      `protobuf:"bytes,3,opt,name=ip,proto3" json:"ip,omitempty"`
 	RuntimeInfo        `protobuf:"bytes,4,opt,name=runtime_info,json=runtimeInfo,embedded=runtime_info" json:"runtime_info"`
 }
@@ -138,7 +138,7 @@ func (*PSRegisterRequest) Descriptor() ([]byte, []int) { return fileDescriptorMa
 
 type PSRegisterResponse struct {
 	meta.ResponseHeader `protobuf:"bytes,1,opt,name=header,embedded=header" json:"header"`
-	NodeID              github_com_tiglabs_baud_proto_metapb.NodeID `protobuf:"varint,2,opt,name=nodeID,proto3,casttype=github.com/tiglabs/baud/proto/metapb.NodeID" json:"nodeID,omitempty"`
+	NodeID              github_com_tiglabs_baud_proto_metapb.NodeID `protobuf:"varint,2,opt,name=nodeID,proto3,casttype=github.com/tiglabs/baudengine/proto/metapb.NodeID" json:"nodeID,omitempty"`
 	PSConfig            `protobuf:"bytes,3,opt,name=config,embedded=config" json:"config"`
 	Partitions          []meta.Partition `protobuf:"bytes,4,rep,name=partitions" json:"partitions"`
 }
@@ -165,7 +165,7 @@ func (*PSConfig) Descriptor() ([]byte, []int) { return fileDescriptorMaster, []i
 
 type PSHeartbeatRequest struct {
 	meta.RequestHeader `protobuf:"bytes,1,opt,name=header,embedded=header" json:"header"`
-	NodeID             github_com_tiglabs_baud_proto_metapb.NodeID `protobuf:"varint,2,opt,name=nodeID,proto3,casttype=github.com/tiglabs/baud/proto/metapb.NodeID" json:"nodeID,omitempty"`
+	NodeID             github_com_tiglabs_baud_proto_metapb.NodeID `protobuf:"varint,2,opt,name=nodeID,proto3,casttype=github.com/tiglabs/baudengine/proto/metapb.NodeID" json:"nodeID,omitempty"`
 	Partitions         []PartitionInfo                             `protobuf:"bytes,3,rep,name=partitions" json:"partitions"`
 	SysStats           NodeSysStats                                `protobuf:"bytes,4,opt,name=sys_stats,json=sysStats" json:"sys_stats"`
 }
@@ -183,7 +183,7 @@ func (*PSHeartbeatResponse) ProtoMessage()               {}
 func (*PSHeartbeatResponse) Descriptor() ([]byte, []int) { return fileDescriptorMaster, []int{11} }
 
 type PartitionInfo struct {
-	ID         github_com_tiglabs_baud_proto_metapb.PartitionID `protobuf:"varint,1,opt,name=id,proto3,casttype=github.com/tiglabs/baud/proto/metapb.PartitionID" json:"id,omitempty"`
+	ID         github_com_tiglabs_baud_proto_metapb.PartitionID `protobuf:"varint,1,opt,name=id,proto3,casttype=github.com/tiglabs/baudengine/proto/metapb.PartitionID" json:"id,omitempty"`
 	IsLeader   bool                                             `protobuf:"varint,2,opt,name=is_leader,json=isLeader,proto3" json:"is_leader,omitempty"`
 	Status     meta.PartitionStatus                             `protobuf:"varint,3,opt,name=status,proto3,enum=PartitionStatus" json:"status,omitempty"`
 	Epoch      meta.PartitionEpoch                              `protobuf:"bytes,4,opt,name=epoch" json:"epoch"`
@@ -207,7 +207,7 @@ func (*RuntimeInfo) ProtoMessage()               {}
 func (*RuntimeInfo) Descriptor() ([]byte, []int) { return fileDescriptorMaster, []int{13} }
 
 type RaftStatus struct {
-	ID        github_com_tiglabs_baud_proto_metapb.ReplicaID `protobuf:"varint,1,opt,name=id,proto3,casttype=github.com/tiglabs/baud/proto/metapb.ReplicaID" json:"id,omitempty"`
+	ID        github_com_tiglabs_baud_proto_metapb.ReplicaID `protobuf:"varint,1,opt,name=id,proto3,casttype=github.com/tiglabs/baudengine/proto/metapb.ReplicaID" json:"id,omitempty"`
 	Term      uint64                                         `protobuf:"varint,2,opt,name=term,proto3" json:"term,omitempty"`
 	Index     uint64                                         `protobuf:"varint,3,opt,name=index,proto3" json:"index,omitempty"`
 	Commit    uint64                                         `protobuf:"varint,4,opt,name=commit,proto3" json:"commit,omitempty"`
@@ -220,8 +220,8 @@ func (*RaftStatus) ProtoMessage()               {}
 func (*RaftStatus) Descriptor() ([]byte, []int) { return fileDescriptorMaster, []int{14} }
 
 type RaftFollowerStatus struct {
-	ID          github_com_tiglabs_baud_proto_metapb.ReplicaID `protobuf:"varint,1,opt,name=id,proto3,casttype=github.com/tiglabs/baud/proto/metapb.ReplicaID" json:"id,omitempty"`
-	NodeID      github_com_tiglabs_baud_proto_metapb.NodeID    `protobuf:"varint,2,opt,name=nodeID,proto3,casttype=github.com/tiglabs/baud/proto/metapb.NodeID" json:"nodeID,omitempty"`
+	ID          github_com_tiglabs_baud_proto_metapb.ReplicaID `protobuf:"varint,1,opt,name=id,proto3,casttype=github.com/tiglabs/baudengine/proto/metapb.ReplicaID" json:"id,omitempty"`
+	NodeID      github_com_tiglabs_baud_proto_metapb.NodeID    `protobuf:"varint,2,opt,name=nodeID,proto3,casttype=github.com/tiglabs/baudengine/proto/metapb.NodeID" json:"nodeID,omitempty"`
 	Match       uint64                                         `protobuf:"varint,3,opt,name=match,proto3" json:"match,omitempty"`
 	Commit      uint64                                         `protobuf:"varint,4,opt,name=commit,proto3" json:"commit,omitempty"`
 	Next        uint64                                         `protobuf:"varint,5,opt,name=next,proto3" json:"next,omitempty"`

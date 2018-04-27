@@ -2,10 +2,10 @@ package master
 
 import (
 	"context"
-	"github.com/tiglabs/baud/proto/metapb"
-	"github.com/tiglabs/baud/proto/pspb"
-	"github.com/tiglabs/baud/util/log"
-	"github.com/tiglabs/baud/util/rpc"
+	"github.com/tiglabs/baudengine/proto/metapb"
+	"github.com/tiglabs/baudengine/proto/pspb"
+	"github.com/tiglabs/baudengine/util/log"
+	"github.com/tiglabs/baudengine/util/rpc"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/status"
 	"sync"

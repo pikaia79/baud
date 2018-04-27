@@ -2,9 +2,9 @@ package master
 
 import (
 	"context"
-	"github.com/tiglabs/baud/proto/metapb"
-	"github.com/tiglabs/baud/util/deepcopy"
-	"github.com/tiglabs/baud/util/log"
+	"github.com/tiglabs/baudengine/proto/metapb"
+	"github.com/tiglabs/baudengine/util/deepcopy"
+	"github.com/tiglabs/baudengine/util/log"
 	"runtime/debug"
 	"sync"
 )

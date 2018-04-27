@@ -2,10 +2,10 @@ package master
 
 import (
 	"fmt"
-	"github.com/tiglabs/baud/proto/masterpb"
-	"github.com/tiglabs/baud/util"
-	"github.com/tiglabs/baud/util/log"
-	"github.com/tiglabs/baud/util/raftkvstore"
+	"github.com/tiglabs/baudengine/proto/masterpb"
+	"github.com/tiglabs/baudengine/util"
+	"github.com/tiglabs/baudengine/util/log"
+	"github.com/tiglabs/baudengine/util/raftkvstore"
 	"github.com/tiglabs/raft"
 	raftproto "github.com/tiglabs/raft/proto"
 	"github.com/tiglabs/raft/storage/wal"
@@ -270,7 +270,7 @@ func (rs *RaftStore) initRaftStoreCfg() error {
 		log.Error("make raft data root directory[%v] failed, err[%v]", raftDataDir, err)
 		return err
 	}
-	raftStoreCfg.DataPath = filepath.Join(rs.config.ModuleCfg.DataPath, "baud.db")
+	raftStoreCfg.DataPath = filepath.Join(rs.config.ModuleCfg.DataPath, "baudengine.db")
 	raftStoreCfg.WalPath = raftDataDir
 
 	raftStoreCfg.RaftRetainLogs = rs.config.ClusterCfg.RaftRetainLogsCount

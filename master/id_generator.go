@@ -2,8 +2,8 @@ package master
 
 import (
 	"fmt"
-	"github.com/tiglabs/baud/util"
-	"github.com/tiglabs/baud/util/log"
+	"github.com/tiglabs/baudengine/util"
+	"github.com/tiglabs/baudengine/util/log"
 	"sync"
 	"sync/atomic"
 )

@@ -10,9 +10,9 @@ import (
 
 	"google.golang.org/grpc"
 
-	"github.com/tiglabs/baud/util/log"
-	"github.com/tiglabs/baud/util/netutil"
-	"github.com/tiglabs/baud/util/rpc/heartbeat"
+	"github.com/tiglabs/baudengine/util/log"
+	"github.com/tiglabs/baudengine/util/netutil"
+	"github.com/tiglabs/baudengine/util/rpc/heartbeat"
 )
 
 var sourceAddr = func() net.Addr {

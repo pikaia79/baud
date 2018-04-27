@@ -2,8 +2,8 @@ package master
 
 import (
 	"github.com/gogo/protobuf/proto"
-	"github.com/tiglabs/baud/proto/masterpb"
-	"github.com/tiglabs/baud/util/raftkvstore"
+	"github.com/tiglabs/baudengine/proto/masterpb"
+	"github.com/tiglabs/baudengine/util/raftkvstore"
 	raftproto "github.com/tiglabs/raft/proto"
 	"io"
 )

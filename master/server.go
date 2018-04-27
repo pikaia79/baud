@@ -1,7 +1,7 @@
 package master
 
 import (
-	"github.com/tiglabs/baud/util/log"
+	"github.com/tiglabs/baudengine/util/log"
 	"sync"
 )
 

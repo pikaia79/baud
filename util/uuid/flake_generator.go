@@ -9,7 +9,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/tiglabs/baud/util/bufalloc"
+	"github.com/tiglabs/baudengine/util/bufalloc"
 )
 
 const (

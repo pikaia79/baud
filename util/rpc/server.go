@@ -8,7 +8,7 @@ import (
 	"google.golang.org/grpc/keepalive"
 	"google.golang.org/grpc/stats"
 
-	"github.com/tiglabs/baud/util/rpc/heartbeat"
+	"github.com/tiglabs/baudengine/util/rpc/heartbeat"
 )
 
 // By default, gRPC disconnects clients that send "too many" pings,

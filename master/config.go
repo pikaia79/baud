@@ -1,11 +1,11 @@
 package master
 
 import (
-	"github.com/tiglabs/baud/util"
+	"github.com/tiglabs/baudengine/util"
 	"strings"
 
 	"github.com/BurntSushi/toml"
-	"github.com/tiglabs/baud/util/log"
+	"github.com/tiglabs/baudengine/util/log"
 	"os"
 )
 
@@ -32,10 +32,10 @@ role = "master"
 version = "v1"
 # web request request signature key
 signkey = ""
-data-path = "/tmp/baud/master/data"
+data-path = "/tmp/baudengine/master/data"
 
 [log]
-log-path = "/tmp/baud/master/log"
+log-path = "/tmp/baudengine/master/log"
 #debug, info, warn, error
 level="debug"
 #debug, info, warn

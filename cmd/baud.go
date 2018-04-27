@@ -2,9 +2,9 @@ package main
 
 import (
     "flag"
-    "github.com/tiglabs/baud/master"
-    "github.com/tiglabs/baud/partition"
-    "github.com/tiglabs/baud/util/config"
+    "github.com/tiglabs/baudengine/master"
+    "github.com/tiglabs/baudengine/partition"
+    "github.com/tiglabs/baudengine/util/config"
     "log"
     "net/http"
     _ "net/http/pprof"

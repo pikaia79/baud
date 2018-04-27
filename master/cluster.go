@@ -1,9 +1,9 @@
 package master
 
 import (
-	"github.com/tiglabs/baud/proto/metapb"
-	"github.com/tiglabs/baud/util"
-	"github.com/tiglabs/baud/util/log"
+	"github.com/tiglabs/baudengine/proto/metapb"
+	"github.com/tiglabs/baudengine/util"
+	"github.com/tiglabs/baudengine/util/log"
 	"math"
 	"sync"
 )
