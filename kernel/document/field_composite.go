@@ -1,6 +1,6 @@
 package document
 
-import "github.com/tiglabs/baud/kernel/analysis"
+import "github.com/tiglabs/baudengine/kernel/analysis"
 
 const space = byte(' ')
 

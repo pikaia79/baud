@@ -7,7 +7,7 @@ import (
 	"sort"
 	"fmt"
 
-	"github.com/tiglabs/baud/util/bufalloc"
+	"github.com/tiglabs/baudengine/util/bufalloc"
 )
 
 type NodeIterator func(key []byte, val interface{}) bool

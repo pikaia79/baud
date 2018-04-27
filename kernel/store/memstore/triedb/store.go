@@ -1,7 +1,7 @@
 package triedb
 
 import (
-	"github.com/tiglabs/baud/kernel/store/memstore"
+	"github.com/tiglabs/baudengine/kernel/store/memstore"
 )
 
 var _ memstore.MemStore = &Store{}

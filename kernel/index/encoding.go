@@ -3,8 +3,8 @@ package index
 import (
 	"errors"
 
-	"github.com/tiglabs/baud/kernel/document"
-	"github.com/tiglabs/baud/util/encoding"
+	"github.com/tiglabs/baudengine/kernel/document"
+	"github.com/tiglabs/baudengine/util/encoding"
 )
 
 type KEY_TYPE byte

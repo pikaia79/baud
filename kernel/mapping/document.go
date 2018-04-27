@@ -10,7 +10,7 @@ import (
 	"sort"
 	"sync/atomic"
 
-	"github.com/tiglabs/baud/kernel/document"
+	"github.com/tiglabs/baudengine/kernel/document"
 )
 
 type DocumentMapping struct {

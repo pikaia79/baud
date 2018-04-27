@@ -3,7 +3,7 @@ package document
 import (
 	"fmt"
 
-	"github.com/tiglabs/baud/kernel/analysis"
+	"github.com/tiglabs/baudengine/kernel/analysis"
 )
 
 var _ Field = &BooleanField{}

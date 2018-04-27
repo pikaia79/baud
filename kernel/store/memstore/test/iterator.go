@@ -5,7 +5,7 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/tiglabs/baud/kernel/store/memstore"
+	"github.com/tiglabs/baudengine/kernel/store/memstore"
 )
 
 // tests around the correct behavior of iterators

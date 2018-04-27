@@ -2,10 +2,10 @@ package mapping
 
 import (
 	"testing"
-	"github.com/tiglabs/baud/kernel/document"
-	"github.com/tiglabs/baud/kernel/analysis"
+	"github.com/tiglabs/baudengine/kernel/document"
+	"github.com/tiglabs/baudengine/kernel/analysis"
 	"time"
-	"github.com/tiglabs/baud/util"
+	"github.com/tiglabs/baudengine/util"
 	"encoding/json"
 	"fmt"
 )

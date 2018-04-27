@@ -5,8 +5,8 @@ import (
 	"testing"
 
 	"github.com/boltdb/bolt"
-	"github.com/tiglabs/baud/kernel/store/kvstore"
-	"github.com/tiglabs/baud/kernel/store/kvstore/test"
+	"github.com/tiglabs/baudengine/kernel/store/kvstore"
+	"github.com/tiglabs/baudengine/kernel/store/kvstore/test"
 )
 
 func open(t *testing.T) kvstore.KVStore {

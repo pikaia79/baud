@@ -2,7 +2,7 @@ package document
 
 import (
 	"testing"
-	"github.com/tiglabs/baud/kernel/analysis"
+	"github.com/tiglabs/baudengine/kernel/analysis"
 )
 
 type EmptyField struct {
