@@ -67,6 +67,8 @@ func (pm *ProcessorManager) Start() {
 	}()
 
 	pm.isStarted = true
+
+	log.Info("Processor manager has started")
 }
 
 func (pm *ProcessorManager) Stop() {
@@ -77,6 +79,8 @@ func (pm *ProcessorManager) Stop() {
 
 	pm.cancel()
 	pm.wg.Wait()
+
+	log.Info("Processor manager has stop")
 }
 
 func (pm *ProcessorManager) PushEvent(event *ProcessorEvent) error {

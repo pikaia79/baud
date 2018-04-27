@@ -54,8 +54,9 @@ func (c *Cluster) Start() error {
 		log.Error("fail to recovery partitionCache. err[%v]", err)
 		return err
 	}
-
 	log.Info("finish to recovery whole cluster")
+
+	log.Info("Cluster has started")
 	return nil
 }
 
@@ -63,6 +64,7 @@ func (c *Cluster) Close() {
 	if c.store != nil {
 		c.store.Close()
 	}
+	log.Info("Cluster has closed")
 }
 
 func (c *Cluster) recoveryPSCache() error {
