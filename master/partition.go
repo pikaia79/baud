@@ -4,11 +4,11 @@ import (
 	"fmt"
 	"github.com/gogo/protobuf/proto"
 	"github.com/google/btree"
-	"github.com/tiglabs/baud/proto/masterpb"
-	"github.com/tiglabs/baud/proto/metapb"
-	"github.com/tiglabs/baud/util"
-	"github.com/tiglabs/baud/util/deepcopy"
-	"github.com/tiglabs/baud/util/log"
+	"github.com/tiglabs/baudengine/proto/masterpb"
+	"github.com/tiglabs/baudengine/proto/metapb"
+	"github.com/tiglabs/baudengine/util"
+	"github.com/tiglabs/baudengine/util/deepcopy"
+	"github.com/tiglabs/baudengine/util/log"
 	"sync"
 	"time"
 )
@@ -32,7 +32,7 @@ type Partition struct {
 }
 
 func NewPartition(dbId, spaceId, startSlot, endSlot uint32) (*Partition, error) {
-	partId, err := GetIdGeneratorInstance(nil).GenID()
+	partId, err := GetIdGeneratorSingle(nil).GenID()
 	if err != nil {
 		log.Error("generate partition id is failed. err:[%v]", err)
 		return nil, ErrGenIdFailed
@@ -76,7 +76,7 @@ func (p *Partition) erase(store Store) error {
 	key := []byte(fmt.Sprintf("%s%d", PREFIX_PARTITION, p.ID))
 	if err := store.Delete(key); err != nil {
 		log.Error("fail to delete partition[%v] from store. err:[%v]", p.Partition, err)
-		return ErrBoltDbOpsFailed
+		return ErrLocalDbOpsFailed
 	}
 
 	return nil

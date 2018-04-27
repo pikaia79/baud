@@ -2,9 +2,10 @@ package master
 
 import (
 	"context"
-	"github.com/tiglabs/baud/proto/metapb"
-	"github.com/tiglabs/baud/proto/pspb"
-	"github.com/tiglabs/baud/util/log"
+	"github.com/tiglabs/baudengine/proto/metapb"
+	"github.com/tiglabs/baudengine/proto/pspb"
+	"github.com/tiglabs/baudengine/util/log"
+	"github.com/tiglabs/baudengine/util/rpc"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/status"
 	"sync"
@@ -12,115 +13,58 @@ import (
 )
 
 const (
-	GRPC_REQUEST_TIMEOUT = time.Second
-	GRPC_CONN_TIMEOUT    = time.Second * 3
+	PS_GRPC_REQUEST_TIMEOUT = time.Second
 )
 
 var (
-	singleInstance *PSRpcClient
-	instanceLock   sync.RWMutex
+	single     *PSRpcClient
+	singleLock sync.Once
 )
 
 type PSRpcClient struct {
-	connPool map[string]*PSConn
-	lock     sync.RWMutex
+	ctx       context.Context
+	cancel    context.CancelFunc
+	rpcClient *rpc.Client
 }
 
-func GetPSRpcClientInstance() *PSRpcClient {
-	if singleInstance != nil {
-		return singleInstance
+func GetPSRpcClientSingle(config *Config) *PSRpcClient {
+	if single == nil {
+		singleLock.Do(func() {
+			if config == nil {
+				log.Panic("config should not be nil at first time when create single psRpcClient")
+			}
+
+			single = new(PSRpcClient)
+			single.ctx, single.cancel = context.WithCancel(context.Background())
+
+			connMgrOpt := rpc.DefaultManagerOption
+			connMgr := rpc.NewConnectionMgr(single.ctx, &connMgrOpt)
+			clientOpt := rpc.DefaultClientOption
+			clientOpt.ClusterID = string(config.ClusterCfg.ClusterID)
+			clientOpt.ConnectMgr = connMgr
+			clientOpt.CreateFunc = func(cc *grpc.ClientConn) interface{} { return pspb.NewAdminGrpcClient(cc) }
+			single.rpcClient = rpc.NewClient(1, &clientOpt)
+		})
 	}
 
-	instanceLock.Lock()
-	defer instanceLock.Unlock()
-	if singleInstance == nil {
-		singleInstance = &PSRpcClient{
-			connPool: make(map[string]*PSConn),
-		}
-	}
-	return singleInstance
+	return single
 }
 
-type PSConn struct {
-	rpcAddr string
-	conn    *grpc.ClientConn
-	client  pspb.AdminGrpcClient
+func (c *PSRpcClient) Close() {
+	c.rpcClient.Close()
 }
 
-func (c *PSConn) callRpc(req interface{}, timeout time.Duration) (resp interface{}, err error) {
-	var header *metapb.ResponseHeader
-
-	ctx, cancel := context.WithTimeout(context.Background(), timeout)
-	switch in := req.(type) {
-	case *pspb.CreatePartitionRequest:
-		out, err := c.client.CreatePartition(ctx, in)
-		cancel()
-		if err != nil {
-			if status, ok := status.FromError(err); ok {
-				err = status.Err()
-			}
-			log.Error("grpc invoke is failed. err[%v]", err)
-			return nil, ErrGrpcInvokeFailed
-		}
-
-		header = &out.ResponseHeader
-		if header == nil {
-			return nil, ErrGrpcInvalidResp
-		}
-		if header.Code == 0 {
-			return out, nil
-		}
-
-	case *pspb.DeletePartitionRequest:
-		out, err := c.client.DeletePartition(ctx, in)
-		cancel()
-		if err != nil {
-			if status, ok := status.FromError(err); ok {
-				err = status.Err()
-			}
-			log.Error("grpc invoke is failed. err[%v]", err)
-			return nil, ErrGrpcInvokeFailed
-		}
-
-		header = &out.ResponseHeader
-		if header == nil {
-			return nil, ErrGrpcInvalidResp
-		}
-		if header.Code == 0 {
-			return out, nil
-		}
-
-	case *pspb.ChangeReplicaRequest:
-		out, err := c.client.ChangeReplica(ctx, in)
-		cancel()
-		if err != nil {
-			if status, ok := status.FromError(err); ok {
-				err = status.Err()
-			}
-			log.Error("grpc invoke is failed. err[%v]", err)
-			return nil, ErrGrpcInvokeFailed
-		}
-
-		header = &out.ResponseHeader
-		if header == nil {
-			return nil, ErrGrpcInvalidResp
-		}
-		if header.Code == 0 {
-			return out, nil
-		}
-
-	default:
-		cancel()
-		log.Error("invalid grpc request type[%v]", in)
-		return nil, ErrInternalError
+func (c *PSRpcClient) getClient(addr string) (pspb.AdminGrpcClient, error) {
+	client, err := c.rpcClient.GetGrpcClient(addr)
+	if err != nil {
+		log.Error("fail to get grpc client handle from pool. err[%v]", err)
+		return nil, ErrRpcGetClientFailed
 	}
-
-	log.Error("grpc invoke return error message[%v]", header.Message)
-	return nil, ErrGrpcInvokeFailed
+	return client.(pspb.AdminGrpcClient), nil
 }
 
 func (c *PSRpcClient) CreatePartition(addr string, partition *metapb.Partition) error {
-	psConn, err := c.getConn(addr)
+	client, err := c.getClient(addr)
 	if err != nil {
 		return err
 	}
@@ -129,16 +73,27 @@ func (c *PSRpcClient) CreatePartition(addr string, partition *metapb.Partition) 
 		RequestHeader: metapb.RequestHeader{},
 		Partition:     *partition,
 	}
-	_, err = psConn.callRpc(req, GRPC_REQUEST_TIMEOUT)
+	ctx, cancel := context.WithTimeout(context.Background(), PS_GRPC_REQUEST_TIMEOUT)
+	resp, err := client.CreatePartition(ctx, req)
+	cancel()
 	if err != nil {
-		return err
+		if status, ok := status.FromError(err); ok {
+			err = status.Err()
+		}
+		log.Error("grpc invoke is failed. err[%v]", err)
+		return ErrRpcInvokeFailed
 	}
 
-	return nil
+	if resp.ResponseHeader.Code == 0 {
+		return nil
+	} else {
+		log.Error("grpc CreatePartition response err[%v]", resp.ResponseHeader)
+		return ErrRpcInvokeFailed
+	}
 }
 
 func (c *PSRpcClient) DeletePartition(addr string, partitionId metapb.PartitionID) error {
-	psConn, err := c.getConn(addr)
+	client, err := c.getClient(addr)
 	if err != nil {
 		return err
 	}
@@ -147,17 +102,28 @@ func (c *PSRpcClient) DeletePartition(addr string, partitionId metapb.PartitionI
 		RequestHeader: metapb.RequestHeader{},
 		ID:            partitionId,
 	}
-	_, err = psConn.callRpc(req, GRPC_REQUEST_TIMEOUT)
+	ctx, cancel := context.WithTimeout(context.Background(), PS_GRPC_REQUEST_TIMEOUT)
+	resp, err := client.DeletePartition(ctx, req)
+	cancel()
 	if err != nil {
-		return err
+		if status, ok := status.FromError(err); ok {
+			err = status.Err()
+		}
+		log.Error("grpc invoke is failed. err[%v]", err)
+		return ErrRpcInvokeFailed
 	}
 
-	return nil
+	if resp.ResponseHeader.Code == 0 {
+		return nil
+	} else {
+		log.Error("grpc DeletePartition response err[%v]", resp.ResponseHeader)
+		return ErrRpcInvokeFailed
+	}
 }
 
 func (c *PSRpcClient) AddReplica(addr string, partitionId metapb.PartitionID, raftAddrs *metapb.RaftAddrs,
 	replicaId metapb.ReplicaID, replicaNodeId metapb.NodeID) error {
-	psConn, err := c.getConn(addr)
+	client, err := c.getClient(addr)
 	if err != nil {
 		return err
 	}
@@ -170,17 +136,28 @@ func (c *PSRpcClient) AddReplica(addr string, partitionId metapb.PartitionID, ra
 		NodeID:        replicaNodeId,
 		RaftAddrs:     *raftAddrs,
 	}
-	_, err = psConn.callRpc(req, GRPC_REQUEST_TIMEOUT)
+	ctx, cancel := context.WithTimeout(context.Background(), PS_GRPC_REQUEST_TIMEOUT)
+	resp, err := client.ChangeReplica(ctx, req)
+	cancel()
 	if err != nil {
-		return err
+		if status, ok := status.FromError(err); ok {
+			err = status.Err()
+		}
+		log.Error("grpc invoke is failed. err[%v]", err)
+		return ErrRpcInvokeFailed
 	}
 
-	return nil
+	if resp.ResponseHeader.Code == 0 {
+		return nil
+	} else {
+		log.Error("grpc ChangeReplica(add) response err[%v]", resp.ResponseHeader)
+		return ErrRpcInvokeFailed
+	}
 }
 
 func (c *PSRpcClient) RemoveReplica(addr string, partitionId metapb.PartitionID, raftAddrs *metapb.RaftAddrs,
 	replicaId metapb.ReplicaID, replicaNodeId metapb.NodeID) error {
-	psConn, err := c.getConn(addr)
+	client, err := c.getClient(addr)
 	if err != nil {
 		return err
 	}
@@ -193,38 +170,21 @@ func (c *PSRpcClient) RemoveReplica(addr string, partitionId metapb.PartitionID,
 		NodeID:        replicaNodeId,
 		RaftAddrs:     *raftAddrs,
 	}
-	_, err = psConn.callRpc(req, GRPC_REQUEST_TIMEOUT)
+	ctx, cancel := context.WithTimeout(context.Background(), PS_GRPC_REQUEST_TIMEOUT)
+	resp, err := client.ChangeReplica(ctx, req)
+	cancel()
 	if err != nil {
-		return err
+		if status, ok := status.FromError(err); ok {
+			err = status.Err()
+		}
+		log.Error("grpc invoke is failed. err[%v]", err)
+		return ErrRpcInvokeFailed
 	}
 
-	return nil
-}
-
-func (c *PSRpcClient) getConn(addr string) (*PSConn, error) {
-	if len(addr) == 0 {
-		return nil, ErrInternalError
+	if resp.ResponseHeader.Code == 0 {
+		return nil
+	} else {
+		log.Error("grpc ChangeReplica(remove) response err[%v]", resp.ResponseHeader)
+		return ErrRpcInvokeFailed
 	}
-	c.lock.Lock()
-	defer c.lock.Unlock()
-
-	if psConn, ok := c.connPool[addr]; ok {
-		return psConn, nil
-	}
-
-	ctx, _ := context.WithTimeout(context.Background(), GRPC_CONN_TIMEOUT)
-	grpcConn, err := grpc.DialContext(ctx, addr, grpc.WithInsecure())
-	if err != nil {
-		log.Error("fail to create grpc raw client connection for addr[%v]. err[%v]", addr, err)
-		return nil, err
-	}
-
-	psConn := &PSConn{
-		rpcAddr: addr,
-		conn:    grpcConn,
-		client:  pspb.NewAdminGrpcClient(grpcConn),
-	}
-	c.connPool[addr] = psConn
-
-	return psConn, nil
 }

@@ -2,7 +2,7 @@ syntax = "proto3";
 
 import "github.com/gogo/protobuf/gogoproto/gogo.proto";
 
-import "github.com/tiglabs/baud/proto/metapb/meta.proto";
+import "github.com/tiglabs/baudengine/proto/metapb/meta.proto";
 
 option go_package = "masterpb";
 
@@ -31,7 +31,7 @@ service MasterRpc {
 message Route {
     Partition       partition  = 1 [(gogoproto.nullable) = false, (gogoproto.embed) = true];
     repeated Node   nodes = 2;
-    uint32          leader = 3 [(gogoproto.customname) = "leader", (gogoproto.casttype) = "github.com/tiglabs/baud/proto/metapb.NodeID"];
+    uint32          leader = 3 [(gogoproto.customname) = "Leader", (gogoproto.casttype) = "github.com/tiglabs/baudengine/proto/metapb.NodeID"];
 }
 
 message GetDBRequest {
@@ -46,7 +46,7 @@ message GetDBResponse {
 
 message GetSpaceRequest {
     RequestHeader header = 1 [(gogoproto.nullable) = false, (gogoproto.embed) = true];
-    uint32        db_id   = 2 [(gogoproto.customname) = "ID", (gogoproto.casttype) = "github.com/tiglabs/baud/proto/metapb.DBID"];
+    uint32        db_id   = 2 [(gogoproto.customname) = "ID", (gogoproto.casttype) = "github.com/tiglabs/baudengine/proto/metapb.DBID"];
     string        Space_name = 3;
 }
 
@@ -57,9 +57,9 @@ message GetSpaceResponse {
 
 message GetRouteRequest {
     RequestHeader header = 1 [(gogoproto.nullable) = false, (gogoproto.embed) = true];
-    uint32        db  = 2 [(gogoproto.customname) = "DB", (gogoproto.casttype) = "github.com/tiglabs/baud/proto/metapb.DBID"];
-    uint32        space  = 3 [(gogoproto.customname) = "Space", (gogoproto.casttype) = "github.com/tiglabs/baud/proto/metapb.SpaceID"];
-    uint32        slot   = 4 [(gogoproto.customname) = "Slot", (gogoproto.casttype) = "github.com/tiglabs/baud/proto/metapb.SlotID"];
+    uint32        db  = 2 [(gogoproto.customname) = "DB", (gogoproto.casttype) = "github.com/tiglabs/baudengine/proto/metapb.DBID"];
+    uint32        space  = 3 [(gogoproto.customname) = "Space", (gogoproto.casttype) = "github.com/tiglabs/baudengine/proto/metapb.SpaceID"];
+    uint32        slot   = 4 [(gogoproto.customname) = "Slot", (gogoproto.casttype) = "github.com/tiglabs/baudengine/proto/metapb.SlotID"];
 }
 
 message GetRouteResponse {
@@ -69,14 +69,14 @@ message GetRouteResponse {
 
 message PSRegisterRequest {
     RequestHeader header       = 1 [(gogoproto.nullable) = false, (gogoproto.embed) = true];
-    uint32        nodeID       = 2 [(gogoproto.customname) = "NodeID", (gogoproto.casttype) = "github.com/tiglabs/baud/proto/metapb.NodeID"];
+    uint32        nodeID       = 2 [(gogoproto.customname) = "NodeID", (gogoproto.casttype) = "github.com/tiglabs/baudengine/proto/metapb.NodeID"];
     string        ip           = 3;
     RuntimeInfo   runtime_info = 4 [(gogoproto.nullable) = false, (gogoproto.embed) = true];
 }
 
 message PSRegisterResponse {
     ResponseHeader     header     = 1 [(gogoproto.nullable) = false, (gogoproto.embed) = true];
-    uint32             nodeID     = 2 [(gogoproto.customname) = "NodeID", (gogoproto.casttype) = "github.com/tiglabs/baud/proto/metapb.NodeID"];
+    uint32             nodeID     = 2 [(gogoproto.customname) = "NodeID", (gogoproto.casttype) = "github.com/tiglabs/baudengine/proto/metapb.NodeID"];
     PSConfig           config     = 3 [(gogoproto.nullable) = false, (gogoproto.embed) = true];
     repeated Partition partitions = 4 [(gogoproto.nullable) = false];
 }
@@ -95,7 +95,7 @@ message PSConfig {
 
 message PSHeartbeatRequest {
     RequestHeader          header     = 1 [(gogoproto.nullable) = false, (gogoproto.embed) = true];
-    uint32                 nodeID     = 2 [(gogoproto.customname) = "NodeID", (gogoproto.casttype) = "github.com/tiglabs/baud/proto/metapb.NodeID"];
+    uint32                 nodeID     = 2 [(gogoproto.customname) = "NodeID", (gogoproto.casttype) = "github.com/tiglabs/baudengine/proto/metapb.NodeID"];
     repeated PartitionInfo partitions = 3 [(gogoproto.nullable) = false];
     NodeSysStats           sys_stats  = 4 [(gogoproto.nullable) = false];
 }
@@ -105,7 +105,7 @@ message PSHeartbeatResponse {
 }
 
 message PartitionInfo {
-    uint32           id          = 1 [(gogoproto.customname) = "ID", (gogoproto.casttype) = "github.com/tiglabs/baud/proto/metapb.PartitionID"];
+    uint32           id          = 1 [(gogoproto.customname) = "ID", (gogoproto.casttype) = "github.com/tiglabs/baudengine/proto/metapb.PartitionID"];
     bool             is_leader   = 2;
     PartitionStatus  status      = 3;
     PartitionEpoch   epoch       = 4 [(gogoproto.nullable) = false];
@@ -121,7 +121,7 @@ message RuntimeInfo {
 }
 
 message RaftStatus {
-    uint64 id                             = 1 [(gogoproto.customname) = "ID", (gogoproto.casttype) = "github.com/tiglabs/baud/proto/metapb.ReplicaID"];
+    uint64 id                             = 1 [(gogoproto.customname) = "ID", (gogoproto.casttype) = "github.com/tiglabs/baudengine/proto/metapb.ReplicaID"];
     uint64 term                           = 2;
     uint64 index                          = 3;
     uint64 commit                         = 4;
@@ -130,8 +130,8 @@ message RaftStatus {
 }
 
 message RaftFollowerStatus {
-    uint64 id           = 1 [(gogoproto.customname) = "ID", (gogoproto.casttype) = "github.com/tiglabs/baud/proto/metapb.ReplicaID"];
-    uint32 nodeID       = 2 [(gogoproto.customname) = "NodeID", (gogoproto.casttype) = "github.com/tiglabs/baud/proto/metapb.NodeID"];
+    uint64 id           = 1 [(gogoproto.customname) = "ID", (gogoproto.casttype) = "github.com/tiglabs/baudengine/proto/metapb.ReplicaID"];
+    uint32 nodeID       = 2 [(gogoproto.customname) = "NodeID", (gogoproto.casttype) = "github.com/tiglabs/baudengine/proto/metapb.NodeID"];
     uint64 match        = 3;
     uint64 commit       = 4;
     uint64 next         = 5;

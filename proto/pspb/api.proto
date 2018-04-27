@@ -2,7 +2,7 @@ syntax = "proto3";
 
 import "github.com/gogo/protobuf/gogoproto/gogo.proto";
 
-import "github.com/tiglabs/baud/proto/metapb/meta.proto";
+import "github.com/tiglabs/baudengine/proto/metapb/meta.proto";
 
 option go_package = "pspb";
 
@@ -49,8 +49,8 @@ enum WriteResult {
 }
 
 message ActionRequestHeader {
-    uint32  space_id                = 1 [(gogoproto.customname) = "SpaceID", (gogoproto.casttype) = "github.com/tiglabs/baud/proto/metapb.SpaceID"];
-    uint32  partition_id            = 2 [(gogoproto.customname) = "PartitionID", (gogoproto.casttype) = "github.com/tiglabs/baud/proto/metapb.PartitionID"];
+    uint32  space_id                = 1 [(gogoproto.customname) = "SpaceID", (gogoproto.casttype) = "github.com/tiglabs/baudengine/proto/metapb.SpaceID"];
+    uint32  partition_id            = 2 [(gogoproto.customname) = "PartitionID", (gogoproto.casttype) = "github.com/tiglabs/baudengine/proto/metapb.PartitionID"];
     string  timeout                 = 3;
     RequestContentType  content_type = 4;
     string  req_id                  = 5;
@@ -96,7 +96,7 @@ message IndexResponse {
 }
 
 message UpdateRequest {
-    DocID     id            = 1 [(gogoproto.nullable) = false, (gogoproto.casttype) = "github.com/tiglabs/baud/proto/metapb.DocID"];
+    DocID     id            = 1 [(gogoproto.nullable) = false, (gogoproto.casttype) = "github.com/tiglabs/baudengine/proto/metapb.DocID"];
     bytes     doc           = 2;
     bool      doc_as_upsert = 3;
 }
@@ -107,7 +107,7 @@ message UpdateResponse {
 }
 
 message DeleteRequest {
-    DocID id = 1 [(gogoproto.nullable) = false, (gogoproto.casttype) = "github.com/tiglabs/baud/proto/metapb.DocID"];
+    DocID id = 1 [(gogoproto.nullable) = false, (gogoproto.casttype) = "github.com/tiglabs/baudengine/proto/metapb.DocID"];
 }
 
 message DeleteResponse {
@@ -119,7 +119,7 @@ message GetRequest {
     option (gogoproto.goproto_stringer) = false;
 
     ActionRequestHeader header    = 1 [(gogoproto.nullable) = false, (gogoproto.embed) = true];
-    DocID               id        = 2 [(gogoproto.nullable) = false, (gogoproto.casttype) = "github.com/tiglabs/baud/proto/metapb.DocID"];
+    DocID               id        = 2 [(gogoproto.nullable) = false, (gogoproto.casttype) = "github.com/tiglabs/baudengine/proto/metapb.DocID"];
     repeated string stored_fields = 3;
 }
 

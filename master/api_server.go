@@ -3,12 +3,12 @@ package master
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/tiglabs/baud/util"
-	"github.com/tiglabs/baud/util/log"
-	"github.com/tiglabs/baud/util/server"
+	"github.com/tiglabs/baudengine/util"
+	"github.com/tiglabs/baudengine/util/log"
+	"github.com/tiglabs/baudengine/util/server"
+	"math"
 	"net/http"
 	"strconv"
-    "math"
 )
 
 const (
@@ -66,16 +66,16 @@ func (s *ApiServer) Close() {
 }
 
 func (s *ApiServer) initAdminHandler() {
-    s.httpServer.Handle("/manage/db/create", s.handleDbCreate)
-    s.httpServer.Handle("/manage/db/delete", s.handleDbDelete)
-    s.httpServer.Handle("/manage/db/rename", s.handleDbRename)
-    s.httpServer.Handle("/manage/db/list", s.handleDbList)
-    s.httpServer.Handle("/manage/db/detail", s.handleDbDetail)
-    s.httpServer.Handle("/manage/space/create", s.handleSpaceCreate)
-    s.httpServer.Handle("/manage/space/delete", s.handleSpaceDelete)
-    s.httpServer.Handle("/manage/space/rename", s.handleSpaceRename)
+	s.httpServer.Handle("/manage/db/create", s.handleDbCreate)
+	s.httpServer.Handle("/manage/db/delete", s.handleDbDelete)
+	s.httpServer.Handle("/manage/db/rename", s.handleDbRename)
+	s.httpServer.Handle("/manage/db/list", s.handleDbList)
+	s.httpServer.Handle("/manage/db/detail", s.handleDbDetail)
+	s.httpServer.Handle("/manage/space/create", s.handleSpaceCreate)
+	s.httpServer.Handle("/manage/space/delete", s.handleSpaceDelete)
+	s.httpServer.Handle("/manage/space/rename", s.handleSpaceRename)
 	s.httpServer.Handle("/manage/space/list", s.handleSpaceList)
-    s.httpServer.Handle("/manage/space/detail", s.handleSpaceDetail)
+	s.httpServer.Handle("/manage/space/detail", s.handleSpaceDetail)
 }
 
 func (s *ApiServer) handleDbCreate(w http.ResponseWriter, r *http.Request) {
@@ -114,14 +114,13 @@ func (s *ApiServer) handleDbRename(w http.ResponseWriter, r *http.Request) {
 	sendReply(w, newHttpSucReply(""))
 }
 
-
 func (s *ApiServer) handleDbList(w http.ResponseWriter, r *http.Request) {
 	dbs := s.cluster.dbCache.getAllDBs()
 
 	sendReply(w, newHttpSucReply(dbs))
 }
 
-func(s *ApiServer) handleDbDetail(w http.ResponseWriter, r *http.Request) {
+func (s *ApiServer) handleDbDetail(w http.ResponseWriter, r *http.Request) {
 	dbName, err := checkMissingParam(w, r, DB_NAME)
 	if err != nil {
 		return
@@ -292,12 +291,12 @@ func checkMissingAndUint32Param(w http.ResponseWriter, r *http.Request, paramNam
 		return 0, ErrParamError
 	}
 	if paramValInt > math.MaxUint32 {
-	    reply := newHttpErrReply(ErrParamError)
-	    newMsg := fmt.Sprintf("%s, value of [%s] exceed uint32 limit", reply.Msg, paramName)
-	    reply.Msg = newMsg
-	    sendReply(w, reply)
-	    return 0, ErrParamError
-    }
+		reply := newHttpErrReply(ErrParamError)
+		newMsg := fmt.Sprintf("%s, value of [%s] exceed uint32 limit", reply.Msg, paramName)
+		reply.Msg = newMsg
+		sendReply(w, reply)
+		return 0, ErrParamError
+	}
 	return uint32(paramValInt), nil
 }
 

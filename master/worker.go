@@ -2,11 +2,11 @@ package master
 
 import (
 	"context"
-	"github.com/tiglabs/baud/proto/metapb"
-	"github.com/tiglabs/baud/util/log"
+	"github.com/tiglabs/baudengine/proto/metapb"
+	"github.com/tiglabs/baudengine/util/log"
+	"runtime/debug"
 	"sync"
 	"time"
-	"runtime/debug"
 )
 
 type WorkerManager struct {
@@ -126,7 +126,7 @@ func (w *SpaceStateTransitionWorker) run() {
 		spaces := db.spaceCache.getAllSpaces()
 		for _, space := range spaces {
 
-			func () {
+			func() {
 				space.propertyLock.Lock()
 				defer space.propertyLock.Unlock()
 

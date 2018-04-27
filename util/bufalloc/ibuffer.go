@@ -5,7 +5,7 @@ import (
 	"errors"
 	"io"
 
-	byteutil "github.com/tiglabs/baud/util/bytes"
+	byteutil "github.com/tiglabs/baudengine/util/bytes"
 )
 
 const minRead = 128

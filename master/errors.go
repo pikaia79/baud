@@ -18,16 +18,16 @@ var (
 	ErrSpaceNotExists     = errors.New("space not exists")
 	ErrPSNotExists        = errors.New("partition server is not exists")
 	ErrGenIdFailed        = errors.New("generate id is failed")
-	ErrBoltDbOpsFailed    = errors.New("boltdb operation error")
+	ErrLocalDbOpsFailed   = errors.New("local storage db operation error")
 	ErrUnknownRaftCmdType = errors.New("unknown raft command type")
 	ErrRouteNotFound      = errors.New("route not found")
-	//ErrEntryNotFound		    = errors.New("storage entry not found")
 
-	ErrGrpcInvalidResp      = errors.New("invalid grpc response")
-	ErrGrpcInvokeFailed     = errors.New("invoke grpc is failed")
-	ErrGrpcParamError       = errors.New("grpc param error")
-	ErrGrpcEmptyFollowers   = errors.New("reported empty followers")
-	ErrGrpcInvalidFollowers = errors.New("reported invalid followers")
+	ErrRpcGetClientFailed  = errors.New("get rpc client handle is failed")
+	ErrRpcInvalidResp      = errors.New("invalid rpc response")
+	ErrRpcInvokeFailed     = errors.New("invoke rpc is failed")
+	ErrRpcParamError       = errors.New("rpc param error")
+	ErrRpcEmptyFollowers   = errors.New("reported empty followers")
+	ErrRpcInvalidFollowers = errors.New("reported invalid followers")
 
 	ErrRaftNotRegHandler          = errors.New("have no register raft handler")
 	ErrRaftInvalidNode            = errors.New("invalid raft node")
@@ -55,7 +55,7 @@ const (
 	ERRCODE_PS_NOTEXISTS
 
 	ERRCODE_GENID_FAILED
-	ERRCODE_BOLTDB_OPTFAILED
+	ERRCODE_LOCALDB_OPTFAILED
 
 //	ERRCODE_UNKNOWN_RAFTCMDTYPE
 )
@@ -72,6 +72,6 @@ var Err2CodeMap = map[error]int32{
 	ErrSpaceNotExists: ERRCODE_SPACE_NOTEXISTS,
 	ErrPSNotExists:    ERRCODE_PS_NOTEXISTS,
 
-	ErrGenIdFailed:     ERRCODE_GENID_FAILED,
-	ErrBoltDbOpsFailed: ERRCODE_BOLTDB_OPTFAILED,
+	ErrGenIdFailed:      ERRCODE_GENID_FAILED,
+	ErrLocalDbOpsFailed: ERRCODE_LOCALDB_OPTFAILED,
 }

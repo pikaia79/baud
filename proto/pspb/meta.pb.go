@@ -17,7 +17,7 @@ import fmt "fmt"
 import math "math"
 import _ "github.com/gogo/protobuf/gogoproto"
 
-import github_com_tiglabs_baud_proto_metapb "github.com/tiglabs/baud/proto/metapb"
+import github_com_tiglabs_baud_proto_metapb "github.com/tiglabs/baudengine/proto/metapb"
 
 import strings "strings"
 import reflect "reflect"
@@ -37,7 +37,7 @@ const _ = proto.ProtoPackageIsVersion2 // please upgrade the proto package
 
 type MetaInfo struct {
 	ClusterID string                                      `protobuf:"bytes,1,opt,name=cluster_id,json=clusterId,proto3" json:"cluster_id,omitempty"`
-	NodeID    github_com_tiglabs_baud_proto_metapb.NodeID `protobuf:"varint,2,opt,name=node_id,json=nodeId,proto3,casttype=github.com/tiglabs/baud/proto/metapb.NodeID" json:"node_id,omitempty"`
+	NodeID    github_com_tiglabs_baud_proto_metapb.NodeID `protobuf:"varint,2,opt,name=node_id,json=nodeId,proto3,casttype=github.com/tiglabs/baudengine/proto/metapb.NodeID" json:"node_id,omitempty"`
 }
 
 func (m *MetaInfo) Reset()                    { *m = MetaInfo{} }

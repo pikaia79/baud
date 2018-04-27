@@ -23,9 +23,9 @@ import proto "github.com/golang/protobuf/proto"
 import fmt "fmt"
 import math "math"
 import _ "github.com/gogo/protobuf/gogoproto"
-import meta "github.com/tiglabs/baud/proto/metapb"
+import meta "github.com/tiglabs/baudengine/proto/metapb"
 
-import github_com_tiglabs_baud_proto_metapb "github.com/tiglabs/baud/proto/metapb"
+import github_com_tiglabs_baud_proto_metapb "github.com/tiglabs/baudengine/proto/metapb"
 
 import context "golang.org/x/net/context"
 import grpc "google.golang.org/grpc"
@@ -86,7 +86,7 @@ func (*CreatePartitionResponse) Descriptor() ([]byte, []int) { return fileDescri
 
 type DeletePartitionRequest struct {
 	meta.RequestHeader `protobuf:"bytes,1,opt,name=header,embedded=header" json:"header"`
-	ID                 github_com_tiglabs_baud_proto_metapb.PartitionID `protobuf:"varint,2,opt,name=id,proto3,casttype=github.com/tiglabs/baud/proto/metapb.PartitionID" json:"id,omitempty"`
+	ID                 github_com_tiglabs_baud_proto_metapb.PartitionID `protobuf:"varint,2,opt,name=id,proto3,casttype=github.com/tiglabs/baudengine/proto/metapb.PartitionID" json:"id,omitempty"`
 }
 
 func (m *DeletePartitionRequest) Reset()                    { *m = DeletePartitionRequest{} }
@@ -104,9 +104,9 @@ func (*DeletePartitionResponse) Descriptor() ([]byte, []int) { return fileDescri
 type ChangeReplicaRequest struct {
 	meta.RequestHeader `protobuf:"bytes,1,opt,name=header,embedded=header" json:"header"`
 	Type               ReplicaChangeType                                `protobuf:"varint,2,opt,name=type,proto3,enum=ReplicaChangeType" json:"type,omitempty"`
-	PartitionID        github_com_tiglabs_baud_proto_metapb.PartitionID `protobuf:"varint,3,opt,name=partition_id,json=partitionId,proto3,casttype=github.com/tiglabs/baud/proto/metapb.PartitionID" json:"partition_id,omitempty"`
-	ReplicaID          github_com_tiglabs_baud_proto_metapb.ReplicaID   `protobuf:"varint,4,opt,name=ReplicaID,proto3,casttype=github.com/tiglabs/baud/proto/metapb.ReplicaID" json:"ReplicaID,omitempty"`
-	NodeID             github_com_tiglabs_baud_proto_metapb.NodeID      `protobuf:"varint,5,opt,name=nodeID,proto3,casttype=github.com/tiglabs/baud/proto/metapb.NodeID" json:"nodeID,omitempty"`
+	PartitionID        github_com_tiglabs_baud_proto_metapb.PartitionID `protobuf:"varint,3,opt,name=partition_id,json=partitionId,proto3,casttype=github.com/tiglabs/baudengine/proto/metapb.PartitionID" json:"partition_id,omitempty"`
+	ReplicaID          github_com_tiglabs_baud_proto_metapb.ReplicaID   `protobuf:"varint,4,opt,name=ReplicaID,proto3,casttype=github.com/tiglabs/baudengine/proto/metapb.ReplicaID" json:"ReplicaID,omitempty"`
+	NodeID             github_com_tiglabs_baud_proto_metapb.NodeID      `protobuf:"varint,5,opt,name=nodeID,proto3,casttype=github.com/tiglabs/baudengine/proto/metapb.NodeID" json:"nodeID,omitempty"`
 	meta.RaftAddrs     `protobuf:"bytes,6,opt,name=raft_addrs,json=raftAddrs,embedded=raft_addrs" json:"raft_addrs"`
 }
 
@@ -124,7 +124,7 @@ func (*ChangeReplicaResponse) Descriptor() ([]byte, []int) { return fileDescript
 
 type ChangeLeaderRequest struct {
 	meta.RequestHeader `protobuf:"bytes,1,opt,name=header,embedded=header" json:"header"`
-	PartitionID        github_com_tiglabs_baud_proto_metapb.PartitionID `protobuf:"varint,2,opt,name=partition_id,json=partitionId,proto3,casttype=github.com/tiglabs/baud/proto/metapb.PartitionID" json:"partition_id,omitempty"`
+	PartitionID        github_com_tiglabs_baud_proto_metapb.PartitionID `protobuf:"varint,2,opt,name=partition_id,json=partitionId,proto3,casttype=github.com/tiglabs/baudengine/proto/metapb.PartitionID" json:"partition_id,omitempty"`
 }
 
 func (m *ChangeLeaderRequest) Reset()                    { *m = ChangeLeaderRequest{} }

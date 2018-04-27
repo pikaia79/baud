@@ -1,10 +1,10 @@
 package master
 
 import (
-	"github.com/tiglabs/baud/proto/masterpb"
-	"github.com/tiglabs/baud/proto/metapb"
-	"github.com/tiglabs/baud/util"
-	"github.com/tiglabs/baud/util/log"
+	"github.com/tiglabs/baudengine/proto/masterpb"
+	"github.com/tiglabs/baudengine/proto/metapb"
+	"github.com/tiglabs/baudengine/util"
+	"github.com/tiglabs/baudengine/util/log"
 	"golang.org/x/net/context"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/reflection"
@@ -79,7 +79,7 @@ func (s *RpcServer) GetRoute(ctx context.Context,
 	for _, partition := range partitions {
 		route := masterpb.Route{
 			Partition: *partition.Partition,
-			Leader:    partition.pickLeaderNodeId(),
+			NodeID:    partition.pickLeaderNodeId(), // Leader NodeId
 		}
 
 		replicas := partition.Replicas
@@ -290,7 +290,7 @@ func pickReplicaToDelete(info *masterpb.PartitionInfo, leaderNodeId metapb.NodeI
 	followers := info.RaftStatus.Followers
 	if followers == nil || len(followers) == 0 {
 		log.Error("!!!Never happened. Cannot report empty replicas in ps heartbeat. info:[%v]", info)
-		return nil, ErrGrpcEmptyFollowers
+		return nil, ErrRpcEmptyFollowers
 	}
 
 	var replicaToDelete *metapb.Replica
@@ -311,7 +311,7 @@ func pickReplicaToDelete(info *masterpb.PartitionInfo, leaderNodeId metapb.NodeI
 			}
 
 			log.Error("cannot find leader in followers")
-			return nil, ErrGrpcInvalidFollowers
+			return nil, ErrRpcInvalidFollowers
 
 		} else {
 			replicaToDelete = &metapb.Replica{ID: followers[0].ID, NodeID: followers[0].NodeID}

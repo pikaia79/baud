@@ -2,10 +2,10 @@ package master
 
 import (
 	"fmt"
-	"github.com/tiglabs/baud/proto/masterpb"
-	"github.com/tiglabs/baud/util"
-	"github.com/tiglabs/baud/util/log"
-	"github.com/tiglabs/baud/util/raftkvstore"
+	"github.com/tiglabs/baudengine/proto/masterpb"
+	"github.com/tiglabs/baudengine/util"
+	"github.com/tiglabs/baudengine/util/log"
+	"github.com/tiglabs/baudengine/util/raftkvstore"
 	"github.com/tiglabs/raft"
 	raftproto "github.com/tiglabs/raft/proto"
 	"github.com/tiglabs/raft/storage/wal"
@@ -270,15 +270,15 @@ func (rs *RaftStore) initRaftStoreCfg() error {
 		log.Error("make raft data root directory[%v] failed, err[%v]", raftDataDir, err)
 		return err
 	}
-	raftStoreCfg.DataPath = filepath.Join(rs.config.ModuleCfg.DataPath, "baud.db")
+	raftStoreCfg.DataPath = filepath.Join(rs.config.ModuleCfg.DataPath, "baudengine.db")
 	raftStoreCfg.WalPath = raftDataDir
 
 	raftStoreCfg.RaftRetainLogs = rs.config.ClusterCfg.RaftRetainLogsCount
 	raftStoreCfg.RaftHeartbeatInterval = rs.config.ClusterCfg.RaftHeartbeatInterval.Duration
 	raftStoreCfg.RaftHeartbeatAddr = util.BuildAddr(rs.config.ClusterCfg.CurNode.Host,
-			int(rs.config.ClusterCfg.CurNode.RaftHeartbeatPort))
+		int(rs.config.ClusterCfg.CurNode.RaftHeartbeatPort))
 	raftStoreCfg.RaftReplicateAddr = util.BuildAddr(rs.config.ClusterCfg.CurNode.Host,
-			int(rs.config.ClusterCfg.CurNode.RaftReplicatePort))
+		int(rs.config.ClusterCfg.CurNode.RaftReplicatePort))
 
 	var peers []*Peer
 	for _, p := range rs.config.ClusterCfg.Nodes {
@@ -592,4 +592,5 @@ func (rs *RaftStore) LeaderChangeHandler(leaderId uint64) {
 func (rs *RaftStore) FatalEventHandler(err *raft.FatalError) {
 	log.Error("received raft fatal error[%v]", err)
 }
+
 ///////////////////////callback implement end////////////////
