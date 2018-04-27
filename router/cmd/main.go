@@ -1,8 +1,9 @@
-package router
+package main
 
 import (
 	"flag"
-	"github.com/tiglabs/baud/util/log"
+	"github.com/tiglabs/baudengine/util/log"
+	"github.com/tiglabs/baudengine/router"
 	"net/http"
 	_ "net/http/pprof"
 	"os"
@@ -25,7 +26,7 @@ var (
 	mainWg sync.WaitGroup
 )
 
-func interceptSignal(s *Router) {
+func interceptSignal(s *router.Router) {
 	sigs := make(chan os.Signal, 1)
 	signal.Notify(sigs, syscall.SIGINT, syscall.SIGTERM)
 
@@ -41,7 +42,7 @@ func main() {
 	fmt.Println("Hello, Baud! I router!!!")
 	flag.Parse()
 
-	cfg := LoadConfig(*configFile)
+	cfg := router.LoadConfig(*configFile)
 
 	//for multi-cpu scheduling
 	runtime.GOMAXPROCS(runtime.NumCPU())
@@ -51,7 +52,7 @@ func main() {
 		fmt.Println(http.ListenAndServe(fmt.Sprintf(":%d", cfg.Pprof), nil))
 	}()
 
-	server := NewServer()
+	server := router.NewServer()
 
 	//install the signal handler
 	interceptSignal(server)

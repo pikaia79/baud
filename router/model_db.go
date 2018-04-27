@@ -2,7 +2,7 @@ package router
 
 import (
 	"context"
-	"github.com/tiglabs/baud/proto/metapb"
+	"github.com/tiglabs/baudengine/proto/metapb"
 	"sync"
 )
 
