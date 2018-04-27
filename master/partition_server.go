@@ -46,7 +46,7 @@ func NewPartitionServer(ip string) (*PartitionServer, error) {
 
 	return &PartitionServer{
 		Node: &metapb.Node{
-			ID: newId,
+			ID: metapb.NodeID(newId),
 			Ip: ip,
 		},
 		NodeSysStats:   new(masterpb.NodeSysStats),
@@ -174,7 +174,7 @@ func (c *PSCache) findServerByAddr(addr string) *PartitionServer {
 	return ps
 }
 
-func (c *PSCache) findServerById(psId uint32) *PartitionServer {
+func (c *PSCache) findServerById(psId metapb.NodeID) *PartitionServer {
 	if psId == 0 {
 		return nil
 	}
