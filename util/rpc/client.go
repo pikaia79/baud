@@ -4,9 +4,8 @@ import (
 	"strconv"
 	"strings"
 	"sync"
-	"time"
-
 	"sync/atomic"
+	"time"
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/stats"
@@ -91,12 +90,16 @@ func (cw *clientWrapper) getClient() (interface{}, error) {
 	cw.rwMutex.RLock()
 	if cw.conn != nil {
 		if _, err := cw.conn.connect(); err == nil {
+			cw.rwMutex.RUnlock()
+
 			return cw.clientRaw, nil
 		}
 	}
 	cw.rwMutex.RUnlock()
 
 	cw.rwMutex.Lock()
+	defer cw.rwMutex.Unlock()
+
 	if cw.conn != nil {
 		if _, err := cw.conn.connect(); err == nil {
 			return cw.clientRaw, nil
@@ -114,7 +117,6 @@ func (cw *clientWrapper) getClient() (interface{}, error) {
 		cw.conn = nil
 	}
 	cw.clientRaw = cli
-	cw.rwMutex.Unlock()
 
 	return cli, err
 }
@@ -130,9 +132,15 @@ func (cw *clientWrapper) Close() error {
 	return nil
 }
 
+type loadPoll struct {
+	pos  uint64
+	mask uint64
+	next func() uint64
+}
+
 type clientPool struct {
 	size     uint32
-	pos      uint32
+	loadPoll *loadPoll
 	wrappers []clientWrapper
 }
 
@@ -141,11 +149,26 @@ func newClientPool(size uint32, addr string, option *ClientOption) *clientPool {
 		size:     size,
 		wrappers: make([]clientWrapper, size),
 	}
-
 	for i := 0; i < int(size); i++ {
 		pool.wrappers[i].key = strings.Join([]string{addr, strconv.Itoa(i)}, "-")
 		pool.wrappers[i].addr = addr
 		pool.wrappers[i].option = *option
+	}
+
+	if size > 1 {
+		if size&(size-1) == 0 {
+			pool.loadPoll = &loadPoll{mask: uint64(size - 1)}
+			pool.loadPoll.next = func() uint64 {
+				pos := atomic.AddUint64(&pool.loadPoll.pos, 1)
+				return pos & pool.loadPoll.mask
+			}
+		} else {
+			pool.loadPoll = &loadPoll{mask: uint64(size)}
+			pool.loadPoll.next = func() uint64 {
+				pos := atomic.AddUint64(&pool.loadPoll.pos, 1)
+				return pos % pool.loadPoll.mask
+			}
+		}
 	}
 
 	return pool
@@ -156,11 +179,7 @@ func (p *clientPool) getClient() (interface{}, error) {
 		return p.wrappers[0].getClient()
 	}
 
-	idx := atomic.AddUint32(&p.pos, 1)
-	if idx >= p.size {
-		atomic.StoreUint32(&p.pos, 0)
-		idx = 0
-	}
+	idx := p.loadPoll.next()
 	return p.wrappers[idx].getClient()
 }
 

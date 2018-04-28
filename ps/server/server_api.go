@@ -26,7 +26,7 @@ func (s *Server) Get(ctx context.Context, request *pspb.GetRequest) (*pspb.GetRe
 	}
 
 	if p, ok := s.partitions.Load(request.PartitionID); ok {
-		p.(*partition).internalGet(request, response)
+		p.(*partition).getInternal(request, response)
 	} else {
 		response.Code = metapb.PS_RESP_CODE_NO_PARTITION
 		response.Message = fmt.Sprintf("node[%d] has not found partition[%d]", s.nodeID, request.PartitionID)

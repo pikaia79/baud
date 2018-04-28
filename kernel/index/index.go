@@ -1,14 +1,14 @@
 package index
 
 import (
-	"errors"
 	"bytes"
+	"errors"
 
+	"github.com/tiglabs/baudengine/kernel"
 	"github.com/tiglabs/baudengine/kernel/document"
+	"github.com/tiglabs/baudengine/kernel/mapping"
 	"github.com/tiglabs/baudengine/kernel/store/kvstore"
 	"github.com/tiglabs/baudengine/kernel/util"
-	"github.com/tiglabs/baudengine/kernel/mapping"
-	"github.com/tiglabs/baudengine/kernel"
 )
 
 type IndexDriver struct {
@@ -16,12 +16,18 @@ type IndexDriver struct {
 	indexMapping mapping.IndexMapping
 }
 
+func NewIndexDriver(store kvstore.KVStore) *IndexDriver {
+	return &IndexDriver{
+		store: store,
+	}
+}
+
 func (id *IndexDriver) AddDocuments(docs []*document.Document, ops ...*kernel.Option) error {
 	tx, err := id.store.NewTransaction(true)
 	if err != nil {
 		return err
 	}
-	err = func () error {
+	err = func() error {
 		for _, doc := range docs {
 			// check doc version
 			val, err := tx.Get(encodeStoreFieldKey(doc.ID, "_version"))
@@ -54,7 +60,7 @@ func (id *IndexDriver) UpdateDocuments(docs []*document.Document, ops ...*kernel
 	if err != nil {
 		return err
 	}
-	err = func () error {
+	err = func() error {
 		for _, doc := range docs {
 			// get old document
 			iter := tx.PrefixIterator(encodeStoreFieldKey(doc.ID, ""))
