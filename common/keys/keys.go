@@ -5,8 +5,8 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/tiglabs/baud/proto/metapb"
-	"github.com/tiglabs/baud/util/encoding"
+	"github.com/tiglabs/baudengine/proto/metapb"
+	"github.com/tiglabs/baudengine/util/encoding"
 )
 
 const (

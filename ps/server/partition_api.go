@@ -5,10 +5,10 @@ import (
 
 	"errors"
 
-	"github.com/tiglabs/baud/common/content"
-	"github.com/tiglabs/baud/proto/metapb"
-	"github.com/tiglabs/baud/proto/pspb"
-	"github.com/tiglabs/baud/util/log"
+	"github.com/tiglabs/baudengine/common/content"
+	"github.com/tiglabs/baudengine/proto/metapb"
+	"github.com/tiglabs/baudengine/proto/pspb"
+	"github.com/tiglabs/baudengine/util/log"
 )
 
 func (p *partition) getInternal(request *pspb.GetRequest, response *pspb.GetResponse) {

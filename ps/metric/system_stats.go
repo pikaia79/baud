@@ -8,9 +8,9 @@ import (
 	"github.com/shirou/gopsutil/mem"
 	"github.com/shirou/gopsutil/net"
 
-	"github.com/tiglabs/baud/proto/masterpb"
-	"github.com/tiglabs/baud/util/log"
-	"github.com/tiglabs/baud/util/routine"
+	"github.com/tiglabs/baudengine/proto/masterpb"
+	"github.com/tiglabs/baudengine/util/log"
+	"github.com/tiglabs/baudengine/util/routine"
 )
 
 // SystemMetric system metric gather
