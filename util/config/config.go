@@ -7,8 +7,7 @@ import (
 	"strconv"
 	"strings"
 
-	"csm/util"
-
+	"github.com/tiglabs/baudengine/util/bytes"
 	"github.com/tiglabs/baudengine/util/json"
 )
 
@@ -101,7 +100,7 @@ func (c *Config) GetBool(key string) bool {
 func (c *Config) GetArray(key string) []interface{} {
 	if env := os.Getenv(key); env != "" {
 		var data interface{}
-		if err := json.Unmarshal(util.StringToBytes(env), &data); err == nil {
+		if err := json.Unmarshal(bytes.StringToByte(env), &data); err == nil {
 			return data.([]interface{})
 		}
 	}

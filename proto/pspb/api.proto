@@ -86,7 +86,8 @@ message BulkItemResponse {
 }
 
 message IndexRequest {
-    bytes   source = 1;
+    uint32 slot   = 1 [(gogoproto.customname) = "Slot", (gogoproto.casttype) = "github.com/tiglabs/baudengine/proto/metapb.SlotID"];
+    bytes  source = 2;
 }
 
 message IndexResponse {

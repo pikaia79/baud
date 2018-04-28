@@ -6,7 +6,6 @@ import (
 
 	"github.com/tiglabs/baudengine/kernel"
 	"github.com/tiglabs/baudengine/kernel/index"
-	"github.com/tiglabs/baudengine/kernel/mapping"
 	"github.com/tiglabs/baudengine/kernel/store/kvstore/badgerdb"
 	"github.com/tiglabs/baudengine/proto/masterpb"
 	"github.com/tiglabs/baudengine/proto/metapb"
@@ -19,7 +18,6 @@ type partition struct {
 
 	server    *Server
 	store     kernel.Engine
-	mapping   *mapping.DocumentMapping
 	closeOnce sync.Once
 
 	rwMutex    sync.RWMutex
@@ -28,11 +26,10 @@ type partition struct {
 	statistics masterpb.PartitionStats
 }
 
-func newPartition(server *Server, meta metapb.Partition, mapping *mapping.DocumentMapping) *partition {
+func newPartition(server *Server, meta metapb.Partition) *partition {
 	p := &partition{
-		meta:    meta,
-		mapping: mapping,
-		server:  server,
+		meta:   meta,
+		server: server,
 	}
 	p.meta.Status = metapb.PA_NOTREAD
 	p.ctx, p.ctxCancel = context.WithCancel(server.ctx)

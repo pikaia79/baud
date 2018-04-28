@@ -5,13 +5,12 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"sort"
 	"sync"
 	"time"
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/reflection"
-
-	"sort"
 
 	"github.com/gogo/protobuf/proto"
 	"github.com/tiglabs/baudengine/proto/masterpb"
@@ -203,7 +202,7 @@ func (s *Server) doStart(init bool) error {
 }
 
 // Stop stop server
-func (s *Server) Stop() {
+func (s *Server) Close() error {
 	s.stopping.Set(true)
 	s.ctxCancel()
 
@@ -229,6 +228,8 @@ func (s *Server) Stop() {
 	if s.connMgr != nil {
 		s.connMgr.Close()
 	}
+
+	return nil
 }
 
 func (s *Server) closeAllRange() {
