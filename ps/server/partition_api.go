@@ -3,13 +3,15 @@ package server
 import (
 	"fmt"
 
+	"errors"
+
+	"github.com/tiglabs/baud/common/content"
 	"github.com/tiglabs/baud/proto/metapb"
 	"github.com/tiglabs/baud/proto/pspb"
-	"github.com/tiglabs/baud/util/json"
 	"github.com/tiglabs/baud/util/log"
 )
 
-func (p *partition) internalGet(request *pspb.GetRequest, response *pspb.GetResponse) {
+func (p *partition) getInternal(request *pspb.GetRequest, response *pspb.GetResponse) {
 	if err := p.validate(); err != nil {
 		response.Error = *err
 		if err.NotLeader != nil {
@@ -27,13 +29,30 @@ func (p *partition) internalGet(request *pspb.GetRequest, response *pspb.GetResp
 	var fields map[string]interface{}
 	fields, response.Found = p.store.GetDocument(&request.Id, request.StoredFields)
 	if response.Found && len(fields) > 0 {
-		if b, err := json.Marshal(fields); err == nil {
-			response.Fields = b
+		contentWr, _ := content.CreateWriter(request.ContentType)
+		if err := contentWr.WriteMap(fields); err == nil {
+			response.Fields = contentWr.Bytes()
 		} else {
 			response.Code = metapb.RESP_CODE_SERVER_ERROR
-			response.Message = fmt.Sprintf("json marshal document fileds error, request is:[%v], error is:[%v]", request, err)
+			response.Message = fmt.Sprintf("marshal document fileds error, request is:[%v], error is:[%v]", request, err)
 		}
+		contentWr.Close()
 	}
 
 	return
+}
+
+func (p *partition) indexInternal(contentType pspb.RequestContentType, request *pspb.IndexRequest) (*pspb.IndexResponse, error) {
+	if err := p.validate(); err != nil {
+		if err.NotLeader != nil {
+			return nil, errors.New("is not leader")
+		} else if err.NoLeader != nil {
+			return nil, errors.New("has no leader")
+		}
+	}
+
+	parser, _ := content.CreateParser(contentType, request.Source)
+	val, err := parser.MapValues()
+	parser.Close()
+
 }

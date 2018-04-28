@@ -5,7 +5,8 @@ import (
 	"sync"
 
 	"github.com/tiglabs/baud/kernel"
-	"github.com/tiglabs/baud/kernel/store"
+	"github.com/tiglabs/baud/kernel/index"
+	"github.com/tiglabs/baud/kernel/mapping"
 	"github.com/tiglabs/baud/kernel/store/kvstore/badgerdb"
 	"github.com/tiglabs/baud/proto/masterpb"
 	"github.com/tiglabs/baud/proto/metapb"
@@ -18,6 +19,7 @@ type partition struct {
 
 	server    *Server
 	store     kernel.Engine
+	mapping   *mapping.DocumentMapping
 	closeOnce sync.Once
 
 	rwMutex    sync.RWMutex
@@ -26,10 +28,11 @@ type partition struct {
 	statistics masterpb.PartitionStats
 }
 
-func newPartition(server *Server, meta metapb.Partition) *partition {
+func newPartition(server *Server, meta metapb.Partition, mapping *mapping.DocumentMapping) *partition {
 	p := &partition{
-		meta:   meta,
-		server: server,
+		meta:    meta,
+		mapping: mapping,
+		server:  server,
 	}
 	p.meta.Status = metapb.PA_NOTREAD
 	p.ctx, p.ctxCancel = context.WithCancel(server.ctx)
@@ -62,7 +65,7 @@ func (p *partition) start() {
 		return
 	}
 
-	p.store = store.NewDocStore(kvStore)
+	p.store = index.NewIndexDriver(kvStore)
 }
 
 func (p *partition) Close() error {
