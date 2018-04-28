@@ -51,6 +51,9 @@ func (ms *Master) Start(config *Config) error {
 	ms.workerManager = NewWorkerManager(ms.cluster)
 	if err := ms.workerManager.Start(); err != nil {
 		log.Error("fail to start worker manager. err:[%v]", err)
+		ms.apiServer.Close()
+		ms.rpcServer.Close()
+		ms.cluster.Close()
 		return err
 	}
 
