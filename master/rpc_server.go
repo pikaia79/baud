@@ -9,6 +9,7 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/reflection"
 	"net"
+	"github.com/tiglabs/baudengine/util/rpc"
 )
 
 type RpcServer struct {
@@ -23,10 +24,11 @@ func NewRpcServer(config *Config, cluster *Cluster) *RpcServer {
 	server.config = config
 	server.cluster = cluster
 
-	s := grpc.NewServer()
-	masterpb.RegisterMasterRpcServer(s, server)
-	reflection.Register(s)
-	server.grpcServer = s
+	serverOption := &rpc.DefaultServerOption
+	serverOption.ClusterID = string(config.ClusterCfg.ClusterID)
+	server.grpcServer = rpc.NewGrpcServer(serverOption)
+	masterpb.RegisterMasterRpcServer(server.grpcServer, server)
+	reflection.Register(server.grpcServer)
 
 	return server
 }
@@ -81,7 +83,7 @@ func (s *RpcServer) GetRoute(ctx context.Context,
 	for _, partition := range partitions {
 		route := masterpb.Route{
 			Partition: *partition.Partition,
-			NodeID:    partition.pickLeaderNodeId(), // Leader NodeId
+			Leader:    partition.pickLeaderNodeId(),
 		}
 
 		replicas := partition.Replicas
