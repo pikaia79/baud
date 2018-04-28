@@ -4,9 +4,9 @@ import (
 	"errors"
 	"strconv"
 
-	"github.com/tiglabs/baud/proto/masterpb"
-	"github.com/tiglabs/baud/util/config"
-	"github.com/tiglabs/baud/util/multierror"
+	"github.com/tiglabs/baudengine/proto/masterpb"
+	"github.com/tiglabs/baudengine/util/config"
+	"github.com/tiglabs/baudengine/util/multierror"
 )
 
 // Config ps server config

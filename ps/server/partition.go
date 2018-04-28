@@ -4,13 +4,13 @@ import (
 	"context"
 	"sync"
 
-	"github.com/tiglabs/baud/kernel"
-	"github.com/tiglabs/baud/kernel/index"
-	"github.com/tiglabs/baud/kernel/mapping"
-	"github.com/tiglabs/baud/kernel/store/kvstore/badgerdb"
-	"github.com/tiglabs/baud/proto/masterpb"
-	"github.com/tiglabs/baud/proto/metapb"
-	"github.com/tiglabs/baud/util/log"
+	"github.com/tiglabs/baudengine/kernel"
+	"github.com/tiglabs/baudengine/kernel/index"
+	"github.com/tiglabs/baudengine/kernel/mapping"
+	"github.com/tiglabs/baudengine/kernel/store/kvstore/badgerdb"
+	"github.com/tiglabs/baudengine/proto/masterpb"
+	"github.com/tiglabs/baudengine/proto/metapb"
+	"github.com/tiglabs/baudengine/util/log"
 )
 
 type partition struct {

@@ -8,8 +8,8 @@ import (
 
 	"github.com/gogo/protobuf/proto"
 
-	"github.com/tiglabs/baud/proto/metapb"
-	"github.com/tiglabs/baud/proto/pspb"
+	"github.com/tiglabs/baudengine/proto/metapb"
+	"github.com/tiglabs/baudengine/proto/pspb"
 )
 
 // CreatePartition admin grpc service for create partition
