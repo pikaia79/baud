@@ -55,7 +55,7 @@ func (h *heartbeatWork) start() {
 
 			case <-heartbeatTimer.C:
 				h.doHeartbeat()
-				h.update(&heartbeatTimer)
+				h.update(heartbeatTimer)
 
 			case <-h.triggerCh:
 				now := time.Now()
@@ -70,7 +70,7 @@ func (h *heartbeatWork) start() {
 				}
 
 				h.doHeartbeat()
-				h.update(&heartbeatTimer)
+				h.update(heartbeatTimer)
 			}
 		}
 	}, quitCh)

@@ -1,14 +1,14 @@
 package document
 
 type Document struct {
-	ID              string  `json:"id"`
+	ID []byte `json:"id"`
 	// _version, _source, _all as special field for document
-	Fields          map[string][]Field `json:"fields"`
+	Fields map[string][]Field `json:"fields"`
 }
 
-func NewDocument(id string) *Document {
+func NewDocument(id []byte) *Document {
 	return &Document{
-		ID:              id,
+		ID: id,
 	}
 }
 
