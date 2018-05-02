@@ -35,7 +35,6 @@ func(tx *Transaction) Put(key, value []byte, ops ...*kvstore.Option) error {
 		if err != nil {
 			return err
 		}
-
 	}
 	return nil
 }
@@ -61,7 +60,6 @@ func(tx *Transaction) Delete(key []byte, ops ...*kvstore.Option) error {
 		if err != nil {
 			return err
 		}
-
 	}
 	return nil
 }

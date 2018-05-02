@@ -4,12 +4,14 @@ import (
 	"bytes"
 	"errors"
 
-	"github.com/tiglabs/baudengine/kernel"
 	"github.com/tiglabs/baudengine/kernel/document"
 	"github.com/tiglabs/baudengine/kernel/mapping"
 	"github.com/tiglabs/baudengine/kernel/store/kvstore"
 	"github.com/tiglabs/baudengine/kernel/util"
+	"github.com/tiglabs/baudengine/kernel"
 )
+
+var _ kernel.Engine = &IndexDriver{}
 
 type IndexDriver struct {
 	store        kvstore.KVStore
@@ -22,7 +24,7 @@ func NewIndexDriver(store kvstore.KVStore) *IndexDriver {
 	}
 }
 
-func (id *IndexDriver) addDocument(tx kvstore.Transaction, doc *document.Document, ops ...*kernel.Option) error {
+func (id *IndexDriver) addDocument(tx kvstore.Transaction, doc *document.Document, applyId uint64) error {
 	val, err := tx.Get(encodeStoreFieldKey(doc.ID, "_version"))
 	if err != nil {
 		return err
@@ -35,17 +37,17 @@ func (id *IndexDriver) addDocument(tx kvstore.Transaction, doc *document.Documen
 		if err != nil {
 			return err
 		}
-		tx.Put(key, row)
+		tx.Put(key, row, &kvstore.Option{ApplyID: applyId})
 	}
 	return nil
 }
 
-func (id *IndexDriver) AddDocument(doc *document.Document, ops ...*kernel.Option) error {
+func (id *IndexDriver) AddDocument(doc *document.Document, applyId uint64) error {
 	tx, err := id.store.NewTransaction(true)
 	if err != nil {
 		return err
 	}
-	err = id.addDocument(tx, doc, ops...)
+	err = id.addDocument(tx, doc, applyId)
 	if err != nil {
 		return tx.Rollback()
 	}
@@ -54,7 +56,7 @@ func (id *IndexDriver) AddDocument(doc *document.Document, ops ...*kernel.Option
 
 // parameter docs must merge before update
 // IndexDriver UpdateDocuments API will be called by ps when raft apply
-func (id *IndexDriver) UpdateDocument(doc *document.Document, upsert bool, ops ...*kernel.Option) (found bool, err error) {
+func (id *IndexDriver) UpdateDocument(doc *document.Document, upsert bool, applyId uint64) (found bool, err error) {
 	tx, err := id.store.NewTransaction(true)
 	if err != nil {
 		return false, err
@@ -85,7 +87,7 @@ func (id *IndexDriver) UpdateDocument(doc *document.Document, upsert bool, ops .
 		if bytes.Compare(oldVersion, srcVersion) != 0 {
 			return true, errors.New("version conflict")
 		}
-		_, err = id.deleteDocument(tx, doc.ID)
+		_, err = id.deleteDocument(tx, doc.ID, applyId)
 		if err != nil {
 			return true, err
 		}
@@ -100,7 +102,7 @@ func (id *IndexDriver) UpdateDocument(doc *document.Document, upsert bool, ops .
 			if err != nil {
 				return true, err
 			}
-			tx.Put(key, row)
+			tx.Put(key, row, &kvstore.Option{ApplyID: applyId})
 		}
 		// todo analysis document
 		return true, nil
@@ -110,7 +112,7 @@ func (id *IndexDriver) UpdateDocument(doc *document.Document, upsert bool, ops .
 		return found, err
 	}
 	if !found && upsert {
-		err = id.addDocument(tx, doc, ops...)
+		err = id.addDocument(tx, doc, applyId)
 		if err != nil {
 			tx.Rollback()
 			return found, err
@@ -119,13 +121,13 @@ func (id *IndexDriver) UpdateDocument(doc *document.Document, upsert bool, ops .
 	return found, tx.Commit()
 }
 
-func (id *IndexDriver) DeleteDocument(docID []byte, ops ...*kernel.Option) (int, error) {
+func (id *IndexDriver) DeleteDocument(docID []byte, applyId uint64) (int, error) {
 	tx, err := id.store.NewTransaction(true)
 	if err != nil {
 		return 0, err
 	}
 	var count int
-	n, err := id.deleteDocument(tx, docID)
+	n, err := id.deleteDocument(tx, docID, applyId)
 	if err != nil {
 		tx.Rollback()
 		return count, err
@@ -182,11 +184,26 @@ func (id *IndexDriver) GetDocument(docID []byte, fields []string) (map[string]in
 	return fieldValues, true
 }
 
+func (id *IndexDriver) GetLastApplyID() (uint64, error) {
+	if id == nil {
+		return 0, nil
+	}
+	snap, err := id.store.GetSnapshot()
+	if err != nil {
+		return 0, err
+	}
+	op, err := snap.LastOption()
+	if err != nil {
+		return 0, err
+	}
+	return op.ApplyID, nil
+}
+
 func (id *IndexDriver) Close() error {
 	return id.store.Close()
 }
 
-func (id *IndexDriver) deleteDocument(tx kvstore.Transaction, docID []byte) (int, error) {
+func (id *IndexDriver) deleteDocument(tx kvstore.Transaction, docID []byte, applyId uint64) (int, error) {
 	iter := tx.PrefixIterator(encodeStoreFieldKey(docID, ""))
 	defer iter.Close()
 	if !iter.Valid() {
@@ -198,7 +215,7 @@ func (id *IndexDriver) deleteDocument(tx kvstore.Transaction, docID []byte) (int
 		if !has {
 			return 0, errors.New("document not exist")
 		}
-		err := tx.Delete(key)
+		err := tx.Delete(key, &kvstore.Option{ApplyID: applyId})
 		if err != nil {
 			return 0, err
 		}

@@ -56,8 +56,11 @@ func New(config *StoreConfig) (kvstore.KVStore, error) {
 
 	if !bo.ReadOnly {
 		err = db.Update(func(tx *bolt.Tx) error {
-			_, err := tx.CreateBucketIfNotExists([]byte(bucket))
-
+			_, err = tx.CreateBucketIfNotExists([]byte(bucket))
+			if err != nil {
+				return err
+			}
+			_, err = tx.CreateBucketIfNotExists(raftBucket)
 			return err
 		})
 		if err != nil {
