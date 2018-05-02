@@ -37,7 +37,7 @@ func TestAddDocument(t *testing.T) {
 	tf := document.NewTextField("text", []byte("hello, baud"), document.StoreField)
 	doc.AddField(tf)
 
-	err := driver.AddDocument(doc)
+	err := driver.AddDocument(doc, 1)
 	if err != nil {
 		t.Fatalf("add document failed, err %v", err)
 	}
@@ -60,7 +60,7 @@ func TestGetDocument(t *testing.T) {
 	doc.AddField(tf)
 	doc.AddField(bf)
 
-	err := driver.AddDocument(doc)
+	err := driver.AddDocument(doc, 1)
 	if err != nil {
 		t.Fatalf("add document failed, err %v", err)
 	}
@@ -88,7 +88,7 @@ func TestDelDocument(t *testing.T) {
 	tf := document.NewTextField("text", []byte("hello, baud"), document.StoreField)
 	doc.AddField(tf)
 
-	err := driver.AddDocument(doc)
+	err := driver.AddDocument(doc, 1)
 	if err != nil {
 		t.Fatalf("add document failed, err %v", err)
 	}
@@ -99,7 +99,7 @@ func TestDelDocument(t *testing.T) {
 	if fvs["text"].(string) != "hello, baud" {
 		t.Fatal("get document failed")
 	}
-	n, err := driver.DeleteDocument([]byte("1"))
+	n, err := driver.DeleteDocument([]byte("1"), 2)
 	if err != nil {
 		t.Fatalf("del document failed, err %v", err)
 	}
@@ -122,7 +122,7 @@ func TestUpdateDocument(t *testing.T) {
 	doc.AddField(tf)
 	doc.AddField(vf)
 
-	err := driver.AddDocument(doc)
+	err := driver.AddDocument(doc, 1)
 	if err != nil {
 		t.Fatalf("add document failed, err %v", err)
 	}
@@ -139,7 +139,7 @@ func TestUpdateDocument(t *testing.T) {
 	vf = document.NewTextField("_version", []byte("1"), document.StoreField)
 	doc.AddField(tf)
 	doc.AddField(vf)
-	found, err := driver.UpdateDocument(doc, false)
+	found, err := driver.UpdateDocument(doc, false, 2)
 	if err != nil {
 		t.Fatalf("update document failed, err %v", err)
 	}

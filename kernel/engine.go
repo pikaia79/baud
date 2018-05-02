@@ -4,13 +4,12 @@ import (
 	"github.com/tiglabs/baudengine/kernel/document"
 )
 
-type Option struct {
-}
-
 type Engine interface {
-	AddDocument(doc *document.Document, ops ...*Option) error
-	UpdateDocument(doc *document.Document, upsert bool, ops ...*Option) (found bool, err error)
-	DeleteDocument(docID []byte, ops ...*Option) (int, error)
+	// for raft server init
+	GetLastApplyID() (uint64, error)
+	AddDocument(doc *document.Document, applyId uint64) error
+	UpdateDocument(doc *document.Document, upsert bool, applyId uint64) (found bool, err error)
+	DeleteDocument(docID []byte, applyId uint64) (int, error)
 	// _source, _all as system field
 	GetDocument(docID []byte, fields []string) (map[string]interface{}, bool)
 	Close() error
