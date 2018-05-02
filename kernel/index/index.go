@@ -22,29 +22,30 @@ func NewIndexDriver(store kvstore.KVStore) *IndexDriver {
 	}
 }
 
+func (id *IndexDriver) addDocument(tx kvstore.Transaction, doc *document.Document, ops ...*kernel.Option) error {
+	val, err := tx.Get(encodeStoreFieldKey(doc.ID, "_version"))
+	if err != nil {
+		return err
+	}
+	if val != nil {
+		return errors.New("document exist")
+	}
+	for _, fields := range doc.Fields {
+		key, row, err := encodeStoreField(doc.ID, fields)
+		if err != nil {
+			return err
+		}
+		tx.Put(key, row)
+	}
+	return nil
+}
+
 func (id *IndexDriver) AddDocument(doc *document.Document, ops ...*kernel.Option) error {
 	tx, err := id.store.NewTransaction(true)
 	if err != nil {
 		return err
 	}
-	err = func() error {
-		// check doc version
-		val, err := tx.Get(encodeStoreFieldKey(doc.ID, "_version"))
-		if err != nil {
-			return err
-		}
-		if val != nil {
-			return errors.New("document exist")
-		}
-		for _, fields := range doc.Fields {
-			key, row, err := encodeStoreField(doc.ID, fields)
-			if err != nil {
-				return err
-			}
-			tx.Put(key, row)
-		}
-		return nil
-	}()
+	err = id.addDocument(tx, doc, ops...)
 	if err != nil {
 		return tx.Rollback()
 	}
@@ -63,7 +64,6 @@ func (id *IndexDriver) UpdateDocument(doc *document.Document, upsert bool, ops .
 		iter := tx.PrefixIterator(encodeStoreFieldKey(doc.ID, ""))
 		oldDoc, err, ok := getDocument(doc.ID, iter)
 		iter.Close()
-
 		if err != nil {
 			return false, err
 		}
@@ -73,8 +73,14 @@ func (id *IndexDriver) UpdateDocument(doc *document.Document, upsert bool, ops .
 
 		// check version
 		fs := oldDoc.FindFields("_version")
+		if len(fs) == 0 {
+			return false, errors.New("invalid document, has no _version field")
+		}
 		oldVersion := fs[0].Value()
 		fs = doc.FindFields("_version")
+		if len(fs) == 0 {
+			return false, errors.New("invalid document, has no _version field")
+		}
 		srcVersion := fs[0].Value()
 		if bytes.Compare(oldVersion, srcVersion) != 0 {
 			return true, errors.New("version conflict")
@@ -99,12 +105,16 @@ func (id *IndexDriver) UpdateDocument(doc *document.Document, upsert bool, ops .
 		// todo analysis document
 		return true, nil
 	}()
-
 	if err != nil {
-		return found, tx.Rollback()
+		tx.Rollback()
+		return found, err
 	}
 	if !found && upsert {
-		return found, id.AddDocument(doc, ops...)
+		err = id.addDocument(tx, doc, ops...)
+		if err != nil {
+			tx.Rollback()
+			return found, err
+		}
 	}
 	return found, tx.Commit()
 }
@@ -149,7 +159,27 @@ func (id *IndexDriver) GetDocument(docID []byte, fields []string) (map[string]in
 			doc.AddField(f)
 		}
 	}
-	return nil, true
+	fieldValues := make(map[string]interface{})
+	for name, fs := range doc.Fields {
+		if len(fs) == 1 {
+			v, err := getFieldValue(fs[0])
+			if err != nil {
+				return nil, false
+			}
+			fieldValues[name] = v
+		} else {
+			var vs []interface{}
+			for _, f :=  range fs {
+				v, err := getFieldValue(f)
+				if err != nil {
+					return nil, false
+				}
+				vs = append(vs, v)
+			}
+			fieldValues[name] = vs
+		}
+	}
+	return fieldValues, true
 }
 
 func (id *IndexDriver) Close() error {
@@ -204,4 +234,19 @@ func getDocument(docID []byte, iter kvstore.KVIterator) (*document.Document, err
 		iter.Next()
 	}
 	return doc, nil, true
+}
+
+func getFieldValue(field document.Field) (interface{}, error) {
+	switch f := field.(type) {
+	case *document.TextField:
+		return string(f.Value()), nil
+	case *document.BooleanField:
+		return f.Boolean()
+	case *document.DateTimeField:
+		return f.DateTime()
+	case *document.NumericField:
+		return f.Number()
+	default:
+		return nil, errors.New("invalid field type")
+	}
 }

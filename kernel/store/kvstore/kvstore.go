@@ -114,7 +114,7 @@ type KVBatch interface {
 // KVReader, and might be used by KVStore implementations that don't
 // have a native multi-get facility.
 func MultiGet(reader Snapshot, keys [][]byte) ([][]byte, error) {
-	vals := make([][]byte, 0, len(keys))
+	vals := make([][]byte, len(keys))
 
 	for i, key := range keys {
 		val, err := reader.Get(key)

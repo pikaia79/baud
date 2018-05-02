@@ -86,7 +86,7 @@ func decodeStoreField(fieldName string, row []byte) ([]document.Field, error) {
 	var err error
 	fieldType := FIELD_TYPE(row[0])
 	property := document.Property(row[1])
-	row = row[1:]
+	row = row[2:]
 	for len(row) > 0 {
 		var val []byte
 		switch fieldType {
