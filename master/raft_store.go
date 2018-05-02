@@ -64,8 +64,6 @@ type RaftStore struct {
 
 type Peer struct {
 	NodeId uint64
-	//WebManageAddr     string
-	//RpcServerAddr     string
 	RaftHeartbeatAddr string
 	RaftReplicateAddr string
 }
@@ -80,9 +78,6 @@ type RaftStoreConfig struct {
 	NodeId   uint64
 	DataPath string
 	WalPath  string
-
-	//LeaderChangeHandler raftgroup.RaftLeaderChangeHandler
-	//FatalHandler        raftgroup.RaftFatalEventHandler
 }
 
 func NewRaftStore(config *Config) *RaftStore {

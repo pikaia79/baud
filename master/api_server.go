@@ -83,16 +83,6 @@ func (s *ApiServer) initAdminHandler() {
 	s.httpServer.Handle(netutil.GET, "/manage/space/detail", s.handleSpaceDetail)
 }
 
-
-//type HttpHandleFilter interface {
-//
-//}
-//
-//func (s *ApiServer) filterChains(handle func(w http.ResponseWriter, r *http.Request),
-//       filters... func(w http.ResponseWriter, r *http.Request)) func(w http.ResponseWriter, r *http.Request) {
-//
-//}
-
 func (s *ApiServer) handleDbCreate(w http.ResponseWriter, r *http.Request, params netutil.UriParams) {
 	dbName, err := checkMissingParam(w, r, DB_NAME)
 	if err != nil {

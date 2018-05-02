@@ -99,6 +99,14 @@ type Handle func(http.ResponseWriter, *http.Request, UriParams)
 
 func (s *Server) Handle(method HttpMethod, uri string, handle Handle) {
 	h := func(w http.ResponseWriter, r *http.Request, params httprouter.Params) {
+        //if len(filterHandles) != 0 {
+        //    for _, filterHandle := range filterHandles {
+        //        if !filterHandle(w, r) {
+        //            return
+        //        }
+        //    }
+        //}
+
 		uriParams := make(map[string]string)
 		for _, param := range params {
 			if _, ok := uriParams[param.Key]; !ok {
@@ -109,6 +117,8 @@ func (s *Server) Handle(method HttpMethod, uri string, handle Handle) {
 	}
 	s.router.Handle(method.name(), uri, h)
 }
+
+// type FilterHandle func(http.ResponseWriter, *http.Request) bool
 
 // Close closes the server.
 func (s *Server) Close() {
