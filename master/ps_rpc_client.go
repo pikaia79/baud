@@ -157,9 +157,11 @@ func (c *PSRpcClient) AddReplica(addr string, partitionId metapb.PartitionID, ra
 		RequestHeader: metapb.RequestHeader{},
 		Type:          pspb.ReplicaChangeType_Add,
 		PartitionID:   partitionId,
-		ReplicaID:     replicaId,
-		NodeID:        replicaNodeId,
-		RaftAddrs:     *raftAddrs,
+		Replica: metapb.Replica{
+			ID:        replicaId,
+			NodeID:    replicaNodeId,
+			RaftAddrs: *raftAddrs,
+		},
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), PS_GRPC_REQUEST_TIMEOUT)
 	resp, err := client.ChangeReplica(ctx, req)
@@ -191,9 +193,11 @@ func (c *PSRpcClient) RemoveReplica(addr string, partitionId metapb.PartitionID,
 		RequestHeader: metapb.RequestHeader{},
 		Type:          pspb.ReplicaChangeType_Remove,
 		PartitionID:   partitionId,
-		ReplicaID:     replicaId,
-		NodeID:        replicaNodeId,
-		RaftAddrs:     *raftAddrs,
+		Replica: metapb.Replica{
+			ID:        replicaId,
+			NodeID:    replicaNodeId,
+			RaftAddrs: *raftAddrs,
+		},
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), PS_GRPC_REQUEST_TIMEOUT)
 	resp, err := client.ChangeReplica(ctx, req)
