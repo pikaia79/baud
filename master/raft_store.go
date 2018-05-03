@@ -37,7 +37,7 @@ type Store interface {
 	Get(key []byte) ([]byte, error)
 	Scan(startKey, limitKey []byte) raftkvstore.Iterator
 	NewBatch() Batch
-	WatchLeader(notifier chan bool)
+	WatchLeader(becomeLeader chan bool)
 	Close() error
 }
 
