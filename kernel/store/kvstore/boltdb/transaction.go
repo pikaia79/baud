@@ -1,8 +1,6 @@
 package boltdb
 
 import (
-	"encoding/binary"
-
 	"github.com/boltdb/bolt"
 	"github.com/tiglabs/baudengine/kernel/store/kvstore"
 )
@@ -22,19 +20,10 @@ func(bs *Store) NewTransaction(writable bool) (kvstore.Transaction, error) {
 	return &Transaction{tx: tx, bucket: bucket, writable: writable}, nil
 }
 
-func(tx *Transaction) Put(key, value []byte, ops ...*kvstore.Option) error {
+func(tx *Transaction) Put(key, value []byte) error {
 	err := tx.bucket.Put(key, value)
 	if err != nil {
 		return err
-	}
-	if len(ops) > 0 {
-		var buff [8]byte
-		r := tx.tx.Bucket(raftBucket)
-		binary.BigEndian.PutUint64(buff[:], ops[0].ApplyID)
-		err = r.Put(RAFT_APPLY_ID, buff[:])
-		if err != nil {
-			return err
-		}
 	}
 	return nil
 }
@@ -47,19 +36,10 @@ func(tx *Transaction) Get(key []byte) ([]byte, error) {
 	return nil, nil
 }
 
-func(tx *Transaction) Delete(key []byte, ops ...*kvstore.Option) error {
+func(tx *Transaction) Delete(key []byte) error {
 	err := tx.bucket.Delete(key)
 	if err != nil {
 		return err
-	}
-	if len(ops) > 0 {
-		var buff [8]byte
-		r := tx.tx.Bucket(raftBucket)
-		binary.BigEndian.PutUint64(buff[:], ops[0].ApplyID)
-		err = r.Put(RAFT_APPLY_ID, buff[:])
-		if err != nil {
-			return err
-		}
 	}
 	return nil
 }

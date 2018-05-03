@@ -1,7 +1,6 @@
 package badgerdb
 
 import (
-	"encoding/binary"
 	"errors"
 	"os"
 
@@ -10,8 +9,6 @@ import (
 )
 
 var _ kvstore.KVStore = &Store{}
-
-var RAFT_APPLY_ID []byte = []byte("Raft_apply_id")
 
 type StoreConfig struct {
 	Path     string
@@ -68,7 +65,7 @@ func (bs *Store) Get(key []byte) (value []byte, err error) {
 	return
 }
 
-func (bs *Store) Put(key []byte, value []byte, ops ...*kvstore.Option) error {
+func (bs *Store) Put(key []byte, value []byte) error {
 	if bs == nil {
 		return nil
 	}
@@ -77,19 +74,11 @@ func (bs *Store) Put(key []byte, value []byte, ops ...*kvstore.Option) error {
 		if err != nil {
 			return err
 		}
-		if len(ops) > 0 {
-			var buff [8]byte
-			binary.BigEndian.PutUint64(buff[:], ops[0].ApplyID)
-			err = tx.Set(RAFT_APPLY_ID, buff[:])
-			if err != nil {
-				return err
-			}
-		}
 		return nil
 	})
 }
 
-func (bs *Store) Delete(key []byte, ops ...*kvstore.Option) error {
+func (bs *Store) Delete(key []byte) error {
 	if bs == nil {
 		return nil
 	}
@@ -97,15 +86,6 @@ func (bs *Store) Delete(key []byte, ops ...*kvstore.Option) error {
 		err := tx.Delete(key)
 		if err != nil {
 			return err
-		}
-		if len(ops) > 0 {
-			var buff [8]byte
-			binary.BigEndian.PutUint64(buff[:], ops[0].ApplyID)
-			err = tx.Set(RAFT_APPLY_ID, buff[:])
-			if err != nil {
-				return err
-			}
-
 		}
 		return nil
 	})
@@ -165,7 +145,7 @@ func (bs *Store) NewKVBatch() kvstore.KVBatch {
 	return kvstore.NewBatch()
 }
 
-func (bs *Store) ExecuteBatch(batch kvstore.KVBatch, ops ...*kvstore.Option) (err error) {
+func (bs *Store) ExecuteBatch(batch kvstore.KVBatch) (err error) {
 	if bs == nil {
 		return nil
 	}
@@ -192,14 +172,6 @@ func (bs *Store) ExecuteBatch(batch kvstore.KVBatch, ops ...*kvstore.Option) (er
 				return
 			}
 			tx = bs.db.NewTransaction(true)
-		}
-	}
-	if len(ops) > 0 {
-		var buff [8]byte
-		binary.BigEndian.PutUint64(buff[:], ops[0].ApplyID)
-		err = tx.Set(RAFT_APPLY_ID, buff[:])
-		if err != nil {
-			return
 		}
 	}
 	err = tx.Commit(nil)
