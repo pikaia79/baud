@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"github.com/tiglabs/baudengine/util"
 	"github.com/tiglabs/baudengine/util/log"
-	"github.com/tiglabs/baudengine/util/server"
+	"github.com/tiglabs/baudengine/util/netutil"
 	"math"
 	"net/http"
 	"strconv"
@@ -28,23 +28,23 @@ const (
 
 type ApiServer struct {
 	config     *Config
-	httpServer *server.Server
+	httpServer *netutil.Server
 	cluster    *Cluster
 }
 
 func NewApiServer(config *Config, cluster *Cluster) *ApiServer {
+    cfg := &netutil.ServerConfig{
+        Name:      "master-api-server",
+        Addr:      util.BuildAddr("0.0.0.0", int(config.ClusterCfg.CurNode.HttpPort)),
+        Version:   "v1",
+        ConnLimit: DEFAULT_CONN_LIMIT,
+    }
+
 	apiServer := &ApiServer{
 		config:     config,
-		httpServer: server.NewServer(),
+        httpServer: netutil.NewServer(cfg),
 		cluster:    cluster,
 	}
-
-	apiServer.httpServer.Init("master-api-server", &server.ServerConfig{
-		Sock:      util.BuildAddr("0.0.0.0", int(config.ClusterCfg.CurNode.HttpPort)),
-		Version:   "v1",
-		ConnLimit: DEFAULT_CONN_LIMIT,
-	})
-
 	apiServer.initAdminHandler()
 
 	return apiServer
@@ -70,19 +70,20 @@ func (s *ApiServer) Close() {
 }
 
 func (s *ApiServer) initAdminHandler() {
-	s.httpServer.Handle("/manage/db/create", s.handleDbCreate)
-	s.httpServer.Handle("/manage/db/delete", s.handleDbDelete)
-	s.httpServer.Handle("/manage/db/rename", s.handleDbRename)
-	s.httpServer.Handle("/manage/db/list", s.handleDbList)
-	s.httpServer.Handle("/manage/db/detail", s.handleDbDetail)
-	s.httpServer.Handle("/manage/space/create", s.handleSpaceCreate)
-	s.httpServer.Handle("/manage/space/delete", s.handleSpaceDelete)
-	s.httpServer.Handle("/manage/space/rename", s.handleSpaceRename)
-	s.httpServer.Handle("/manage/space/list", s.handleSpaceList)
-	s.httpServer.Handle("/manage/space/detail", s.handleSpaceDetail)
+	s.httpServer.Handle(netutil.POST, "/manage/db/create", s.handleDbCreate)
+	s.httpServer.Handle(netutil.GET, "/manage/db/delete", s.handleDbDelete)
+	s.httpServer.Handle(netutil.GET, "/manage/db/rename", s.handleDbRename)
+	s.httpServer.Handle(netutil.GET, "/manage/db/list", s.handleDbList)
+	s.httpServer.Handle(netutil.GET, "/manage/db/detail", s.handleDbDetail)
+
+	s.httpServer.Handle(netutil.POST, "/manage/space/create", s.handleSpaceCreate)
+	s.httpServer.Handle(netutil.GET, "/manage/space/delete", s.handleSpaceDelete)
+	s.httpServer.Handle(netutil.GET, "/manage/space/rename", s.handleSpaceRename)
+	s.httpServer.Handle(netutil.GET, "/manage/space/list", s.handleSpaceList)
+	s.httpServer.Handle(netutil.GET, "/manage/space/detail", s.handleSpaceDetail)
 }
 
-func (s *ApiServer) handleDbCreate(w http.ResponseWriter, r *http.Request) {
+func (s *ApiServer) handleDbCreate(w http.ResponseWriter, r *http.Request, params netutil.UriParams) {
 	dbName, err := checkMissingParam(w, r, DB_NAME)
 	if err != nil {
 		return
@@ -97,10 +98,10 @@ func (s *ApiServer) handleDbCreate(w http.ResponseWriter, r *http.Request) {
 	sendReply(w, newHttpSucReply(db))
 }
 
-func (s *ApiServer) handleDbDelete(w http.ResponseWriter, r *http.Request) {
+func (s *ApiServer) handleDbDelete(w http.ResponseWriter, r *http.Request, params netutil.UriParams) {
 }
 
-func (s *ApiServer) handleDbRename(w http.ResponseWriter, r *http.Request) {
+func (s *ApiServer) handleDbRename(w http.ResponseWriter, r *http.Request, params netutil.UriParams) {
 	srcDbName, err := checkMissingParam(w, r, SRC_DB_NAME)
 	if err != nil {
 		return
@@ -118,13 +119,13 @@ func (s *ApiServer) handleDbRename(w http.ResponseWriter, r *http.Request) {
 	sendReply(w, newHttpSucReply(""))
 }
 
-func (s *ApiServer) handleDbList(w http.ResponseWriter, r *http.Request) {
+func (s *ApiServer) handleDbList(w http.ResponseWriter, r *http.Request, params netutil.UriParams) {
 	dbs := s.cluster.dbCache.getAllDBs()
 
 	sendReply(w, newHttpSucReply(dbs))
 }
 
-func (s *ApiServer) handleDbDetail(w http.ResponseWriter, r *http.Request) {
+func (s *ApiServer) handleDbDetail(w http.ResponseWriter, r *http.Request, params netutil.UriParams) {
 	dbName, err := checkMissingParam(w, r, DB_NAME)
 	if err != nil {
 		return
@@ -139,7 +140,7 @@ func (s *ApiServer) handleDbDetail(w http.ResponseWriter, r *http.Request) {
 	sendReply(w, newHttpSucReply(db))
 }
 
-func (s *ApiServer) handleSpaceCreate(w http.ResponseWriter, r *http.Request) {
+func (s *ApiServer) handleSpaceCreate(w http.ResponseWriter, r *http.Request, params netutil.UriParams) {
 	dbName, err := checkMissingParam(w, r, DB_NAME)
 	if err != nil {
 		return
@@ -171,10 +172,10 @@ func (s *ApiServer) handleSpaceCreate(w http.ResponseWriter, r *http.Request) {
 	sendReply(w, newHttpSucReply(space))
 }
 
-func (s *ApiServer) handleSpaceDelete(w http.ResponseWriter, r *http.Request) {
+func (s *ApiServer) handleSpaceDelete(w http.ResponseWriter, r *http.Request, params netutil.UriParams) {
 }
 
-func (s *ApiServer) handleSpaceRename(w http.ResponseWriter, r *http.Request) {
+func (s *ApiServer) handleSpaceRename(w http.ResponseWriter, r *http.Request, params netutil.UriParams) {
 	dbName, err := checkMissingParam(w, r, DB_NAME)
 	if err != nil {
 		return
@@ -195,7 +196,7 @@ func (s *ApiServer) handleSpaceRename(w http.ResponseWriter, r *http.Request) {
 	sendReply(w, newHttpSucReply(""))
 }
 
-func (s *ApiServer) handleSpaceDetail(w http.ResponseWriter, r *http.Request) {
+func (s *ApiServer) handleSpaceDetail(w http.ResponseWriter, r *http.Request, params netutil.UriParams) {
 	dbName, err := checkMissingParam(w, r, DB_NAME)
 	if err != nil {
 		return
@@ -220,7 +221,7 @@ func (s *ApiServer) handleSpaceDetail(w http.ResponseWriter, r *http.Request) {
 	sendReply(w, newHttpSucReply(space))
 }
 
-func (s *ApiServer) handleSpaceList(w http.ResponseWriter, r *http.Request) {
+func (s *ApiServer) handleSpaceList(w http.ResponseWriter, r *http.Request, params netutil.UriParams) {
 	dbName, err := checkMissingParam(w, r, DB_NAME)
 	if err != nil {
 		return
