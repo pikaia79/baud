@@ -115,7 +115,7 @@ func (ms *Master) Shutdown() {
 }
 
 func (ms *Master) watchLeader() {
-    ms.leaderCh = make(chan bool, 5)
+    ms.leaderCh = make(chan bool, 4)
     ms.globalStore.WatchLeader(ms.leaderCh)
 
     ms.wg.Add(1)

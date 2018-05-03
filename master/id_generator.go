@@ -117,12 +117,15 @@ func (id *StoreIdGenerator) generate() (uint32, error) {
 		return 0, err
 	}
 
-	if value == nil || len(value) != 4 {
+	if value != nil && len(value) != 4 {
 		log.Error("invalid data, must 4 bytes, but %d", len(value))
 		return 0, ErrInternalError
 	}
 
-	end := util.BytesToUint32(value)
+    var end uint32
+	if len(value) != 0 {
+        end = util.BytesToUint32(value)
+    }
 	end += id.step
 	value = util.Uint32ToBytes(end)
 	err = id.put(id.key, value)
