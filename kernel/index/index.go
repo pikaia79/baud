@@ -3,14 +3,14 @@ package index
 import (
 	"bytes"
 	"errors"
+	"encoding/binary"
+	"golang.org/x/net/context"
 
 	"github.com/tiglabs/baudengine/kernel/document"
 	"github.com/tiglabs/baudengine/kernel/mapping"
 	"github.com/tiglabs/baudengine/kernel/store/kvstore"
 	"github.com/tiglabs/baudengine/kernel/util"
 	"github.com/tiglabs/baudengine/kernel"
-	"encoding/binary"
-	"golang.org/x/net/context"
 )
 
 var RAFT_APPLY_ID []byte = []byte("Raft_apply_id")
@@ -46,23 +46,32 @@ func (id *IndexDriver) addDocument(tx kvstore.Transaction, doc *document.Documen
 	return nil
 }
 
-func (id *IndexDriver) AddDocument(ctx context.Context, doc *document.Document) error {
+func (id *IndexDriver) AddDocument(ctx context.Context, doc *document.Document, applyID uint64) error {
 	tx, err := id.store.NewTransaction(true)
 	if err != nil {
+		id.SetApplyID(applyID)
 		return err
 	}
 	err = id.addDocument(tx, doc)
 	if err != nil {
-		return tx.Rollback()
+		tx.Rollback()
+		id.SetApplyID(applyID)
+		return err
+	}
+	if applyID > 0 {
+		var buff [8]byte
+		binary.BigEndian.PutUint64(buff[:], applyID)
+		tx.Put(RAFT_APPLY_ID, buff[:])
 	}
 	return tx.Commit()
 }
 
 // parameter docs must merge before update
 // IndexDriver UpdateDocuments API will be called by ps when raft apply
-func (id *IndexDriver) UpdateDocument(ctx context.Context, doc *document.Document, upsert bool) (found bool, err error) {
+func (id *IndexDriver) UpdateDocument(ctx context.Context, doc *document.Document, upsert bool, applyID uint64) (found bool, err error) {
 	tx, err := id.store.NewTransaction(true)
 	if err != nil {
+		id.SetApplyID(applyID)
 		return false, err
 	}
 	found, err = func() (bool, error) {
@@ -113,32 +122,47 @@ func (id *IndexDriver) UpdateDocument(ctx context.Context, doc *document.Documen
 	}()
 	if err != nil {
 		tx.Rollback()
+		id.SetApplyID(applyID)
 		return found, err
 	}
 	if !found && upsert {
 		err = id.addDocument(tx, doc)
 		if err != nil {
 			tx.Rollback()
+			id.SetApplyID(applyID)
 			return found, err
 		}
+	}
+	if applyID > 0 {
+		var buff [8]byte
+		binary.BigEndian.PutUint64(buff[:], applyID)
+		tx.Put(RAFT_APPLY_ID, buff[:])
 	}
 	return found, tx.Commit()
 }
 
-func (id *IndexDriver) DeleteDocument(ctx context.Context, docID []byte) (int, error) {
+func (id *IndexDriver) DeleteDocument(ctx context.Context, docID []byte, applyID uint64) (int, error) {
 	tx, err := id.store.NewTransaction(true)
 	if err != nil {
+		id.SetApplyID(applyID)
 		return 0, err
 	}
 	var count int
 	n, err := id.deleteDocument(tx, docID)
 	if err != nil {
 		tx.Rollback()
+		id.SetApplyID(applyID)
 		return count, err
 	}
-	count += n
+	if n > 0 {
+		count ++
+	}
+	if applyID > 0 {
+		var buff [8]byte
+		binary.BigEndian.PutUint64(buff[:], applyID)
+		tx.Put(RAFT_APPLY_ID, buff[:])
+	}
 	err = tx.Commit()
-
 	return count, err
 }
 
@@ -189,9 +213,12 @@ func (id *IndexDriver) GetDocument(ctx context.Context, docID []byte, fields []s
 }
 
 func (id *IndexDriver) SetApplyID(applyID uint64) error {
-	var buff [8]byte
-	binary.BigEndian.PutUint64(buff[:], applyID)
-	return id.store.Put(RAFT_APPLY_ID, buff[:])
+	if applyID > 0 {
+		var buff [8]byte
+		binary.BigEndian.PutUint64(buff[:], applyID)
+		return id.store.Put(RAFT_APPLY_ID, buff[:])
+	}
+	return nil
 }
 
 func (id *IndexDriver) GetDocSnapshot() (kernel.Snapshot, error) {

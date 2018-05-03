@@ -32,9 +32,9 @@ type Engine interface {
 	GetApplyID() (uint64, error)
 	GetDocSnapshot() (Snapshot, error)
 	ApplyDocSnapshot(ctx context.Context, iter Iterator) error
-	AddDocument(ctx context.Context, doc *document.Document) error
-	UpdateDocument(ctx context.Context, doc *document.Document, upsert bool) (found bool, err error)
-	DeleteDocument(ctx context.Context, docID []byte) (int, error)
+	AddDocument(ctx context.Context, doc *document.Document, applyID uint64) error
+	UpdateDocument(ctx context.Context, doc *document.Document, upsert bool, applyID uint64) (found bool, err error)
+	DeleteDocument(ctx context.Context, docID []byte, applyID uint64) (int, error)
 	// _source, _all as system field
 	GetDocument(ctx context.Context, docID []byte, fields []string) (map[string]interface{}, bool)
 	Close() error
