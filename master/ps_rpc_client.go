@@ -42,7 +42,7 @@ func GetPSRpcClientSingle(config *Config) *PSRpcClient {
 
 	if atomic.LoadUint32(&psClientSingleDone) == 0 {
 		if config == nil {
-			log.Error("config should not be nil at first time when create psClientSingle psRpcClient")
+			log.Error("config should not be nil at first time when create PSRpcClient single")
 		}
 
 		psClientSingle = new(PSRpcClient)

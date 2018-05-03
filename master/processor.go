@@ -50,7 +50,7 @@ func GetPMSingle(cluster *Cluster) *ProcessorManager {
 
 	if atomic.LoadUint32(&processorManagerSingleDone) == 0 {
 		if cluster == nil {
-			log.Error("cluster should not be nil at first time when create psClientSingle processorManager")
+			log.Error("cluster should not be nil at first time when create ProcessorManager single")
 		}
 
 		pm := new(ProcessorManager)

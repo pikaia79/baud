@@ -35,7 +35,7 @@ func GetIdGeneratorSingle(store Store) IDGenerator {
 
 	if atomic.LoadUint32(&idGeneratorSingleDone) == 0 {
 		if store == nil {
-			log.Error("store should not be nil at first time when create psClientSingle StoreIdGenerator")
+			log.Error("store should not be nil at first time when create IdGenerator single")
 			return nil
 		}
 		idGeneratorSingle = NewIDGenerator([]byte(AUTO_INCREMENT_ID), GEN_STEP, store)
