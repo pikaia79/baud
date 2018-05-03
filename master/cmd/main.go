@@ -29,7 +29,9 @@ func interceptSignal(s IServer) {
 	signal.Notify(sigs, syscall.SIGINT, syscall.SIGTERM)
 
 	go func() {
-		<-sigs
+		signal := <-sigs
+		log.Info("master received signal[%v]", signal.String())
+
 		s.Shutdown()
 		mainWg.Done()
 		os.Exit(0)

@@ -19,10 +19,10 @@ type Cluster struct {
 	clusterLock sync.RWMutex
 }
 
-func NewCluster(config *Config) *Cluster {
+func NewCluster(config *Config, store Store) *Cluster {
 	return &Cluster{
 		config:         config,
-		store:          NewRaftStore(config),
+		store: 			store,
 		dbCache:        NewDBCache(),
 		psCache:        NewPSCache(),
 		partitionCache: NewPartitionCache(),
@@ -30,13 +30,6 @@ func NewCluster(config *Config) *Cluster {
 }
 
 func (c *Cluster) Start() error {
-	if err := c.store.Open(); err != nil {
-		log.Error("fail to create raft store. err:[%v]", err)
-		return err
-	}
-
-	GetIdGeneratorSingle(c.store)
-
 	// recovery memory meta data
 	if err := c.recoveryPSCache(); err != nil {
 		log.Error("fail to recovery psCache. err:[%v]", err)
@@ -50,7 +43,7 @@ func (c *Cluster) Start() error {
 		log.Error("fail to recovery spaceCache. err[%v]", err)
 		return err
 	}
-	if err := c.recoveryPartition(); err != nil {
+	if err := c.recoveryPartitionCache(); err != nil {
 		log.Error("fail to recovery partitionCache. err[%v]", err)
 		return err
 	}
@@ -61,9 +54,7 @@ func (c *Cluster) Start() error {
 }
 
 func (c *Cluster) Close() {
-	if c.store != nil {
-		c.store.Close()
-	}
+	c.clearAllCache()
 	log.Info("Cluster has closed")
 }
 
@@ -130,7 +121,7 @@ func (c *Cluster) recoverySpaceCache() error {
 	return nil
 }
 
-func (c *Cluster) recoveryPartition() error {
+func (c *Cluster) recoveryPartitionCache() error {
 	c.clusterLock.Lock()
 	defer c.clusterLock.Unlock()
 
@@ -181,6 +172,15 @@ func (c *Cluster) recoveryPartition() error {
 	}
 
 	return nil
+}
+
+func (c *Cluster) clearAllCache() {
+	c.clusterLock.Lock()
+	defer c.clusterLock.Unlock()
+
+	c.psCache.clear()
+	c.dbCache.clear()
+	c.partitionCache.clear()
 }
 
 func (c *Cluster) createDb(dbName string) (*DB, error) {

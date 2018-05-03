@@ -10,13 +10,14 @@ import (
 	"google.golang.org/grpc/reflection"
 	"net"
 	"github.com/tiglabs/baudengine/util/rpc"
+	"sync"
 )
 
 type RpcServer struct {
 	config     *Config
 	grpcServer *grpc.Server
-
-	cluster *Cluster
+	cluster    *Cluster
+	wg         sync.WaitGroup
 }
 
 func NewRpcServer(config *Config, cluster *Cluster) *RpcServer {
@@ -40,7 +41,10 @@ func (s *RpcServer) Start() error {
 		return err
 	}
 
+	s.wg.Add(1)
 	go func() {
+		defer s.wg.Done()
+
 		if err := s.grpcServer.Serve(l); err != nil {
 			log.Error("grpc server serve error[%v]", err)
 		}
@@ -53,7 +57,11 @@ func (s *RpcServer) Start() error {
 func (s *RpcServer) Close() {
 	if s.grpcServer != nil {
 		s.grpcServer.GracefulStop()
+		s.grpcServer = nil
 	}
+
+	s.wg.Wait()
+
 	log.Info("RPC server has closed")
 }
 

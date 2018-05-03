@@ -9,10 +9,13 @@ import (
 	"math"
 	"net/http"
 	"strconv"
+	"sync"
+	"time"
 )
 
 const (
 	DEFAULT_CONN_LIMIT = 100
+	DEFAULT_CLOSE_TIMEOUT = 5 * time.Second
 
 	// definition for http url parameter name
 	DB_NAME         = "db_name"
@@ -30,14 +33,16 @@ type ApiServer struct {
 	config     *Config
 	httpServer *netutil.Server
 	cluster    *Cluster
+	wg         sync.WaitGroup
 }
 
 func NewApiServer(config *Config, cluster *Cluster) *ApiServer {
     cfg := &netutil.ServerConfig{
-        Name:      "master-api-server",
-        Addr:      util.BuildAddr("0.0.0.0", int(config.ClusterCfg.CurNode.HttpPort)),
-        Version:   "v1",
-        ConnLimit: DEFAULT_CONN_LIMIT,
+		Name:         "master-api-server",
+		Addr:         util.BuildAddr("0.0.0.0", int(config.ClusterCfg.CurNode.HttpPort)),
+		Version:      "v1",
+		ConnLimit:    DEFAULT_CONN_LIMIT,
+		CloseTimeout: DEFAULT_CLOSE_TIMEOUT,
     }
 
 	apiServer := &ApiServer{
@@ -51,7 +56,10 @@ func NewApiServer(config *Config, cluster *Cluster) *ApiServer {
 }
 
 func (s *ApiServer) Start() error {
+	s.wg.Add(1)
 	go func() {
+		defer s.wg.Done()
+
 		if err := s.httpServer.Run(); err != nil {
 			log.Error("api server run error[%v]", err)
 		}
@@ -63,8 +71,11 @@ func (s *ApiServer) Start() error {
 
 func (s *ApiServer) Close() {
 	if s.httpServer != nil {
-		s.httpServer.Close()
+		s.httpServer.Shutdown()
+		s.httpServer = nil
 	}
+
+	s.wg.Wait()
 
 	log.Info("ApiServer has closed")
 }
