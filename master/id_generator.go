@@ -40,6 +40,8 @@ func GetIdGeneratorSingle(store Store) IDGenerator {
 		}
 		idGeneratorSingle = NewIDGenerator([]byte(AUTO_INCREMENT_ID), GEN_STEP, store)
 		atomic.StoreUint32(&idGeneratorSingleDone, 1)
+
+		log.Info("IdGenerator single has started")
 	}
 
 	return idGeneratorSingle
@@ -94,7 +96,7 @@ func (id *StoreIdGenerator) Close() {
 	idGeneratorSingle = nil
 	atomic.StoreUint32(&idGeneratorSingleDone, 0)
 
-	log.Info("Id Generator has closed")
+	log.Info("IdGenerator single has closed")
 }
 
 func (id *StoreIdGenerator) get(key []byte) ([]byte, error) {

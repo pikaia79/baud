@@ -61,6 +61,8 @@ func GetPMSingle(cluster *Cluster) *ProcessorManager {
 		pm.start()
 
 		atomic.StoreUint32(&processorManagerSingleDone, 1)
+
+		log.Info("ProcessorManager single has started")
 	}
 
 	return processorManagerSingle
@@ -83,7 +85,7 @@ func (pm *ProcessorManager) Close() {
 	processorManagerSingle = nil
 	atomic.StoreUint32(&processorManagerSingleDone, 0)
 
-	log.Info("Processor manager has closed")
+	log.Info("ProcessorManager single has closed")
 }
 
 func (pm *ProcessorManager) start() {
