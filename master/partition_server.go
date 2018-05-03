@@ -227,3 +227,11 @@ func (c *PSCache) recovery(store Store) ([]*PartitionServer, error) {
 
 	return resultServers, nil
 }
+
+func (c *PSCache) clear() {
+	c.lock.Lock()
+	defer c.lock.Unlock()
+
+	c.id2Servers = make(map[metapb.NodeID]*PartitionServer)
+	c.ip2Servers = make(map[string]*PartitionServer)
+}

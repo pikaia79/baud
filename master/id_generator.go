@@ -13,25 +13,39 @@ var (
 	AUTO_INCREMENT_ID        = fmt.Sprintf("$auto_increment_id")
 
 	idGeneratorSingle     IDGenerator
-	idGeneratorSingleLock sync.Once
+	idGeneratorSingleLock sync.Mutex
+	idGeneratorSingleDone uint32
 )
 
 type IDGenerator interface {
 	GenID() (uint32, error)
+	Close()
 }
 
 func GetIdGeneratorSingle(store Store) IDGenerator {
-	idGeneratorSingleLock.Do(func() {
+	if idGeneratorSingle != nil {
+		return idGeneratorSingle
+	}
+	if atomic.LoadUint32(&idGeneratorSingleDone) == 1 {
+		return idGeneratorSingle
+	}
+
+	idGeneratorSingleLock.Lock()
+	defer idGeneratorSingleLock.Unlock()
+
+	if atomic.LoadUint32(&idGeneratorSingleDone) == 0 {
 		if store == nil {
-			log.Error("store should not be nil at first time when create single idGenerator")
-			return
+			log.Error("store should not be nil at first time when create psClientSingle StoreIdGenerator")
+			return nil
 		}
 		idGeneratorSingle = NewIDGenerator([]byte(AUTO_INCREMENT_ID), GEN_STEP, store)
-	})
+		atomic.StoreUint32(&idGeneratorSingleDone, 1)
+	}
+
 	return idGeneratorSingle
 }
 
-type idGenerator struct {
+type StoreIdGenerator struct {
 	lock sync.Mutex
 	base uint32
 	end  uint32
@@ -44,11 +58,11 @@ type idGenerator struct {
 	store Store
 }
 
-func NewIDGenerator(key []byte, step uint32, store Store) *idGenerator {
-	return &idGenerator{key: key, step: step, store: store}
+func NewIDGenerator(key []byte, step uint32, store Store) *StoreIdGenerator {
+	return &StoreIdGenerator{key: key, step: step, store: store}
 }
 
-func (id *idGenerator) GenID() (uint32, error) {
+func (id *StoreIdGenerator) GenID() (uint32, error) {
 	if id.base == id.end {
 		id.lock.Lock()
 
@@ -73,7 +87,17 @@ func (id *idGenerator) GenID() (uint32, error) {
 	return id.base, nil
 }
 
-func (id *idGenerator) get(key []byte) ([]byte, error) {
+func (id *StoreIdGenerator) Close() {
+	idGeneratorSingleLock.Lock()
+	defer idGeneratorSingleLock.Unlock()
+
+	idGeneratorSingle = nil
+	atomic.StoreUint32(&idGeneratorSingleDone, 0)
+
+	log.Info("Id Generator has closed")
+}
+
+func (id *StoreIdGenerator) get(key []byte) ([]byte, error) {
 	value, err := id.store.Get(key)
 	if err != nil {
 		return nil, err
@@ -81,11 +105,11 @@ func (id *idGenerator) get(key []byte) ([]byte, error) {
 	return value, nil
 }
 
-func (id *idGenerator) put(key, value []byte) error {
+func (id *StoreIdGenerator) put(key, value []byte) error {
 	return id.store.Put(key, value)
 }
 
-func (id *idGenerator) generate() (uint32, error) {
+func (id *StoreIdGenerator) generate() (uint32, error) {
 	value, err := id.get(id.key)
 	if err != nil {
 		return 0, err

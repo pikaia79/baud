@@ -178,3 +178,11 @@ func (c *DBCache) recovery(store Store) ([]*DB, error) {
 
 	return resultDBs, nil
 }
+
+func (c *DBCache) clear() {
+	c.lock.Lock()
+	defer c.lock.Unlock()
+
+	c.dbs = make(map[metapb.DBID]*DB)
+	c.name2Ids = make(map[string]metapb.DBID)
+}

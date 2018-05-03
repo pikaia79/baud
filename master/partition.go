@@ -332,6 +332,13 @@ func (c *PartitionCache) recovery(store Store) ([]*Partition, error) {
 	return resultPartitions, nil
 }
 
+func (c *PartitionCache) clear() {
+	c.lock.Lock()
+	defer c.lock.Unlock()
+
+	c.partitions = make(map[metapb.PartitionID]*Partition)
+}
+
 type PartitionItem struct {
 	partition *Partition
 }

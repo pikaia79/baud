@@ -37,6 +37,7 @@ type Store interface {
 	Get(key []byte) ([]byte, error)
 	Scan(startKey, limitKey []byte) raftkvstore.Iterator
 	NewBatch() Batch
+	WatchLeader(notifier chan bool)
 	Close() error
 }
 
@@ -48,9 +49,11 @@ type Batch interface {
 }
 
 type RaftStore struct {
-	config     *Config
-	localStore raftkvstore.Store
-	localRead  bool
+	config         *Config
+	localStore     raftkvstore.Store
+	localRead      bool
+	curLeaderId    uint64  // 0: no leader
+	becomeLeaderCh chan bool
 
 	raftStoreConfig *RaftStoreConfig
 	raftGroup       *RaftGroup
@@ -82,8 +85,8 @@ type RaftStoreConfig struct {
 
 func NewRaftStore(config *Config) *RaftStore {
 	rs := &RaftStore{
-		config:    config,
-		localRead: true,
+		config:         config,
+		localRead:      true,
 	}
 	rs.ctx, rs.ctxCancel = context.WithCancel(context.Background())
 	return rs
@@ -102,6 +105,8 @@ func (rs *RaftStore) Open() error {
 	}
 	rs.wg.Add(1)
 	go rs.raftLogCleanup()
+
+	log.Info("Raft store has started")
 	return nil
 }
 
@@ -168,6 +173,10 @@ func (rs *RaftStore) NewBatch() Batch {
 	return NewSaveBatch(rs.raftGroup)
 }
 
+func (rs *RaftStore) WatchLeader(becomeLeader chan bool) {
+	rs.becomeLeaderCh = becomeLeader
+}
+
 func (rs *RaftStore) Close() error {
 	var lastErr error
 	if rs.raftGroup != nil {
@@ -189,6 +198,7 @@ func (rs *RaftStore) Close() error {
 		}
 	}
 
+	log.Info("Raft store has closed")
 	return lastErr
 }
 
@@ -252,7 +262,6 @@ func (b *SaveBatch) Commit() error {
 	}
 	return nil
 }
-
 /////////////////////store end////////////////////////
 
 ////////////////////raft begin////////////////////////
@@ -350,6 +359,7 @@ func (rs *RaftStore) initRaftServer() error {
 
 	return nil
 }
+
 func (rs *RaftStore) raftLogCleanup() {
 	defer rs.wg.Done()
 	ticker := time.NewTicker(time.Minute * 5)
@@ -415,6 +425,9 @@ func (r *Resolver) NodeAddress(nodeID uint64, stype raft.SocketType) (addr strin
 	}
 }
 
+func (rs *RaftStore) becomeLeader(newLeaderId uint64) bool {
+	return newLeaderId != 0 && rs.config.ClusterCfg.CurNodeId == newLeaderId
+}
 ////////////////////raft end////////////////////////
 
 /////////////////////callback implement begin///////////////
@@ -582,6 +595,18 @@ func (rs *RaftStore) HandleApplySnapshot(peers []raftproto.Peer, iter *SnapshotK
 
 func (rs *RaftStore) LeaderChangeHandler(leaderId uint64) {
 	log.Info("raft leader had changed to id[%v]", leaderId)
+	rs.curLeaderId = leaderId
+
+	if rs.becomeLeaderCh == nil {
+		return
+	}
+
+	select {
+	case <- time.After(500 * time.Millisecond):
+		log.Error("notify leader change timeout")
+	case rs.becomeLeaderCh <- rs.becomeLeader(leaderId):
+		log.Debug("notify become leader[%v] end", rs.becomeLeader(leaderId))
+	}
 }
 
 func (rs *RaftStore) FatalEventHandler(err *raft.FatalError) {

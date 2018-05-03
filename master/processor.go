@@ -7,6 +7,7 @@ import (
 	"github.com/tiglabs/baudengine/util/log"
 	"runtime/debug"
 	"sync"
+	"sync/atomic"
 )
 
 const (
@@ -22,7 +23,8 @@ const (
 
 var (
 	processorManagerSingle     *ProcessorManager
-	processorManagerSingleLock sync.Once
+	processorManagerSingleLock sync.Mutex
+	processorManagerSingleDone uint32
 )
 
 type ProcessorManager struct {
@@ -36,24 +38,55 @@ type ProcessorManager struct {
 }
 
 func GetPMSingle(cluster *Cluster) *ProcessorManager {
-	if processorManagerSingle == nil {
-		processorManagerSingleLock.Do(func() {
-			if cluster == nil {
-				log.Panic("cluster should not be nil at first time when create single processorManager")
-			}
+	if processorManagerSingle != nil {
+		return processorManagerSingle
+	}
+	if atomic.LoadUint32(&processorManagerSingleDone) == 1 {
+		return processorManagerSingle
+	}
 
-			pm := new(ProcessorManager)
-			pm.ctx, pm.cancel = context.WithCancel(context.Background())
-			pm.pp = NewPartitionProcessor(pm.ctx, pm.cancel, cluster)
+	processorManagerSingleLock.Lock()
+	defer processorManagerSingleLock.Unlock()
 
-			processorManagerSingle = pm
-		})
+	if atomic.LoadUint32(&processorManagerSingleDone) == 0 {
+		if cluster == nil {
+			log.Panic("cluster should not be nil at first time when create psClientSingle processorManager")
+		}
+
+		pm := new(ProcessorManager)
+		pm.ctx, pm.cancel = context.WithCancel(context.Background())
+		pm.pp = NewPartitionProcessor(pm.ctx, pm.cancel, cluster)
+
+		processorManagerSingle = pm
+		pm.start()
+
+		atomic.StoreUint32(&processorManagerSingleDone, 1)
 	}
 
 	return processorManagerSingle
 }
 
-func (pm *ProcessorManager) Start() {
+func (pm *ProcessorManager) Close() {
+	if !pm.isStarted {
+		return
+	}
+	pm.isStarted = false
+
+	pm.cancel()
+	pm.wg.Wait()
+
+	pm.pp.close()
+
+	processorManagerSingleLock.Lock()
+	defer processorManagerSingleLock.Unlock()
+
+	processorManagerSingle = nil
+	atomic.StoreUint32(&processorManagerSingleDone, 0)
+
+	log.Info("Processor manager has closed")
+}
+
+func (pm *ProcessorManager) start() {
 	pm.wg.Add(1)
 	go func() {
 		defer pm.wg.Done()
@@ -69,18 +102,6 @@ func (pm *ProcessorManager) Start() {
 	pm.isStarted = true
 
 	log.Info("Processor manager has started")
-}
-
-func (pm *ProcessorManager) Stop() {
-	if !pm.isStarted {
-		return
-	}
-	pm.isStarted = false
-
-	pm.cancel()
-	pm.wg.Wait()
-
-	log.Info("Processor manager has stop")
 }
 
 func (pm *ProcessorManager) PushEvent(event *ProcessorEvent) error {
@@ -159,6 +180,7 @@ func NewForcePartitionDeleteEvent(partitionId metapb.PartitionID, replicaRpcAddr
 
 type Processor interface {
 	run()
+	close()
 }
 
 type PartitionProcessor struct {
@@ -193,7 +215,11 @@ func (p *PartitionProcessor) run() {
 		case <-p.ctx.Done():
 			log.Info("Partition Processor exit")
 			return
-		case event := <-p.eventCh:
+		case event, opened := <-p.eventCh:
+			if !opened {
+				log.Debug("closed partition processor event channel")
+				return
+			}
 
 			if event.typ == EVENT_TYPE_PARTITION_CREATE {
 				psToCreate := p.serverSelector.SelectTarget(p.cluster.psCache.getAllServers())
@@ -275,5 +301,11 @@ func (p *PartitionProcessor) run() {
 				}(body.partitionId, body.replicaRpcAddr, body.replica)
 			}
 		}
+	}
+}
+
+func (p *PartitionProcessor) close() {
+	if p.eventCh != nil {
+		close(p.eventCh)
 	}
 }
