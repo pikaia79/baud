@@ -48,6 +48,11 @@ func (wm *WorkerManager) Shutdown() {
 	wm.cancel()
 	wm.wg.Wait()
 
+	wm.workersLock.RLock()
+	defer wm.workersLock.RUnlock()
+
+	wm.workers = nil
+
 	log.Info("Worker manager has closed")
 }
 

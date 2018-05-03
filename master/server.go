@@ -56,16 +56,18 @@ func (ms *Master) Start(config *Config) error {
 		return err
 	}
 
-    ms.idGenerator = GetIdGeneratorSingle(ms.globalStore)
-    ms.processorManager = GetPMSingle(ms.cluster)
-	ms.psRpcClient = GetPSRpcClientSingle(config)
+    ms.psRpcClient = GetPSRpcClientSingle(config)
 
-	ms.workerManager = NewWorkerManager(ms.cluster)
-	if err := ms.workerManager.Start(); err != nil {
-		log.Error("fail to start worker manager. err:[%v]", err)
-        ms.Shutdown()
-		return err
-	}
+
+    //ms.idGenerator = GetIdGeneratorSingle(ms.globalStore)
+    //ms.processorManager = GetPMSingle(ms.cluster)
+    //
+	//ms.workerManager = NewWorkerManager(ms.cluster)
+	//if err := ms.workerManager.Start(); err != nil {
+	//	log.Error("fail to start worker manager. err:[%v]", err)
+     //   ms.Shutdown()
+	//	return err
+	//}
 
 	ms.watchLeader()
 
@@ -149,12 +151,19 @@ func (ms *Master) watchLeader() {
                         log.Error("fail to restart cluster. err:[%v]", err)
                         break
                     }
-                    ms.idGenerator = GetIdGeneratorSingle(ms.globalStore)
-                    ms.processorManager = GetPMSingle(ms.cluster)
-                    ms.workerManager = NewWorkerManager(ms.cluster)
-                    if err := ms.workerManager.Start(); err != nil {
-                        log.Error("fail to restart worker manager. err:[%v]", err)
-                        break
+
+                    if ms.idGenerator == nil {
+                        ms.idGenerator = GetIdGeneratorSingle(ms.globalStore)
+                    }
+                    if ms.processorManager == nil {
+                        ms.processorManager = GetPMSingle(ms.cluster)
+                    }
+                    if ms.workerManager == nil {
+                        ms.workerManager = NewWorkerManager(ms.cluster)
+                        if err := ms.workerManager.Start(); err != nil {
+                            log.Error("fail to restart worker manager. err:[%v]", err)
+                            break
+                        }
                     }
                 }
             }
