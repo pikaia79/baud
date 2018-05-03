@@ -13,13 +13,16 @@ import (
 	"github.com/tiglabs/baudengine/util/log"
 	"github.com/julienschmidt/httprouter"
 	"github.com/tiglabs/baudengine/util/gogc"
+	"context"
+	"time"
 )
 
 type ServerConfig struct {
-	Name      string
-	Addr      string   // ip:port
-	Version   string
-	ConnLimit int
+	Name         string
+	Addr         string // ip:port
+	Version      string
+	ConnLimit    int
+	CloseTimeout time.Duration
 }
 
 // Server is a http server
@@ -132,6 +135,24 @@ func (s *Server) Close() {
 	}
 }
 
+// Graceful shutdown the server
+func (s *Server) Shutdown() {
+	if !atomic.CompareAndSwapInt64(&s.closed, 0, 1) {
+		return
+	}
+
+	if s.server != nil {
+		ctx, cancel := context.WithTimeout(context.Background(), s.cfg.CloseTimeout)
+		defer cancel()
+
+		if err := s.server.Shutdown(ctx); err != nil {
+			log.Error("fail to graceful shutdown http server. err[%v]", err)
+		} else {
+			log.Debug("finish to shutdown http server")
+		}
+	}
+}
+
 // isClosed checks whether server is closed or not.
 func (s *Server) isClosed() bool {
 	return atomic.LoadInt64(&s.closed) == 1
@@ -151,7 +172,7 @@ func (s *Server) Run() error {
 	s.server = &http.Server{
 		Handler: s.router,
 	}
-	if err = s.server.Serve(l); err != nil {
+	if err = s.server.Serve(l); err != http.ErrServerClosed {
 		log.Error("http.listenAndServe failed: %s", err)
 		return err
 	}
