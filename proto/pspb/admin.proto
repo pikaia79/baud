@@ -49,9 +49,7 @@ message ChangeReplicaRequest {
     RequestHeader     header        = 1 [(gogoproto.nullable) = false, (gogoproto.embed) = true];
     ReplicaChangeType type          = 2;
     uint32            partition_id  = 3 [(gogoproto.customname) = "PartitionID", (gogoproto.casttype) = "github.com/tiglabs/baudengine/proto/metapb.PartitionID"];
-    uint64            ReplicaID     = 4 [(gogoproto.customname) = "ReplicaID", (gogoproto.casttype) = "github.com/tiglabs/baudengine/proto/metapb.ReplicaID"];
-    uint32            nodeID        = 5 [(gogoproto.customname) = "NodeID", (gogoproto.casttype) = "github.com/tiglabs/baudengine/proto/metapb.NodeID"];
-    RaftAddrs         raft_addrs    = 6 [(gogoproto.nullable) = false, (gogoproto.embed) = true];
+    Replica           replica       = 4 [(gogoproto.nullable) = false];
 }
 
 message ChangeReplicaResponse {
