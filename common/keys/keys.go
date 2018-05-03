@@ -5,8 +5,8 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/tiglabs/baud/proto/metapb"
-	"github.com/tiglabs/baud/util/encoding"
+	"github.com/tiglabs/baudengine/proto/metapb"
+	"github.com/tiglabs/baudengine/util/encoding"
 )
 
 const (
@@ -35,7 +35,7 @@ func DecodeDocID(id metapb.Key) (*metapb.DocID, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &metapb.DocID{SlotID: uint32(slotID), SeqNo: seqNo}, nil
+	return &metapb.DocID{SlotID: metapb.SlotID(slotID), SeqNo: seqNo}, nil
 }
 
 // DecodeDocIDToString decode bytes to string
@@ -66,5 +66,5 @@ func DecodeDocIDFromString(id string) (*metapb.DocID, error) {
 		return nil, fmt.Errorf("The given id(%s) parse seqNo error: %s", id, err.Error())
 	}
 
-	return &metapb.DocID{SlotID: uint32(slotID), SeqNo: seqNo}, nil
+	return &metapb.DocID{SlotID: metapb.SlotID(slotID), SeqNo: seqNo}, nil
 }

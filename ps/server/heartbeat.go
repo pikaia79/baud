@@ -4,11 +4,11 @@ import (
 	"context"
 	"time"
 
-	"github.com/tiglabs/baud/proto/masterpb"
-	"github.com/tiglabs/baud/proto/metapb"
-	"github.com/tiglabs/baud/util/log"
-	"github.com/tiglabs/baud/util/routine"
-	"github.com/tiglabs/baud/util/uuid"
+	"github.com/tiglabs/baudengine/proto/masterpb"
+	"github.com/tiglabs/baudengine/proto/metapb"
+	"github.com/tiglabs/baudengine/util/log"
+	"github.com/tiglabs/baudengine/util/routine"
+	"github.com/tiglabs/baudengine/util/uuid"
 )
 
 const (
@@ -55,7 +55,7 @@ func (h *heartbeatWork) start() {
 
 			case <-heartbeatTimer.C:
 				h.doHeartbeat()
-				h.update(&heartbeatTimer)
+				h.update(heartbeatTimer)
 
 			case <-h.triggerCh:
 				now := time.Now()
@@ -70,7 +70,7 @@ func (h *heartbeatWork) start() {
 				}
 
 				h.doHeartbeat()
-				h.update(&heartbeatTimer)
+				h.update(heartbeatTimer)
 			}
 		}
 	}, quitCh)

@@ -21,8 +21,8 @@ const (
 	FIELD_TYPE_B FIELD_TYPE = 'B'
 )
 
-func encodeStoreFieldKey(docID, fieldName string) (key []byte) {
-	key = encoding.EncodeBytesAscending(key, append([]byte(docID), byte(KEY_TYPE_F)))
+func encodeStoreFieldKey(docID []byte, fieldName string) (key []byte) {
+	key = encoding.EncodeBytesAscending(key, append(docID, byte(KEY_TYPE_F)))
 	if len(fieldName) > 0 {
 		key = encoding.EncodeBytesAscending(key, []byte(fieldName))
 	}
@@ -48,7 +48,7 @@ func decodeStoreFieldKey(key []byte) (string, error) {
 }
 
 // fields must have the same field type
-func encodeStoreField(docID string, fields []document.Field) (key []byte, row []byte, err error) {
+func encodeStoreField(docID []byte, fields []document.Field) (key []byte, row []byte, err error) {
 	var fieldType FIELD_TYPE
 	for i, field := range fields {
 		if !field.Property().IsStored() {
@@ -86,7 +86,7 @@ func decodeStoreField(fieldName string, row []byte) ([]document.Field, error) {
 	var err error
 	fieldType := FIELD_TYPE(row[0])
 	property := document.Property(row[1])
-	row = row[1:]
+	row = row[2:]
 	for len(row) > 0 {
 		var val []byte
 		switch fieldType {
@@ -120,4 +120,3 @@ func decodeStoreField(fieldName string, row []byte) ([]document.Field, error) {
 	}
 	return fields, nil
 }
-

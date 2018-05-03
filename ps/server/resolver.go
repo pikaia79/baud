@@ -5,7 +5,7 @@ import (
 	"sync"
 	"sync/atomic"
 
-	"github.com/tiglabs/baud/proto/metapb"
+	"github.com/tiglabs/baudengine/proto/metapb"
 	"github.com/tiglabs/raft"
 )
 

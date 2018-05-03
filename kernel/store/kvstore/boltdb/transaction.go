@@ -14,7 +14,7 @@ type Transaction struct {
 }
 
 func(bs *Store) NewTransaction(writable bool) (kvstore.Transaction, error) {
-	tx, err := bs.db.Begin(false)
+	tx, err := bs.db.Begin(writable)
 	if err != nil {
 		return nil, err
 	}
@@ -35,7 +35,6 @@ func(tx *Transaction) Put(key, value []byte, ops ...*kvstore.Option) error {
 		if err != nil {
 			return err
 		}
-
 	}
 	return nil
 }
@@ -61,7 +60,6 @@ func(tx *Transaction) Delete(key []byte, ops ...*kvstore.Option) error {
 		if err != nil {
 			return err
 		}
-
 	}
 	return nil
 }
@@ -81,7 +79,7 @@ func(tx *Transaction) PrefixIterator(prefix []byte) kvstore.KVIterator {
 func(tx *Transaction) RangeIterator(start, end []byte) kvstore.KVIterator {
 	cursor := tx.bucket.Cursor()
 	rv := &Iterator{
-		tx:     tx,
+		tx:     tx.tx,
 		cursor: cursor,
 		start:  start,
 		end:    end,
@@ -106,5 +104,8 @@ func(tx *Transaction) Rollback() error {
 	if tx == nil {
 		return nil
 	}
-	return tx.Rollback()
+	if tx.tx != nil {
+		return tx.tx.Rollback()
+	}
+	return nil
 }

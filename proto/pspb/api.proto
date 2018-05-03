@@ -82,12 +82,12 @@ message BulkItemResponse {
     IndexResponse   index   = 2;
     UpdateResponse  update  = 3;
     DeleteResponse  delete  = 4;
+    Failure         failure = 5;
 }
 
 message IndexRequest {
-    OpType  op_type = 1;
-    bytes   source = 2;
-
+    uint32 slot   = 1 [(gogoproto.customname) = "Slot", (gogoproto.casttype) = "github.com/tiglabs/baudengine/proto/metapb.SlotID"];
+    bytes  source = 2;
 }
 
 message IndexResponse {
@@ -130,4 +130,11 @@ message GetResponse {
     string           id        = 2;
     bool             found     = 3;
     bytes            fields    = 4;
+}
+
+message Failure {
+    option (gogoproto.goproto_stringer) = false;
+
+    string id    = 1;
+    string cause = 2;
 }

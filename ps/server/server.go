@@ -5,29 +5,28 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"sort"
 	"sync"
 	"time"
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/reflection"
 
-	"sort"
-
 	"github.com/gogo/protobuf/proto"
-	"github.com/tiglabs/baud/proto/masterpb"
-	"github.com/tiglabs/baud/proto/metapb"
-	"github.com/tiglabs/baud/proto/pspb"
-	"github.com/tiglabs/baud/ps/metric"
-	"github.com/tiglabs/baud/util"
-	"github.com/tiglabs/baud/util/atomic"
-	"github.com/tiglabs/baud/util/build"
-	"github.com/tiglabs/baud/util/config"
-	"github.com/tiglabs/baud/util/log"
-	"github.com/tiglabs/baud/util/netutil"
-	"github.com/tiglabs/baud/util/routine"
-	"github.com/tiglabs/baud/util/rpc"
-	"github.com/tiglabs/baud/util/timeutil"
-	"github.com/tiglabs/baud/util/uuid"
+	"github.com/tiglabs/baudengine/proto/masterpb"
+	"github.com/tiglabs/baudengine/proto/metapb"
+	"github.com/tiglabs/baudengine/proto/pspb"
+	"github.com/tiglabs/baudengine/ps/metric"
+	"github.com/tiglabs/baudengine/util"
+	"github.com/tiglabs/baudengine/util/atomic"
+	"github.com/tiglabs/baudengine/util/build"
+	"github.com/tiglabs/baudengine/util/config"
+	"github.com/tiglabs/baudengine/util/log"
+	"github.com/tiglabs/baudengine/util/netutil"
+	"github.com/tiglabs/baudengine/util/routine"
+	"github.com/tiglabs/baudengine/util/rpc"
+	"github.com/tiglabs/baudengine/util/timeutil"
+	"github.com/tiglabs/baudengine/util/uuid"
 	"github.com/tiglabs/raft"
 )
 
@@ -203,7 +202,7 @@ func (s *Server) doStart(init bool) error {
 }
 
 // Stop stop server
-func (s *Server) Stop() {
+func (s *Server) Close() error {
 	s.stopping.Set(true)
 	s.ctxCancel()
 
@@ -229,6 +228,8 @@ func (s *Server) Stop() {
 	if s.connMgr != nil {
 		s.connMgr.Close()
 	}
+
+	return nil
 }
 
 func (s *Server) closeAllRange() {

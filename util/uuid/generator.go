@@ -7,9 +7,15 @@ type Generator interface {
 
 var (
 	flakeUUIDGenerator = NewFlakeGenerator()
+	timeUUIDGenerator  = NewTimeGenerator()
 )
 
-// FlakeUUID Generates a time-based UUID (similar to Flake IDs)
+// FlakeUUID Generates an UUID (similar to Flake IDs)
 func FlakeUUID() string {
 	return flakeUUIDGenerator.GetUUID()
+}
+
+// TimeUUID Generates a time-based UUID for tests.
+func TimeUUID() string {
+	return timeUUIDGenerator.GetUUID()
 }
