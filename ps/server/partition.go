@@ -2,6 +2,7 @@ package server
 
 import (
 	"context"
+	"errors"
 	"sync"
 
 	"github.com/tiglabs/baudengine/kernel"
@@ -13,6 +14,11 @@ import (
 	"github.com/tiglabs/raft"
 	"github.com/tiglabs/raft/proto"
 	"github.com/tiglabs/raft/storage/wal"
+)
+
+var (
+	errorPartitonClosed  = errors.New("partition has closed")
+	errorPartitonCommand = errors.New("unsupported command")
 )
 
 type partition struct {
@@ -65,7 +71,7 @@ func (p *partition) start() {
 		return
 	}
 	p.store = index.NewIndexDriver(kvStore)
-	apply, err := p.store.GetLastApplyID()
+	apply, err := p.store.GetApplyID()
 	if err != nil {
 		p.rwMutex.Lock()
 		p.meta.Status = metapb.PA_INVALID
@@ -139,7 +145,7 @@ func (p *partition) getPartitionInfo() *masterpb.PartitionInfo {
 	return info
 }
 
-func (p *partition) validate() *metapb.Error {
+func (p *partition) checkWriteAble() *metapb.Error {
 	p.rwMutex.RLock()
 	defer p.rwMutex.RUnlock()
 
@@ -152,8 +158,31 @@ func (p *partition) validate() *metapb.Error {
 	if p.leader != uint64(p.server.nodeID) {
 		return &metapb.Error{NotLeader: &metapb.NotLeader{
 			PartitionID: p.meta.ID,
-			NodeID:      metapb.NodeID(p.leader),
-			NodeAddr:
+			Leader:      metapb.NodeID(p.leader),
+			Epoch:       p.meta.Epoch,
 		}}
 	}
+
+	return nil
+}
+
+func (p *partition) checkReadAble(readLeader bool) *metapb.Error {
+	p.rwMutex.RLock()
+	defer p.rwMutex.RUnlock()
+
+	if p.meta.Status == metapb.PA_INVALID || p.meta.Status == metapb.PA_NOTREAD {
+		return &metapb.Error{PartitionNotFound: &metapb.PartitionNotFound{p.meta.ID}}
+	}
+	if p.leader == 0 {
+		return &metapb.Error{NoLeader: &metapb.NoLeader{p.meta.ID}}
+	}
+	if readLeader && p.leader != uint64(p.server.nodeID) {
+		return &metapb.Error{NotLeader: &metapb.NotLeader{
+			PartitionID: p.meta.ID,
+			Leader:      metapb.NodeID(p.leader),
+			Epoch:       p.meta.Epoch,
+		}}
+	}
+
+	return nil
 }
