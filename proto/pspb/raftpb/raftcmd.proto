@@ -22,11 +22,11 @@ option (gogoproto.benchgen_all) = false;
 option (gogoproto.goproto_getters_all) = false;
 
 enum CmdType {
-    DATA    = 0;
+    WRITE    = 0;
     ADMIN   = 1;
 }
 
 message RaftCommand {
-    CmdType     type          = 1;
-    BulkRequest data_request  = 2;
+    CmdType         type           = 1;
+    BulkItemRequest write_request  = 2;
 }

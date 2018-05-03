@@ -164,13 +164,6 @@ func (p *partition) updateInternal(contentType pspb.RequestContentType, request 
 }
 
 func (p *partition) deleteInternal(contentType pspb.RequestContentType, request *pspb.DeleteRequest) (*pspb.DeleteResponse, error) {
-	if err := p.validate(); err != nil {
-		if err.NotLeader != nil {
-			return nil, errors.New("is not leader")
-		} else if err.NoLeader != nil {
-			return nil, errors.New("has no leader")
-		}
-	}
 
 	n, err := p.store.DeleteDocument(keys.EncodeDocID(&request.Id))
 	if err != nil {

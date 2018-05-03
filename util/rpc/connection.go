@@ -51,6 +51,11 @@ func newConnection(clusterID, addr string, manager *ConnectionMgr) *connection {
 		heartbeatDone: make(chan struct{}),
 		closeDone:     make(chan struct{}),
 	}
+
+	c.heartbeatResult.Store(heartbeatResult{
+		succeeded: false,
+		err:       ErrNotHeartbeated,
+	})
 	return c
 }
 

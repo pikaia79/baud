@@ -2,10 +2,38 @@ package server
 
 import (
 	"github.com/tiglabs/baudengine/proto/metapb"
+	"github.com/tiglabs/baudengine/proto/pspb/raftpb"
 	"github.com/tiglabs/baudengine/util/log"
 	"github.com/tiglabs/raft"
 	"github.com/tiglabs/raft/proto"
 )
+
+func (p *partition) Apply(command []byte, index uint64) (resp interface{}, err error) {
+	raftCmd := raftpb.CreateRaftCommand()
+	defer func() {
+		raftCmd.Close()
+
+		select {
+		case <-p.ctx.Done():
+			return
+		default:
+			p.store.SetApplyID(index)
+		}
+
+	}()
+
+	if err = raftCmd.Unmarshal(command); err == nil {
+		switch raftCmd.Type {
+		case raftpb.CmdType_WRITE:
+			resp, err = p.bulkItemInternal(raftCmd.WriteRequest)
+
+		default:
+			err = errorPartitonCommand
+		}
+	}
+
+	return
+}
 
 func (p *partition) ApplyMemberChange(confChange *proto.ConfChange, index uint64) (interface{}, error) {
 	p.rwMutex.Lock()
@@ -45,6 +73,14 @@ func (p *partition) ApplyMemberChange(confChange *proto.ConfChange, index uint64
 	}
 
 	return nil, nil
+}
+
+func (p *partition) Snapshot() (proto.Snapshot, error) {
+	return nil, nil
+}
+
+func (p *partition) ApplySnapshot(peers []proto.Peer, iter proto.SnapIterator) error {
+	return nil
 }
 
 func (p *partition) HandleLeaderChange(leader uint64) {
