@@ -2,6 +2,7 @@ package kernel
 
 import (
 	"github.com/tiglabs/baudengine/kernel/document"
+	"golang.org/x/net/context"
 )
 
 type Snapshot interface {
@@ -27,14 +28,15 @@ type Iterator interface {
 
 type Engine interface {
 	// for raft server init
-	GetLastApplyID() (uint64, error)
+	SetApplyID(uint64) error
+	GetApplyID() (uint64, error)
 	GetDocSnapshot() (Snapshot, error)
-	ApplyDocSnapshot(applyId uint64, iter Iterator) error
-	AddDocument(doc *document.Document, applyId uint64) error
-	UpdateDocument(doc *document.Document, upsert bool, applyId uint64) (found bool, err error)
-	DeleteDocument(docID []byte, applyId uint64) (int, error)
+	ApplyDocSnapshot(ctx context.Context, iter Iterator) error
+	AddDocument(ctx context.Context, doc *document.Document) error
+	UpdateDocument(ctx context.Context, doc *document.Document, upsert bool) (found bool, err error)
+	DeleteDocument(ctx context.Context, docID []byte) (int, error)
 	// _source, _all as system field
-	GetDocument(docID []byte, fields []string) (map[string]interface{}, bool)
+	GetDocument(ctx context.Context, docID []byte, fields []string) (map[string]interface{}, bool)
 	Close() error
 	// TODO search
 }

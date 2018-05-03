@@ -1,9 +1,9 @@
 package kvstore
 
 type KVStore interface {
-	Put(key, value []byte, ops ...*Option) error
+	Put(key, value []byte) error
 	Get(key []byte) ([]byte, error)
-	Delete(key []byte, ops ...*Option) error
+	Delete(key []byte) error
 
 	// MultiGet retrieves multiple values in one call.
 	MultiGet(keys [][]byte) ([][]byte, error)
@@ -19,7 +19,7 @@ type KVStore interface {
 	RangeIterator(start, end []byte) KVIterator
 
 	NewKVBatch() KVBatch
-	ExecuteBatch(batch KVBatch, ops ...*Option) error
+	ExecuteBatch(batch KVBatch) error
 
 	// GetSnapshot returns a Snapshot which can be used to
 	// read data from the KVStore.  If a Snapshot cannot
@@ -41,10 +41,6 @@ type Snapshot interface {
 	// If the key does not exist, nil is returned.
 	// The caller owns the bytes returned.
 	Get(key []byte) ([]byte, error)
-
-	// Get last option which is Set by store.
-	// We can use it to get last raft apply ID of the snapshot.
-	LastOption() (*Option, error)
 
 	// MultiGet retrieves multiple values in one call.
 	MultiGet(keys [][]byte) ([][]byte, error)
@@ -126,9 +122,4 @@ func MultiGet(reader Snapshot, keys [][]byte) ([][]byte, error) {
 	}
 
 	return vals, nil
-}
-
-type Option struct {
-	// only for raft when write
-	ApplyID uint64
 }

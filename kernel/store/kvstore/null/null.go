@@ -18,11 +18,11 @@ func (r *Store) Get(key []byte) ([]byte, error) {
 	return nil, nil
 }
 
-func (r *Store) Delete(key []byte, ops ...*kvstore.Option) error {
+func (r *Store) Delete(key []byte) error {
 	return nil
 }
 
-func (r *Store) Put(key, value []byte, ops ...*kvstore.Option) error {
+func (r *Store) Put(key, value []byte) error {
 	return nil
 }
 
@@ -42,7 +42,7 @@ func (w *Store) NewKVBatch() kvstore.KVBatch {
 	return &batch{}
 }
 
-func (w *Store) ExecuteBatch(batch kvstore.KVBatch, ops ...*kvstore.Option) error {
+func (w *Store) ExecuteBatch(batch kvstore.KVBatch) error {
 	return nil
 }
 
@@ -102,10 +102,6 @@ func (r *reader) RangeIterator(start, end []byte) kvstore.KVIterator {
 	return &iterator{}
 }
 
-func (r *reader) LastOption() (*kvstore.Option, error) {
-	return &kvstore.Option{}, nil
-}
-
 func (r *reader) Close() error {
 	return nil
 }
@@ -121,9 +117,9 @@ func (i *batch) Close() error                    { return nil }
 
 type transaction struct {}
 
-func(tx *transaction) Put(key, value []byte, ops ...*kvstore.Option) error {return nil}
+func(tx *transaction) Put(key, value []byte) error {return nil}
 func(tx *transaction) Get(key []byte) ([]byte, error) {return nil, nil}
-func(tx *transaction) Delete(key []byte, ops ...*kvstore.Option) error {return nil}
+func(tx *transaction) Delete(key []byte) error {return nil}
 func(tx *transaction) PrefixIterator(prefix []byte) kvstore.KVIterator {return &iterator{}}
 func(tx *transaction) RangeIterator(start, end []byte) kvstore.KVIterator {return &iterator{}}
 func (tx *transaction) Commit() error { return nil }

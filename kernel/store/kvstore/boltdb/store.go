@@ -1,8 +1,6 @@
 package boltdb
 
 import (
-	"bytes"
-	"encoding/binary"
 	"errors"
 	"os"
 
@@ -11,9 +9,6 @@ import (
 )
 
 var _ kvstore.KVStore = &Store{}
-
-var raftBucket []byte = []byte("raft")
-var RAFT_APPLY_ID []byte = []byte("#raft_apply_id")
 
 type StoreConfig struct {
 	Path     string
@@ -41,9 +36,6 @@ func New(config *StoreConfig) (kvstore.KVStore, error) {
 	if config.Bucket == "" {
 		bucket = "baud"
 	}
-	if bytes.Compare([]byte(bucket), raftBucket) == 0 {
-		return nil, errors.New("reserved bucket")
-	}
 	noSync := config.NoSync
 	bo := &bolt.Options{}
 	bo.ReadOnly = config.ReadOnly
@@ -57,10 +49,6 @@ func New(config *StoreConfig) (kvstore.KVStore, error) {
 	if !bo.ReadOnly {
 		err = db.Update(func(tx *bolt.Tx) error {
 			_, err = tx.CreateBucketIfNotExists([]byte(bucket))
-			if err != nil {
-				return err
-			}
-			_, err = tx.CreateBucketIfNotExists(raftBucket)
 			return err
 		})
 		if err != nil {
@@ -92,7 +80,7 @@ func (bs *Store) Get(key []byte) (value []byte, err error) {
 	return
 }
 
-func (bs *Store) Put(key []byte, value []byte, ops ...*kvstore.Option) error {
+func (bs *Store) Put(key []byte, value []byte) error {
 	if bs == nil {
 		return nil
 	}
@@ -102,21 +90,11 @@ func (bs *Store) Put(key []byte, value []byte, ops ...*kvstore.Option) error {
 		if err != nil {
 			return err
 		}
-		if len(ops) > 0 {
-			var buff [8]byte
-			r := tx.Bucket(raftBucket)
-			binary.BigEndian.PutUint64(buff[:], ops[0].ApplyID)
-			err = r.Put(RAFT_APPLY_ID, buff[:])
-			if err != nil {
-				return err
-			}
-
-		}
 		return nil
 	})
 }
 
-func (bs *Store) Delete(key []byte, ops ...*kvstore.Option) error {
+func (bs *Store) Delete(key []byte) error {
 	if bs == nil {
 		return nil
 	}
@@ -125,16 +103,6 @@ func (bs *Store) Delete(key []byte, ops ...*kvstore.Option) error {
 		err := b.Delete(key)
 		if err != nil {
 			return err
-		}
-		if len(ops) > 0 {
-			var buff [8]byte
-			r := tx.Bucket(raftBucket)
-			binary.BigEndian.PutUint64(buff[:], ops[0].ApplyID)
-			err = r.Put(RAFT_APPLY_ID, buff[:])
-			if err != nil {
-				return err
-			}
-
 		}
 		return nil
 	})
@@ -201,7 +169,7 @@ func (bs *Store) NewKVBatch() kvstore.KVBatch {
 	return kvstore.NewBatch()
 }
 
-func (bs *Store) ExecuteBatch(batch kvstore.KVBatch, ops ...*kvstore.Option) (err error) {
+func (bs *Store) ExecuteBatch(batch kvstore.KVBatch) (err error) {
 	if bs == nil {
 		return nil
 	}
@@ -234,15 +202,6 @@ func (bs *Store) ExecuteBatch(batch kvstore.KVBatch, ops ...*kvstore.Option) (er
 			if err != nil {
 				return
 			}
-		}
-	}
-	if len(ops) > 0 {
-		var buff [8]byte
-		r := tx.Bucket(raftBucket)
-		binary.BigEndian.PutUint64(buff[:], ops[0].ApplyID)
-		err = r.Put(RAFT_APPLY_ID, buff[:])
-		if err != nil {
-			return
 		}
 	}
 	return

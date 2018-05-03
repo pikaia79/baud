@@ -1,7 +1,6 @@
 package boltdb
 
 import (
-	"encoding/binary"
 	"github.com/boltdb/bolt"
 	"github.com/tiglabs/baudengine/kernel/store/kvstore"
 )
@@ -62,20 +61,6 @@ func (r *Snapshot) RangeIterator(start, end []byte) kvstore.KVIterator {
 
 	rv.Seek(start)
 	return rv
-}
-
-func (r *Snapshot) LastOption() (*kvstore.Option, error) {
-	if r == nil {
-		return nil, nil
-	}
-
-	raft := r.tx.Bucket(raftBucket)
-	v := raft.Get(RAFT_APPLY_ID)
-	if len(v) == 0 {
-		return &kvstore.Option{}, nil
-	} else {
-		return &kvstore.Option{ApplyID: binary.BigEndian.Uint64(v)}, nil
-	}
 }
 
 func (r *Snapshot) Close() error {

@@ -7,6 +7,7 @@ import (
 	"github.com/tiglabs/baudengine/kernel/store/kvstore"
 	"github.com/tiglabs/baudengine/kernel/store/kvstore/boltdb"
 	"github.com/tiglabs/baudengine/kernel/document"
+	"golang.org/x/net/context"
 )
 
 
@@ -37,11 +38,11 @@ func TestAddDocument(t *testing.T) {
 	tf := document.NewTextField("text", []byte("hello, baud"), document.StoreField)
 	doc.AddField(tf)
 
-	err := driver.AddDocument(doc, 1)
+	err := driver.AddDocument(context.Background(), doc)
 	if err != nil {
 		t.Fatalf("add document failed, err %v", err)
 	}
-	fvs, find := driver.GetDocument([]byte("1"), []string{"text"})
+	fvs, find := driver.GetDocument(context.Background(), []byte("1"), []string{"text"})
 	if !find {
 		t.Fatal("get docment failed")
 	}
@@ -60,18 +61,18 @@ func TestGetDocument(t *testing.T) {
 	doc.AddField(tf)
 	doc.AddField(bf)
 
-	err := driver.AddDocument(doc, 1)
+	err := driver.AddDocument(context.Background(), doc)
 	if err != nil {
 		t.Fatalf("add document failed, err %v", err)
 	}
-	fvs, find := driver.GetDocument([]byte("1"), []string{"text"})
+	fvs, find := driver.GetDocument(context.Background(), []byte("1"), []string{"text"})
 	if !find {
 		t.Fatal("get docment failed")
 	}
 	if fvs["text"].(string) != "hello, baud" {
 		t.Fatal("get document failed")
 	}
-	fvs, find = driver.GetDocument([]byte("1"), []string{"bool"})
+	fvs, find = driver.GetDocument(context.Background(), []byte("1"), []string{"bool"})
 	if !find {
 		t.Fatal("get docment failed")
 	}
@@ -88,25 +89,25 @@ func TestDelDocument(t *testing.T) {
 	tf := document.NewTextField("text", []byte("hello, baud"), document.StoreField)
 	doc.AddField(tf)
 
-	err := driver.AddDocument(doc, 1)
+	err := driver.AddDocument(context.Background(), doc)
 	if err != nil {
 		t.Fatalf("add document failed, err %v", err)
 	}
-	fvs, find := driver.GetDocument([]byte("1"), []string{"text"})
+	fvs, find := driver.GetDocument(context.Background(), []byte("1"), []string{"text"})
 	if !find {
 		t.Fatal("get docment failed")
 	}
 	if fvs["text"].(string) != "hello, baud" {
 		t.Fatal("get document failed")
 	}
-	n, err := driver.DeleteDocument([]byte("1"), 2)
+	n, err := driver.DeleteDocument(context.Background(), []byte("1"))
 	if err != nil {
 		t.Fatalf("del document failed, err %v", err)
 	}
 	if n != 1 {
 		t.Fatal("del document failed")
 	}
-	_, find = driver.GetDocument([]byte("1"), []string{"text"})
+	_, find = driver.GetDocument(context.Background(), []byte("1"), []string{"text"})
 	if find {
 		t.Fatal("get docment failed")
 	}
@@ -122,11 +123,11 @@ func TestUpdateDocument(t *testing.T) {
 	doc.AddField(tf)
 	doc.AddField(vf)
 
-	err := driver.AddDocument(doc, 1)
+	err := driver.AddDocument(context.Background(), doc)
 	if err != nil {
 		t.Fatalf("add document failed, err %v", err)
 	}
-	fvs, find := driver.GetDocument([]byte("1"), []string{"text"})
+	fvs, find := driver.GetDocument(context.Background(), []byte("1"), []string{"text"})
 	if !find {
 		t.Fatal("get docment failed")
 	}
@@ -139,7 +140,7 @@ func TestUpdateDocument(t *testing.T) {
 	vf = document.NewTextField("_version", []byte("1"), document.StoreField)
 	doc.AddField(tf)
 	doc.AddField(vf)
-	found, err := driver.UpdateDocument(doc, false, 2)
+	found, err := driver.UpdateDocument(context.Background(), doc, false)
 	if err != nil {
 		t.Fatalf("update document failed, err %v", err)
 	}
@@ -147,7 +148,7 @@ func TestUpdateDocument(t *testing.T) {
 		t.Fatal("update document failed")
 	}
 
-	fvs, find = driver.GetDocument([]byte("1"), []string{"text"})
+	fvs, find = driver.GetDocument(context.Background(), []byte("1"), []string{"text"})
 	if !find {
 		t.Fatal("get docment failed")
 	}

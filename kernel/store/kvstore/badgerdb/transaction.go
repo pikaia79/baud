@@ -1,8 +1,6 @@
 package badgerdb
 
 import (
-	"encoding/binary"
-
 	"github.com/dgraph-io/badger"
 	"github.com/tiglabs/baudengine/kernel/store/kvstore"
 )
@@ -17,18 +15,10 @@ func (bs *Store) NewTransaction(writable bool) (kvstore.Transaction, error) {
 	return &Transaction{tx: tx, writable: writable}, nil
 }
 
-func(tx *Transaction) Put(key, value []byte, ops ...*kvstore.Option) error {
+func(tx *Transaction) Put(key, value []byte) error {
 	err := tx.tx.Set(key, value)
 	if err != nil {
 		return err
-	}
-	if len(ops) > 0 {
-		var buff [8]byte
-		binary.BigEndian.PutUint64(buff[:], ops[0].ApplyID)
-		err = tx.tx.Set(RAFT_APPLY_ID, buff[:])
-		if err != nil {
-			return err
-		}
 	}
 	return nil
 }
@@ -45,18 +35,10 @@ func(tx *Transaction) Get(key []byte) ([]byte, error) {
 	return v.ValueCopy(value)
 }
 
-func(tx *Transaction) Delete(key []byte, ops ...*kvstore.Option) error {
+func(tx *Transaction) Delete(key []byte) error {
 	err := tx.tx.Delete(key)
 	if err != nil {
 		return err
-	}
-	if len(ops) > 0 {
-		var buff [8]byte
-		binary.BigEndian.PutUint64(buff[:], ops[0].ApplyID)
-		err = tx.tx.Set(RAFT_APPLY_ID, buff[:])
-		if err != nil {
-			return err
-		}
 	}
 	return nil
 }
