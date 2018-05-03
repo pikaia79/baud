@@ -40,6 +40,8 @@ func GetIdGeneratorSingle(store Store) IDGenerator {
 		}
 		idGeneratorSingle = NewIDGenerator([]byte(AUTO_INCREMENT_ID), GEN_STEP, store)
 		atomic.StoreUint32(&idGeneratorSingleDone, 1)
+
+		log.Info("IdGenerator single has started")
 	}
 
 	return idGeneratorSingle
@@ -94,7 +96,7 @@ func (id *StoreIdGenerator) Close() {
 	idGeneratorSingle = nil
 	atomic.StoreUint32(&idGeneratorSingleDone, 0)
 
-	log.Info("Id Generator has closed")
+	log.Info("IdGenerator single has closed")
 }
 
 func (id *StoreIdGenerator) get(key []byte) ([]byte, error) {
@@ -115,12 +117,15 @@ func (id *StoreIdGenerator) generate() (uint32, error) {
 		return 0, err
 	}
 
-	if value == nil || len(value) != 4 {
+	if value != nil && len(value) != 4 {
 		log.Error("invalid data, must 4 bytes, but %d", len(value))
 		return 0, ErrInternalError
 	}
 
-	end := util.BytesToUint32(value)
+    var end uint32
+	if len(value) != 0 {
+        end = util.BytesToUint32(value)
+    }
 	end += id.step
 	value = util.Uint32ToBytes(end)
 	err = id.put(id.key, value)

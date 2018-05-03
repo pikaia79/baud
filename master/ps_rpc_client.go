@@ -58,7 +58,7 @@ func GetPSRpcClientSingle(config *Config) *PSRpcClient {
 
 		atomic.StoreUint32(&psClientSingleDone, 1)
 
-		log.Info("ps rpc client has started")
+		log.Info("PSRpcClient single has started")
 	}
 
 	return psClientSingle
@@ -76,7 +76,7 @@ func (c *PSRpcClient) Close() {
 	psClientSingle = nil
 	atomic.StoreUint32(&psClientSingleDone, 0)
 
-	log.Info("ps rpc client has closed")
+	log.Info("PSRpcClient single has closed")
 }
 
 func (c *PSRpcClient) getClient(addr string) (pspb.AdminGrpcClient, error) {
