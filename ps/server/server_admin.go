@@ -2,6 +2,7 @@ package server
 
 import (
 	"context"
+	"fmt"
 	"io/ioutil"
 	"os"
 	"strconv"
@@ -10,6 +11,7 @@ import (
 
 	"github.com/tiglabs/baudengine/proto/metapb"
 	"github.com/tiglabs/baudengine/proto/pspb"
+	raftproto "github.com/tiglabs/raft/proto"
 )
 
 // CreatePartition admin grpc service for create partition
@@ -59,6 +61,33 @@ func (s *Server) ChangeReplica(ctx context.Context, request *pspb.ChangeReplicaR
 		},
 	}
 
+	if s.stopping.Get() {
+		response.Code = metapb.RESP_CODE_SERVER_STOP
+		response.Message = "server is stopping"
+		return response, nil
+	}
+	if _, ok := s.partitions.Load(request.PartitionID); !ok {
+		response.Code = metapb.PS_RESP_CODE_NO_PARTITION
+		response.Message = fmt.Sprintf("node[%d] has not found partition[%d]", s.nodeID, request.PartitionID)
+		return response, nil
+	}
+	if !s.raftServer.IsLeader(request.PartitionID) {
+		response.Code = metapb.PS_RESP_CODE_NOT_LEADER
+		response.Message = fmt.Sprintf("node[%d] is not leader of partition[%d]", s.nodeID, request.PartitionID)
+		return response, nil
+	}
+
+	var ccType raftproto.ConfChangeType
+	switch request.Type {
+	case pspb.ReplicaChangeType_Add:
+		ccType = raftproto.ConfAddNode
+	case pspb.ReplicaChangeType_Remove:
+		ccType = raftproto.ConfRemoveNode
+	}
+	peer := raftproto.Peer{Type: raftproto.PeerNormal, ID: uint64(request.Replica.NodeID), PeerID: request.Replica.ID}
+	ctxData, _ := request.Replica.Marshal()
+	s.raftServer.ChangeMember(request.PartitionID, ccType, peer, ctxData)
+
 	return response, nil
 }
 
@@ -71,6 +100,18 @@ func (s *Server) ChangeLeader(ctx context.Context, request *pspb.ChangeLeaderReq
 		},
 	}
 
+	if s.stopping.Get() {
+		response.Code = metapb.RESP_CODE_SERVER_STOP
+		response.Message = "server is stopping"
+		return response, nil
+	}
+	if _, ok := s.partitions.Load(request.PartitionID); !ok {
+		response.Code = metapb.PS_RESP_CODE_NO_PARTITION
+		response.Message = fmt.Sprintf("node[%d] has not found partition[%d]", s.nodeID, request.PartitionID)
+		return response, nil
+	}
+
+	s.raftServer.TryToLeader(request.PartitionID)
 	return response, nil
 }
 
@@ -163,6 +204,8 @@ func (s *Server) doAdminEvent(event proto.Message) {
 		s.masterHeartbeat.trigger()
 
 	case *pspb.DeletePartitionRequest:
+		s.doPartitionDelete(e.ID)
+		s.masterHeartbeat.trigger()
 
 	}
 }

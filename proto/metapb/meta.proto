@@ -120,9 +120,8 @@ message ResponseHeader {
 
 message NotLeader {
     uint32 partition_id   = 1 [(gogoproto.customname) = "PartitionID", (gogoproto.casttype) = "PartitionID"];
-    uint32 node_id        = 2 [(gogoproto.customname) = "NodeID", (gogoproto.casttype) = "NodeID"];
-    string node_addr      = 3;
-    PartitionEpoch  epoch = 4 [(gogoproto.nullable) = false];
+    uint32 leader         = 2 [(gogoproto.customname) = "Leader", (gogoproto.casttype) = "NodeID"];
+    PartitionEpoch  epoch = 3 [(gogoproto.nullable) = false];
 }
 
 message NoLeader {

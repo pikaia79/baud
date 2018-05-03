@@ -66,20 +66,14 @@ func getPartitionPath(id metapb.PartitionID, path string, create bool) (dir stri
 	return
 }
 
-func getDataPath(id metapb.PartitionID, path string, create bool) (dir string, err error) {
-	dir = filepath.Join(path, fmt.Sprintf("%d", id), "data")
-	if create {
-		err = os.MkdirAll(dir, os.ModePerm)
+func getDataAndRaftPath(id metapb.PartitionID, path string) (data, raft string, err error) {
+	data = filepath.Join(path, fmt.Sprintf("%d", id), "data")
+	if err = os.MkdirAll(data, os.ModePerm); err != nil {
+		return
 	}
 
-	return
-}
-
-func getRaftPath(id metapb.PartitionID, path string, create bool) (dir string, err error) {
-	dir = filepath.Join(path, fmt.Sprintf("%d", id), "raft")
-	if create {
-		err = os.MkdirAll(dir, os.ModePerm)
-	}
+	raft = filepath.Join(path, fmt.Sprintf("%d", id), "raft")
+	err = os.MkdirAll(raft, os.ModePerm)
 
 	return
 }
