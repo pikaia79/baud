@@ -174,11 +174,16 @@ func (s *ApiServer) handleSpaceCreate(w http.ResponseWriter, r *http.Request, pa
 		return
 	}
 
-	space, err := s.cluster.createSpace(dbName, spaceName, partitionKey, partitionFunc, partitionNum)
-	if err != nil {
-		sendReply(w, newHttpErrReply(err))
-		return
-	}
+    policy := &PartitionPolicy{
+        Key:      partitionKey,
+        Function: partitionFunc,
+        Number:   partitionNum,
+    }
+    space, err := s.cluster.createSpace(dbName, spaceName, policy)
+    if err != nil {
+        sendReply(w, newHttpErrReply(err))
+        return
+    }
 
 	sendReply(w, newHttpSucReply(space))
 }
