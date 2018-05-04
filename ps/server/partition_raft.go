@@ -10,26 +10,20 @@ import (
 
 func (p *partition) Apply(command []byte, index uint64) (resp interface{}, err error) {
 	raftCmd := raftpb.CreateRaftCommand()
-	defer func() {
-		raftCmd.Close()
+	defer raftCmd.Close()
 
-		select {
-		case <-p.ctx.Done():
-			return
-		default:
-			p.store.SetApplyID(index)
-		}
+	if err = raftCmd.Unmarshal(command); err != nil {
+		panic(err)
+	}
 
-	}()
+	switch raftCmd.Type {
+	case raftpb.CmdType_WRITE:
+		resp, err = p.execWriteCommand(index, raftCmd.WriteCommand)
 
-	if err = raftCmd.Unmarshal(command); err == nil {
-		switch raftCmd.Type {
-		case raftpb.CmdType_WRITE:
-			resp, err = p.bulkItemInternal(raftCmd.WriteRequest)
-
-		default:
-			err = errorPartitonCommand
-		}
+	default:
+		p.store.SetApplyID(index)
+		err = errorPartitonCommand
+		log.Error("unsupported command[%s]", raftCmd.Type)
 	}
 
 	return
