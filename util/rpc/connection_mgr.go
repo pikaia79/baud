@@ -63,10 +63,12 @@ func (mgr *ConnectionMgr) grpcDial(key, target string, option *ClientOption) *co
 		if conn.dialErr == nil {
 			routine.RunWork("GRPC-DOINITHEARTBEAT", func() error {
 				err := conn.heartbeat()
-				if err != nil && !IsClosedGrpcConnection(err) {
-					log.Error("removing connection to %s due to error: %s", target, err)
+				if err != nil {
+					mgr.removeConn(key, conn)
+					if !IsClosedGrpcConnection(err) {
+						log.Error("removing connection to %s due to error: %s", target, err)
+					}
 				}
-				mgr.removeConn(key, conn)
 				return err
 			}, routine.LogPanic(false))
 		}
