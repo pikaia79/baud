@@ -32,7 +32,7 @@ type PSRpcClient struct {
 func GetPSRpcClientSingle(config *Config) *PSRpcClient {
 	if psClientSingle != nil {
 		return psClientSingle
-}
+	}
 	if atomic.LoadUint32(&psClientSingleDone) == 1 {
 		return psClientSingle
 	}
@@ -51,7 +51,7 @@ func GetPSRpcClientSingle(config *Config) *PSRpcClient {
 		connMgrOpt := rpc.DefaultManagerOption
 		connMgr := rpc.NewConnectionMgr(psClientSingle.ctx, &connMgrOpt)
 		clientOpt := rpc.DefaultClientOption
-		clientOpt.ClusterID = string(config.ClusterCfg.ClusterID)
+		clientOpt.ClusterID = config.ClusterCfg.ClusterID
 		clientOpt.ConnectMgr = connMgr
 		clientOpt.CreateFunc = func(cc *grpc.ClientConn) interface{} { return pspb.NewAdminGrpcClient(cc) }
 		psClientSingle.rpcClient = rpc.NewClient(1, &clientOpt)
