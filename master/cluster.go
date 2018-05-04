@@ -228,7 +228,7 @@ func (c *Cluster) renameDb(srcDbName, destDbName string) error {
 	return nil
 }
 
-func (c *Cluster) createSpace(dbName, spaceName, partitionKey, partitionFunc string, partitionNum uint32) (*Space, error) {
+func (c *Cluster) createSpace(dbName, spaceName string, policy *PartitionPolicy) (*Space, error) {
 	c.clusterLock.Lock()
 	defer c.clusterLock.Unlock()
 
@@ -243,11 +243,6 @@ func (c *Cluster) createSpace(dbName, spaceName, partitionKey, partitionFunc str
 	// batch commit
 	batch := c.store.NewBatch()
 
-	policy := &PartitionPolicy{
-		Key:           partitionKey,
-		Function:      partitionFunc,
-		NumPartitions: partitionNum,
-	}
 	space, err := NewSpace(db.ID, dbName, spaceName, policy)
 	if err != nil {
 		return nil, err
@@ -256,7 +251,7 @@ func (c *Cluster) createSpace(dbName, spaceName, partitionKey, partitionFunc str
 		return nil, err
 	}
 
-	slots := util.SlotSplit(0, math.MaxUint32, uint64(partitionNum)+1)
+	slots := util.SlotSplit(0, math.MaxUint32, uint64(policy.Number)+1)
 	if slots == nil {
 		log.Error("fail to split slot range [%v-%v]", 0, math.MaxUint32)
 		return nil, ErrInternalError

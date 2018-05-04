@@ -15,18 +15,13 @@ const (
 )
 
 type PartitionPolicy struct {
-	Key           string
-	Function      string
-	NumPartitions uint32
+	Key      string
+	Function string
+	Number   uint32
 }
 
 type Space struct {
 	*metapb.Space
-
-	// TODO:move partitioning to metapb.Space definition
-	partitioning *PartitionPolicy `json:"-"`
-	mapping      []Field
-
 	searchTree   *PartitionTree `json:"-"`
 	propertyLock sync.RWMutex   `json:"-"`
 }
@@ -53,8 +48,11 @@ func NewSpace(dbId metapb.DBID, dbName, spaceName string, policy *PartitionPolic
 			DB:     dbId,
 			DbName: dbName,
 			Status: metapb.SS_Init,
+			KeyPolicy: &metapb.KeyPolicy{
+				KeyField: policy.Key,
+				KeyFunc:  policy.Function,
+			},
 		},
-		partitioning: policy,
 		searchTree:   NewPartitionTree(),
 	}, nil
 }

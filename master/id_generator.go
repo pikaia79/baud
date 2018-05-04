@@ -35,7 +35,7 @@ func GetIdGeneratorSingle(store Store) IDGenerator {
 
 	if atomic.LoadUint32(&idGeneratorSingleDone) == 0 {
 		if store == nil {
-			log.Error("store should not be nil at first time when create psClientSingle StoreIdGenerator")
+			log.Error("store should not be nil at first time when create IdGenerator single")
 			return nil
 		}
 		idGeneratorSingle = NewIDGenerator([]byte(AUTO_INCREMENT_ID), GEN_STEP, store)
@@ -65,6 +65,10 @@ func NewIDGenerator(key []byte, step uint32, store Store) *StoreIdGenerator {
 }
 
 func (id *StoreIdGenerator) GenID() (uint32, error) {
+    if id == nil {
+        return 0, ErrInternalError
+    }
+
 	if id.base == id.end {
 		id.lock.Lock()
 
@@ -90,6 +94,10 @@ func (id *StoreIdGenerator) GenID() (uint32, error) {
 }
 
 func (id *StoreIdGenerator) Close() {
+    if id == nil {
+        return
+    }
+
 	idGeneratorSingleLock.Lock()
 	defer idGeneratorSingleLock.Unlock()
 
