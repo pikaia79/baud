@@ -258,7 +258,7 @@ func (c *Cluster) createSpace(dbName, spaceName string, policy *PartitionPolicy)
 	}
 	partitions := make([]*Partition, 0, len(slots))
 	for i := 0; i < len(slots)-1; i++ {
-		partition, err := NewPartition(db.ID, space.ID, slots[i], slots[i+1])
+		partition, err := NewPartition(db.ID, space.ID, metapb.SlotID(slots[i]), metapb.SlotID(slots[i+1]))
 		if err != nil {
 			return nil, err
 		}

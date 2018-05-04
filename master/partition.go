@@ -31,7 +31,7 @@ type Partition struct {
 	propertyLock  sync.RWMutex
 }
 
-func NewPartition(dbId metapb.DBID, spaceId metapb.SpaceID, startSlot, endSlot uint32) (*Partition, error) {
+func NewPartition(dbId metapb.DBID, spaceId metapb.SpaceID, startSlot, endSlot metapb.SlotID) (*Partition, error) {
 	partId, err := GetIdGeneratorSingle(nil).GenID()
 	if err != nil {
 		log.Error("generate partition id is failed. err:[%v]", err)
