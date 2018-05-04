@@ -11,7 +11,6 @@ import (
 	"net"
 	"github.com/tiglabs/baudengine/util/rpc"
 	"sync"
-	"strconv"
 )
 
 type RpcServer struct {
@@ -27,7 +26,7 @@ func NewRpcServer(config *Config, cluster *Cluster) *RpcServer {
 	server.cluster = cluster
 
 	serverOption := &rpc.DefaultServerOption
-	serverOption.ClusterID = strconv.FormatUint(config.ClusterCfg.ClusterID, 10)
+	serverOption.ClusterID = config.ClusterCfg.ClusterID
 	server.grpcServer = rpc.NewGrpcServer(serverOption)
 	masterpb.RegisterMasterRpcServer(server.grpcServer, server)
 	reflection.Register(server.grpcServer)

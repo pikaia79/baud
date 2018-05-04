@@ -149,7 +149,7 @@ type ClusterNode struct {
 }
 
 type ClusterConfig struct {
-	ClusterID             uint64         `toml:"cluster-id,omitempty" json:"cluster-id"`
+	ClusterID             string         `toml:"cluster-id,omitempty" json:"cluster-id"`
 	CurNodeId             uint64         `toml:"node-id,omitempty" json:"node-id"`
 	RaftHeartbeatInterval util.Duration  `toml:"raft-heartbeat-interval,omitempty" json:"raft-heartbeat-interval"`
 	RaftRetainLogsCount   uint64         `toml:"raft-retain-logs-count,omitempty" json:"raft-retain-logs-count"`
@@ -158,7 +158,7 @@ type ClusterConfig struct {
 }
 
 func (cfg *ClusterConfig) adjust() {
-	adjustUint64(&cfg.ClusterID, "no cluster-id")
+	adjustString(&cfg.ClusterID, "no cluster-id")
 	adjustUint64(&cfg.CurNodeId, "no current node-id")
 	adjustDuration(&cfg.RaftHeartbeatInterval, "no raft heartbeat interval")
 	adjustUint64(&cfg.RaftRetainLogsCount, "no raft retain log count")

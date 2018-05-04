@@ -16,7 +16,7 @@ level="debug"
 raft-level="info"
 
 [cluster]
-cluster-id = 1
+cluster-id = "1"
 node-id = 1
 raft-heartbeat-interval="500ms"
 raft-retain-logs-count=100
