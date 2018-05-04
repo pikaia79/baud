@@ -69,13 +69,13 @@ func (s *RpcServer) GetRoute(ctx context.Context,
 	req *masterpb.GetRouteRequest) (*masterpb.GetRouteResponse, error) {
 	resp := new(masterpb.GetRouteResponse)
 
-	db := s.cluster.dbCache.findDbById(req.DB)
+	db := s.cluster.DbCache.FindDbById(req.DB)
 	if db == nil {
 		resp.ResponseHeader = *makeRpcRespHeader(ErrDbNotExists)
 		return resp, nil
 	}
 
-	space := db.spaceCache.findSpaceById(req.Space)
+	space := db.SpaceCache.findSpaceById(req.Space)
 	if space == nil {
 		resp.ResponseHeader = *makeRpcRespHeader(ErrSpaceNotExists)
 		return resp, nil
@@ -98,7 +98,7 @@ func (s *RpcServer) GetRoute(ctx context.Context,
 		if replicas != nil || len(replicas) != 0 {
 			nodes := make([]*metapb.Node, 0, len(replicas))
 			for _, replica := range replicas {
-				ps := s.cluster.psCache.findServerById(replica.NodeID)
+				ps := s.cluster.PsCache.findServerById(replica.NodeID)
 				if ps != nil {
 					nodes = append(nodes, ps.Node)
 				}
@@ -116,7 +116,7 @@ func (s *RpcServer) GetRoute(ctx context.Context,
 func (s *RpcServer) GetDB(ctx context.Context, req *masterpb.GetDBRequest) (*masterpb.GetDBResponse, error) {
 	resp := new(masterpb.GetDBResponse)
 
-	db := s.cluster.dbCache.findDbByName(req.DBName)
+	db := s.cluster.DbCache.FindDbByName(req.DBName)
 	if db == nil {
 		resp.ResponseHeader = *makeRpcRespHeader(ErrDbNotExists)
 		return resp, nil
@@ -130,13 +130,13 @@ func (s *RpcServer) GetDB(ctx context.Context, req *masterpb.GetDBRequest) (*mas
 func (s *RpcServer) GetSpace(ctx context.Context, req *masterpb.GetSpaceRequest) (*masterpb.GetSpaceResponse, error) {
 	resp := new(masterpb.GetSpaceResponse)
 
-	db := s.cluster.dbCache.findDbById(req.ID)
+	db := s.cluster.DbCache.FindDbById(req.ID)
 	if db == nil {
 		resp.ResponseHeader = *makeRpcRespHeader(ErrDbNotExists)
 		return resp, nil
 	}
 
-	space := db.spaceCache.findSpaceByName(req.SpaceName)
+	space := db.SpaceCache.findSpaceByName(req.SpaceName)
 	if space == nil {
 		resp.ResponseHeader = *makeRpcRespHeader(ErrSpaceNotExists)
 		return resp, nil
@@ -163,7 +163,7 @@ func (s *RpcServer) PSRegister(ctx context.Context,
 		ps.persistent(s.cluster.store)
 
 		ps.status = PS_REGISTERED
-		s.cluster.psCache.addServer(ps)
+		s.cluster.PsCache.addServer(ps)
 
 		resp.ResponseHeader = *makeRpcRespHeader(ErrSuc)
 		resp.NodeID = ps.ID
@@ -171,7 +171,7 @@ func (s *RpcServer) PSRegister(ctx context.Context,
 	}
 
 	// use nodeid reserved by ps to recognize same one ps
-	ps := s.cluster.psCache.findServerById(nodeId)
+	ps := s.cluster.PsCache.findServerById(nodeId)
 	if ps == nil {
 		// illegal ps will register
 		log.Warn("Can not find nodeid[%v] in master.", nodeId)
@@ -196,7 +196,7 @@ func (s *RpcServer) PSHeartbeat(ctx context.Context,
 
 	// process ps
 	psId := req.NodeID
-	ps := s.cluster.psCache.findServerById(psId)
+	ps := s.cluster.PsCache.findServerById(psId)
 	if ps == nil {
 		log.Error("ps heartbeat received invalid psid[%v]", psId)
 		resp.ResponseHeader = *makeRpcRespHeader(ErrPSNotExists)
@@ -213,7 +213,7 @@ func (s *RpcServer) PSHeartbeat(ctx context.Context,
 	// process partition
 	for _, partitionInfo := range partitionInfos {
 		partitionId := partitionInfo.ID
-		partitionMS := s.cluster.partitionCache.findPartitionById(partitionId)
+		partitionMS := s.cluster.PartitionCache.findPartitionById(partitionId)
 		if partitionMS == nil {
 			log.Debug("ps heartbeat received a partition[%v] not existed.", partitionId)
 

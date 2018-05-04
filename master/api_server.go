@@ -100,7 +100,7 @@ func (s *ApiServer) handleDbCreate(w http.ResponseWriter, r *http.Request, param
 		return
 	}
 
-	db, err := s.cluster.createDb(dbName)
+	db, err := s.cluster.CreateDb(dbName)
 	if err != nil {
 		sendReply(w, newHttpErrReply(err))
 		return
@@ -122,7 +122,7 @@ func (s *ApiServer) handleDbRename(w http.ResponseWriter, r *http.Request, param
 		return
 	}
 
-	if err := s.cluster.renameDb(srcDbName, destDbName); err != nil {
+	if err := s.cluster.RenameDb(srcDbName, destDbName); err != nil {
 		sendReply(w, newHttpErrReply(err))
 		return
 	}
@@ -131,7 +131,7 @@ func (s *ApiServer) handleDbRename(w http.ResponseWriter, r *http.Request, param
 }
 
 func (s *ApiServer) handleDbList(w http.ResponseWriter, r *http.Request, params netutil.UriParams) {
-	dbs := s.cluster.dbCache.getAllDBs()
+	dbs := s.cluster.DbCache.GetAllDBs()
 
 	sendReply(w, newHttpSucReply(dbs))
 }
@@ -142,7 +142,7 @@ func (s *ApiServer) handleDbDetail(w http.ResponseWriter, r *http.Request, param
 		return
 	}
 
-	db := s.cluster.dbCache.findDbByName(dbName)
+	db := s.cluster.DbCache.FindDbByName(dbName)
 	if db == nil {
 		sendReply(w, newHttpErrReply(ErrDbNotExists))
 		return
@@ -179,7 +179,7 @@ func (s *ApiServer) handleSpaceCreate(w http.ResponseWriter, r *http.Request, pa
         Function: partitionFunc,
         Number:   partitionNum,
     }
-    space, err := s.cluster.createSpace(dbName, spaceName, policy)
+    space, err := s.cluster.CreateSpace(dbName, spaceName, policy)
     if err != nil {
         sendReply(w, newHttpErrReply(err))
         return
@@ -205,7 +205,7 @@ func (s *ApiServer) handleSpaceRename(w http.ResponseWriter, r *http.Request, pa
 		return
 	}
 
-	if err := s.cluster.renameSpace(dbName, srcSpaceName, destSpaceName); err != nil {
+	if err := s.cluster.RenameSpace(dbName, srcSpaceName, destSpaceName); err != nil {
 		sendReply(w, newHttpErrReply(err))
 	}
 
@@ -222,13 +222,13 @@ func (s *ApiServer) handleSpaceDetail(w http.ResponseWriter, r *http.Request, pa
 		return
 	}
 
-	db := s.cluster.dbCache.findDbByName(dbName)
+	db := s.cluster.DbCache.FindDbByName(dbName)
 	if db == nil {
 		sendReply(w, newHttpErrReply(ErrDbNotExists))
 		return
 	}
 
-	space := db.spaceCache.findSpaceByName(spaceName)
+	space := db.SpaceCache.findSpaceByName(spaceName)
 	if space == nil {
 		sendReply(w, newHttpErrReply(ErrSpaceNotExists))
 		return
@@ -243,13 +243,13 @@ func (s *ApiServer) handleSpaceList(w http.ResponseWriter, r *http.Request, para
 		return
 	}
 
-	db := s.cluster.dbCache.findDbByName(dbName)
+	db := s.cluster.DbCache.FindDbByName(dbName)
 	if db == nil {
 		sendReply(w, newHttpErrReply(ErrDbNotExists))
 		return
 	}
 
-	sendReply(w, newHttpSucReply(db.spaceCache.getAllSpaces()))
+	sendReply(w, newHttpSucReply(db.SpaceCache.getAllSpaces()))
 }
 
 type HttpReply struct {
