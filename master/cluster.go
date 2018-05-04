@@ -152,7 +152,7 @@ func (c *Cluster) recoveryPartitionCache() error {
 		}
 
 		space.searchTree.update(partition)
-		c.PartitionCache.addPartition(partition)
+		c.PartitionCache.AddPartition(partition)
 
 		var delMetaReplicas = make([]*metapb.Replica, 0)
 		for _, metaReplica := range partition.getAllReplicas() {
@@ -178,9 +178,9 @@ func (c *Cluster) clearAllCache() {
 	c.clusterLock.Lock()
 	defer c.clusterLock.Unlock()
 
-	c.PsCache.clear()
-	c.DbCache.clear()
-	c.PartitionCache.clear()
+	c.PsCache.Clear()
+	c.DbCache.Clear()
+	c.PartitionCache.Clear()
 }
 
 func (c *Cluster) CreateDb(dbName string) (*DB, error) {

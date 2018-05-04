@@ -184,7 +184,7 @@ func (s *RpcServer) PSRegister(ctx context.Context,
 
 	resp.ResponseHeader = *makeRpcRespHeader(ErrSuc)
 	resp.NodeID = ps.ID
-	resp.Partitions = *ps.partitionCache.getAllMetaPartitions()
+	resp.Partitions = *ps.partitionCache.GetAllMetaPartitions()
 
 	return resp, nil
 }
@@ -213,7 +213,7 @@ func (s *RpcServer) PSHeartbeat(ctx context.Context,
 	// process partition
 	for _, partitionInfo := range partitionInfos {
 		partitionId := partitionInfo.ID
-		partitionMS := s.cluster.PartitionCache.findPartitionById(partitionId)
+		partitionMS := s.cluster.PartitionCache.FindPartitionById(partitionId)
 		if partitionMS == nil {
 			log.Debug("ps heartbeat received a partition[%v] not existed.", partitionId)
 

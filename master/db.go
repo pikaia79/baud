@@ -179,7 +179,7 @@ func (c *DBCache) Recovery(store Store) ([]*DB, error) {
 	return resultDBs, nil
 }
 
-func (c *DBCache) clear() {
+func (c *DBCache) Clear() {
 	c.lock.Lock()
 	defer c.lock.Unlock()
 

@@ -219,50 +219,6 @@ func doMetaMarshal(p *metapb.Partition) ([]byte, []byte, error) {
 	return key, val, err
 }
 
-//type ReplicaGroup struct {
-//	lock 		sync.RWMutex
-//	replicas 	map[uint32]*Replica  // key: replicaId
-//	servers  	map[uint32]*PartitionServer // key:replicaId
-//}
-
-//func (g *ReplicaGroup) getAllServers() []*PartitionServer {
-//	g.lock.RLock()
-//	defer g.lock.RUnlock()
-//
-//	servers := make([]*PartitionServer, 0, len(g.servers))
-//	for _, server := range g.servers {
-//		servers = append(servers, server)
-//	}
-//	return servers
-//}
-//
-//func (g *ReplicaGroup) addReplica(replica *Replica, server *PartitionServer) {
-//	g.lock.Lock()
-//	defer g.lock.RUnlock()
-//
-//	g.replicas[replica.GetId()] = replica
-//	g.servers[replica.GetId()] = server
-//}
-//
-//func (g *ReplicaGroup) findReplicaById(replicaId uint32) *Replica {
-//	g.lock.RLock()
-//	defer g.lock.RUnlock()
-//
-//	r, ok := g.replicas[replicaId]
-//	if !ok {
-//		return nil
-//	}
-//
-//	return r
-//}
-//
-//func (g *ReplicaGroup) count() int {
-//	g.lock.RLock()
-//	defer g.lock.RUnlock()
-//
-//	return len(g.replicas)
-//}
-
 type PartitionCache struct {
 	lock       sync.RWMutex
 	partitions map[metapb.PartitionID]*Partition
@@ -274,7 +230,7 @@ func NewPartitionCache() *PartitionCache {
 	}
 }
 
-func (c *PartitionCache) findPartitionById(partitionId metapb.PartitionID) *Partition {
+func (c *PartitionCache) FindPartitionById(partitionId metapb.PartitionID) *Partition {
 	c.lock.RLock()
 	defer c.lock.RUnlock()
 
@@ -286,14 +242,14 @@ func (c *PartitionCache) findPartitionById(partitionId metapb.PartitionID) *Part
 	return p
 }
 
-func (c *PartitionCache) addPartition(partition *Partition) {
+func (c *PartitionCache) AddPartition(partition *Partition) {
 	c.lock.Lock()
 	defer c.lock.Unlock()
 
 	c.partitions[partition.ID] = partition
 }
 
-func (c *PartitionCache) getAllMetaPartitions() *[]metapb.Partition {
+func (c *PartitionCache) GetAllMetaPartitions() *[]metapb.Partition {
 	c.lock.RLock()
 	defer c.lock.RUnlock()
 
@@ -332,7 +288,7 @@ func (c *PartitionCache) recovery(store Store) ([]*Partition, error) {
 	return resultPartitions, nil
 }
 
-func (c *PartitionCache) clear() {
+func (c *PartitionCache) Clear() {
 	c.lock.Lock()
 	defer c.lock.Unlock()
 

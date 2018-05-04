@@ -91,7 +91,7 @@ func (p *PartitionServer) addPartition(partition *Partition) {
 	p.propertyLock.Lock()
 	defer p.propertyLock.Unlock()
 
-	p.partitionCache.addPartition(partition)
+	p.partitionCache.AddPartition(partition)
 }
 
 func (p *PartitionServer) updateHb() {
@@ -228,7 +228,7 @@ func (c *PSCache) recovery(store Store) ([]*PartitionServer, error) {
 	return resultServers, nil
 }
 
-func (c *PSCache) clear() {
+func (c *PSCache) Clear() {
 	c.lock.Lock()
 	defer c.lock.Unlock()
 
