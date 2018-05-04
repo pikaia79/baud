@@ -62,13 +62,13 @@ func (c *Cluster) recoveryPSCache() error {
 	c.clusterLock.Lock()
 	defer c.clusterLock.Unlock()
 
-	servers, err := c.PsCache.recovery(c.store)
+	servers, err := c.PsCache.Recovery(c.store)
 	if err != nil {
 		return err
 	}
 
 	for _, server := range servers {
-		c.PsCache.addServer(server)
+		c.PsCache.AddServer(server)
 	}
 
 	return nil
@@ -99,7 +99,7 @@ func (c *Cluster) recoverySpaceCache() error {
 		return nil
 	}
 
-	allSpaces, err := dbs[0].SpaceCache.recovery(c.store)
+	allSpaces, err := dbs[0].SpaceCache.Recovery(c.store)
 	if err != nil {
 		return err
 	}
@@ -115,7 +115,7 @@ func (c *Cluster) recoverySpaceCache() error {
 			continue
 		}
 
-		db.SpaceCache.addSpace(space)
+		db.SpaceCache.AddSpace(space)
 	}
 
 	return nil
@@ -125,7 +125,7 @@ func (c *Cluster) recoveryPartitionCache() error {
 	c.clusterLock.Lock()
 	defer c.clusterLock.Unlock()
 
-	partitions, err := c.PartitionCache.recovery(c.store)
+	partitions, err := c.PartitionCache.Recovery(c.store)
 	if err != nil {
 		return err
 	}
@@ -141,7 +141,7 @@ func (c *Cluster) recoveryPartitionCache() error {
 			continue
 		}
 
-		space := db.SpaceCache.findSpaceById(partition.Space)
+		space := db.SpaceCache.FindSpaceById(partition.Space)
 		if space == nil {
 			log.Warn("Cannot find space for the partition[%v] when recovery partition. discord it", partition)
 
@@ -156,7 +156,7 @@ func (c *Cluster) recoveryPartitionCache() error {
 
 		var delMetaReplicas = make([]*metapb.Replica, 0)
 		for _, metaReplica := range partition.getAllReplicas() {
-			ps := c.PsCache.findServerById(metaReplica.NodeID)
+			ps := c.PsCache.FindServerById(metaReplica.NodeID)
 			if ps == nil {
 				log.Warn("Cannot find ps for the replica[%v] when recovery replicas. discord it", metaReplica)
 				delMetaReplicas = append(delMetaReplicas, metaReplica)
@@ -236,7 +236,7 @@ func (c *Cluster) CreateSpace(dbName, spaceName string, policy *PartitionPolicy)
 	if db == nil {
 		return nil, ErrDbNotExists
 	}
-	if space := db.SpaceCache.findSpaceByName(spaceName); space != nil {
+	if space := db.SpaceCache.FindSpaceByName(spaceName); space != nil {
 		return nil, ErrDupSpace
 	}
 
@@ -272,7 +272,7 @@ func (c *Cluster) CreateSpace(dbName, spaceName string, policy *PartitionPolicy)
 	}
 
 	// update memory and send event
-	db.SpaceCache.addSpace(space)
+	db.SpaceCache.AddSpace(space)
 	for _, partition := range partitions {
 		space.putPartition(partition)
 
@@ -295,21 +295,21 @@ func (c *Cluster) RenameSpace(dbName, srcSpaceName, destSpaceName string) error 
 		return ErrDbNotExists
 	}
 
-	srcSpace := db.SpaceCache.findSpaceByName(srcSpaceName)
+	srcSpace := db.SpaceCache.FindSpaceByName(srcSpaceName)
 	if srcSpace == nil {
 		return ErrSpaceNotExists
 	}
-	destSpace := db.SpaceCache.findSpaceByName(destSpaceName)
+	destSpace := db.SpaceCache.FindSpaceByName(destSpaceName)
 	if destSpace != nil {
 		return ErrDupSpace
 	}
 
-	db.SpaceCache.deleteSpace(srcSpace)
+	db.SpaceCache.DeleteSpace(srcSpace)
 	srcSpace.rename(destSpaceName)
 	if err := srcSpace.persistent(c.store); err != nil {
 		return err
 	}
-	db.SpaceCache.addSpace(srcSpace)
+	db.SpaceCache.AddSpace(srcSpace)
 
 	return nil
 }

@@ -131,7 +131,7 @@ func (w *SpaceStateTransitionWorker) getInterval() time.Duration {
 func (w *SpaceStateTransitionWorker) run() {
 	dbs := w.cluster.DbCache.GetAllDBs()
 	for _, db := range dbs {
-		spaces := db.SpaceCache.getAllSpaces()
+		spaces := db.SpaceCache.GetAllSpaces()
 		for _, space := range spaces {
 
 			func() {

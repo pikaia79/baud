@@ -261,7 +261,7 @@ func (c *PartitionCache) GetAllMetaPartitions() *[]metapb.Partition {
 	return &partitions
 }
 
-func (c *PartitionCache) recovery(store Store) ([]*Partition, error) {
+func (c *PartitionCache) Recovery(store Store) ([]*Partition, error) {
 	prefix := []byte(PREFIX_PARTITION)
 	startKey, limitKey := util.BytesPrefix(prefix)
 

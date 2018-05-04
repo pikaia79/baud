@@ -228,7 +228,7 @@ func (s *ApiServer) handleSpaceDetail(w http.ResponseWriter, r *http.Request, pa
 		return
 	}
 
-	space := db.SpaceCache.findSpaceByName(spaceName)
+	space := db.SpaceCache.FindSpaceByName(spaceName)
 	if space == nil {
 		sendReply(w, newHttpErrReply(ErrSpaceNotExists))
 		return
@@ -249,7 +249,7 @@ func (s *ApiServer) handleSpaceList(w http.ResponseWriter, r *http.Request, para
 		return
 	}
 
-	sendReply(w, newHttpSucReply(db.SpaceCache.getAllSpaces()))
+	sendReply(w, newHttpSucReply(db.SpaceCache.GetAllSpaces()))
 }
 
 type HttpReply struct {

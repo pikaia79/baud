@@ -147,7 +147,7 @@ func NewPSCache() *PSCache {
 	}
 }
 
-func (c *PSCache) getAllServers() []*PartitionServer {
+func (c *PSCache) GetAllServers() []*PartitionServer {
 	c.lock.RLock()
 	defer c.lock.RUnlock()
 
@@ -159,7 +159,7 @@ func (c *PSCache) getAllServers() []*PartitionServer {
 	return servers
 }
 
-func (c *PSCache) findServerByAddr(addr string) *PartitionServer {
+func (c *PSCache) FindServerByAddr(addr string) *PartitionServer {
 	if len(addr) == 0 {
 		return nil
 	}
@@ -174,7 +174,7 @@ func (c *PSCache) findServerByAddr(addr string) *PartitionServer {
 	return ps
 }
 
-func (c *PSCache) findServerById(psId metapb.NodeID) *PartitionServer {
+func (c *PSCache) FindServerById(psId metapb.NodeID) *PartitionServer {
 	if psId == 0 {
 		return nil
 	}
@@ -189,7 +189,7 @@ func (c *PSCache) findServerById(psId metapb.NodeID) *PartitionServer {
 	return ps
 }
 
-func (c *PSCache) addServer(server *PartitionServer) {
+func (c *PSCache) AddServer(server *PartitionServer) {
 	if server == nil {
 		return
 	}
@@ -201,7 +201,7 @@ func (c *PSCache) addServer(server *PartitionServer) {
 	c.ip2Servers[server.Ip] = server
 }
 
-func (c *PSCache) recovery(store Store) ([]*PartitionServer, error) {
+func (c *PSCache) Recovery(store Store) ([]*PartitionServer, error) {
 	prefix := []byte(PREFIX_PARTITION_SERVER)
 	startKey, limitKey := util.BytesPrefix(prefix)
 

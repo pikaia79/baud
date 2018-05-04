@@ -224,7 +224,7 @@ func (p *PartitionProcessor) run() {
 			}
 
 			if event.typ == EVENT_TYPE_PARTITION_CREATE {
-				psToCreate := p.serverSelector.SelectTarget(p.cluster.PsCache.getAllServers())
+				psToCreate := p.serverSelector.SelectTarget(p.cluster.PsCache.GetAllServers())
 				if psToCreate == nil {
 					log.Error("Can not distribute suitable ps node")
 					// TODO: calling jdos api to allocate a container asynchronously
@@ -232,7 +232,7 @@ func (p *PartitionProcessor) run() {
 				}
 
 				go func(partitionToCreate *Partition) {
-					leaderPS := p.cluster.PsCache.findServerById(partitionToCreate.pickLeaderNodeId())
+					leaderPS := p.cluster.PsCache.FindServerById(partitionToCreate.pickLeaderNodeId())
 					// leaderPS is nil when create first partition
 
 					replicaId, err := GetIdGeneratorSingle(nil).GenID()
@@ -266,12 +266,12 @@ func (p *PartitionProcessor) run() {
 				body := event.body.(*PartitionDeleteBody)
 
 				go func(partitionId metapb.PartitionID, leaderNodeId metapb.NodeID, replica *metapb.Replica) {
-					leaderPS := p.cluster.PsCache.findServerById(leaderNodeId)
+					leaderPS := p.cluster.PsCache.FindServerById(leaderNodeId)
 					if leaderPS == nil {
 						log.Debug("can not find leader ps when notify deleting replicas to leader")
 						return
 					}
-					psToDelete := p.cluster.PsCache.findServerById(replica.NodeID)
+					psToDelete := p.cluster.PsCache.FindServerById(replica.NodeID)
 					if psToDelete == nil {
 						log.Debug("can not find replica[%v] ps needed to deleted", replica.NodeID)
 						return
