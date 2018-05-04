@@ -226,7 +226,7 @@ func (p *PartitionProcessor) run() {
 			if event.typ == EVENT_TYPE_PARTITION_CREATE {
 				psToCreate := p.serverSelector.SelectTarget(p.cluster.psCache.getAllServers())
 				if psToCreate == nil {
-					log.Error("Can not distribute suitable ps")
+					log.Error("Can not distribute suitable ps node")
 					// TODO: calling jdos api to allocate a container asynchronously
 					break
 				}
