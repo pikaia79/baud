@@ -13,6 +13,7 @@ import (
 	"sync/atomic"
 )
 
+//go:generate mockgen -destination mock/admin_mock.go -package mock_master github.com/tiglabs/baudengine/proto/pspb AdminGrpcClient
 const (
 	PS_GRPC_REQUEST_TIMEOUT = time.Second
 )
