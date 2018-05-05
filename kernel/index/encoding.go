@@ -12,6 +12,8 @@ type FIELD_TYPE byte
 
 const (
 	KEY_TYPE_F KEY_TYPE = 'F'
+	// raft apply ID
+	KEY_TYPE_R KEY_TYPE = 'R'
 )
 
 const (

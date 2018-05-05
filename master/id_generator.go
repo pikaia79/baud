@@ -13,25 +13,41 @@ var (
 	AUTO_INCREMENT_ID        = fmt.Sprintf("$auto_increment_id")
 
 	idGeneratorSingle     IDGenerator
-	idGeneratorSingleLock sync.Once
+	idGeneratorSingleLock sync.Mutex
+	idGeneratorSingleDone uint32
 )
 
 type IDGenerator interface {
 	GenID() (uint32, error)
+	Close()
 }
 
 func GetIdGeneratorSingle(store Store) IDGenerator {
-	idGeneratorSingleLock.Do(func() {
+	if idGeneratorSingle != nil {
+		return idGeneratorSingle
+	}
+	if atomic.LoadUint32(&idGeneratorSingleDone) == 1 {
+		return idGeneratorSingle
+	}
+
+	idGeneratorSingleLock.Lock()
+	defer idGeneratorSingleLock.Unlock()
+
+	if atomic.LoadUint32(&idGeneratorSingleDone) == 0 {
 		if store == nil {
-			log.Error("store should not be nil at first time when create single idGenerator")
-			return
+			log.Error("store should not be nil at first time when create IdGenerator single")
+			return nil
 		}
 		idGeneratorSingle = NewIDGenerator([]byte(AUTO_INCREMENT_ID), GEN_STEP, store)
-	})
+		atomic.StoreUint32(&idGeneratorSingleDone, 1)
+
+		log.Info("IdGenerator single has started")
+	}
+
 	return idGeneratorSingle
 }
 
-type idGenerator struct {
+type StoreIdGenerator struct {
 	lock sync.Mutex
 	base uint32
 	end  uint32
@@ -44,11 +60,15 @@ type idGenerator struct {
 	store Store
 }
 
-func NewIDGenerator(key []byte, step uint32, store Store) *idGenerator {
-	return &idGenerator{key: key, step: step, store: store}
+func NewIDGenerator(key []byte, step uint32, store Store) *StoreIdGenerator {
+	return &StoreIdGenerator{key: key, step: step, store: store}
 }
 
-func (id *idGenerator) GenID() (uint32, error) {
+func (id *StoreIdGenerator) GenID() (uint32, error) {
+    if id == nil {
+        return 0, ErrInternalError
+    }
+
 	if id.base == id.end {
 		id.lock.Lock()
 
@@ -73,7 +93,21 @@ func (id *idGenerator) GenID() (uint32, error) {
 	return id.base, nil
 }
 
-func (id *idGenerator) get(key []byte) ([]byte, error) {
+func (id *StoreIdGenerator) Close() {
+    if id == nil {
+        return
+    }
+
+	idGeneratorSingleLock.Lock()
+	defer idGeneratorSingleLock.Unlock()
+
+	idGeneratorSingle = nil
+	atomic.StoreUint32(&idGeneratorSingleDone, 0)
+
+	log.Info("IdGenerator single has closed")
+}
+
+func (id *StoreIdGenerator) get(key []byte) ([]byte, error) {
 	value, err := id.store.Get(key)
 	if err != nil {
 		return nil, err
@@ -81,22 +115,25 @@ func (id *idGenerator) get(key []byte) ([]byte, error) {
 	return value, nil
 }
 
-func (id *idGenerator) put(key, value []byte) error {
+func (id *StoreIdGenerator) put(key, value []byte) error {
 	return id.store.Put(key, value)
 }
 
-func (id *idGenerator) generate() (uint32, error) {
+func (id *StoreIdGenerator) generate() (uint32, error) {
 	value, err := id.get(id.key)
 	if err != nil {
 		return 0, err
 	}
 
-	if value == nil || len(value) != 4 {
+	if value != nil && len(value) != 4 {
 		log.Error("invalid data, must 4 bytes, but %d", len(value))
 		return 0, ErrInternalError
 	}
 
-	end := util.BytesToUint32(value)
+    var end uint32
+	if len(value) != 0 {
+        end = util.BytesToUint32(value)
+    }
 	end += id.step
 	value = util.Uint32ToBytes(end)
 	err = id.put(id.key, value)

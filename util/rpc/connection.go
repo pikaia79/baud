@@ -11,15 +11,8 @@ import (
 	"google.golang.org/grpc"
 
 	"github.com/tiglabs/baudengine/util/log"
-	"github.com/tiglabs/baudengine/util/netutil"
 	"github.com/tiglabs/baudengine/util/rpc/heartbeat"
 )
-
-var sourceAddr = func() net.Addr {
-	return &net.TCPAddr{
-		IP: netutil.GetPrivateIP(),
-	}
-}()
 
 type heartbeatResult struct {
 	succeeded bool
@@ -51,6 +44,11 @@ func newConnection(clusterID, addr string, manager *ConnectionMgr) *connection {
 		heartbeatDone: make(chan struct{}),
 		closeDone:     make(chan struct{}),
 	}
+
+	c.heartbeatResult.Store(heartbeatResult{
+		succeeded: false,
+		err:       ErrNotHeartbeated,
+	})
 	return c
 }
 
@@ -165,8 +163,7 @@ func (d *onceDialer) dial(addr string, timeout time.Duration) (net.Conn, error) 
 	if !d.dialed {
 		d.dialed = true
 		dialer := net.Dialer{
-			Timeout:   timeout,
-			LocalAddr: sourceAddr,
+			Timeout: timeout,
 		}
 		return dialer.Dial("tcp", addr)
 	} else if !d.closed {

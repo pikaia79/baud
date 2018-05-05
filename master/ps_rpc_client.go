@@ -10,6 +10,7 @@ import (
 	"google.golang.org/grpc/status"
 	"sync"
 	"time"
+	"sync/atomic"
 )
 
 const (
@@ -17,8 +18,9 @@ const (
 )
 
 var (
-	single     *PSRpcClient
-	singleLock sync.Once
+	psClientSingle     *PSRpcClient
+	psClientSingleLock sync.Mutex
+	psClientSingleDone uint32
 )
 
 type PSRpcClient struct {
@@ -28,30 +30,53 @@ type PSRpcClient struct {
 }
 
 func GetPSRpcClientSingle(config *Config) *PSRpcClient {
-	if single == nil {
-		singleLock.Do(func() {
-			if config == nil {
-				log.Panic("config should not be nil at first time when create single psRpcClient")
-			}
-
-			single = new(PSRpcClient)
-			single.ctx, single.cancel = context.WithCancel(context.Background())
-
-			connMgrOpt := rpc.DefaultManagerOption
-			connMgr := rpc.NewConnectionMgr(single.ctx, &connMgrOpt)
-			clientOpt := rpc.DefaultClientOption
-			clientOpt.ClusterID = string(config.ClusterCfg.ClusterID)
-			clientOpt.ConnectMgr = connMgr
-			clientOpt.CreateFunc = func(cc *grpc.ClientConn) interface{} { return pspb.NewAdminGrpcClient(cc) }
-			single.rpcClient = rpc.NewClient(1, &clientOpt)
-		})
+	if psClientSingle != nil {
+		return psClientSingle
+}
+	if atomic.LoadUint32(&psClientSingleDone) == 1 {
+		return psClientSingle
 	}
 
-	return single
+	psClientSingleLock.Lock()
+	defer psClientSingleLock.Unlock()
+
+	if atomic.LoadUint32(&psClientSingleDone) == 0 {
+		if config == nil {
+			log.Error("config should not be nil at first time when create PSRpcClient single")
+		}
+
+		psClientSingle = new(PSRpcClient)
+		psClientSingle.ctx, psClientSingle.cancel = context.WithCancel(context.Background())
+
+		connMgrOpt := rpc.DefaultManagerOption
+		connMgr := rpc.NewConnectionMgr(psClientSingle.ctx, &connMgrOpt)
+		clientOpt := rpc.DefaultClientOption
+		clientOpt.ClusterID = string(config.ClusterCfg.ClusterID)
+		clientOpt.ConnectMgr = connMgr
+		clientOpt.CreateFunc = func(cc *grpc.ClientConn) interface{} { return pspb.NewAdminGrpcClient(cc) }
+		psClientSingle.rpcClient = rpc.NewClient(1, &clientOpt)
+
+		atomic.StoreUint32(&psClientSingleDone, 1)
+
+		log.Info("PSRpcClient single has started")
+	}
+
+	return psClientSingle
 }
 
 func (c *PSRpcClient) Close() {
-	c.rpcClient.Close()
+	psClientSingleLock.Lock()
+	defer psClientSingleLock.Unlock()
+
+	if c.rpcClient != nil {
+		c.rpcClient.Close()
+		c.rpcClient = nil
+	}
+
+	psClientSingle = nil
+	atomic.StoreUint32(&psClientSingleDone, 0)
+
+	log.Info("PSRpcClient single has closed")
 }
 
 func (c *PSRpcClient) getClient(addr string) (pspb.AdminGrpcClient, error) {
@@ -132,9 +157,11 @@ func (c *PSRpcClient) AddReplica(addr string, partitionId metapb.PartitionID, ra
 		RequestHeader: metapb.RequestHeader{},
 		Type:          pspb.ReplicaChangeType_Add,
 		PartitionID:   partitionId,
-		ReplicaID:     replicaId,
-		NodeID:        replicaNodeId,
-		RaftAddrs:     *raftAddrs,
+		Replica: metapb.Replica{
+			ID:        replicaId,
+			NodeID:    replicaNodeId,
+			RaftAddrs: *raftAddrs,
+		},
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), PS_GRPC_REQUEST_TIMEOUT)
 	resp, err := client.ChangeReplica(ctx, req)
@@ -166,9 +193,11 @@ func (c *PSRpcClient) RemoveReplica(addr string, partitionId metapb.PartitionID,
 		RequestHeader: metapb.RequestHeader{},
 		Type:          pspb.ReplicaChangeType_Remove,
 		PartitionID:   partitionId,
-		ReplicaID:     replicaId,
-		NodeID:        replicaNodeId,
-		RaftAddrs:     *raftAddrs,
+		Replica: metapb.Replica{
+			ID:        replicaId,
+			NodeID:    replicaNodeId,
+			RaftAddrs: *raftAddrs,
+		},
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), PS_GRPC_REQUEST_TIMEOUT)
 	resp, err := client.ChangeReplica(ctx, req)

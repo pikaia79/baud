@@ -135,6 +135,7 @@ message GetResponse {
 message Failure {
     option (gogoproto.goproto_stringer) = false;
 
-    string id    = 1;
-    string cause = 2;
+    string id      = 1;
+    string cause   = 2;
+    bool   aborted = 3;
 }

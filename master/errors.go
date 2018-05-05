@@ -11,6 +11,7 @@ var (
 	ErrSysBusy       = errors.New("system busy")
 	ErrParamError    = errors.New("param error")
 	ErrInvalidCfg    = errors.New("config error")
+	// ErrNotLeader     = errors.New("not permitted. node not leader")
 
 	ErrDupDb              = errors.New("duplicated database")
 	ErrDbNotExists        = errors.New("db not exists")
