@@ -145,7 +145,7 @@ func (p *partition) getPartitionInfo() *masterpb.PartitionInfo {
 	return info
 }
 
-func (p *partition) checkWriteAble() *metapb.Error {
+func (p *partition) checkWritable() *metapb.Error {
 	p.rwMutex.RLock()
 	defer p.rwMutex.RUnlock()
 
@@ -166,7 +166,7 @@ func (p *partition) checkWriteAble() *metapb.Error {
 	return nil
 }
 
-func (p *partition) checkReadAble(readLeader bool) *metapb.Error {
+func (p *partition) checkReadable(readLeader bool) *metapb.Error {
 	p.rwMutex.RLock()
 	defer p.rwMutex.RUnlock()
 

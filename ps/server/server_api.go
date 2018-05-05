@@ -161,7 +161,7 @@ func (s *Server) checkBulkWrite(request *pspb.BulkRequest, response *pspb.BulkRe
 		return false
 	}
 
-	if err := p.(*partition).checkWriteAble(); err != nil {
+	if err := p.(*partition).checkWritable(); err != nil {
 		response.Error = *err
 		if err.NotLeader != nil {
 			response.Code = metapb.PS_RESP_CODE_NOT_LEADER

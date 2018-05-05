@@ -16,7 +16,7 @@ import (
 )
 
 func (p *partition) getInternal(request *pspb.GetRequest, response *pspb.GetResponse) {
-	if err := p.checkReadAble(true); err != nil {
+	if err := p.checkReadable(true); err != nil {
 		response.Error = *err
 		if err.NotLeader != nil {
 			response.Code = metapb.PS_RESP_CODE_NOT_LEADER
