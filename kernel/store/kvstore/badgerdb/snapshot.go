@@ -2,7 +2,6 @@ package badgerdb
 
 import (
 	"sync"
-	"encoding/binary"
 
 	"github.com/dgraph-io/badger"
 	"github.com/tiglabs/baudengine/kernel/store/kvstore"
@@ -72,22 +71,6 @@ func (r *Snapshot) RangeIterator(start, end []byte) kvstore.KVIterator {
 
 	rv.Seek(start)
 	return rv
-}
-
-func (r *Snapshot) LastOption() (*kvstore.Option, error) {
-	if r == nil {
-		return nil, nil
-	}
-
-	v, err := r.tx.Get(RAFT_APPLY_ID)
-	if err != nil {
-		return nil, err
-	}
-	val, err := v.Value()
-	if err != nil {
-		return nil, err
-	}
-	return &kvstore.Option{ApplyID: binary.BigEndian.Uint64(val)}, nil
 }
 
 func (r *Snapshot) Close() error {

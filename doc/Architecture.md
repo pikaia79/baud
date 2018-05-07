@@ -1,6 +1,6 @@
-# Architecture
+# The Architecture of Baudengine
 
-BaudEngine (Baud for short) is a distributed document database for elastic storage and flexible search.
+Baudengine is a distributed document database for elastic storage and flexible search.
 
 ## Data Model
 
@@ -18,35 +18,51 @@ Any field can be indexed and morever full-text search is a first-class citizen.
 
 * Flexible partitioning policies
 
-each space has a field as the partition key
+each space has a field as the partition key, and the documents with the same partition key are co-located.
 
-## Overview
+## Concepts
 
-BaudEngine is a multi-datacenter distributed system. 
+BaudEngine is a multi-datacenter distributed system. However, it can be run in the single-datacenter mode.  
 
-However, it can be run in the single-datacenter mode.  
+### zone
+
+Zones, or called cells, are the unit of physical isolation as well as admin deployment. 
 
 ### components
 
-master, raft replication for high availability
+* Router
 
-partitionserver (PS), 'writer-role' or 'reader-role'
+a zone has a set of stateless routers as the service gateway
 
-router
+* Master
+
+the global master of the entire cluster
+
+the zone master per zone
+
+both are based on raft replication for high availability
+
+* Partition Server
+
+the writer role, i.e. Writer Partition Server (WPS)
+
+the reader role, i.e. Reader Partition Server (RPS)
 
 ### software stack
 
 * cluster management
 
-conainer-native - baud runs on Kubernetes clusters
+conainer-native - baud runs on Kubernetes clusters. 
 
-each DB is allocated with its own set of PS across different datacenters (zones). 
+each zone has a DCOS/Kubernetes interface to allocate PS nodes and router nodes. 
+
+each DB is allocated with its own set of PS across different zones.
 
 each zone has a group of routers which are shared by all the applications. 
 
 * BaudStorage
 
-BS is mounted to store partition data (sorted key-value files and WAL) 
+As the shared datacenter storage, BS is mounted to store partition data, which is log-structured sorted key-value files and redo-logs (WALs). 
 
 ### partitioning 
 
@@ -78,54 +94,52 @@ One Baud cluster can host one to thousands of databases;
 one DB can host billions of spaces;
 one space can host unlimited number of objects;
 
+
 ## Master
 
-three/five/.. BM instances form a replicated BM service, or leverage a distributed coordination service like etcd/consul to store the metadata of Baud itself. 
+There are two tiers for the cluster topo metadata managment. 
 
-we currently choose the former approach. 
+### globalmaster
 
-* e.g. Start a master via cmd shell,
+* core data structures
 
-host2:$ baud -cm -http-addr host2:5001 -raft-addr host2:5002 -topo http://host1:5001 -data ~/node
+db and space schemas
 
+zones
 
-### data structures
+partitions -> zones
 
-* database metadata
+note that the globalmaster has no knowledge of nodes, neither PS nodes nor router nodes
 
-db (name -> id): serving zones, PS nodes
+* key operations
 
-space (name -> id): entity or edge
+create DB and Spaces
 
-partition (slot id range of (source) entity uid) : entity or edge
+split or merge a partition
 
-* cluster topo metadata
+### zonemaster
 
-Zones (i.e. Datacenters, Cells): each zone has a DCOS/Kubernetes interface to allocate PS nodes and router nodes. 
+* core data structures
 
-master nodes - cross at least 3 zones
+partitions -> PS nodes
 
-ps node - which zone it is located at and which DB it serves
+* key operations
 
-router node - which zone 
+assign partitions to PS nodes
 
-### persistence
+* failure detector (FD)
 
-marshalled and written to the underlying key-value store
+distributed voting of PS health
 
-### key operations
+* placement driver (PD)
 
-* Create a Space
+move partitions between PS nodes for load balancing
 
-* Split a Partition
+### availability & reliability
 
-* Merge Partitions
+raft replication
 
-the reverse process of split
-
-* PS metrics reporting
-
-* Router metrics reporting
+data structures are in memory but also marshalled and written to the underlying key-value store
 
 
 ## PS
@@ -161,6 +175,9 @@ term synonyms are stored as a file of Baudstorage and loaded by PS for document 
 
 
 ## Router
+
+A router needs to interact with not only the zonemaster of its own zone but also the zonemasters of other zones. 
+
 
 ## Search
 
