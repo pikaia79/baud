@@ -31,13 +31,14 @@ type PartitionServer struct {
 	*metapb.Node
 	*masterpb.NodeSysStats
 
+	adminPort 	   uint32
 	status         PSStatus
 	lastHeartbeat  time.Time
 	partitionCache *PartitionCache
 	propertyLock   sync.RWMutex
 }
 
-func NewPartitionServer(ip string) (*PartitionServer, error) {
+func NewPartitionServer(ip string, psCfg *PsConfig) (*PartitionServer, error) {
 	newId, err := GetIdGeneratorSingle(nil).GenID()
 	if err != nil {
 		log.Error("fail to generate ps id. err[%v]", err)
@@ -46,10 +47,12 @@ func NewPartitionServer(ip string) (*PartitionServer, error) {
 
 	return &PartitionServer{
 		Node: &metapb.Node{
-			ID: metapb.NodeID(newId),
-			Ip: ip,
+			ID:   metapb.NodeID(newId),
+			Ip:   ip,
+			Port: int(psCfg.RpcPort),
 		},
 		NodeSysStats:   new(masterpb.NodeSysStats),
+		adminPort:      psCfg.AdminPort,
 		status:         PS_INIT,
 		lastHeartbeat:  time.Now(),
 		partitionCache: NewPartitionCache(),
@@ -131,7 +134,7 @@ func (p *PartitionServer) getRpcAddr() string {
 	p.propertyLock.RLock()
 	defer p.propertyLock.RUnlock()
 
-	return util.BuildAddr(p.Ip, p.Port)
+	return util.BuildAddr(p.Ip, p.adminPort)
 }
 
 type PSCache struct {

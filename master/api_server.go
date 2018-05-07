@@ -39,7 +39,7 @@ type ApiServer struct {
 func NewApiServer(config *Config, cluster *Cluster) *ApiServer {
     cfg := &netutil.ServerConfig{
 		Name:         "master-api-server",
-		Addr:         util.BuildAddr("0.0.0.0", int(config.ClusterCfg.CurNode.HttpPort)),
+		Addr:         util.BuildAddr("0.0.0.0", config.ClusterCfg.CurNode.HttpPort),
 		Version:      "v1",
 		ConnLimit:    DEFAULT_CONN_LIMIT,
 		CloseTimeout: DEFAULT_CLOSE_TIMEOUT,

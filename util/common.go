@@ -6,7 +6,7 @@ import (
     "fmt"
 )
 
-func BuildAddr(ip string, port int) string {
+func BuildAddr(ip string, port uint32) string {
     return fmt.Sprintf("%s:%d", ip, port)
 }
 

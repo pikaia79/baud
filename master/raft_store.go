@@ -283,16 +283,16 @@ func (rs *RaftStore) initRaftStoreCfg() error {
 	raftStoreCfg.RaftRetainLogs = rs.config.ClusterCfg.RaftRetainLogsCount
 	raftStoreCfg.RaftHeartbeatInterval = rs.config.ClusterCfg.RaftHeartbeatInterval.Duration
 	raftStoreCfg.RaftHeartbeatAddr = util.BuildAddr(rs.config.ClusterCfg.CurNode.Host,
-		int(rs.config.ClusterCfg.CurNode.RaftHeartbeatPort))
+		rs.config.ClusterCfg.CurNode.RaftHeartbeatPort)
 	raftStoreCfg.RaftReplicateAddr = util.BuildAddr(rs.config.ClusterCfg.CurNode.Host,
-		int(rs.config.ClusterCfg.CurNode.RaftReplicatePort))
+		rs.config.ClusterCfg.CurNode.RaftReplicatePort)
 
 	var peers []*Peer
 	for _, p := range rs.config.ClusterCfg.Nodes {
 		peer := new(Peer)
 		peer.NodeId = p.NodeId
-		peer.RaftHeartbeatAddr = util.BuildAddr(p.Host, int(p.RaftHeartbeatPort))
-		peer.RaftReplicateAddr = util.BuildAddr(p.Host, int(p.RaftReplicatePort))
+		peer.RaftHeartbeatAddr = util.BuildAddr(p.Host, p.RaftHeartbeatPort)
+		peer.RaftReplicateAddr = util.BuildAddr(p.Host, p.RaftReplicatePort)
 		peers = append(peers, peer)
 	}
 	raftStoreCfg.RaftNodes = peers

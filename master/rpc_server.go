@@ -35,7 +35,7 @@ func NewRpcServer(config *Config, cluster *Cluster) *RpcServer {
 }
 
 func (s *RpcServer) Start() error {
-	l, err := net.Listen("tcp", util.BuildAddr("0.0.0.0", int(s.config.ClusterCfg.CurNode.RpcPort)))
+	l, err := net.Listen("tcp", util.BuildAddr("0.0.0.0", s.config.ClusterCfg.CurNode.RpcPort))
 	if err != nil {
 		log.Error("rpc server listen error[%v]", err)
 		return err
@@ -155,7 +155,7 @@ func (s *RpcServer) PSRegister(ctx context.Context,
 
 	if nodeId == 0 {
 		// this is a new ps unregistered never, distribute new psid to it
-		ps, err := NewPartitionServer(req.Ip)
+		ps, err := NewPartitionServer(req.Ip, &s.config.PsCfg)
 		if err != nil {
 			resp.ResponseHeader = *makeRpcRespHeader(err)
 			return resp, nil
