@@ -198,7 +198,7 @@ func (s *RpcServer) PSHeartbeat(ctx context.Context,
 	psId := req.NodeID
 	ps := s.cluster.PsCache.FindServerById(psId)
 	if ps == nil {
-		log.Error("ps heartbeat received invalid psid[%v]", psId)
+		log.Error("ps heartbeat received invalid ps. id[%v]", psId)
 		resp.ResponseHeader = *makeRpcRespHeader(ErrPSNotExists)
 		return resp, nil
 	}
@@ -307,31 +307,32 @@ func pickReplicaToDelete(info *masterpb.PartitionInfo, leaderNodeId metapb.NodeI
 
 	var replicaToDelete *metapb.Replica
 
-	for {
-		if !info.IsLeader {
-			replicaToDelete = &metapb.Replica{ID: followers[0].ID, NodeID: followers[0].NodeID}
-			break
-		}
-
-		// firstly pick followers, finally leader
-		if len(followers) > 1 {
-			for _, follower := range followers {
-				if follower.NodeID != leaderNodeId {
-					replicaToDelete = &metapb.Replica{ID: follower.ID, NodeID: follower.NodeID}
-					break
-				}
-			}
-
-			log.Error("cannot find leader in followers")
-			return nil, ErrRpcInvalidFollowers
-
-		} else {
-			replicaToDelete = &metapb.Replica{ID: followers[0].ID, NodeID: followers[0].NodeID}
-			break
-		}
-
+	if !info.IsLeader {
+		replicaToDelete = &metapb.Replica{ID: followers[0].ID, NodeID: followers[0].NodeID}
+		return replicaToDelete, nil
 	}
 
+	var leaderFound bool
+	// firstly pick followers, finally leader
+	for _, follower := range followers {
+		if follower.NodeID == leaderNodeId {
+			leaderFound = true
+			continue
+		}
+
+		replicaToDelete = &metapb.Replica{ID: follower.ID, NodeID: follower.NodeID}
+		break
+	}
+
+	if !leaderFound {
+		log.Error("cannot find leader in followers")
+		return nil, ErrRpcInvalidFollowers
+	}
+	if replicaToDelete != nil {
+		return replicaToDelete, nil
+	}
+
+	replicaToDelete = &metapb.Replica{ID: followers[0].ID, NodeID: followers[0].NodeID}
 	return replicaToDelete, nil
 }
 
