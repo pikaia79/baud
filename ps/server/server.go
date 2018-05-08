@@ -63,7 +63,7 @@ type Server struct {
 // NewServer create server instance
 func NewServer(conf *config.Config) *Server {
 	serverConf := loadConfig(conf)
-
+	log.InitFileLog(serverConf.LogDir, serverConf.LogModule, serverConf.LogLevel)
 	s := &Server{
 		Config:       *serverConf,
 		ip:           netutil.GetPrivateIP().String(),
