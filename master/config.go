@@ -64,7 +64,8 @@ raft-replicate-port=8895
 [ps]
 rpc-port=8000
 admin-port=8001
-heartbeat-interval="100ms"
+heartbeat-interval="5s"
+raft-heartbeat-interval="100ms"
 raft-heartbeat-port=8002
 raft-replicate-port=8003
 raft-retain-logs=10000
@@ -246,6 +247,7 @@ type PsConfig struct {
 	RpcPort                 uint32        `toml:"rpc-port,omitempty" json:"rpc-port"`
 	AdminPort               uint32        `toml:"admin-port,omitempty" json:"admin-port"`
 	HeartbeatInterval       util.Duration `toml:"heartbeat-interval,omitempty" json:"heartbeat-interval"`
+	RaftHeartbeatInterval   util.Duration `toml:"raft-heartbeat-interval,omitempty" json:"raft-heartbeat-interval"`
 	RaftHeartbeatPort       uint32        `toml:"raft-heartbeat-port,omitempty" json:"raft-heartbeat-port"`
 	RaftReplicatePort       uint32        `toml:"raft-replicate-port,omitempty" json:"raft-replicate-port"`
 	RaftRetainLogs          uint64        `toml:"raft-retain-logs,omitempty" json:"raft-retain-logs"`
@@ -257,6 +259,7 @@ func (cfg *PsConfig) adjust() {
 	adjustUint32(&cfg.RpcPort, "no ps raft port")
 	adjustUint32(&cfg.AdminPort, "no ps admin port")
 	adjustDuration(&cfg.HeartbeatInterval, "no ps heartbeat interval")
+	adjustDuration(&cfg.RaftHeartbeatInterval, "no ps raft heartbeat interval")
 	adjustUint32(&cfg.RaftHeartbeatPort, "no ps raft heartbeat port")
 	adjustUint32(&cfg.RaftReplicatePort, "no ps raft replicate port")
 	adjustUint64(&cfg.RaftRetainLogs, "no ps raft retain logs")

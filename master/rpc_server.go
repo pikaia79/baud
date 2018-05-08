@@ -167,6 +167,7 @@ func (s *RpcServer) PSRegister(ctx context.Context,
 
 		resp.ResponseHeader = *makeRpcRespHeader(ErrSuc)
 		resp.NodeID = ps.ID
+		packPsRegRespWithCfg(resp, &s.config.PsCfg)
 		return resp, nil
 	}
 
@@ -184,6 +185,7 @@ func (s *RpcServer) PSRegister(ctx context.Context,
 
 	resp.ResponseHeader = *makeRpcRespHeader(ErrSuc)
 	resp.NodeID = ps.ID
+	packPsRegRespWithCfg(resp, &s.config.PsCfg)
 	resp.Partitions = *ps.partitionCache.GetAllMetaPartitions()
 
 	return resp, nil
@@ -349,4 +351,16 @@ func makeRpcRespHeader(err error) *metapb.ResponseHeader {
 			Message: ErrInternalError.Error(),
 		}
 	}
+}
+
+func packPsRegRespWithCfg(resp *masterpb.PSRegisterResponse, psCfg *PsConfig) {
+	resp.RPCPort = int(psCfg.RpcPort)
+	resp.AdminPort = int(psCfg.AdminPort)
+	resp.HeartbeatInterval = int(psCfg.HeartbeatInterval.Nanoseconds() / 1000000)
+	resp.RaftHeartbeatInterval = int(psCfg.RaftHeartbeatInterval.Nanoseconds() / 1000000)
+	resp.RaftHeartbeatPort = int(psCfg.RaftHeartbeatPort)
+	resp.RaftReplicatePort = int(psCfg.RaftReplicatePort)
+	resp.RaftRetainLogs = psCfg.RaftRetainLogs
+	resp.RaftReplicaConcurrency = int(psCfg.RaftReplicaConcurrency)
+	resp.RaftSnapshotConcurrency = int(psCfg.RaftSnapshotConcurrency)
 }
