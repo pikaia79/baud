@@ -11,7 +11,7 @@ var (
 	ErrSysBusy       = errors.New("system busy")
 	ErrParamError    = errors.New("param error")
 	ErrInvalidCfg    = errors.New("config error")
-	// ErrNotLeader     = errors.New("not permitted. node not leader")
+
 
 	ErrDupDb              = errors.New("duplicated database")
 	ErrDbNotExists        = errors.New("db not exists")
@@ -29,6 +29,7 @@ var (
 	ErrRpcParamError       = errors.New("rpc param error")
 	ErrRpcEmptyFollowers   = errors.New("reported empty followers")
 	ErrRpcInvalidFollowers = errors.New("reported invalid followers")
+	ErrRpcNotLeader        = errors.New("partition is not a leader")
 
 	ErrRaftNotRegHandler          = errors.New("have no register raft handler")
 	ErrRaftInvalidNode            = errors.New("invalid raft node")

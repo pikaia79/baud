@@ -125,6 +125,13 @@ func (p *Partition) addReplica(store Store, metaReplicas ...*metapb.Replica) err
 	return nil
 }
 
+//func (p *Partition) casReplicas(store Store, info *masterpb.PartitionInfo, nodeId metapb.NodeID) {
+//	p.propertyLock.Lock()
+//	defer p.propertyLock.Unlock()
+//
+//
+//}
+
 func (p *Partition) updateInfo(store Store, info *masterpb.PartitionInfo, nodeId metapb.NodeID) error {
 	p.propertyLock.Lock()
 	defer p.propertyLock.Unlock()
@@ -192,6 +199,19 @@ func (p *Partition) pickLeaderNodeId() metapb.NodeID {
 	} else {
 		return 0
 	}
+}
+
+func (p *Partition) findReplicaById(replicaId metapb.ReplicaID) bool {
+	p.propertyLock.RLock()
+	defer p.propertyLock.RUnlock()
+
+	for _, replica := range p.Replicas {
+		if replica.ID == replicaId {
+			return true
+		}
+	}
+
+	return false
 }
 
 func (p *Partition) takeChangeMemberTask() bool {
