@@ -93,7 +93,7 @@ func (c *PSRpcClientImpl) Close() {
 func (c *PSRpcClientImpl) getClient(addr string) (pspb.AdminGrpcClient, error) {
 	client, err := c.rpcClient.GetGrpcClient(addr)
 	if err != nil {
-		log.Error("fail to get grpc client handle from pool. err[%v]", err)
+		log.Error("fail to get grpc client[%v] handle from pool. err[%v]", addr, err)
 		return nil, ErrRpcGetClientFailed
 	}
 	return client.(pspb.AdminGrpcClient), nil
