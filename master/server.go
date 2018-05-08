@@ -18,7 +18,7 @@ type Master struct {
     processorManager *ProcessorManager
     workerManager    *WorkerManager
     idGenerator      IDGenerator
-    psRpcClient      *PSRpcClient
+    psRpcClient      PSRpcClient
 }
 
 func NewServer() *Master {

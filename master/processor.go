@@ -77,7 +77,7 @@ func (pm *ProcessorManager) Close() {
 	pm.cancel()
 	pm.wg.Wait()
 
-	pm.pp.close()
+	pm.pp.Close()
 
 	processorManagerSingleLock.Lock()
 	defer processorManagerSingleLock.Unlock()
@@ -98,7 +98,7 @@ func (pm *ProcessorManager) start() {
 			}
 		}()
 
-		pm.pp.run()
+		pm.pp.Run()
 	}()
 
 	pm.isStarted = true
@@ -181,13 +181,14 @@ func NewForcePartitionDeleteEvent(partitionId metapb.PartitionID, replicaRpcAddr
 }
 
 type Processor interface {
-	run()
-	close()
+	Run()
+	Close()
 }
 
 type PartitionProcessor struct {
 	ctx        context.Context
 	cancelFunc context.CancelFunc
+	wg         sync.WaitGroup
 
 	eventCh        chan *ProcessorEvent
 	cluster        *Cluster
@@ -209,7 +210,7 @@ func NewPartitionProcessor(ctx context.Context, cancel context.CancelFunc, clust
 	return p
 }
 
-func (p *PartitionProcessor) run() {
+func (p *PartitionProcessor) Run() {
 	log.Info("Partition Processor is running")
 
 	for {
@@ -231,83 +232,104 @@ func (p *PartitionProcessor) run() {
 					break
 				}
 
-				go func(partitionToCreate *Partition) {
-					leaderPS := p.cluster.PsCache.FindServerById(partitionToCreate.pickLeaderNodeId())
-					// leaderPS is nil when create first partition
+				p.wg.Add(1)
+				go func() {
+					defer p.wg.Done()
 
-					replicaId, err := GetIdGeneratorSingle(nil).GenID()
-					if err != nil {
-						log.Error("fail to generate new replica ßid. err:[%v]", err)
-						return
-					}
-					var newMetaReplica = &metapb.Replica{ID: metapb.ReplicaID(replicaId), NodeID: psToCreate.ID}
-
-					partitionCopy := deepcopy.Iface(partitionToCreate.Partition).(*metapb.Partition)
-					partitionCopy.Replicas = append(partitionCopy.Replicas, *newMetaReplica)
-					if err := GetPSRpcClientSingle(nil).CreatePartition(psToCreate.getRpcAddr(),
-						partitionCopy); err != nil {
-						log.Error("Rpc fail to create partition[%v] into ps. err:[%v]",
-							partitionToCreate.Partition, err)
-						return
-					}
-
-					if leaderPS != nil {
-						if err := GetPSRpcClientSingle(nil).AddReplica(leaderPS.getRpcAddr(), partitionToCreate.ID,
-							&psToCreate.RaftAddrs, newMetaReplica.ID, newMetaReplica.NodeID); err != nil {
-							log.Error("Rpc fail to add replica[%v] into leader ps. err[%v]", newMetaReplica, err)
-							return
-						}
-					}
-
-				}(event.body.(*Partition))
+					p.createPartition(event.body.(*Partition), psToCreate)
+				}()
 
 			} else if event.typ == EVENT_TYPE_PARTITION_DELETE {
 
-				body := event.body.(*PartitionDeleteBody)
+				p.wg.Add(1)
+				go func() {
+					defer p.wg.Done()
 
-				go func(partitionId metapb.PartitionID, leaderNodeId metapb.NodeID, replica *metapb.Replica) {
-					leaderPS := p.cluster.PsCache.FindServerById(leaderNodeId)
-					if leaderPS == nil {
-						log.Debug("can not find leader ps when notify deleting replicas to leader")
-						return
-					}
-					psToDelete := p.cluster.PsCache.FindServerById(replica.NodeID)
-					if psToDelete == nil {
-						log.Debug("can not find replica[%v] ps needed to deleted", replica.NodeID)
-						return
-					}
-
-					if err := GetPSRpcClientSingle(nil).RemoveReplica(leaderPS.getRpcAddr(), partitionId,
-						&psToDelete.RaftAddrs, replica.ID, replica.NodeID); err != nil {
-						log.Error("Rpc fail to remove replica[%v] from ps. err[%v]", replica.ID, err)
-						return
-					}
-
-					if err := GetPSRpcClientSingle(nil).DeletePartition(psToDelete.getRpcAddr(),
-						partitionId); err != nil {
-						log.Error("Rpc fail to delete partition[%v] from ps. err:[%v]", partitionId, err)
-						return
-					}
-
-				}(body.partitionId, body.leaderNodeId, body.replica)
+					body := event.body.(*PartitionDeleteBody)
+					p.deletePartition(body.partitionId, body.leaderNodeId, body.replica)
+				}()
 
 			} else if event.typ == EVENT_TYPE_FORCE_PARTITION_DELETE {
 
-				body := event.body.(*PartitionDeleteBody)
+				p.wg.Add(1)
+				go func() {
+					defer p.wg.Done()
 
-				go func(partitionId metapb.PartitionID, replicaRpcAddr string, replica *metapb.Replica) {
-					if err := GetPSRpcClientSingle(nil).DeletePartition(replicaRpcAddr, partitionId); err != nil {
-						log.Error("Rpc fail to delete partition[%v] from ps. err:[%v]", partitionId, err)
-						return
-					}
-				}(body.partitionId, body.replicaRpcAddr, body.replica)
+					body := event.body.(*PartitionDeleteBody)
+					p.forceDeletePartition(body.partitionId, body.replicaRpcAddr, body.replica)
+				}()
 			}
 		}
 	}
 }
 
-func (p *PartitionProcessor) close() {
+func (p *PartitionProcessor) Close() {
 	if p.eventCh != nil {
 		close(p.eventCh)
+	}
+
+	p.wg.Wait()
+}
+
+func (p *PartitionProcessor) createPartition(partitionToCreate *Partition, psToCreate *PartitionServer) {
+	leaderPS := p.cluster.PsCache.FindServerById(partitionToCreate.pickLeaderNodeId())
+	// leaderPS is nil when create first partition
+
+	replicaId, err := GetIdGeneratorSingle(nil).GenID()
+	if err != nil {
+		log.Error("fail to generate new replica ßid. err:[%v]", err)
+		return
+	}
+	var newMetaReplica = &metapb.Replica{ID: metapb.ReplicaID(replicaId), NodeID: psToCreate.ID}
+
+	partitionCopy := deepcopy.Iface(partitionToCreate.Partition).(*metapb.Partition)
+	partitionCopy.Replicas = append(partitionCopy.Replicas, *newMetaReplica)
+	if err := GetPSRpcClientSingle(nil).CreatePartition(psToCreate.getRpcAddr(),
+		partitionCopy); err != nil {
+		log.Error("Rpc fail to create partition[%v] into ps. err:[%v]",
+			partitionToCreate.Partition, err)
+		return
+	}
+
+	if leaderPS != nil {
+		if err := GetPSRpcClientSingle(nil).AddReplica(leaderPS.getRpcAddr(), partitionToCreate.ID,
+			&psToCreate.RaftAddrs, newMetaReplica.ID, newMetaReplica.NodeID); err != nil {
+			log.Error("Rpc fail to add replica[%v] into leader ps. err[%v]", newMetaReplica, err)
+			return
+		}
+	}
+}
+
+func (p *PartitionProcessor) deletePartition (partitionId metapb.PartitionID, leaderNodeId metapb.NodeID,
+			replica *metapb.Replica) {
+	leaderPS := p.cluster.PsCache.FindServerById(leaderNodeId)
+	if leaderPS == nil {
+		log.Debug("can not find leader ps when notify deleting replicas to leader")
+		return
+	}
+	psToDelete := p.cluster.PsCache.FindServerById(replica.NodeID)
+	if psToDelete == nil {
+		log.Debug("can not find replica[%v] ps needed to deleted", replica.NodeID)
+		return
+	}
+
+	if err := GetPSRpcClientSingle(nil).RemoveReplica(leaderPS.getRpcAddr(), partitionId,
+		&psToDelete.RaftAddrs, replica.ID, replica.NodeID); err != nil {
+		log.Error("Rpc fail to remove replica[%v] from ps. err[%v]", replica.ID, err)
+		return
+	}
+
+	if err := GetPSRpcClientSingle(nil).DeletePartition(psToDelete.getRpcAddr(),
+		partitionId); err != nil {
+		log.Error("Rpc fail to delete partition[%v] from ps. err:[%v]", partitionId, err)
+		return
+	}
+}
+
+func (p *PartitionProcessor) forceDeletePartition (partitionId metapb.PartitionID, replicaRpcAddr string,
+			replica *metapb.Replica) {
+	if err := GetPSRpcClientSingle(nil).DeletePartition(replicaRpcAddr, partitionId); err != nil {
+		log.Error("Rpc fail to delete partition[%v] from ps. err:[%v]", partitionId, err)
+		return
 	}
 }

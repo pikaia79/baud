@@ -126,6 +126,24 @@ func (s *Space) putPartition(partition *Partition) {
 	s.searchTree.update(partition)
 }
 
+func (s *Space) AscendScanPartition(pivotSlot metapb.SlotID, batchNum int) []*Partition {
+    searchPivot := &Partition{
+        Partition: &metapb.Partition{
+            StartSlot: pivotSlot,
+        },
+    }
+    items := s.searchTree.ascendScan(searchPivot, batchNum)
+    if items == nil || len(items) == 0 {
+        return nil
+    }
+
+    result := make([]*Partition, 0, len(items))
+    for _, item := range items {
+        result = append(result, item.partition)
+    }
+    return result
+}
+
 type SpaceCache struct {
 	lock     sync.RWMutex
 	name2Ids map[string]metapb.SpaceID

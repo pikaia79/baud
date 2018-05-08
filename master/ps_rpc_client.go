@@ -13,24 +13,34 @@ import (
 	"sync/atomic"
 )
 
-//go:generate mockgen -destination mock/admin_mock.go -package mock_master github.com/tiglabs/baudengine/proto/pspb AdminGrpcClient
+//go:generate mockgen -destination mock/ps_rpc_client_mock.go -package mock_master github.com/tiglabs/baudengine/master PSRpcClient
 const (
 	PS_GRPC_REQUEST_TIMEOUT = time.Second
 )
 
 var (
-	psClientSingle     *PSRpcClient
+	psClientSingle     *PSRpcClientImpl
 	psClientSingleLock sync.Mutex
 	psClientSingleDone uint32
 )
 
-type PSRpcClient struct {
+type PSRpcClient interface {
+    CreatePartition(addr string, partition *metapb.Partition) error
+    DeletePartition(addr string, partitionId metapb.PartitionID) error
+    AddReplica(addr string, partitionId metapb.PartitionID, raftAddrs *metapb.RaftAddrs,
+            replicaId metapb.ReplicaID, replicaNodeId metapb.NodeID) error
+    RemoveReplica(addr string, partitionId metapb.PartitionID, raftAddrs *metapb.RaftAddrs,
+            replicaId metapb.ReplicaID, replicaNodeId metapb.NodeID) error
+    Close()
+}
+
+type PSRpcClientImpl struct {
 	ctx       context.Context
 	cancel    context.CancelFunc
 	rpcClient *rpc.Client
 }
 
-func GetPSRpcClientSingle(config *Config) *PSRpcClient {
+func GetPSRpcClientSingle(config *Config) PSRpcClient {
 	if psClientSingle != nil {
 		return psClientSingle
 	}
@@ -46,7 +56,7 @@ func GetPSRpcClientSingle(config *Config) *PSRpcClient {
 			log.Error("config should not be nil at first time when create PSRpcClient single")
 		}
 
-		psClientSingle = new(PSRpcClient)
+		psClientSingle = new(PSRpcClientImpl)
 		psClientSingle.ctx, psClientSingle.cancel = context.WithCancel(context.Background())
 
 		connMgrOpt := rpc.DefaultManagerOption
@@ -65,7 +75,7 @@ func GetPSRpcClientSingle(config *Config) *PSRpcClient {
 	return psClientSingle
 }
 
-func (c *PSRpcClient) Close() {
+func (c *PSRpcClientImpl) Close() {
 	psClientSingleLock.Lock()
 	defer psClientSingleLock.Unlock()
 
@@ -80,7 +90,7 @@ func (c *PSRpcClient) Close() {
 	log.Info("PSRpcClient single has closed")
 }
 
-func (c *PSRpcClient) getClient(addr string) (pspb.AdminGrpcClient, error) {
+func (c *PSRpcClientImpl) getClient(addr string) (pspb.AdminGrpcClient, error) {
 	client, err := c.rpcClient.GetGrpcClient(addr)
 	if err != nil {
 		log.Error("fail to get grpc client handle from pool. err[%v]", err)
@@ -89,7 +99,7 @@ func (c *PSRpcClient) getClient(addr string) (pspb.AdminGrpcClient, error) {
 	return client.(pspb.AdminGrpcClient), nil
 }
 
-func (c *PSRpcClient) CreatePartition(addr string, partition *metapb.Partition) error {
+func (c *PSRpcClientImpl) CreatePartition(addr string, partition *metapb.Partition) error {
 	client, err := c.getClient(addr)
 	if err != nil {
 		return err
@@ -118,7 +128,7 @@ func (c *PSRpcClient) CreatePartition(addr string, partition *metapb.Partition) 
 	}
 }
 
-func (c *PSRpcClient) DeletePartition(addr string, partitionId metapb.PartitionID) error {
+func (c *PSRpcClientImpl) DeletePartition(addr string, partitionId metapb.PartitionID) error {
 	client, err := c.getClient(addr)
 	if err != nil {
 		return err
@@ -147,7 +157,7 @@ func (c *PSRpcClient) DeletePartition(addr string, partitionId metapb.PartitionI
 	}
 }
 
-func (c *PSRpcClient) AddReplica(addr string, partitionId metapb.PartitionID, raftAddrs *metapb.RaftAddrs,
+func (c *PSRpcClientImpl) AddReplica(addr string, partitionId metapb.PartitionID, raftAddrs *metapb.RaftAddrs,
 	replicaId metapb.ReplicaID, replicaNodeId metapb.NodeID) error {
 	client, err := c.getClient(addr)
 	if err != nil {
@@ -183,7 +193,7 @@ func (c *PSRpcClient) AddReplica(addr string, partitionId metapb.PartitionID, ra
 	}
 }
 
-func (c *PSRpcClient) RemoveReplica(addr string, partitionId metapb.PartitionID, raftAddrs *metapb.RaftAddrs,
+func (c *PSRpcClientImpl) RemoveReplica(addr string, partitionId metapb.PartitionID, raftAddrs *metapb.RaftAddrs,
 	replicaId metapb.ReplicaID, replicaNodeId metapb.NodeID) error {
 	client, err := c.getClient(addr)
 	if err != nil {
