@@ -121,7 +121,7 @@ func (s *Server) doPartitionCreate(p metapb.Partition) {
 		partition.Close()
 	} else {
 		for _, r := range p.Replicas {
-			s.nodeResolver.addNode(r.NodeID, r.RaftAddrs)
+			s.nodeResolver.addNode(r.NodeID, r.ReplicaAddrs)
 		}
 
 		partition.start()

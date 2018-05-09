@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"sync"
+	"time"
 
 	"github.com/tiglabs/baudengine/kernel"
 	"github.com/tiglabs/baudengine/kernel/index"
@@ -141,11 +142,38 @@ func (p *partition) getPartitionInfo() *masterpb.PartitionInfo {
 	info.Status = p.meta.Status
 	info.Epoch = p.meta.Epoch
 	info.Statistics = p.statistics
+	replicas := p.meta.Replicas
 	p.rwMutex.RUnlock()
 
 	if info.IsLeader {
 		raftStatus := p.server.raftServer.Status(p.meta.ID)
 		info.RaftStatus = new(masterpb.RaftStatus)
+		for _, r := range replicas {
+			if r.NodeID == p.server.nodeID {
+				info.RaftStatus.Replica = r
+				info.RaftStatus.Term = raftStatus.Term
+				info.RaftStatus.Index = raftStatus.Index
+				info.RaftStatus.Commit = raftStatus.Commit
+				info.RaftStatus.Applied = raftStatus.Applied
+			} else {
+				if replStatus, ok := raftStatus.Replicas[uint64(r.NodeID)]; ok {
+					follower := masterpb.RaftFollowerStatus{
+						Replica: r,
+						Match:   replStatus.Match,
+						Commit:  replStatus.Commit,
+						Next:    replStatus.Next,
+						State:   replStatus.State,
+					}
+					since := time.Since(replStatus.LastActive)
+					// 两次心跳内没活跃就视为Down
+					downDuration := since - time.Duration(2*p.server.raftConfig.HeartbeatTick)*p.server.raftConfig.TickInterval
+					if downDuration > 0 {
+						follower.DownSeconds = uint64(downDuration / time.Second)
+					}
+					info.RaftStatus.Followers = append(info.RaftStatus.Followers, follower)
+				}
+			}
+		}
 	}
 
 	return info

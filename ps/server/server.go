@@ -43,6 +43,7 @@ type Server struct {
 	ctxCancel context.CancelFunc
 
 	nodeResolver *NodeResolver
+	raftConfig   *raft.Config
 	raftServer   *raft.RaftServer
 	apiServer    *grpc.Server
 	adminServer  *grpc.Server
@@ -50,6 +51,7 @@ type Server struct {
 	systemMetric *metric.SystemMetric
 
 	connMgr         *rpc.ConnectionMgr
+	masterLeader    string
 	masterClient    *rpc.Client
 	masterHeartbeat *heartbeatWork
 
@@ -63,6 +65,7 @@ type Server struct {
 // NewServer create server instance
 func NewServer(conf *config.Config) *Server {
 	serverConf := loadConfig(conf)
+	log.InitFileLog(serverConf.LogDir, serverConf.LogModule, serverConf.LogLevel)
 
 	s := &Server{
 		Config:       *serverConf,
@@ -161,6 +164,7 @@ func (s *Server) doStart(init bool) error {
 			return fmt.Errorf("boot raft server failed, error: %v", err)
 		}
 		s.raftServer = rs
+		s.raftConfig = rc
 	}
 
 	// create and recover partitions
@@ -265,11 +269,16 @@ func (s *Server) register() (*masterpb.PSRegisterResponse, error) {
 	var response *masterpb.PSRegisterResponse
 
 	err := util.RetryMaxAttempt(&retryOpt, func() error {
-		masterClient, err := s.masterClient.GetGrpcClient(s.MasterServer)
+		masterAddr := s.MasterServer
+		if s.masterLeader != "" {
+			masterAddr = s.masterLeader
+		}
+		masterClient, err := s.masterClient.GetGrpcClient(masterAddr)
 		if err != nil {
 			log.Error("get master register rpc client error: %v", err)
 			return err
 		}
+
 		goCtx, cancel := context.WithTimeout(s.ctx, registerTimeout)
 		resp, err := masterClient.(masterpb.MasterRpcClient).PSRegister(goCtx, request)
 		cancel()
@@ -281,6 +290,11 @@ func (s *Server) register() (*masterpb.PSRegisterResponse, error) {
 		if resp.Code != metapb.RESP_CODE_OK {
 			msg := fmt.Sprintf("master register requeset[%s] ack code not ok[%v], message is: %s", request.ReqId, resp.Code, resp.Message)
 			log.Error(msg)
+			if resp.Error.NoLeader != nil {
+				s.masterLeader = ""
+			} else if resp.Error.NotLeader != nil {
+				s.masterLeader = resp.Error.NotLeader.LeaderAddr
+			}
 			return errors.New(msg)
 		}
 

@@ -43,7 +43,7 @@ func (p *partition) ApplyMemberChange(confChange *proto.ConfChange, index uint64
 
 		replica := new(metapb.Replica)
 		replica.Unmarshal(confChange.Context)
-		p.server.nodeResolver.addNode(replica.NodeID, replica.RaftAddrs)
+		p.server.nodeResolver.addNode(replica.NodeID, replica.ReplicaAddrs)
 
 		p.meta.Epoch.ConfVersion++
 		p.meta.Replicas = append(p.meta.Replicas, *replica)
