@@ -17,7 +17,11 @@ export GOPATH
 export BAUD_BUILD=$(BAUDPATH)/build
 export BAUD_OUT=$(SRCPATH)/bin
 export GOARCH ?= amd64
-LOCAL_OS := $(shell uname)
+LOCAL_OS := ${BUILD_OS}
+ifeq ($(LOCAL_OS),)
+   LOCAL_OS = $(shell uname)
+endif
+
 ifeq ($(LOCAL_OS),Linux)
    export GOOS ?= linux
 else ifeq ($(LOCAL_OS),Darwin)
