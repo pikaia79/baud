@@ -22,8 +22,9 @@ const (
 type Partition struct {
 	*metapb.Partition // !!! Do not directly operate the Replicas，must be firstly take the propertyLock
 
-	leader *metapb.Replica
+	leader *masterpb.RaftFollowerStatus
 
+	// TODO: temporary policy, finally using global task to replace it
 	taskFlag    bool
 	taskTimeout time.Time
 
@@ -31,7 +32,7 @@ type Partition struct {
 	propertyLock  sync.RWMutex
 }
 
-func NewPartition(dbId metapb.DBID, spaceId metapb.SpaceID, startSlot, endSlot uint32) (*Partition, error) {
+func NewPartition(dbId metapb.DBID, spaceId metapb.SpaceID, startSlot, endSlot metapb.SlotID) (*Partition, error) {
 	partId, err := GetIdGeneratorSingle(nil).GenID()
 	if err != nil {
 		log.Error("generate partition id is failed. err:[%v]", err)
@@ -125,36 +126,73 @@ func (p *Partition) addReplica(store Store, metaReplicas ...*metapb.Replica) err
 	return nil
 }
 
-func (p *Partition) updateInfo(store Store, info *masterpb.PartitionInfo, nodeId metapb.NodeID) error {
+func (p *Partition) UpdateReplicaGroupUnderGreatOrZeroVer(store Store, info *masterpb.PartitionInfo,
+		leaderFollower *masterpb.RaftFollowerStatus,) (conditionOk bool, err error) {
 	p.propertyLock.Lock()
 	defer p.propertyLock.Unlock()
 
-	p.Status = info.Status
-	p.lastHeartbeat = time.Now()
-	p.Epoch = info.Epoch
+	if store == nil || info == nil || leaderFollower == nil {
+		return false, nil
+	}
+	if !(p.Epoch.ConfVersion == 0 && p.leader == nil) && !(p.Epoch.ConfVersion < info.Epoch.ConfVersion) {
+        return false, nil
+    }
 
-	p.taskFlag = false
-	p.taskTimeout = time.Time{}
+    p.taskFlag = false
+    p.taskTimeout = time.Time{}
 
-	p.Replicas = make([]metapb.Replica, 0, len(info.RaftStatus.Followers))
-	p.leader = nil
+    p.lastHeartbeat = time.Now()
+    p.Status = info.Status
+    p.Epoch = info.Epoch
 
+    p.Replicas = make([]metapb.Replica, 0, len(info.RaftStatus.Followers))
 	for _, follower := range info.RaftStatus.Followers {
-		replica := &metapb.Replica{ID: follower.ID, NodeID: follower.NodeID}
+		replica := NewMetaReplicaByFollower(&follower)
 		p.Replicas = append(p.Replicas, *replica)
 
-		if replica.NodeID == nodeId {
-			p.leader = replica
+		if replica.ID == leaderFollower.ID {
+			p.leader = leaderFollower
 		}
 	}
 
 	key, val, err := doMetaMarshal(p.Partition)
 	if err != nil {
-		return err
+		return true, err
 	}
+	// TODO: partitions should not be store in db
 	store.Put(key, val)
 
-	return nil
+	return true, nil
+}
+
+func (p *Partition) UpdateLeaderUnderSameVer(info *masterpb.PartitionInfo,
+        leaderFollower *masterpb.RaftFollowerStatus) (conditionOk, updateOk bool) {
+	p.propertyLock.Lock()
+	defer p.propertyLock.Unlock()
+
+    if info == nil || leaderFollower == nil {
+        return false, false
+    }
+	if info.Epoch.ConfVersion != p.Epoch.ConfVersion {
+		return false, false
+	}
+    if p.leader == nil {
+        return false, false
+    }
+
+	var leaderExists bool
+	for _, replica := range p.Replicas {
+		if replica.ID == leaderFollower.ID {
+			leaderExists = true
+			break
+		}
+	}
+	if !leaderExists {
+		return true, false
+	}
+	p.leader = leaderFollower
+
+	return true, true
 }
 
 func (p *Partition) countReplicas() int {
@@ -176,12 +214,12 @@ func (p *Partition) getAllReplicas() []*metapb.Replica {
 	return replicas
 }
 
-func (p *Partition) pickLeaderReplica() *metapb.Replica {
-	p.propertyLock.RLock()
-	defer p.propertyLock.RUnlock()
-
-	return p.leader
-}
+//func (p *Partition) pickLeaderReplica() *metapb.Replica {
+//	p.propertyLock.RLock()
+//	defer p.propertyLock.RUnlock()
+//
+//	return p.leader
+//}
 
 func (p *Partition) pickLeaderNodeId() metapb.NodeID {
 	p.propertyLock.RLock()
@@ -192,6 +230,19 @@ func (p *Partition) pickLeaderNodeId() metapb.NodeID {
 	} else {
 		return 0
 	}
+}
+
+func (p *Partition) findReplicaById(replicaId metapb.ReplicaID) *metapb.Replica {
+	p.propertyLock.RLock()
+	defer p.propertyLock.RUnlock()
+
+	for _, replica := range p.Replicas {
+		if replica.ID == replicaId {
+			return &replica
+		}
+	}
+
+	return nil
 }
 
 func (p *Partition) takeChangeMemberTask() bool {
@@ -219,50 +270,6 @@ func doMetaMarshal(p *metapb.Partition) ([]byte, []byte, error) {
 	return key, val, err
 }
 
-//type ReplicaGroup struct {
-//	lock 		sync.RWMutex
-//	replicas 	map[uint32]*Replica  // key: replicaId
-//	servers  	map[uint32]*PartitionServer // key:replicaId
-//}
-
-//func (g *ReplicaGroup) getAllServers() []*PartitionServer {
-//	g.lock.RLock()
-//	defer g.lock.RUnlock()
-//
-//	servers := make([]*PartitionServer, 0, len(g.servers))
-//	for _, server := range g.servers {
-//		servers = append(servers, server)
-//	}
-//	return servers
-//}
-//
-//func (g *ReplicaGroup) addReplica(replica *Replica, server *PartitionServer) {
-//	g.lock.Lock()
-//	defer g.lock.RUnlock()
-//
-//	g.replicas[replica.GetId()] = replica
-//	g.servers[replica.GetId()] = server
-//}
-//
-//func (g *ReplicaGroup) findReplicaById(replicaId uint32) *Replica {
-//	g.lock.RLock()
-//	defer g.lock.RUnlock()
-//
-//	r, ok := g.replicas[replicaId]
-//	if !ok {
-//		return nil
-//	}
-//
-//	return r
-//}
-//
-//func (g *ReplicaGroup) count() int {
-//	g.lock.RLock()
-//	defer g.lock.RUnlock()
-//
-//	return len(g.replicas)
-//}
-
 type PartitionCache struct {
 	lock       sync.RWMutex
 	partitions map[metapb.PartitionID]*Partition
@@ -274,7 +281,7 @@ func NewPartitionCache() *PartitionCache {
 	}
 }
 
-func (c *PartitionCache) findPartitionById(partitionId metapb.PartitionID) *Partition {
+func (c *PartitionCache) FindPartitionById(partitionId metapb.PartitionID) *Partition {
 	c.lock.RLock()
 	defer c.lock.RUnlock()
 
@@ -286,14 +293,14 @@ func (c *PartitionCache) findPartitionById(partitionId metapb.PartitionID) *Part
 	return p
 }
 
-func (c *PartitionCache) addPartition(partition *Partition) {
+func (c *PartitionCache) AddPartition(partition *Partition) {
 	c.lock.Lock()
 	defer c.lock.Unlock()
 
 	c.partitions[partition.ID] = partition
 }
 
-func (c *PartitionCache) getAllMetaPartitions() *[]metapb.Partition {
+func (c *PartitionCache) GetAllMetaPartitions() *[]metapb.Partition {
 	c.lock.RLock()
 	defer c.lock.RUnlock()
 
@@ -305,7 +312,7 @@ func (c *PartitionCache) getAllMetaPartitions() *[]metapb.Partition {
 	return &partitions
 }
 
-func (c *PartitionCache) recovery(store Store) ([]*Partition, error) {
+func (c *PartitionCache) Recovery(store Store) ([]*Partition, error) {
 	prefix := []byte(PREFIX_PARTITION)
 	startKey, limitKey := util.BytesPrefix(prefix)
 
@@ -332,7 +339,7 @@ func (c *PartitionCache) recovery(store Store) ([]*Partition, error) {
 	return resultPartitions, nil
 }
 
-func (c *PartitionCache) clear() {
+func (c *PartitionCache) Clear() {
 	c.lock.Lock()
 	defer c.lock.Unlock()
 

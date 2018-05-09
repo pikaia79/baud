@@ -129,9 +129,9 @@ func (w *SpaceStateTransitionWorker) getInterval() time.Duration {
 }
 
 func (w *SpaceStateTransitionWorker) run() {
-	dbs := w.cluster.dbCache.getAllDBs()
+	dbs := w.cluster.DbCache.GetAllDBs()
 	for _, db := range dbs {
-		spaces := db.spaceCache.getAllSpaces()
+		spaces := db.SpaceCache.GetAllSpaces()
 		for _, space := range spaces {
 
 			func() {
@@ -141,36 +141,30 @@ func (w *SpaceStateTransitionWorker) run() {
 				if space.Status == metapb.SS_Init {
 
 					var noReplica = false
-					var searchPivot *Partition
-					var searchNum = 100
+					var pivotSlot metapb.SlotID
+					var batchNum = 100
+
+
 					for {
-						if searchPivot == nil {
-							searchPivot = &Partition{
-								Partition: &metapb.Partition{
-									StartSlot: 0,
-								},
-							}
-						}
-						items := space.searchTree.ascendScan(searchPivot, searchNum)
-						if items == nil || len(items) == 0 {
+						partitions := space.AscendScanPartition(pivotSlot, batchNum)
+						if partitions == nil  {
 							break
 						}
 
-						for i := 0; i < len(items); i++ {
-							itemPartition := items[i].partition
-							if len(itemPartition.Replicas) == 0 {
+						for _, partition := range partitions {
+							if len(partition.Replicas) == 0 {
 								noReplica = true
 
-								if err := GetPMSingle(nil).PushEvent(NewPartitionCreateEvent(itemPartition)); err != nil {
-									log.Error("fail to push event for creating partition[%v].", itemPartition)
+								if err := GetPMSingle(nil).PushEvent(NewPartitionCreateEvent(partition)); err != nil {
+									log.Error("fail to push event for creating partition[%v].", partition)
 								}
 							}
 						}
 
-						if len(items) < searchNum {
+						if len(partitions) < batchNum {
 							break
 						}
-						searchPivot = items[len(items)-1].partition
+						pivotSlot = partitions[len(partitions) - 1].StartSlot
 					}
 
 					if !noReplica {

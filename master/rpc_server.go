@@ -26,7 +26,7 @@ func NewRpcServer(config *Config, cluster *Cluster) *RpcServer {
 	server.cluster = cluster
 
 	serverOption := &rpc.DefaultServerOption
-	serverOption.ClusterID = string(config.ClusterCfg.ClusterID)
+	serverOption.ClusterID = config.ClusterCfg.ClusterID
 	server.grpcServer = rpc.NewGrpcServer(serverOption)
 	masterpb.RegisterMasterRpcServer(server.grpcServer, server)
 	reflection.Register(server.grpcServer)
@@ -35,7 +35,7 @@ func NewRpcServer(config *Config, cluster *Cluster) *RpcServer {
 }
 
 func (s *RpcServer) Start() error {
-	l, err := net.Listen("tcp", util.BuildAddr("0.0.0.0", int(s.config.ClusterCfg.CurNode.RpcPort)))
+	l, err := net.Listen("tcp", util.BuildAddr("0.0.0.0", s.config.ClusterCfg.CurNode.RpcPort))
 	if err != nil {
 		log.Error("rpc server listen error[%v]", err)
 		return err
@@ -69,13 +69,13 @@ func (s *RpcServer) GetRoute(ctx context.Context,
 	req *masterpb.GetRouteRequest) (*masterpb.GetRouteResponse, error) {
 	resp := new(masterpb.GetRouteResponse)
 
-	db := s.cluster.dbCache.findDbById(req.DB)
+	db := s.cluster.DbCache.FindDbById(req.DB)
 	if db == nil {
 		resp.ResponseHeader = *makeRpcRespHeader(ErrDbNotExists)
 		return resp, nil
 	}
 
-	space := db.spaceCache.findSpaceById(req.Space)
+	space := db.SpaceCache.FindSpaceById(req.Space)
 	if space == nil {
 		resp.ResponseHeader = *makeRpcRespHeader(ErrSpaceNotExists)
 		return resp, nil
@@ -98,7 +98,7 @@ func (s *RpcServer) GetRoute(ctx context.Context,
 		if replicas != nil || len(replicas) != 0 {
 			nodes := make([]*metapb.Node, 0, len(replicas))
 			for _, replica := range replicas {
-				ps := s.cluster.psCache.findServerById(replica.NodeID)
+				ps := s.cluster.PsCache.FindServerById(replica.NodeID)
 				if ps != nil {
 					nodes = append(nodes, ps.Node)
 				}
@@ -116,7 +116,7 @@ func (s *RpcServer) GetRoute(ctx context.Context,
 func (s *RpcServer) GetDB(ctx context.Context, req *masterpb.GetDBRequest) (*masterpb.GetDBResponse, error) {
 	resp := new(masterpb.GetDBResponse)
 
-	db := s.cluster.dbCache.findDbByName(req.DBName)
+	db := s.cluster.DbCache.FindDbByName(req.DBName)
 	if db == nil {
 		resp.ResponseHeader = *makeRpcRespHeader(ErrDbNotExists)
 		return resp, nil
@@ -130,13 +130,13 @@ func (s *RpcServer) GetDB(ctx context.Context, req *masterpb.GetDBRequest) (*mas
 func (s *RpcServer) GetSpace(ctx context.Context, req *masterpb.GetSpaceRequest) (*masterpb.GetSpaceResponse, error) {
 	resp := new(masterpb.GetSpaceResponse)
 
-	db := s.cluster.dbCache.findDbById(req.ID)
+	db := s.cluster.DbCache.FindDbById(req.ID)
 	if db == nil {
 		resp.ResponseHeader = *makeRpcRespHeader(ErrDbNotExists)
 		return resp, nil
 	}
 
-	space := db.spaceCache.findSpaceByName(req.SpaceName)
+	space := db.SpaceCache.FindSpaceByName(req.SpaceName)
 	if space == nil {
 		resp.ResponseHeader = *makeRpcRespHeader(ErrSpaceNotExists)
 		return resp, nil
@@ -151,11 +151,16 @@ func (s *RpcServer) PSRegister(ctx context.Context,
 	req *masterpb.PSRegisterRequest) (*masterpb.PSRegisterResponse, error) {
 	resp := new(masterpb.PSRegisterResponse)
 
+    if err, msLeader := s.validateLeader(); err != nil {
+        resp.ResponseHeader = *makeRpcRespHeaderWithError(err, msLeader)
+        return resp, nil
+    }
+
 	nodeId := req.NodeID
 
 	if nodeId == 0 {
 		// this is a new ps unregistered never, distribute new psid to it
-		ps, err := NewPartitionServer(req.Ip)
+		ps, err := NewPartitionServer(req.Ip, &s.config.PsCfg)
 		if err != nil {
 			resp.ResponseHeader = *makeRpcRespHeader(err)
 			return resp, nil
@@ -163,15 +168,16 @@ func (s *RpcServer) PSRegister(ctx context.Context,
 		ps.persistent(s.cluster.store)
 
 		ps.status = PS_REGISTERED
-		s.cluster.psCache.addServer(ps)
+		s.cluster.PsCache.AddServer(ps)
 
 		resp.ResponseHeader = *makeRpcRespHeader(ErrSuc)
 		resp.NodeID = ps.ID
+		packPsRegRespWithCfg(resp, &s.config.PsCfg)
 		return resp, nil
 	}
 
 	// use nodeid reserved by ps to recognize same one ps
-	ps := s.cluster.psCache.findServerById(nodeId)
+	ps := s.cluster.PsCache.FindServerById(nodeId)
 	if ps == nil {
 		// illegal ps will register
 		log.Warn("Can not find nodeid[%v] in master.", nodeId)
@@ -184,7 +190,8 @@ func (s *RpcServer) PSRegister(ctx context.Context,
 
 	resp.ResponseHeader = *makeRpcRespHeader(ErrSuc)
 	resp.NodeID = ps.ID
-	resp.Partitions = *ps.partitionCache.getAllMetaPartitions()
+	packPsRegRespWithCfg(resp, &s.config.PsCfg)
+	resp.Partitions = *ps.partitionCache.GetAllMetaPartitions()
 
 	return resp, nil
 }
@@ -192,13 +199,18 @@ func (s *RpcServer) PSRegister(ctx context.Context,
 func (s *RpcServer) PSHeartbeat(ctx context.Context,
 	req *masterpb.PSHeartbeatRequest) (*masterpb.PSHeartbeatResponse, error) {
 	resp := new(masterpb.PSHeartbeatResponse)
-	resp.ResponseHeader = *makeRpcRespHeader(ErrSuc)
+    resp.ResponseHeader = *makeRpcRespHeader(ErrSuc)
+
+    if err, msLeader := s.validateLeader(); err != nil {
+        resp.ResponseHeader = *makeRpcRespHeaderWithError(err, msLeader)
+        return resp, nil
+    }
 
 	// process ps
 	psId := req.NodeID
-	ps := s.cluster.psCache.findServerById(psId)
+	ps := s.cluster.PsCache.FindServerById(psId)
 	if ps == nil {
-		log.Error("ps heartbeat received invalid psid[%v]", psId)
+		log.Error("ps heartbeat received invalid ps. id[%v]", psId)
 		resp.ResponseHeader = *makeRpcRespHeader(ErrPSNotExists)
 		return resp, nil
 	}
@@ -206,19 +218,19 @@ func (s *RpcServer) PSHeartbeat(ctx context.Context,
 
 	partitionInfos := req.Partitions
 	if partitionInfos == nil {
-		// TODO:check ps status to destroy ps or create new partition to it
+		// TODO:this is empty ps, check ps status to destroy ps or create new partition to it
 		return resp, nil
 	}
 
 	// process partition
 	for _, partitionInfo := range partitionInfos {
 		partitionId := partitionInfo.ID
-		partitionMS := s.cluster.partitionCache.findPartitionById(partitionId)
+		partitionMS := s.cluster.PartitionCache.FindPartitionById(partitionId)
 		if partitionMS == nil {
-			log.Debug("ps heartbeat received a partition[%v] not existed.", partitionId)
+			log.Info("ps heartbeat received a partition[%v], that not existed in cluster.", partitionId)
 
 			// force to delete
-			replicaToDelete, err := pickReplicaToDelete(&partitionInfo, partitionMS.pickLeaderReplica().NodeID)
+			replicaToDelete, err := pickReplicaToDelete(&partitionInfo, psId)
 			if err != nil {
 				resp.ResponseHeader = *makeRpcRespHeader(err)
 				return resp, nil
@@ -235,10 +247,22 @@ func (s *RpcServer) PSHeartbeat(ctx context.Context,
 				return resp, nil
 			}
 
+			leaderFollowerHb, err := pickLeaderFollower(&partitionInfo)
+			if err != nil {
+				log.Error("Not found leader replica id from info. err[%v]", err)
+				resp.ResponseHeader = *makeRpcRespHeader(err)
+				return resp, nil
+			}
+
 			// force to update by leader
-			if err := partitionMS.updateInfo(s.cluster.store, &partitionInfo, req.NodeID); err != nil {
-				log.Error("fail to update partition[%v] info in ps heartbeat. err[%v]", partitionInfo.ID, err)
-				resp.ResponseHeader = *makeRpcRespHeader(ErrInternalError)
+			condOk, err := partitionMS.UpdateReplicaGroupUnderGreatOrZeroVer(s.cluster.store, &partitionInfo,
+						leaderFollowerHb)
+			if !condOk {
+				log.Debug("ConfVersion is expired. waiting next heartbeat")
+				return resp, nil
+			}
+			if err != nil {
+				log.Error("fail to update partition[%v] info in ps heartbeat.", partitionInfo.ID, err)
 				return resp, nil
 			}
 
@@ -289,16 +313,104 @@ func (s *RpcServer) PSHeartbeat(ctx context.Context,
 			GetPMSingle(nil).PushEvent(NewPartitionDeleteEvent(partitionInfo.ID, partitionMS.pickLeaderNodeId(),
 				replicaToDelete))
 
-		} else {
-			// timeout delete in same conf version when have been not elected leader in ps at a long time
+		} else if confVerHb == confVerMS {
+			if !partitionInfo.IsLeader {
+				return resp, nil
+			}
 
+			leaderFollowerHb, err := pickLeaderFollower(&partitionInfo)
+			if err != nil {
+				log.Error("Not found leader replica id from info. err[%v]", err)
+				resp.ResponseHeader = *makeRpcRespHeader(err)
+				return resp, nil
+			}
+
+			if confVerMS == 0 {
+				condOk, err := partitionMS.UpdateReplicaGroupUnderGreatOrZeroVer(s.cluster.store, &partitionInfo,
+					leaderFollowerHb)
+				if !condOk {
+					log.Debug("ConfVersion is expired. waiting next heartbeat")
+					return resp, nil
+				}
+				if err != nil {
+					log.Error("fail to update partition[%v] info in ps heartbeat.", partitionInfo.ID, err)
+					return resp, nil
+				}
+
+			} else {  // if confVerMS != 0
+				condOk, updateOk := partitionMS.UpdateLeaderUnderSameVer(&partitionInfo, leaderFollowerHb)
+				if !condOk {
+					log.Debug("ConfVersion is expired. waiting next heartbeat")
+					return resp, nil
+				}
+				if !updateOk {
+					log.Info("To delete replicas of partition[%v] that had same conf version",
+						"but member[%v] is unmatched for cluster.", partitionInfo.ID, leaderFollowerHb)
+
+					replicaToDelete, err := pickReplicaToDelete(&partitionInfo, psId)
+					if err != nil {
+						resp.ResponseHeader = *makeRpcRespHeader(err)
+						return resp, nil
+					}
+					log.Info("try to delete replica[%v]", replicaToDelete)
+					GetPMSingle(nil).PushEvent(NewPartitionDeleteEvent(partitionInfo.ID, leaderFollowerHb.NodeID,
+						replicaToDelete))
+
+					return resp, nil
+				}
+			}
+
+			// TODO: add or delete replicas
 		}
 	}
 
 	return resp, nil
 }
 
-func pickReplicaToDelete(info *masterpb.PartitionInfo, leaderNodeId metapb.NodeID) (*metapb.Replica, error) {
+func (s *RpcServer) validateLeader() (error, interface{}) {
+    leaderInfo :=  s.cluster.store.GetLeaderSync()
+    if leaderInfo == nil {
+        return ErrNoMSLeader, nil
+    }
+
+	if !leaderInfo.becomeLeader {
+		if leaderInfo.newLeaderId == 0 {
+			return ErrNoMSLeader, nil
+		} else {
+			leaderId := metapb.NodeID(leaderInfo.newLeaderId)
+			ps := s.cluster.PsCache.FindServerById(leaderId)
+			if ps == nil {
+				log.Error("Ps[%v] not found", leaderId)
+				return ErrInternalError, nil
+			}
+
+			return ErrNotMSLeader, &metapb.NotLeader{
+				Leader:     leaderId,
+				LeaderAddr: ps.RpcAddr,
+			}
+		}
+	}
+
+    return nil, leaderInfo.newLeaderId
+}
+
+func pickLeaderFollower(info *masterpb.PartitionInfo) (*masterpb.RaftFollowerStatus, error) {
+	if !info.IsLeader {
+		return nil, ErrNotMSLeader
+	}
+
+	var leader *masterpb.RaftFollowerStatus
+	for _, follower := range info.RaftStatus.Followers {
+		if follower.ID == info.RaftStatus.ID {
+			leader = &follower
+			break
+		}
+	}
+
+	return leader, nil
+}
+
+func pickReplicaToDelete(info *masterpb.PartitionInfo, nodeId metapb.NodeID) (*metapb.Replica, error) {
 	followers := info.RaftStatus.Followers
 	if followers == nil || len(followers) == 0 {
 		log.Error("!!!Never happened. Cannot report empty replicas in ps heartbeat. info:[%v]", info)
@@ -307,45 +419,52 @@ func pickReplicaToDelete(info *masterpb.PartitionInfo, leaderNodeId metapb.NodeI
 
 	var replicaToDelete *metapb.Replica
 
-	for {
-		if !info.IsLeader {
-			replicaToDelete = &metapb.Replica{ID: followers[0].ID, NodeID: followers[0].NodeID}
-			break
-		}
-
-		// firstly pick followers, finally leader
-		if len(followers) > 1 {
-			for _, follower := range followers {
-				if follower.NodeID != leaderNodeId {
-					replicaToDelete = &metapb.Replica{ID: follower.ID, NodeID: follower.NodeID}
-					break
-				}
-			}
-
-			log.Error("cannot find leader in followers")
-			return nil, ErrRpcInvalidFollowers
-
-		} else {
-			replicaToDelete = &metapb.Replica{ID: followers[0].ID, NodeID: followers[0].NodeID}
-			break
-		}
-
+	if !info.IsLeader {
+		replicaToDelete = NewMetaReplicaByFollower(&followers[0])
+		return replicaToDelete, nil
 	}
 
+	var leaderFound bool
+	// firstly pick followers, finally leader
+	for _, follower := range followers {
+		if follower.NodeID == nodeId {
+			leaderFound = true
+			continue
+		}
+
+        replicaToDelete = NewMetaReplicaByFollower(&follower)
+		break
+	}
+
+	if !leaderFound {
+		log.Error("cannot find leader in followers")
+		return nil, ErrRpcNoFollowerLeader
+	}
+	if replicaToDelete != nil {
+		return replicaToDelete, nil
+	}
+
+	replicaToDelete = NewMetaReplicaByFollower(&followers[0])
 	return replicaToDelete, nil
 }
 
-func makeRpcRespHeader(err error) *metapb.ResponseHeader {
-	code, ok := Err2CodeMap[err]
-	if ok {
-		return &metapb.ResponseHeader{
-			Code:    metapb.RespCode(code),
-			Message: err.Error(),
-		}
-	} else {
-		return &metapb.ResponseHeader{
-			Code:    ERRCODE_INTERNAL_ERROR,
-			Message: ErrInternalError.Error(),
-		}
-	}
+func packPsRegRespWithCfg(resp *masterpb.PSRegisterResponse, psCfg *PsConfig) {
+	resp.RPCPort = int(psCfg.RpcPort)
+	resp.AdminPort = int(psCfg.AdminPort)
+	resp.HeartbeatInterval = int(psCfg.HeartbeatInterval.Nanoseconds() / 1000000)
+	resp.RaftHeartbeatInterval = int(psCfg.RaftHeartbeatInterval.Nanoseconds() / 1000000)
+	resp.RaftHeartbeatPort = int(psCfg.RaftHeartbeatPort)
+	resp.RaftReplicatePort = int(psCfg.RaftReplicatePort)
+	resp.RaftRetainLogs = psCfg.RaftRetainLogs
+	resp.RaftReplicaConcurrency = int(psCfg.RaftReplicaConcurrency)
+	resp.RaftSnapshotConcurrency = int(psCfg.RaftSnapshotConcurrency)
+}
+
+func NewMetaReplicaByFollower(follower *masterpb.RaftFollowerStatus) *metapb.Replica {
+    return &metapb.Replica{ID: follower.ID, NodeID: follower.NodeID, ReplicaAddrs: metapb.ReplicaAddrs{
+        HeartbeatAddr: follower.HeartbeatAddr,
+        ReplicateAddr: follower.ReplicateAddr,
+        RpcAddr:       follower.RpcAddr,
+        AdminAddr:     follower.AdminAddr,
+    }}
 }

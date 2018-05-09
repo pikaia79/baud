@@ -12,9 +12,9 @@ type Cluster struct {
 	config *Config
 	store  Store
 
-	dbCache        *DBCache
-	psCache        *PSCache
-	partitionCache *PartitionCache
+	DbCache        *DBCache
+	PsCache        *PSCache
+	PartitionCache *PartitionCache
 
 	clusterLock sync.RWMutex
 }
@@ -22,29 +22,29 @@ type Cluster struct {
 func NewCluster(config *Config, store Store) *Cluster {
 	return &Cluster{
 		config:         config,
-		store: 			store,
-		dbCache:        NewDBCache(),
-		psCache:        NewPSCache(),
-		partitionCache: NewPartitionCache(),
+		store:          store,
+		DbCache:        NewDBCache(),
+		PsCache:        NewPSCache(),
+		PartitionCache: NewPartitionCache(),
 	}
 }
 
 func (c *Cluster) Start() error {
 	// recovery memory meta data
 	if err := c.recoveryPSCache(); err != nil {
-		log.Error("fail to recovery psCache. err:[%v]", err)
+		log.Error("fail to recovery PsCache. err:[%v]", err)
 		return err
 	}
 	if err := c.recoveryDBCache(); err != nil {
-		log.Error("fail to recovery dbCache. err[%v]", err)
+		log.Error("fail to recovery DbCache. err[%v]", err)
 		return err
 	}
 	if err := c.recoverySpaceCache(); err != nil {
-		log.Error("fail to recovery spaceCache. err[%v]", err)
+		log.Error("fail to recovery SpaceCache. err[%v]", err)
 		return err
 	}
 	if err := c.recoveryPartitionCache(); err != nil {
-		log.Error("fail to recovery partitionCache. err[%v]", err)
+		log.Error("fail to recovery PartitionCache. err[%v]", err)
 		return err
 	}
 	log.Info("finish to recovery whole cluster")
@@ -62,13 +62,13 @@ func (c *Cluster) recoveryPSCache() error {
 	c.clusterLock.Lock()
 	defer c.clusterLock.Unlock()
 
-	servers, err := c.psCache.recovery(c.store)
+	servers, err := c.PsCache.Recovery(c.store)
 	if err != nil {
 		return err
 	}
 
 	for _, server := range servers {
-		c.psCache.addServer(server)
+		c.PsCache.AddServer(server)
 	}
 
 	return nil
@@ -78,13 +78,13 @@ func (c *Cluster) recoveryDBCache() error {
 	c.clusterLock.Lock()
 	defer c.clusterLock.Unlock()
 
-	dbs, err := c.dbCache.recovery(c.store)
+	dbs, err := c.DbCache.Recovery(c.store)
 	if err != nil {
 		return err
 	}
 
 	for _, db := range dbs {
-		c.dbCache.addDb(db)
+		c.DbCache.AddDb(db)
 	}
 
 	return nil
@@ -94,18 +94,18 @@ func (c *Cluster) recoverySpaceCache() error {
 	c.clusterLock.Lock()
 	defer c.clusterLock.Unlock()
 
-	dbs := c.dbCache.getAllDBs()
+	dbs := c.DbCache.GetAllDBs()
 	if dbs == nil || len(dbs) == 0 {
 		return nil
 	}
 
-	allSpaces, err := dbs[0].spaceCache.recovery(c.store)
+	allSpaces, err := dbs[0].SpaceCache.Recovery(c.store)
 	if err != nil {
 		return err
 	}
 
 	for _, space := range allSpaces {
-		db := c.dbCache.findDbById(space.DB)
+		db := c.DbCache.FindDbById(space.DB)
 		if db == nil {
 			log.Warn("Cannot find db for the space[%v] when recovery space. discord it", space)
 
@@ -115,7 +115,7 @@ func (c *Cluster) recoverySpaceCache() error {
 			continue
 		}
 
-		db.spaceCache.addSpace(space)
+		db.SpaceCache.AddSpace(space)
 	}
 
 	return nil
@@ -125,13 +125,13 @@ func (c *Cluster) recoveryPartitionCache() error {
 	c.clusterLock.Lock()
 	defer c.clusterLock.Unlock()
 
-	partitions, err := c.partitionCache.recovery(c.store)
+	partitions, err := c.PartitionCache.Recovery(c.store)
 	if err != nil {
 		return err
 	}
 
 	for _, partition := range partitions {
-		db := c.dbCache.findDbById(partition.DB)
+		db := c.DbCache.FindDbById(partition.DB)
 		if db == nil {
 			log.Warn("Cannot find db for the partition[%v] when recovery partition. discord it", partition)
 
@@ -141,7 +141,7 @@ func (c *Cluster) recoveryPartitionCache() error {
 			continue
 		}
 
-		space := db.spaceCache.findSpaceById(partition.Space)
+		space := db.SpaceCache.FindSpaceById(partition.Space)
 		if space == nil {
 			log.Warn("Cannot find space for the partition[%v] when recovery partition. discord it", partition)
 
@@ -152,11 +152,11 @@ func (c *Cluster) recoveryPartitionCache() error {
 		}
 
 		space.searchTree.update(partition)
-		c.partitionCache.addPartition(partition)
+		c.PartitionCache.AddPartition(partition)
 
 		var delMetaReplicas = make([]*metapb.Replica, 0)
 		for _, metaReplica := range partition.getAllReplicas() {
-			ps := c.psCache.findServerById(metaReplica.NodeID)
+			ps := c.PsCache.FindServerById(metaReplica.NodeID)
 			if ps == nil {
 				log.Warn("Cannot find ps for the replica[%v] when recovery replicas. discord it", metaReplica)
 				delMetaReplicas = append(delMetaReplicas, metaReplica)
@@ -178,16 +178,16 @@ func (c *Cluster) clearAllCache() {
 	c.clusterLock.Lock()
 	defer c.clusterLock.Unlock()
 
-	c.psCache.clear()
-	c.dbCache.clear()
-	c.partitionCache.clear()
+	c.PsCache.Clear()
+	c.DbCache.Clear()
+	c.PartitionCache.Clear()
 }
 
-func (c *Cluster) createDb(dbName string) (*DB, error) {
+func (c *Cluster) CreateDb(dbName string) (*DB, error) {
 	c.clusterLock.Lock()
 	defer c.clusterLock.Unlock()
 
-	db := c.dbCache.findDbByName(dbName)
+	db := c.DbCache.FindDbByName(dbName)
 	if db != nil {
 		return nil, ErrDupDb
 	}
@@ -200,43 +200,43 @@ func (c *Cluster) createDb(dbName string) (*DB, error) {
 	if err := db.persistent(c.store); err != nil {
 		return nil, err
 	}
-	c.dbCache.addDb(db)
+	c.DbCache.AddDb(db)
 
 	return db, nil
 }
 
-func (c *Cluster) renameDb(srcDbName, destDbName string) error {
+func (c *Cluster) RenameDb(srcDbName, destDbName string) error {
 	c.clusterLock.Lock()
 	defer c.clusterLock.Unlock()
 
-	srcDb := c.dbCache.findDbByName(srcDbName)
+	srcDb := c.DbCache.FindDbByName(srcDbName)
 	if srcDb == nil {
 		return ErrDbNotExists
 	}
-	destDb := c.dbCache.findDbByName(destDbName)
+	destDb := c.DbCache.FindDbByName(destDbName)
 	if destDb != nil {
 		return ErrDupDb
 	}
 
-	c.dbCache.deleteDb(srcDb)
+	c.DbCache.DeleteDb(srcDb)
 	srcDb.rename(destDbName)
 	if err := srcDb.persistent(c.store); err != nil {
 		return err
 	}
-	c.dbCache.addDb(srcDb)
+	c.DbCache.AddDb(srcDb)
 
 	return nil
 }
 
-func (c *Cluster) createSpace(dbName, spaceName string, policy *PartitionPolicy) (*Space, error) {
+func (c *Cluster) CreateSpace(dbName, spaceName string, policy *PartitionPolicy) (*Space, error) {
 	c.clusterLock.Lock()
 	defer c.clusterLock.Unlock()
 
-	db := c.dbCache.findDbByName(dbName)
+	db := c.DbCache.FindDbByName(dbName)
 	if db == nil {
 		return nil, ErrDbNotExists
 	}
-	if space := db.spaceCache.findSpaceByName(spaceName); space != nil {
+	if space := db.SpaceCache.FindSpaceByName(spaceName); space != nil {
 		return nil, ErrDupSpace
 	}
 
@@ -258,7 +258,7 @@ func (c *Cluster) createSpace(dbName, spaceName string, policy *PartitionPolicy)
 	}
 	partitions := make([]*Partition, 0, len(slots))
 	for i := 0; i < len(slots)-1; i++ {
-		partition, err := NewPartition(db.ID, space.ID, slots[i], slots[i+1])
+		partition, err := NewPartition(db.ID, space.ID, metapb.SlotID(slots[i]), metapb.SlotID(slots[i+1]))
 		if err != nil {
 			return nil, err
 		}
@@ -272,7 +272,7 @@ func (c *Cluster) createSpace(dbName, spaceName string, policy *PartitionPolicy)
 	}
 
 	// update memory and send event
-	db.spaceCache.addSpace(space)
+	db.SpaceCache.AddSpace(space)
 	for _, partition := range partitions {
 		space.putPartition(partition)
 
@@ -286,30 +286,30 @@ func (c *Cluster) createSpace(dbName, spaceName string, policy *PartitionPolicy)
 	return space, nil
 }
 
-func (c *Cluster) renameSpace(dbName, srcSpaceName, destSpaceName string) error {
+func (c *Cluster) RenameSpace(dbName, srcSpaceName, destSpaceName string) error {
 	c.clusterLock.Lock()
 	defer c.clusterLock.Unlock()
 
-	db := c.dbCache.findDbByName(dbName)
+	db := c.DbCache.FindDbByName(dbName)
 	if db == nil {
 		return ErrDbNotExists
 	}
 
-	srcSpace := db.spaceCache.findSpaceByName(srcSpaceName)
+	srcSpace := db.SpaceCache.FindSpaceByName(srcSpaceName)
 	if srcSpace == nil {
 		return ErrSpaceNotExists
 	}
-	destSpace := db.spaceCache.findSpaceByName(destSpaceName)
+	destSpace := db.SpaceCache.FindSpaceByName(destSpaceName)
 	if destSpace != nil {
 		return ErrDupSpace
 	}
 
-	db.spaceCache.deleteSpace(srcSpace)
+	db.SpaceCache.DeleteSpace(srcSpace)
 	srcSpace.rename(destSpaceName)
 	if err := srcSpace.persistent(c.store); err != nil {
 		return err
 	}
-	db.spaceCache.addSpace(srcSpace)
+	db.SpaceCache.AddSpace(srcSpace)
 
 	return nil
 }

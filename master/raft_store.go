@@ -17,6 +17,9 @@ import (
 	"time"
 )
 
+//go:generate mockgen -destination raft_store_mock.go -package master github.com/tiglabs/baudengine/master Store,Batch
+//go:generate mockgen -destination store_mock.go -package master github.com/tiglabs/baudengine/util/raftkvstore Iterator
+
 const (
 	FIXED_RAFTGROUPID          = 1
 	DEFAULT_RAFTLOG_LIMIT      = 10000
@@ -37,8 +40,9 @@ type Store interface {
 	Get(key []byte) ([]byte, error)
 	Scan(startKey, limitKey []byte) raftkvstore.Iterator
 	NewBatch() Batch
-	WatchLeader(becomeLeader chan bool)
-	Close() error
+    GetLeaderAsync(leaderChangingCh chan *LeaderInfo)
+	GetLeaderSync() *LeaderInfo
+    Close() error
 }
 
 type Batch interface {
@@ -49,20 +53,20 @@ type Batch interface {
 }
 
 type RaftStore struct {
-	config         *Config
-	localStore     raftkvstore.Store
-	localRead      bool
-	curLeaderId    uint64  // 0: no leader
-	becomeLeaderCh chan bool
+    config           *Config
+    localStore       raftkvstore.Store
+    localRead        bool
+    leaderChangingCh chan *LeaderInfo
+    leaderInfo       *LeaderInfo
 
-	raftStoreConfig *RaftStoreConfig
-	raftGroup       *RaftGroup
-	raftServer      *raft.RaftServer
-	raftConfig      *raft.RaftConfig
+    raftStoreConfig *RaftStoreConfig
+    raftGroup       *RaftGroup
+    raftServer      *raft.RaftServer
+    raftConfig      *raft.RaftConfig
 
-	ctx       context.Context
-	ctxCancel context.CancelFunc
-	wg        sync.WaitGroup
+    ctx       context.Context
+    ctxCancel context.CancelFunc
+    wg        sync.WaitGroup
 }
 
 type Peer struct {
@@ -81,6 +85,11 @@ type RaftStoreConfig struct {
 	NodeId   uint64
 	DataPath string
 	WalPath  string
+}
+
+type LeaderInfo struct {
+    becomeLeader   bool
+    newLeaderId    uint64  // 0: no leader
 }
 
 func NewRaftStore(config *Config) *RaftStore {
@@ -173,8 +182,12 @@ func (rs *RaftStore) NewBatch() Batch {
 	return NewSaveBatch(rs.raftGroup)
 }
 
-func (rs *RaftStore) WatchLeader(becomeLeader chan bool) {
-	rs.becomeLeaderCh = becomeLeader
+func (rs *RaftStore) GetLeaderAsync(leaderChangingCh chan *LeaderInfo) {
+	rs.leaderChangingCh = leaderChangingCh
+}
+
+func (rs *RaftStore) GetLeaderSync() *LeaderInfo {
+    return rs.leaderInfo
 }
 
 func (rs *RaftStore) Close() error {
@@ -280,16 +293,16 @@ func (rs *RaftStore) initRaftStoreCfg() error {
 	raftStoreCfg.RaftRetainLogs = rs.config.ClusterCfg.RaftRetainLogsCount
 	raftStoreCfg.RaftHeartbeatInterval = rs.config.ClusterCfg.RaftHeartbeatInterval.Duration
 	raftStoreCfg.RaftHeartbeatAddr = util.BuildAddr(rs.config.ClusterCfg.CurNode.Host,
-		int(rs.config.ClusterCfg.CurNode.RaftHeartbeatPort))
+		rs.config.ClusterCfg.CurNode.RaftHeartbeatPort)
 	raftStoreCfg.RaftReplicateAddr = util.BuildAddr(rs.config.ClusterCfg.CurNode.Host,
-		int(rs.config.ClusterCfg.CurNode.RaftReplicatePort))
+		rs.config.ClusterCfg.CurNode.RaftReplicatePort)
 
 	var peers []*Peer
 	for _, p := range rs.config.ClusterCfg.Nodes {
 		peer := new(Peer)
 		peer.NodeId = p.NodeId
-		peer.RaftHeartbeatAddr = util.BuildAddr(p.Host, int(p.RaftHeartbeatPort))
-		peer.RaftReplicateAddr = util.BuildAddr(p.Host, int(p.RaftReplicatePort))
+		peer.RaftHeartbeatAddr = util.BuildAddr(p.Host, p.RaftHeartbeatPort)
+		peer.RaftReplicateAddr = util.BuildAddr(p.Host, p.RaftReplicatePort)
 		peers = append(peers, peer)
 	}
 	raftStoreCfg.RaftNodes = peers
@@ -595,18 +608,22 @@ func (rs *RaftStore) HandleApplySnapshot(peers []raftproto.Peer, iter *SnapshotK
 
 func (rs *RaftStore) LeaderChangeHandler(leaderId uint64) {
 	log.Info("raft leader had changed to id[%v]", leaderId)
-	rs.curLeaderId = leaderId
 
-	if rs.becomeLeaderCh == nil {
+	if rs.leaderChangingCh == nil {
 		return
 	}
 
-	select {
-	case <- time.After(500 * time.Millisecond):
-		log.Error("notify leader change timeout")
-	case rs.becomeLeaderCh <- rs.becomeLeader(leaderId):
-		log.Debug("notify become leader[%v] end", rs.becomeLeader(leaderId))
-	}
+    info := &LeaderInfo{
+        becomeLeader: rs.becomeLeader(leaderId),
+        newLeaderId:  leaderId,
+    }
+    rs.leaderInfo = info
+    select {
+    case <-time.After(500 * time.Millisecond):
+        log.Error("notify leader change timeout")
+    case rs.leaderChangingCh <- info:
+        log.Debug("notify leader change[%v] end", info)
+    }
 }
 
 func (rs *RaftStore) FatalEventHandler(err *raft.FatalError) {

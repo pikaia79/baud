@@ -2,6 +2,8 @@ package master
 
 import (
 	"github.com/pkg/errors"
+	"github.com/tiglabs/baudengine/proto/metapb"
+	"github.com/tiglabs/baudengine/util/log"
 )
 
 //master global error definitions
@@ -11,7 +13,7 @@ var (
 	ErrSysBusy       = errors.New("system busy")
 	ErrParamError    = errors.New("param error")
 	ErrInvalidCfg    = errors.New("config error")
-	// ErrNotLeader     = errors.New("not permitted. node not leader")
+
 
 	ErrDupDb              = errors.New("duplicated database")
 	ErrDbNotExists        = errors.New("db not exists")
@@ -28,7 +30,9 @@ var (
 	ErrRpcInvokeFailed     = errors.New("invoke rpc is failed")
 	ErrRpcParamError       = errors.New("rpc param error")
 	ErrRpcEmptyFollowers   = errors.New("reported empty followers")
-	ErrRpcInvalidFollowers = errors.New("reported invalid followers")
+	ErrRpcNoFollowerLeader = errors.New("Follower leader not found")
+	ErrNotMSLeader         = errors.New("the master node is not a leader")
+	ErrNoMSLeader          = errors.New("the master cluster have no a leader")
 
 	ErrRaftNotRegHandler          = errors.New("have no register raft handler")
 	ErrRaftInvalidNode            = errors.New("invalid raft node")
@@ -75,4 +79,55 @@ var Err2CodeMap = map[error]int32{
 
 	ErrGenIdFailed:      ERRCODE_GENID_FAILED,
 	ErrLocalDbOpsFailed: ERRCODE_LOCALDB_OPTFAILED,
+}
+
+var Err2RpcCodeMap = map[error]metapb.RespCode{
+    ErrSuc:                 metapb.RESP_CODE_OK,
+    ErrDbNotExists:         metapb.MASTER_RESP_CODE_DB_NOTEXISTS,
+    ErrSpaceNotExists:      metapb.MASTER_RESP_CODE_SPACE_NOTEXISTS,
+    ErrPSNotExists:         metapb.MASTER_RESP_CODE_PS_NOTEXISTS,
+    ErrSpaceNotExists:      metapb.MASTER_RESP_CODE_ROUTE_NOTEXISTS,
+    ErrRpcEmptyFollowers:   metapb.MASTER_RESP_CODE_EMPTY_FOLLOWERS,
+    ErrRpcNoFollowerLeader: metapb.MASTER_RESP_CODE_NO_FOLLOWER_LEADER,
+}
+
+
+func makeRpcRespHeader(err error) *metapb.ResponseHeader {
+    code, ok := Err2RpcCodeMap[err]
+    if ok {
+        return &metapb.ResponseHeader{
+            Code:    code,
+            Message: "",
+        }
+    } else {
+        return &metapb.ResponseHeader{
+            Code:    metapb.RESP_CODE_SERVER_ERROR,
+            Message: "",
+        }
+    }
+}
+
+func makeRpcRespHeaderWithError(err error, body interface{}) *metapb.ResponseHeader {
+    code, ok := Err2RpcCodeMap[err]
+    if ok {
+        var errBody = new(metapb.Error)
+		switch code {
+		case metapb.MASTER_RESP_CODE_NOT_LEADER:
+			if errBody.NotLeader, ok = body.(*metapb.NotLeader); !ok {
+				log.Error("Can not cast rpc response body to type NotLeader error.")
+			}
+		}
+
+		return &metapb.ResponseHeader{
+			Code:    code,
+			Message: "",
+			Error:   *errBody,
+		}
+
+    } else {
+        return &metapb.ResponseHeader{
+            Code:    metapb.RESP_CODE_SERVER_ERROR,
+            Message: "",
+        }
+    }
 }

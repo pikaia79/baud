@@ -39,7 +39,7 @@ type ApiServer struct {
 func NewApiServer(config *Config, cluster *Cluster) *ApiServer {
     cfg := &netutil.ServerConfig{
 		Name:         "master-api-server",
-		Addr:         util.BuildAddr("0.0.0.0", int(config.ClusterCfg.CurNode.HttpPort)),
+		Addr:         util.BuildAddr("0.0.0.0", config.ClusterCfg.CurNode.HttpPort),
 		Version:      "v1",
 		ConnLimit:    DEFAULT_CONN_LIMIT,
 		CloseTimeout: DEFAULT_CLOSE_TIMEOUT,
@@ -95,12 +95,16 @@ func (s *ApiServer) initAdminHandler() {
 }
 
 func (s *ApiServer) handleDbCreate(w http.ResponseWriter, r *http.Request, params netutil.UriParams) {
+	if err := s.checkLeader(w); err != nil {
+		return
+	}
+
 	dbName, err := checkMissingParam(w, r, DB_NAME)
 	if err != nil {
 		return
 	}
 
-	db, err := s.cluster.createDb(dbName)
+	db, err := s.cluster.CreateDb(dbName)
 	if err != nil {
 		sendReply(w, newHttpErrReply(err))
 		return
@@ -110,9 +114,16 @@ func (s *ApiServer) handleDbCreate(w http.ResponseWriter, r *http.Request, param
 }
 
 func (s *ApiServer) handleDbDelete(w http.ResponseWriter, r *http.Request, params netutil.UriParams) {
+	if err := s.checkLeader(w); err != nil {
+		return
+	}
 }
 
 func (s *ApiServer) handleDbRename(w http.ResponseWriter, r *http.Request, params netutil.UriParams) {
+	if err := s.checkLeader(w); err != nil {
+		return
+	}
+
 	srcDbName, err := checkMissingParam(w, r, SRC_DB_NAME)
 	if err != nil {
 		return
@@ -122,7 +133,7 @@ func (s *ApiServer) handleDbRename(w http.ResponseWriter, r *http.Request, param
 		return
 	}
 
-	if err := s.cluster.renameDb(srcDbName, destDbName); err != nil {
+	if err := s.cluster.RenameDb(srcDbName, destDbName); err != nil {
 		sendReply(w, newHttpErrReply(err))
 		return
 	}
@@ -131,18 +142,26 @@ func (s *ApiServer) handleDbRename(w http.ResponseWriter, r *http.Request, param
 }
 
 func (s *ApiServer) handleDbList(w http.ResponseWriter, r *http.Request, params netutil.UriParams) {
-	dbs := s.cluster.dbCache.getAllDBs()
+	if err := s.checkLeader(w); err != nil {
+		return
+	}
+
+	dbs := s.cluster.DbCache.GetAllDBs()
 
 	sendReply(w, newHttpSucReply(dbs))
 }
 
 func (s *ApiServer) handleDbDetail(w http.ResponseWriter, r *http.Request, params netutil.UriParams) {
+	if err := s.checkLeader(w); err != nil {
+		return
+	}
+
 	dbName, err := checkMissingParam(w, r, DB_NAME)
 	if err != nil {
 		return
 	}
 
-	db := s.cluster.dbCache.findDbByName(dbName)
+	db := s.cluster.DbCache.FindDbByName(dbName)
 	if db == nil {
 		sendReply(w, newHttpErrReply(ErrDbNotExists))
 		return
@@ -152,6 +171,10 @@ func (s *ApiServer) handleDbDetail(w http.ResponseWriter, r *http.Request, param
 }
 
 func (s *ApiServer) handleSpaceCreate(w http.ResponseWriter, r *http.Request, params netutil.UriParams) {
+	if err := s.checkLeader(w); err != nil {
+		return
+	}
+
 	dbName, err := checkMissingParam(w, r, DB_NAME)
 	if err != nil {
 		return
@@ -179,7 +202,7 @@ func (s *ApiServer) handleSpaceCreate(w http.ResponseWriter, r *http.Request, pa
         Function: partitionFunc,
         Number:   partitionNum,
     }
-    space, err := s.cluster.createSpace(dbName, spaceName, policy)
+    space, err := s.cluster.CreateSpace(dbName, spaceName, policy)
     if err != nil {
         sendReply(w, newHttpErrReply(err))
         return
@@ -189,9 +212,16 @@ func (s *ApiServer) handleSpaceCreate(w http.ResponseWriter, r *http.Request, pa
 }
 
 func (s *ApiServer) handleSpaceDelete(w http.ResponseWriter, r *http.Request, params netutil.UriParams) {
+	if err := s.checkLeader(w); err != nil {
+		return
+	}
 }
 
 func (s *ApiServer) handleSpaceRename(w http.ResponseWriter, r *http.Request, params netutil.UriParams) {
+	if err := s.checkLeader(w); err != nil {
+		return
+	}
+
 	dbName, err := checkMissingParam(w, r, DB_NAME)
 	if err != nil {
 		return
@@ -205,7 +235,7 @@ func (s *ApiServer) handleSpaceRename(w http.ResponseWriter, r *http.Request, pa
 		return
 	}
 
-	if err := s.cluster.renameSpace(dbName, srcSpaceName, destSpaceName); err != nil {
+	if err := s.cluster.RenameSpace(dbName, srcSpaceName, destSpaceName); err != nil {
 		sendReply(w, newHttpErrReply(err))
 	}
 
@@ -213,6 +243,10 @@ func (s *ApiServer) handleSpaceRename(w http.ResponseWriter, r *http.Request, pa
 }
 
 func (s *ApiServer) handleSpaceDetail(w http.ResponseWriter, r *http.Request, params netutil.UriParams) {
+	if err := s.checkLeader(w); err != nil {
+		return
+	}
+
 	dbName, err := checkMissingParam(w, r, DB_NAME)
 	if err != nil {
 		return
@@ -222,13 +256,13 @@ func (s *ApiServer) handleSpaceDetail(w http.ResponseWriter, r *http.Request, pa
 		return
 	}
 
-	db := s.cluster.dbCache.findDbByName(dbName)
+	db := s.cluster.DbCache.FindDbByName(dbName)
 	if db == nil {
 		sendReply(w, newHttpErrReply(ErrDbNotExists))
 		return
 	}
 
-	space := db.spaceCache.findSpaceByName(spaceName)
+	space := db.SpaceCache.FindSpaceByName(spaceName)
 	if space == nil {
 		sendReply(w, newHttpErrReply(ErrSpaceNotExists))
 		return
@@ -243,13 +277,13 @@ func (s *ApiServer) handleSpaceList(w http.ResponseWriter, r *http.Request, para
 		return
 	}
 
-	db := s.cluster.dbCache.findDbByName(dbName)
+	db := s.cluster.DbCache.FindDbByName(dbName)
 	if db == nil {
 		sendReply(w, newHttpErrReply(ErrDbNotExists))
 		return
 	}
 
-	sendReply(w, newHttpSucReply(db.spaceCache.getAllSpaces()))
+	sendReply(w, newHttpSucReply(db.SpaceCache.GetAllSpaces()))
 }
 
 type HttpReply struct {
@@ -283,6 +317,29 @@ func newHttpErrReply(err error) *HttpReply {
 			Msg:  ErrInternalError.Error(),
 		}
 	}
+}
+
+func (s *ApiServer) checkLeader(w http.ResponseWriter) error {
+	leaderInfo := s.cluster.store.GetLeaderSync()
+
+	if leaderInfo == nil {
+		sendReply(w, newHttpErrReply(ErrNoMSLeader))
+		return ErrNoMSLeader
+	}
+
+
+	if !leaderInfo.becomeLeader {
+		if leaderInfo.newLeaderId == 0 {
+			sendReply(w, newHttpErrReply(ErrNoMSLeader))
+			return ErrNoMSLeader
+		} else {
+			log.Debug("current master leader is [%v]", leaderInfo.newLeaderId)
+			sendReply(w, newHttpErrReply(ErrNotMSLeader))
+			return ErrNotMSLeader
+		}
+	}
+
+	return nil
 }
 
 func checkMissingParam(w http.ResponseWriter, r *http.Request, paramName string) (string, error) {
