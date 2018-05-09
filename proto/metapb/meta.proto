@@ -88,23 +88,24 @@ message Partition {
 }
 
 message Replica {
-    uint64        id         = 1 [(gogoproto.customname) = "ID", (gogoproto.casttype) = "ReplicaID"];
-    uint32        nodeID     = 2 [(gogoproto.customname) = "NodeID", (gogoproto.casttype) = "NodeID"];
-    RaftAddrs     raft_addrs = 3 [(gogoproto.nullable) = false];
+    uint64        id            = 1 [(gogoproto.customname) = "ID", (gogoproto.casttype) = "ReplicaID"];
+    uint32        nodeID        = 2 [(gogoproto.customname) = "NodeID", (gogoproto.casttype) = "NodeID"];
+    ReplicaAddrs  replica_addrs = 3 [(gogoproto.nullable) = false, (gogoproto.embed) = true];
 }
 
 message Node {
-    uint32    id         = 1 [(gogoproto.customname) = "ID", (gogoproto.casttype) = "NodeID"];
-    string    ip         = 2;
-    int32     port       = 3 [(gogoproto.casttype) = "int"];
-    string    zone       = 4;
-    uint32    version    = 5;
-    RaftAddrs raft_addrs = 6 [(gogoproto.nullable) = false, (gogoproto.embed) = true];
+    uint32    id                = 1 [(gogoproto.customname) = "ID", (gogoproto.casttype) = "NodeID"];
+    string    ip                = 2;
+    string    zone              = 3;
+    uint32    version           = 4;
+    ReplicaAddrs  replica_addrs = 5 [(gogoproto.nullable) = false, (gogoproto.embed) = true];
 }
 
-message RaftAddrs {
+message ReplicaAddrs {
     string heartbeat_addr = 1;
     string replicate_addr = 2;
+    string rpc_addr       = 3;
+    string admin_addr     = 4;
 }
 
 message RequestHeader {
@@ -121,7 +122,8 @@ message ResponseHeader {
 message NotLeader {
     uint32 partition_id   = 1 [(gogoproto.customname) = "PartitionID", (gogoproto.casttype) = "PartitionID"];
     uint32 leader         = 2 [(gogoproto.customname) = "Leader", (gogoproto.casttype) = "NodeID"];
-    PartitionEpoch  epoch = 3 [(gogoproto.nullable) = false];
+    string leader_addr    = 3 ;
+    PartitionEpoch  epoch = 4 [(gogoproto.nullable) = false];
 }
 
 message NoLeader {
