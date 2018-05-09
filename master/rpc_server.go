@@ -151,6 +151,11 @@ func (s *RpcServer) PSRegister(ctx context.Context,
 	req *masterpb.PSRegisterRequest) (*masterpb.PSRegisterResponse, error) {
 	resp := new(masterpb.PSRegisterResponse)
 
+    if err, msLeader := s.validateLeader(); err != nil {
+        resp.ResponseHeader = *makeRpcRespHeaderWithError(err, msLeader)
+        return resp, nil
+    }
+
 	nodeId := req.NodeID
 
 	if nodeId == 0 {
@@ -194,7 +199,12 @@ func (s *RpcServer) PSRegister(ctx context.Context,
 func (s *RpcServer) PSHeartbeat(ctx context.Context,
 	req *masterpb.PSHeartbeatRequest) (*masterpb.PSHeartbeatResponse, error) {
 	resp := new(masterpb.PSHeartbeatResponse)
-	resp.ResponseHeader = *makeRpcRespHeader(ErrSuc)
+    resp.ResponseHeader = *makeRpcRespHeader(ErrSuc)
+
+    if err, msLeader := s.validateLeader(); err != nil {
+        resp.ResponseHeader = *makeRpcRespHeaderWithError(err, msLeader)
+        return resp, nil
+    }
 
 	// process ps
 	psId := req.NodeID
@@ -357,9 +367,26 @@ func (s *RpcServer) PSHeartbeat(ctx context.Context,
 	return resp, nil
 }
 
+func (s *RpcServer) validateLeader() (error, interface{}) {
+    leaderInfo :=  s.cluster.store.GetLeaderSync()
+    if leaderInfo == nil {
+        return ErrNoMSLeader, 0
+    }
+
+    if !leaderInfo.becomeLeader {
+        if leaderInfo.newLeaderId == 0 {
+            return ErrNoMSLeader, 0
+        } else {
+            return ErrNotMSLeader, leaderInfo.newLeaderId
+        }
+    }
+
+    return nil, leaderInfo.newLeaderId
+}
+
 func pickLeaderFollower(info *masterpb.PartitionInfo) (*masterpb.RaftFollowerStatus, error) {
 	if !info.IsLeader {
-		return nil, ErrRpcNotLeader
+		return nil, ErrNotMSLeader
 	}
 
 	var leader *masterpb.RaftFollowerStatus
@@ -409,21 +436,6 @@ func pickReplicaToDelete(info *masterpb.PartitionInfo, nodeId metapb.NodeID) (*m
 
 	replicaToDelete = &metapb.Replica{ID: followers[0].ID, NodeID: followers[0].NodeID}
 	return replicaToDelete, nil
-}
-
-func makeRpcRespHeader(err error) *metapb.ResponseHeader {
-	code, ok := Err2RpcCodeMap[err]
-	if ok {
-		return &metapb.ResponseHeader{
-			Code:    code,
-			Message: "",
-		}
-	} else {
-		return &metapb.ResponseHeader{
-			Code:    metapb.RESP_CODE_SERVER_ERROR,
-			Message: "",
-		}
-	}
 }
 
 func packPsRegRespWithCfg(resp *masterpb.PSRegisterResponse, psCfg *PsConfig) {

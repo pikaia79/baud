@@ -30,7 +30,8 @@ var (
 	ErrRpcParamError       = errors.New("rpc param error")
 	ErrRpcEmptyFollowers   = errors.New("reported empty followers")
 	ErrRpcNoFollowerLeader = errors.New("Follower leader not found")
-	ErrRpcNotLeader        = errors.New("partition is not a leader")
+	ErrNotMSLeader         = errors.New("the master node is not a leader")
+	ErrNoMSLeader          = errors.New("the master cluster have no a leader")
 
 	ErrRaftNotRegHandler          = errors.New("have no register raft handler")
 	ErrRaftInvalidNode            = errors.New("invalid raft node")
@@ -87,4 +88,44 @@ var Err2RpcCodeMap = map[error]metapb.RespCode{
     ErrSpaceNotExists:      metapb.MASTER_RESP_CODE_ROUTE_NOTEXISTS,
     ErrRpcEmptyFollowers:   metapb.MASTER_RESP_CODE_EMPTY_FOLLOWERS,
     ErrRpcNoFollowerLeader: metapb.MASTER_RESP_CODE_NO_FOLLOWER_LEADER,
+}
+
+
+func makeRpcRespHeader(err error) *metapb.ResponseHeader {
+    code, ok := Err2RpcCodeMap[err]
+    if ok {
+        return &metapb.ResponseHeader{
+            Code:    code,
+            Message: "",
+        }
+    } else {
+        return &metapb.ResponseHeader{
+            Code:    metapb.RESP_CODE_SERVER_ERROR,
+            Message: "",
+        }
+    }
+}
+
+func makeRpcRespHeaderWithError(err error, body interface{}) *metapb.ResponseHeader {
+    code, ok := Err2RpcCodeMap[err]
+    if ok {
+        var errBody = new(metapb.Error)
+        switch code {
+        case metapb.MASTER_RESP_CODE_NOT_LEADER:
+            errBody.NotLeader = &metapb.NotLeader{
+                Leader: metapb.NodeID(body.(uint64)),
+            }
+        }
+
+        return &metapb.ResponseHeader{
+            Code:    code,
+            Message: "",
+            Error:   *errBody,
+        }
+    } else {
+        return &metapb.ResponseHeader{
+            Code:    metapb.RESP_CODE_SERVER_ERROR,
+            Message: "",
+        }
+    }
 }

@@ -40,8 +40,9 @@ type Store interface {
 	Get(key []byte) ([]byte, error)
 	Scan(startKey, limitKey []byte) raftkvstore.Iterator
 	NewBatch() Batch
-	WatchLeader(becomeLeader chan bool)
-	Close() error
+    GetLeaderAsync(leaderChangingCh chan *LeaderInfo)
+	GetLeaderSync() *LeaderInfo
+    Close() error
 }
 
 type Batch interface {
@@ -52,20 +53,20 @@ type Batch interface {
 }
 
 type RaftStore struct {
-	config         *Config
-	localStore     raftkvstore.Store
-	localRead      bool
-	curLeaderId    uint64  // 0: no leader
-	becomeLeaderCh chan bool
+    config           *Config
+    localStore       raftkvstore.Store
+    localRead        bool
+    leaderChangingCh chan *LeaderInfo
+    leaderInfo       *LeaderInfo
 
-	raftStoreConfig *RaftStoreConfig
-	raftGroup       *RaftGroup
-	raftServer      *raft.RaftServer
-	raftConfig      *raft.RaftConfig
+    raftStoreConfig *RaftStoreConfig
+    raftGroup       *RaftGroup
+    raftServer      *raft.RaftServer
+    raftConfig      *raft.RaftConfig
 
-	ctx       context.Context
-	ctxCancel context.CancelFunc
-	wg        sync.WaitGroup
+    ctx       context.Context
+    ctxCancel context.CancelFunc
+    wg        sync.WaitGroup
 }
 
 type Peer struct {
@@ -84,6 +85,11 @@ type RaftStoreConfig struct {
 	NodeId   uint64
 	DataPath string
 	WalPath  string
+}
+
+type LeaderInfo struct {
+    becomeLeader   bool
+    newLeaderId    uint64  // 0: no leader
 }
 
 func NewRaftStore(config *Config) *RaftStore {
@@ -176,8 +182,12 @@ func (rs *RaftStore) NewBatch() Batch {
 	return NewSaveBatch(rs.raftGroup)
 }
 
-func (rs *RaftStore) WatchLeader(becomeLeader chan bool) {
-	rs.becomeLeaderCh = becomeLeader
+func (rs *RaftStore) GetLeaderAsync(leaderChangingCh chan *LeaderInfo) {
+	rs.leaderChangingCh = leaderChangingCh
+}
+
+func (rs *RaftStore) GetLeaderSync() *LeaderInfo {
+    return rs.leaderInfo
 }
 
 func (rs *RaftStore) Close() error {
@@ -598,18 +608,22 @@ func (rs *RaftStore) HandleApplySnapshot(peers []raftproto.Peer, iter *SnapshotK
 
 func (rs *RaftStore) LeaderChangeHandler(leaderId uint64) {
 	log.Info("raft leader had changed to id[%v]", leaderId)
-	rs.curLeaderId = leaderId
 
-	if rs.becomeLeaderCh == nil {
+	if rs.leaderChangingCh == nil {
 		return
 	}
 
-	select {
-	case <- time.After(500 * time.Millisecond):
-		log.Error("notify leader change timeout")
-	case rs.becomeLeaderCh <- rs.becomeLeader(leaderId):
-		log.Debug("notify become leader[%v] end", rs.becomeLeader(leaderId))
-	}
+    info := &LeaderInfo{
+        becomeLeader: rs.becomeLeader(leaderId),
+        newLeaderId:  leaderId,
+    }
+    rs.leaderInfo = info
+    select {
+    case <-time.After(500 * time.Millisecond):
+        log.Error("notify leader change timeout")
+    case rs.leaderChangingCh <- info:
+        log.Debug("notify leader change[%v] end", info)
+    }
 }
 
 func (rs *RaftStore) FatalEventHandler(err *raft.FatalError) {

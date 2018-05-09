@@ -95,6 +95,10 @@ func (s *ApiServer) initAdminHandler() {
 }
 
 func (s *ApiServer) handleDbCreate(w http.ResponseWriter, r *http.Request, params netutil.UriParams) {
+	if err := s.checkLeader(w); err != nil {
+		return
+	}
+
 	dbName, err := checkMissingParam(w, r, DB_NAME)
 	if err != nil {
 		return
@@ -110,9 +114,16 @@ func (s *ApiServer) handleDbCreate(w http.ResponseWriter, r *http.Request, param
 }
 
 func (s *ApiServer) handleDbDelete(w http.ResponseWriter, r *http.Request, params netutil.UriParams) {
+	if err := s.checkLeader(w); err != nil {
+		return
+	}
 }
 
 func (s *ApiServer) handleDbRename(w http.ResponseWriter, r *http.Request, params netutil.UriParams) {
+	if err := s.checkLeader(w); err != nil {
+		return
+	}
+
 	srcDbName, err := checkMissingParam(w, r, SRC_DB_NAME)
 	if err != nil {
 		return
@@ -131,12 +142,20 @@ func (s *ApiServer) handleDbRename(w http.ResponseWriter, r *http.Request, param
 }
 
 func (s *ApiServer) handleDbList(w http.ResponseWriter, r *http.Request, params netutil.UriParams) {
+	if err := s.checkLeader(w); err != nil {
+		return
+	}
+
 	dbs := s.cluster.DbCache.GetAllDBs()
 
 	sendReply(w, newHttpSucReply(dbs))
 }
 
 func (s *ApiServer) handleDbDetail(w http.ResponseWriter, r *http.Request, params netutil.UriParams) {
+	if err := s.checkLeader(w); err != nil {
+		return
+	}
+
 	dbName, err := checkMissingParam(w, r, DB_NAME)
 	if err != nil {
 		return
@@ -152,6 +171,10 @@ func (s *ApiServer) handleDbDetail(w http.ResponseWriter, r *http.Request, param
 }
 
 func (s *ApiServer) handleSpaceCreate(w http.ResponseWriter, r *http.Request, params netutil.UriParams) {
+	if err := s.checkLeader(w); err != nil {
+		return
+	}
+
 	dbName, err := checkMissingParam(w, r, DB_NAME)
 	if err != nil {
 		return
@@ -189,9 +212,16 @@ func (s *ApiServer) handleSpaceCreate(w http.ResponseWriter, r *http.Request, pa
 }
 
 func (s *ApiServer) handleSpaceDelete(w http.ResponseWriter, r *http.Request, params netutil.UriParams) {
+	if err := s.checkLeader(w); err != nil {
+		return
+	}
 }
 
 func (s *ApiServer) handleSpaceRename(w http.ResponseWriter, r *http.Request, params netutil.UriParams) {
+	if err := s.checkLeader(w); err != nil {
+		return
+	}
+
 	dbName, err := checkMissingParam(w, r, DB_NAME)
 	if err != nil {
 		return
@@ -213,6 +243,10 @@ func (s *ApiServer) handleSpaceRename(w http.ResponseWriter, r *http.Request, pa
 }
 
 func (s *ApiServer) handleSpaceDetail(w http.ResponseWriter, r *http.Request, params netutil.UriParams) {
+	if err := s.checkLeader(w); err != nil {
+		return
+	}
+
 	dbName, err := checkMissingParam(w, r, DB_NAME)
 	if err != nil {
 		return
@@ -283,6 +317,29 @@ func newHttpErrReply(err error) *HttpReply {
 			Msg:  ErrInternalError.Error(),
 		}
 	}
+}
+
+func (s *ApiServer) checkLeader(w http.ResponseWriter) error {
+	leaderInfo := s.cluster.store.GetLeaderSync()
+
+	if leaderInfo == nil {
+		sendReply(w, newHttpErrReply(ErrNoMSLeader))
+		return ErrNoMSLeader
+	}
+
+
+	if !leaderInfo.becomeLeader {
+		if leaderInfo.newLeaderId == 0 {
+			sendReply(w, newHttpErrReply(ErrNoMSLeader))
+			return ErrNoMSLeader
+		} else {
+			log.Debug("current master leader is [%v]", leaderInfo.newLeaderId)
+			sendReply(w, newHttpErrReply(ErrNotMSLeader))
+			return ErrNotMSLeader
+		}
+	}
+
+	return nil
 }
 
 func checkMissingParam(w http.ResponseWriter, r *http.Request, paramName string) (string, error) {
