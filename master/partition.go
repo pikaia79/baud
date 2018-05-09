@@ -22,8 +22,9 @@ const (
 type Partition struct {
 	*metapb.Partition // !!! Do not directly operate the Replicas，must be firstly take the propertyLock
 
-	leader *metapb.Replica
+	leader *masterpb.RaftFollowerStatus
 
+	// TODO: temporary policy, finally using global task to replace it
 	taskFlag    bool
 	taskTimeout time.Time
 
@@ -125,43 +126,73 @@ func (p *Partition) addReplica(store Store, metaReplicas ...*metapb.Replica) err
 	return nil
 }
 
-//func (p *Partition) casReplicas(store Store, info *masterpb.PartitionInfo, nodeId metapb.NodeID) {
-//	p.propertyLock.Lock()
-//	defer p.propertyLock.Unlock()
-//
-//
-//}
-
-func (p *Partition) updateInfo(store Store, info *masterpb.PartitionInfo, nodeId metapb.NodeID) error {
+func (p *Partition) UpdateReplicaGroupUnderGreatOrZeroVer(store Store, info *masterpb.PartitionInfo,
+		leaderFollower *masterpb.RaftFollowerStatus,) (conditionOk bool, err error) {
 	p.propertyLock.Lock()
 	defer p.propertyLock.Unlock()
 
-	p.Status = info.Status
-	p.lastHeartbeat = time.Now()
-	p.Epoch = info.Epoch
+	if store == nil || info == nil || leaderFollower == nil {
+		return false, nil
+	}
+	if !(p.Epoch.ConfVersion == 0 && p.leader == nil) && !(p.Epoch.ConfVersion < info.Epoch.ConfVersion) {
+        return false, nil
+    }
 
-	p.taskFlag = false
-	p.taskTimeout = time.Time{}
+    p.taskFlag = false
+    p.taskTimeout = time.Time{}
 
-	p.Replicas = make([]metapb.Replica, 0, len(info.RaftStatus.Followers))
-	p.leader = nil
+    p.lastHeartbeat = time.Now()
+    p.Status = info.Status
+    p.Epoch = info.Epoch
 
+    p.Replicas = make([]metapb.Replica, 0, len(info.RaftStatus.Followers))
 	for _, follower := range info.RaftStatus.Followers {
 		replica := &metapb.Replica{ID: follower.ID, NodeID: follower.NodeID}
 		p.Replicas = append(p.Replicas, *replica)
 
-		if replica.NodeID == nodeId {
-			p.leader = replica
+		if replica.ID == leaderFollower.ID {
+			p.leader = leaderFollower
 		}
 	}
 
 	key, val, err := doMetaMarshal(p.Partition)
 	if err != nil {
-		return err
+		return true, err
 	}
+	// TODO: partitions should not be store in db
 	store.Put(key, val)
 
-	return nil
+	return true, nil
+}
+
+func (p *Partition) UpdateLeaderUnderSameVer(info *masterpb.PartitionInfo,
+        leaderFollower *masterpb.RaftFollowerStatus) (conditionOk, updateOk bool) {
+	p.propertyLock.Lock()
+	defer p.propertyLock.Unlock()
+
+    if info == nil || leaderFollower == nil {
+        return false, false
+    }
+	if info.Epoch.ConfVersion != p.Epoch.ConfVersion {
+		return false, false
+	}
+    if p.leader == nil {
+        return false, false
+    }
+
+	var leaderExists bool
+	for _, replica := range p.Replicas {
+		if replica.ID == leaderFollower.ID {
+			leaderExists = true
+			break
+		}
+	}
+	if !leaderExists {
+		return true, false
+	}
+	p.leader = leaderFollower
+
+	return true, true
 }
 
 func (p *Partition) countReplicas() int {
@@ -183,12 +214,12 @@ func (p *Partition) getAllReplicas() []*metapb.Replica {
 	return replicas
 }
 
-func (p *Partition) pickLeaderReplica() *metapb.Replica {
-	p.propertyLock.RLock()
-	defer p.propertyLock.RUnlock()
-
-	return p.leader
-}
+//func (p *Partition) pickLeaderReplica() *metapb.Replica {
+//	p.propertyLock.RLock()
+//	defer p.propertyLock.RUnlock()
+//
+//	return p.leader
+//}
 
 func (p *Partition) pickLeaderNodeId() metapb.NodeID {
 	p.propertyLock.RLock()
@@ -201,17 +232,17 @@ func (p *Partition) pickLeaderNodeId() metapb.NodeID {
 	}
 }
 
-func (p *Partition) findReplicaById(replicaId metapb.ReplicaID) bool {
+func (p *Partition) findReplicaById(replicaId metapb.ReplicaID) *metapb.Replica {
 	p.propertyLock.RLock()
 	defer p.propertyLock.RUnlock()
 
 	for _, replica := range p.Replicas {
 		if replica.ID == replicaId {
-			return true
+			return &replica
 		}
 	}
 
-	return false
+	return nil
 }
 
 func (p *Partition) takeChangeMemberTask() bool {

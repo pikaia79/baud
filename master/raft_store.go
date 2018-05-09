@@ -17,8 +17,8 @@ import (
 	"time"
 )
 
-//go:generate mockgen -destination mock/raft_store_mock.go -package mock_master github.com/tiglabs/baudengine/master Store,Batch
-//go:generate mockgen -destination mock/store_mock.go -package mock_master github.com/tiglabs/baudengine/util/raftkvstore Iterator
+//go:generate mockgen -destination raft_store_mock.go -package master github.com/tiglabs/baudengine/master Store,Batch
+//go:generate mockgen -destination store_mock.go -package master github.com/tiglabs/baudengine/util/raftkvstore Iterator
 
 const (
 	FIXED_RAFTGROUPID          = 1

@@ -13,7 +13,7 @@ import (
 	"sync/atomic"
 )
 
-//go:generate mockgen -destination mock/ps_rpc_client_mock.go -package mock_master github.com/tiglabs/baudengine/master PSRpcClient
+//go:generate mockgen -destination ps_rpc_client_mock.go -package master github.com/tiglabs/baudengine/master PSRpcClient
 const (
 	PS_GRPC_REQUEST_TIMEOUT = time.Second
 )

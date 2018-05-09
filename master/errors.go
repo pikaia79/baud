@@ -2,6 +2,7 @@ package master
 
 import (
 	"github.com/pkg/errors"
+	"github.com/tiglabs/baudengine/proto/metapb"
 )
 
 //master global error definitions
@@ -28,7 +29,7 @@ var (
 	ErrRpcInvokeFailed     = errors.New("invoke rpc is failed")
 	ErrRpcParamError       = errors.New("rpc param error")
 	ErrRpcEmptyFollowers   = errors.New("reported empty followers")
-	ErrRpcInvalidFollowers = errors.New("reported invalid followers")
+	ErrRpcNoFollowerLeader = errors.New("Follower leader not found")
 	ErrRpcNotLeader        = errors.New("partition is not a leader")
 
 	ErrRaftNotRegHandler          = errors.New("have no register raft handler")
@@ -76,4 +77,14 @@ var Err2CodeMap = map[error]int32{
 
 	ErrGenIdFailed:      ERRCODE_GENID_FAILED,
 	ErrLocalDbOpsFailed: ERRCODE_LOCALDB_OPTFAILED,
+}
+
+var Err2RpcCodeMap = map[error]metapb.RespCode{
+    ErrSuc:                 metapb.RESP_CODE_OK,
+    ErrDbNotExists:         metapb.MASTER_RESP_CODE_DB_NOTEXISTS,
+    ErrSpaceNotExists:      metapb.MASTER_RESP_CODE_SPACE_NOTEXISTS,
+    ErrPSNotExists:         metapb.MASTER_RESP_CODE_PS_NOTEXISTS,
+    ErrSpaceNotExists:      metapb.MASTER_RESP_CODE_ROUTE_NOTEXISTS,
+    ErrRpcEmptyFollowers:   metapb.MASTER_RESP_CODE_EMPTY_FOLLOWERS,
+    ErrRpcNoFollowerLeader: metapb.MASTER_RESP_CODE_NO_FOLLOWER_LEADER,
 }
