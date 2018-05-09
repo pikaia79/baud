@@ -46,12 +46,12 @@ raft-heartbeat-port=8836
 raft-replicate-port=8835
 
 [ps]
-rpc-port=8000
-admin-port=8001
+rpc-port=58000
+admin-port=58001
 heartbeat-interval="5s"
 raft-heartbeat-interval="100ms"
-raft-heartbeat-port=8002
-raft-replicate-port=8003
+raft-heartbeat-port=58002
+raft-replicate-port=58003
 raft-retain-logs=10000
 raft-replica-concurrency=1
 raft-snapshot-concurrency=1
