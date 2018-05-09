@@ -3,6 +3,7 @@ package master
 import (
 	"github.com/pkg/errors"
 	"github.com/tiglabs/baudengine/proto/metapb"
+	"github.com/tiglabs/baudengine/util/log"
 )
 
 //master global error definitions
@@ -110,18 +111,19 @@ func makeRpcRespHeaderWithError(err error, body interface{}) *metapb.ResponseHea
     code, ok := Err2RpcCodeMap[err]
     if ok {
         var errBody = new(metapb.Error)
-        switch code {
-        case metapb.MASTER_RESP_CODE_NOT_LEADER:
-            errBody.NotLeader = &metapb.NotLeader{
-                Leader: metapb.NodeID(body.(uint64)),
-            }
-        }
+		switch code {
+		case metapb.MASTER_RESP_CODE_NOT_LEADER:
+			if errBody.NotLeader, ok = body.(*metapb.NotLeader); !ok {
+				log.Error("Can not cast rpc response body to type NotLeader error.")
+			}
+		}
 
-        return &metapb.ResponseHeader{
-            Code:    code,
-            Message: "",
-            Error:   *errBody,
-        }
+		return &metapb.ResponseHeader{
+			Code:    code,
+			Message: "",
+			Error:   *errBody,
+		}
+
     } else {
         return &metapb.ResponseHeader{
             Code:    metapb.RESP_CODE_SERVER_ERROR,
