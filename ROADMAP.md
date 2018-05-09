@@ -13,14 +13,20 @@ After implementing the document CRUD functions, then the Indexing capability ins
 
 numberic, boolean, string match, fulltext, geo... 
 
-We build a unified in-memory index tech for the above data types. 
+We build a unified index tech for the above data types. 
 
+both data and index are converted into key-value log-structured store. 
 
 ## Search & Ranking
 
+## SQL
+
+tables sharding the same partition key belong to one space. 
+
+MyRouter will seperated from JSONRouter
 
 ## Graph
 
-
+edge partitions are co-located with the source partitions. 
 
 

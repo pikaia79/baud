@@ -137,10 +137,16 @@ func (p *partition) getPartitionInfo() *masterpb.PartitionInfo {
 	p.rwMutex.RLock()
 	info := new(masterpb.PartitionInfo)
 	info.ID = p.meta.ID
+	info.IsLeader = (p.leader == uint64(p.server.nodeID))
 	info.Status = p.meta.Status
 	info.Epoch = p.meta.Epoch
 	info.Statistics = p.statistics
 	p.rwMutex.RUnlock()
+
+	if info.IsLeader {
+		raftStatus := p.server.raftServer.Status(p.meta.ID)
+		info.RaftStatus = new(masterpb.RaftStatus)
+	}
 
 	return info
 }
