@@ -410,7 +410,7 @@ func pickReplicaToDelete(info *masterpb.PartitionInfo, nodeId metapb.NodeID) (*m
 	var replicaToDelete *metapb.Replica
 
 	if !info.IsLeader {
-		replicaToDelete = &metapb.Replica{ID: followers[0].ID, NodeID: followers[0].NodeID}
+		replicaToDelete = NewMetaReplicaByFollower(&followers[0])
 		return replicaToDelete, nil
 	}
 
@@ -422,7 +422,7 @@ func pickReplicaToDelete(info *masterpb.PartitionInfo, nodeId metapb.NodeID) (*m
 			continue
 		}
 
-		replicaToDelete = &metapb.Replica{ID: follower.ID, NodeID: follower.NodeID}
+        replicaToDelete = NewMetaReplicaByFollower(&follower)
 		break
 	}
 
@@ -434,7 +434,7 @@ func pickReplicaToDelete(info *masterpb.PartitionInfo, nodeId metapb.NodeID) (*m
 		return replicaToDelete, nil
 	}
 
-	replicaToDelete = &metapb.Replica{ID: followers[0].ID, NodeID: followers[0].NodeID}
+	replicaToDelete = NewMetaReplicaByFollower(&followers[0])
 	return replicaToDelete, nil
 }
 
@@ -448,4 +448,13 @@ func packPsRegRespWithCfg(resp *masterpb.PSRegisterResponse, psCfg *PsConfig) {
 	resp.RaftRetainLogs = psCfg.RaftRetainLogs
 	resp.RaftReplicaConcurrency = int(psCfg.RaftReplicaConcurrency)
 	resp.RaftSnapshotConcurrency = int(psCfg.RaftSnapshotConcurrency)
+}
+
+func NewMetaReplicaByFollower(follower *masterpb.RaftFollowerStatus) *metapb.Replica {
+    return &metapb.Replica{ID: follower.ID, NodeID: follower.NodeID, ReplicaAddrs: metapb.ReplicaAddrs{
+        HeartbeatAddr: follower.HeartbeatAddr,
+        ReplicateAddr: follower.ReplicateAddr,
+        RpcAddr:       follower.RpcAddr,
+        AdminAddr:     follower.AdminAddr,
+    }}
 }

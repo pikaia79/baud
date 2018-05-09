@@ -27,9 +27,9 @@ var (
 type PSRpcClient interface {
     CreatePartition(addr string, partition *metapb.Partition) error
     DeletePartition(addr string, partitionId metapb.PartitionID) error
-    AddReplica(addr string, partitionId metapb.PartitionID, raftAddrs *metapb.RaftAddrs,
+    AddReplica(addr string, partitionId metapb.PartitionID, replicaAddrs *metapb.ReplicaAddrs,
             replicaId metapb.ReplicaID, replicaNodeId metapb.NodeID) error
-    RemoveReplica(addr string, partitionId metapb.PartitionID, raftAddrs *metapb.RaftAddrs,
+    RemoveReplica(addr string, partitionId metapb.PartitionID, replicaAddrs *metapb.ReplicaAddrs,
             replicaId metapb.ReplicaID, replicaNodeId metapb.NodeID) error
     Close()
 }
@@ -157,7 +157,7 @@ func (c *PSRpcClientImpl) DeletePartition(addr string, partitionId metapb.Partit
 	}
 }
 
-func (c *PSRpcClientImpl) AddReplica(addr string, partitionId metapb.PartitionID, raftAddrs *metapb.RaftAddrs,
+func (c *PSRpcClientImpl) AddReplica(addr string, partitionId metapb.PartitionID, replicaAddrs *metapb.ReplicaAddrs,
 	replicaId metapb.ReplicaID, replicaNodeId metapb.NodeID) error {
 	client, err := c.getClient(addr)
 	if err != nil {
@@ -169,9 +169,9 @@ func (c *PSRpcClientImpl) AddReplica(addr string, partitionId metapb.PartitionID
 		Type:          pspb.ReplicaChangeType_Add,
 		PartitionID:   partitionId,
 		Replica: metapb.Replica{
-			ID:        replicaId,
-			NodeID:    replicaNodeId,
-			RaftAddrs: *raftAddrs,
+			ID:           replicaId,
+			NodeID:       replicaNodeId,
+			ReplicaAddrs: *replicaAddrs,
 		},
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), PS_GRPC_REQUEST_TIMEOUT)
@@ -193,7 +193,7 @@ func (c *PSRpcClientImpl) AddReplica(addr string, partitionId metapb.PartitionID
 	}
 }
 
-func (c *PSRpcClientImpl) RemoveReplica(addr string, partitionId metapb.PartitionID, raftAddrs *metapb.RaftAddrs,
+func (c *PSRpcClientImpl) RemoveReplica(addr string, partitionId metapb.PartitionID, replicaAddrs *metapb.ReplicaAddrs,
 	replicaId metapb.ReplicaID, replicaNodeId metapb.NodeID) error {
 	client, err := c.getClient(addr)
 	if err != nil {
@@ -202,12 +202,12 @@ func (c *PSRpcClientImpl) RemoveReplica(addr string, partitionId metapb.Partitio
 
 	req := &pspb.ChangeReplicaRequest{
 		RequestHeader: metapb.RequestHeader{},
-		Type:          pspb.ReplicaChangeType_Remove,
-		PartitionID:   partitionId,
+		Type:        pspb.ReplicaChangeType_Remove,
+		PartitionID: partitionId,
 		Replica: metapb.Replica{
-			ID:        replicaId,
-			NodeID:    replicaNodeId,
-			RaftAddrs: *raftAddrs,
+			ID:           replicaId,
+			NodeID:       replicaNodeId,
+			ReplicaAddrs: *replicaAddrs,
 		},
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), PS_GRPC_REQUEST_TIMEOUT)

@@ -47,9 +47,14 @@ func NewPartitionServer(ip string, psCfg *PsConfig) (*PartitionServer, error) {
 
 	return &PartitionServer{
 		Node: &metapb.Node{
-			ID:   metapb.NodeID(newId),
-			Ip:   ip,
-			Port: int(psCfg.RpcPort),
+			ID: metapb.NodeID(newId),
+			Ip: ip,
+			ReplicaAddrs: metapb.ReplicaAddrs{
+				HeartbeatAddr: util.BuildAddr(ip, psCfg.RaftHeartbeatPort),
+				ReplicateAddr: util.BuildAddr(ip, psCfg.RaftReplicatePort),
+				RpcAddr:       util.BuildAddr(ip, psCfg.RpcPort),
+				AdminAddr:     util.BuildAddr(ip, psCfg.AdminPort),
+			},
 		},
 		NodeSysStats:   new(masterpb.NodeSysStats),
 		adminPort:      psCfg.AdminPort,

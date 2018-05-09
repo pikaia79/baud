@@ -147,7 +147,7 @@ func (p *Partition) UpdateReplicaGroupUnderGreatOrZeroVer(store Store, info *mas
 
     p.Replicas = make([]metapb.Replica, 0, len(info.RaftStatus.Followers))
 	for _, follower := range info.RaftStatus.Followers {
-		replica := &metapb.Replica{ID: follower.ID, NodeID: follower.NodeID}
+		replica := NewMetaReplicaByFollower(&follower)
 		p.Replicas = append(p.Replicas, *replica)
 
 		if replica.ID == leaderFollower.ID {

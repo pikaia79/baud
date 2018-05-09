@@ -280,7 +280,13 @@ func (p *PartitionProcessor) createPartition(partitionToCreate *Partition, psToC
 		log.Error("fail to generate new replica ßid. err:[%v]", err)
 		return
 	}
-	var newMetaReplica = &metapb.Replica{ID: metapb.ReplicaID(replicaId), NodeID: psToCreate.ID}
+	var newMetaReplica = &metapb.Replica{ID: metapb.ReplicaID(replicaId), NodeID: psToCreate.ID,
+		ReplicaAddrs: metapb.ReplicaAddrs{
+			HeartbeatAddr: psToCreate.HeartbeatAddr,
+			ReplicateAddr: psToCreate.ReplicateAddr,
+			RpcAddr:       psToCreate.RpcAddr,
+			AdminAddr:     psToCreate.AdminAddr,
+		}}
 
 	partitionCopy := deepcopy.Iface(partitionToCreate.Partition).(*metapb.Partition)
 	partitionCopy.Replicas = append(partitionCopy.Replicas, *newMetaReplica)
@@ -293,7 +299,7 @@ func (p *PartitionProcessor) createPartition(partitionToCreate *Partition, psToC
 
 	if leaderPS != nil {
 		if err := GetPSRpcClientSingle(nil).AddReplica(leaderPS.getRpcAddr(), partitionToCreate.ID,
-			&psToCreate.RaftAddrs, newMetaReplica.ID, newMetaReplica.NodeID); err != nil {
+			&psToCreate.ReplicaAddrs, newMetaReplica.ID, newMetaReplica.NodeID); err != nil {
 			log.Error("Rpc fail to add replica[%v] into leader ps. err[%v]", newMetaReplica, err)
 			return
 		}
@@ -314,7 +320,7 @@ func (p *PartitionProcessor) deletePartition (partitionId metapb.PartitionID, le
 	}
 
 	if err := GetPSRpcClientSingle(nil).RemoveReplica(leaderPS.getRpcAddr(), partitionId,
-		&psToDelete.RaftAddrs, replica.ID, replica.NodeID); err != nil {
+		&psToDelete.ReplicaAddrs, replica.ID, replica.NodeID); err != nil {
 		log.Error("Rpc fail to remove replica[%v] from ps. err[%v]", replica.ID, err)
 		return
 	}
