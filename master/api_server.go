@@ -272,6 +272,10 @@ func (s *ApiServer) handleSpaceDetail(w http.ResponseWriter, r *http.Request, pa
 }
 
 func (s *ApiServer) handleSpaceList(w http.ResponseWriter, r *http.Request, params netutil.UriParams) {
+    if err := s.checkLeader(w); err != nil {
+        return
+    }
+
 	dbName, err := checkMissingParam(w, r, DB_NAME)
 	if err != nil {
 		return
