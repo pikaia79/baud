@@ -109,8 +109,8 @@ message PartitionInfo {
     bool             is_leader   = 2;
     PartitionStatus  status      = 3;
     PartitionEpoch   epoch       = 4 [(gogoproto.nullable) = false];
-    RaftStatus       raft_status = 5;
-    PartitionStats   statistics  = 6 [(gogoproto.nullable) = false];
+    PartitionStats   statistics  = 5 [(gogoproto.nullable) = false];
+    RaftStatus       raft_status = 6;
 }
 
 message RuntimeInfo {
@@ -121,7 +121,7 @@ message RuntimeInfo {
 }
 
 message RaftStatus {
-    uint64 id                             = 1 [(gogoproto.customname) = "ID", (gogoproto.casttype) = "github.com/tiglabs/baudengine/proto/metapb.ReplicaID"];
+    Replica replica                       = 1 [(gogoproto.nullable) = false, (gogoproto.embed) = true];
     uint64 term                           = 2;
     uint64 index                          = 3;
     uint64 commit                         = 4;
@@ -130,13 +130,12 @@ message RaftStatus {
 }
 
 message RaftFollowerStatus {
-    uint64 id           = 1 [(gogoproto.customname) = "ID", (gogoproto.casttype) = "github.com/tiglabs/baudengine/proto/metapb.ReplicaID"];
-    uint32 nodeID       = 2 [(gogoproto.customname) = "NodeID", (gogoproto.casttype) = "github.com/tiglabs/baudengine/proto/metapb.NodeID"];
-    uint64 match        = 3;
-    uint64 commit       = 4;
-    uint64 next         = 5;
-    uint64 down_seconds = 6;
-    string state        = 7;
+    Replica replica     = 1 [(gogoproto.nullable) = false, (gogoproto.embed) = true];
+    uint64 match        = 2;
+    uint64 commit       = 3;
+    uint64 next         = 4;
+    uint64 down_seconds = 5;
+    string state        = 6;
 }
 
 message NodeSysStats {
