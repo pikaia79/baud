@@ -114,19 +114,67 @@ func False(t TestingT, obj bool) {
 	}
 }
 
-func Less(t TestingT, x, y interface{}) {
-	v1Type := reflect.TypeOf(x)
-	v2Type := reflect.TypeOf(y)
+func Less(t TestingT, actual interface{}, expected interface{}) {
+	v1Type := reflect.TypeOf(actual)
+	v2Type := reflect.TypeOf(expected)
 
 	if v1Type.Kind() != v2Type.Kind() {
 		fatal(t, "Needs two same type, but %s != %s", v1Type.Kind(), v2Type.Kind())
 	}
-	l, err := less(x, y)
+	l, err := less(actual, expected)
 	if err != nil {
 		fatal(t, "less failed, err %v", err)
 	}
 	if !l {
 		fatal(t, "Expected less than expected value.")
+	}
+}
+
+func LessEqual(t TestingT, actual interface{}, expected interface{}) {
+	v1Type := reflect.TypeOf(actual)
+	v2Type := reflect.TypeOf(expected)
+
+	if v1Type.Kind() != v2Type.Kind() {
+		fatal(t, "Needs two same type, but %s != %s", v1Type.Kind(), v2Type.Kind())
+	}
+	l, err := lessEqual(actual, expected)
+	if err != nil {
+		fatal(t, "lessEqual failed, err %v", err)
+	}
+	if !l {
+		fatal(t, "Expected less or equal than expected value.")
+	}
+}
+
+func Greater(t TestingT, actual interface{}, expected interface{}) {
+	v1Type := reflect.TypeOf(actual)
+	v2Type := reflect.TypeOf(expected)
+
+	if v1Type.Kind() != v2Type.Kind() {
+		fatal(t, "Needs two same type, but %s != %s", v1Type.Kind(), v2Type.Kind())
+	}
+	l, err := greater(actual, expected)
+	if err != nil {
+		fatal(t, "greater failed, err %v", err)
+	}
+	if !l {
+		fatal(t, "Expected greater than expected value.")
+	}
+}
+
+func GreaterEqual(t TestingT, actual interface{}, expected interface{}) {
+	v1Type := reflect.TypeOf(actual)
+	v2Type := reflect.TypeOf(expected)
+
+	if v1Type.Kind() != v2Type.Kind() {
+		fatal(t, "Needs two same type, but %s != %s", v1Type.Kind(), v2Type.Kind())
+	}
+	l, err := greaterEqual(actual, expected)
+	if err != nil {
+		fatal(t, "greaterEqual failed, err %v", err)
+	}
+	if !l {
+		fatal(t, "Expected greate or equal than expected value.")
 	}
 }
 

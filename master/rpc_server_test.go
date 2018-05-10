@@ -33,9 +33,7 @@ func TestPSHeartbeatFirstAdd(t *testing.T) {
     ctrl := gomock.NewController(t)
     defer ctrl.Finish()
 
-    if T_PSID_MAX < T_REPLICA_MAX {
-        t.Errorf("params error")
-    }
+    assert.GreaterEqual(t, T_PSID_MAX, T_REPLICA_MAX)
 
     mockStore, _, _ := CreateStoreMocks(ctrl)
     cluster := NewCluster(nil, mockStore)
