@@ -48,6 +48,12 @@ the reader role, i.e. Reader Partition Server (RPS)
 
 the Go SDK directly talking with masters and PSes.
 
+* API Layer
+
+BaudSQL - the NewSQL gateway with MySQL-compatible protocol
+
+BaudSearch - the NoSQL gateway with ElasticSearch-compatible protocol
+
 ### software stack
 
 * cluster management
@@ -58,11 +64,11 @@ each zone has a DCOS/Kubernetes interface to allocate PS nodes and router nodes.
 
 each DB is allocated with its own set of PS across different zones.
 
-each zone has a group of routers which are shared by all the applications. 
-
 * BaudStorage
 
 As the shared datacenter storage, BS is mounted to store partition data, which is log-structured sorted key-value files and redo-logs (WALs). 
+
+Note BaudEngine can also run on local filesystems - actually BS is transparent to BE. 
 
 ### partitioning 
 
@@ -179,13 +185,31 @@ term synonyms are stored as a file of Baudstorage and loaded by PS for document 
 The client needs to interact with not only the zonemaster of its own zone but also the zonemasters of other zones. 
 
 
-## Search
+## API Layers
 
-### Ranking
-
-## SQL 
+### BaudSQL 
 
 Tables sharing the same partition key = one space
+
+### BaudSearch
+
+JSON <--> Object
+
+ranking
+
+### BaudGraph
+
+TODO: the query language
+
+
+## Deployment Flexibility
+
+* single zone or multiple zones
+
+* the BaudStorage datacenter filesystem or local filesystems
+
+* Kubernetes or bare metal
+
 
 ## Manageability
 
@@ -205,30 +229,17 @@ GC
 
 SlowLog
 
-### Deployment and Configration
-
-
 ### Upgrade
 
 
-
-## Graph
-
-TODO: support graph - as (OIDi, predicate, OIDj) -> (key -> value*)*
-
 ## Applications
 
-### document databases
-
-### search engine
-
-### social backend
+products
 
 email
 
 messaging
 
 blogging
-
 
 
