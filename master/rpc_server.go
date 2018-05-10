@@ -194,7 +194,7 @@ func (s *RpcServer) PSRegister(ctx context.Context,
 	resp.NodeID = ps.ID
 	packPsRegRespWithCfg(resp, &s.config.PsCfg)
 	resp.Partitions = *ps.partitionCache.GetAllMetaPartitions()
-    log.Debug("register response [%v]", resp)
+    log.Debug("old nodeid[%v] register response [%v]", nodeId, resp)
 
 	return resp, nil
 }
