@@ -198,8 +198,9 @@ func (s *RpcServer) PSRegister(ctx context.Context,
 
 func (s *RpcServer) PSHeartbeat(ctx context.Context,
 	req *masterpb.PSHeartbeatRequest) (*masterpb.PSHeartbeatResponse, error) {
+	log.Debug("Received PS Heartbeat req:[%v]", req)
 	resp := new(masterpb.PSHeartbeatResponse)
-    resp.ResponseHeader = *makeRpcRespHeader(ErrSuc)
+	resp.ResponseHeader = *makeRpcRespHeader(ErrSuc)
 
     if err, msLeader := s.validateLeader(); err != nil {
         resp.ResponseHeader = *makeRpcRespHeaderWithError(err, msLeader)

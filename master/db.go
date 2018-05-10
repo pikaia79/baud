@@ -26,14 +26,12 @@ func NewDB(dbName string) (*DB, error) {
 		log.Error("generate id of db[%v] is failed. err[%v]", dbName, err)
 		return nil, ErrGenIdFailed
 	}
-	db := &DB{
-		DB: &metapb.DB{
-			ID:   metapb.DBID(dbId),
-			Name: dbName,
-		},
-		SpaceCache: NewSpaceCache(),
+
+	metaDb := &metapb.DB{
+		ID:   metapb.DBID(dbId),
+		Name: dbName,
 	}
-	return db, nil
+	return NewDBByMeta(metaDb), nil
 }
 
 func NewDBByMeta(metaDb *metapb.DB) *DB {
