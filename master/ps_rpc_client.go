@@ -120,7 +120,7 @@ func (c *PSRpcClientImpl) CreatePartition(addr string, partition *metapb.Partiti
 		return ErrRpcInvokeFailed
 	}
 
-	if resp.ResponseHeader.Code == 0 {
+	if resp.ResponseHeader.Code == metapb.RESP_CODE_OK {
 		return nil
 	} else {
 		log.Error("grpc CreatePartition response err[%v]", resp.ResponseHeader)
@@ -149,7 +149,7 @@ func (c *PSRpcClientImpl) DeletePartition(addr string, partitionId metapb.Partit
 		return ErrRpcInvokeFailed
 	}
 
-	if resp.ResponseHeader.Code == 0 {
+	if resp.ResponseHeader.Code == metapb.RESP_CODE_OK {
 		return nil
 	} else {
 		log.Error("grpc DeletePartition response err[%v]", resp.ResponseHeader)
@@ -185,7 +185,7 @@ func (c *PSRpcClientImpl) AddReplica(addr string, partitionId metapb.PartitionID
 		return ErrRpcInvokeFailed
 	}
 
-	if resp.ResponseHeader.Code == 0 {
+	if resp.ResponseHeader.Code == metapb.RESP_CODE_OK {
 		return nil
 	} else {
 		log.Error("grpc ChangeReplica(add) response err[%v]", resp.ResponseHeader)
@@ -221,7 +221,7 @@ func (c *PSRpcClientImpl) RemoveReplica(addr string, partitionId metapb.Partitio
 		return ErrRpcInvokeFailed
 	}
 
-	if resp.ResponseHeader.Code == 0 {
+	if resp.ResponseHeader.Code == metapb.RESP_CODE_OK {
 		return nil
 	} else {
 		log.Error("grpc ChangeReplica(remove) response err[%v]", resp.ResponseHeader)
