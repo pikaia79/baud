@@ -228,19 +228,19 @@ func (s *RpcServer) PSHeartbeat(ctx context.Context,
 
 	// process partition
 	for _, partitionInfo := range partitionInfos {
+		if err := s.validatePartitionInfo(&partitionInfo); err != nil {
+			resp.ResponseHeader = *makeRpcRespHeader(err)
+			return resp, nil
+		}
+
 		partitionId := partitionInfo.ID
 		partitionMS := s.cluster.PartitionCache.FindPartitionById(partitionId)
 		if partitionMS == nil {
 			log.Info("ps heartbeat received a partition[%v], that not existed in cluster.", partitionId)
-
 			// force to delete
-			replicaToDelete, err := pickReplicaToDelete(&partitionInfo, psId)
-			if err != nil {
-				resp.ResponseHeader = *makeRpcRespHeader(err)
-				return resp, nil
+			if replicaToDelete := pickReplicaToDelete(&partitionInfo); replicaToDelete != nil {
+				GetPMSingle(nil).PushEvent(NewForcePartitionDeleteEvent(partitionId, ps.getRpcAddr(), replicaToDelete))
 			}
-			GetPMSingle(nil).PushEvent(NewForcePartitionDeleteEvent(partitionId, ps.getRpcAddr(), replicaToDelete))
-
 			continue
 		}
 
@@ -282,14 +282,10 @@ func (s *RpcServer) PSHeartbeat(ctx context.Context,
 					return resp, nil
 				}
 
-				replicaToDelete, err := pickReplicaToDelete(&partitionInfo, partitionMS.pickLeaderNodeId())
-				if err != nil {
-					resp.ResponseHeader = *makeRpcRespHeader(err)
-					return resp, nil
+				if replicaToDelete := pickReplicaToDelete(&partitionInfo); replicaToDelete != nil {
+					GetPMSingle(nil).PushEvent(NewPartitionDeleteEvent(partitionInfo.ID, partitionMS.pickLeaderNodeId(),
+						replicaToDelete))
 				}
-
-				GetPMSingle(nil).PushEvent(NewPartitionDeleteEvent(partitionInfo.ID, partitionMS.pickLeaderNodeId(),
-					replicaToDelete))
 
 			} else if replicaCount < FIXED_REPLICA_NUM {
 
@@ -310,13 +306,10 @@ func (s *RpcServer) PSHeartbeat(ctx context.Context,
 				return resp, nil
 			}
 
-			replicaToDelete, err := pickReplicaToDelete(&partitionInfo, partitionMS.pickLeaderNodeId())
-			if err != nil {
-				resp.ResponseHeader = *makeRpcRespHeader(err)
-				return resp, nil
+			if replicaToDelete := pickReplicaToDelete(&partitionInfo); replicaToDelete != nil {
+				GetPMSingle(nil).PushEvent(NewPartitionDeleteEvent(partitionInfo.ID, partitionMS.pickLeaderNodeId(),
+					replicaToDelete))
 			}
-			GetPMSingle(nil).PushEvent(NewPartitionDeleteEvent(partitionInfo.ID, partitionMS.pickLeaderNodeId(),
-				replicaToDelete))
 
 		} else if confVerHb == confVerMS {
 			if !partitionInfo.IsLeader {
@@ -352,16 +345,12 @@ func (s *RpcServer) PSHeartbeat(ctx context.Context,
 					log.Info("To delete replicas of partition[%v] that had same conf version",
 						"but member[%v] is unmatched for cluster.", partitionInfo.ID, leaderFollowerHb)
 
-					replicaToDelete, err := pickReplicaToDelete(&partitionInfo, psId)
-					if err != nil {
-						resp.ResponseHeader = *makeRpcRespHeader(err)
-						return resp, nil
+					if replicaToDelete := pickReplicaToDelete(&partitionInfo); replicaToDelete != nil {
+						log.Info("try to delete replica[%v]", replicaToDelete)
+						GetPMSingle(nil).PushEvent(NewPartitionDeleteEvent(partitionInfo.ID, leaderFollowerHb.NodeID,
+							replicaToDelete))
 					}
-					log.Info("try to delete replica[%v]", replicaToDelete)
-					GetPMSingle(nil).PushEvent(NewPartitionDeleteEvent(partitionInfo.ID, leaderFollowerHb.NodeID,
-						replicaToDelete))
-
-					return resp, nil
+                    return resp, nil
 				}
 			}
 
@@ -392,6 +381,35 @@ func (s *RpcServer) validateLeader() (error, interface{}) {
     return nil, leaderInfo.newLeaderId
 }
 
+func (s *RpcServer) validatePartitionInfo(info *masterpb.PartitionInfo) error {
+	if info == nil {
+		return ErrInternalError
+	}
+
+	if info.IsLeader && (info.RaftStatus == nil ||
+			info.RaftStatus.Followers == nil || len(info.RaftStatus.Followers) == 0) {
+		log.Error("!!!Never happened. Cannot report empty replicas when info is leader. info id[%v]", info.ID)
+		return ErrRpcEmptyFollowers
+	}
+
+	if info.IsLeader {
+		followers := info.RaftStatus.Followers
+		leaderReplica := info.RaftStatus.Replica
+
+		var leaderFound bool
+		for _, follower := range followers {
+			if follower.ID == leaderReplica.ID {
+				leaderFound = true
+				break
+			}
+		}
+		if !leaderFound {
+			return ErrRpcNoFollowerLeader
+		}
+	}
+	return nil
+}
+
 func pickLeaderFollower(info *masterpb.PartitionInfo) (*masterpb.RaftFollowerStatus, error) {
 	if !info.IsLeader {
 		return nil, ErrNotMSLeader
@@ -408,42 +426,34 @@ func pickLeaderFollower(info *masterpb.PartitionInfo) (*masterpb.RaftFollowerSta
 	return leader, nil
 }
 
-func pickReplicaToDelete(info *masterpb.PartitionInfo, nodeId metapb.NodeID) (*metapb.Replica, error) {
-	followers := info.RaftStatus.Followers
-	if followers == nil || len(followers) == 0 {
-		log.Error("!!!Never happened. Cannot report empty replicas in ps heartbeat. info:[%v]", info)
-		return nil, ErrRpcEmptyFollowers
+func pickReplicaToDelete(info *masterpb.PartitionInfo) (*metapb.Replica) {
+	if info == nil || info.RaftStatus == nil ||
+			info.RaftStatus.Followers == nil || len(info.RaftStatus.Followers) == 0 {
+		return nil
 	}
 
+	followers := info.RaftStatus.Followers
 	var replicaToDelete *metapb.Replica
 
 	if !info.IsLeader {
 		replicaToDelete = NewMetaReplicaByFollower(&followers[0])
-		return replicaToDelete, nil
+		return replicaToDelete
 	}
 
-	var leaderFound bool
-	// firstly pick followers, finally leader
+	leaderReplica := info.RaftStatus.Replica
 	for _, follower := range followers {
-		if follower.NodeID == nodeId {
-			leaderFound = true
+		if follower.ID == leaderReplica.ID {
 			continue
 		}
 
         replicaToDelete = NewMetaReplicaByFollower(&follower)
 		break
 	}
-
-	if !leaderFound {
-		log.Error("cannot find leader in followers")
-		return nil, ErrRpcNoFollowerLeader
-	}
 	if replicaToDelete != nil {
-		return replicaToDelete, nil
+		return replicaToDelete
 	}
 
-	replicaToDelete = NewMetaReplicaByFollower(&followers[0])
-	return replicaToDelete, nil
+	return &leaderReplica
 }
 
 func packPsRegRespWithCfg(resp *masterpb.PSRegisterResponse, psCfg *PsConfig) {

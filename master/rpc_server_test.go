@@ -18,10 +18,10 @@ const (
     T_DBID          = 1000
     T_SPACE1        = "space1"
 
-    T_PARTITION_MAX     = 1
+    T_PARTITION_MAX     = 2
     T_PARTITIONID_START = 10
 
-    T_REPLICA_MAX     = 2
+    T_REPLICA_MAX     = 3
     T_REPLICAID_START = 100
     T_LEADER_REPLICAID = T_REPLICAID_START + T_REPLICA_MAX - 1
 )
@@ -39,20 +39,7 @@ func TestPSHeartbeatFirstAdd(t *testing.T) {
 
     mockStore, _, _ := CreateStoreMocks(ctrl)
     cluster := NewCluster(nil, mockStore)
-    for psIdx := 0; psIdx < T_PSID_MAX; psIdx++ {
-        cluster.PsCache.AddServer(&PartitionServer{
-            Node: &metapb.Node{
-                ID: metapb.NodeID(T_PSID_START + psIdx),
-            },
-        })
-    }
-    for pIdx := 0; pIdx < T_PARTITION_MAX; pIdx++ {
-        cluster.PartitionCache.AddPartition(&Partition{
-            Partition: &metapb.Partition{
-                ID: metapb.PartitionID(T_PARTITIONID_START + pIdx),
-            },
-        })
-    }
+    InitPsCacheAndPartitionCache(cluster)
 
     rpcServer := new(RpcServer)
     rpcServer.cluster = cluster
@@ -114,7 +101,7 @@ func TestPSHeartbeatFirstAdd(t *testing.T) {
         }
     }
 
-    // validate leader and non-leader hb results at times
+    // validate leader and non-leader hb results at times, but partition cache not changed
     for times := 0; times < 5; times++ {
         for psIdx := 0; psIdx < T_PSID_MAX; psIdx++ {
             psId := metapb.NodeID(T_PSID_START + psIdx)
@@ -148,6 +135,39 @@ func TestPSHeartbeatFirstAdd(t *testing.T) {
         }
     }
 }
+
+func TestPSHeartbeatPartitionNotFound(t *testing.T) {
+    ctrl := gomock.NewController(t)
+    defer ctrl.Finish()
+
+    assert.GreaterEqual(t, T_PSID_MAX, T_REPLICA_MAX)
+
+    mockStore, _, _ := CreateStoreMocks(ctrl)
+    cluster := NewCluster(nil, mockStore)
+    InitPsCacheAndPartitionCache(cluster)
+
+    rpcServer := new(RpcServer)
+    rpcServer.cluster = cluster
+
+    // validate PartitionId not found
+    req := new(masterpb.PSHeartbeatRequest)
+    req.NodeID = metapb.NodeID(T_PSID_START)
+    req.Partitions = make([]masterpb.PartitionInfo, 0, T_PARTITION_MAX)
+    for pIdx := 0; pIdx < T_PARTITION_MAX; pIdx++ {
+        info := new(masterpb.PartitionInfo)
+        info.ID = metapb.PartitionID(T_PARTITIONID_START + pIdx +  99999999)
+
+        req.Partitions = append(req.Partitions, *info)
+    }
+
+    rpcServer.PSHeartbeat(nil, req)
+
+    for pIdx := 0; pIdx < T_PARTITION_MAX; pIdx++ {
+        partition := cluster.PartitionCache.FindPartitionById(metapb.PartitionID(T_PARTITIONID_START + pIdx + 99999999))
+        assert.Nil(t, partition)
+    }
+}
+
 //
 //type EmptyStore struct {
 //}
@@ -212,6 +232,23 @@ func CreateStoreMocks(ctrl *gomock.Controller) (*MockStore, *MockBatch, *MockIte
     return mockStore, mockBatch, mockIterator
 }
 
+func InitPsCacheAndPartitionCache(cluster *Cluster) {
+    for psIdx := 0; psIdx < T_PSID_MAX; psIdx++ {
+        cluster.PsCache.AddServer(&PartitionServer{
+            Node: &metapb.Node{
+                ID: metapb.NodeID(T_PSID_START + psIdx),
+            },
+        })
+    }
+    for pIdx := 0; pIdx < T_PARTITION_MAX; pIdx++ {
+        cluster.PartitionCache.AddPartition(&Partition{
+            Partition: &metapb.Partition{
+                ID: metapb.PartitionID(T_PARTITIONID_START + pIdx),
+            },
+        })
+    }
+}
+
 func NewPSHeartbeatRequest(psId, leaderPsId metapb.NodeID) *masterpb.PSHeartbeatRequest {
     req := new(masterpb.PSHeartbeatRequest)
 
@@ -260,3 +297,5 @@ func NewPSHeartbeatRequest(psId, leaderPsId metapb.NodeID) *masterpb.PSHeartbeat
 
     return req
 }
+
+
