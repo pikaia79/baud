@@ -38,17 +38,17 @@ func NewPartition(dbId metapb.DBID, spaceId metapb.SpaceID, startSlot, endSlot m
 		log.Error("generate partition id is failed. err:[%v]", err)
 		return nil, ErrGenIdFailed
 	}
-	return &Partition{
-		Partition: &metapb.Partition{
-			ID:        metapb.PartitionID(partId),
-			DB:        dbId,
-			Space:     spaceId,
-			StartSlot: metapb.SlotID(startSlot),
-			EndSlot:   metapb.SlotID(endSlot),
-			Replicas:  make([]metapb.Replica, 0),
-			Status:    metapb.PA_READONLY,
-		},
-	}, nil
+
+	metaPartition := &metapb.Partition{
+		ID:        metapb.PartitionID(partId),
+		DB:        dbId,
+		Space:     spaceId,
+		StartSlot: metapb.SlotID(startSlot),
+		EndSlot:   metapb.SlotID(endSlot),
+		Replicas:  make([]metapb.Replica, 0),
+		Status:    metapb.PA_READONLY,
+	}
+	return NewPartitionByMeta(metaPartition), nil
 }
 
 func NewPartitionByMeta(metaPartition *metapb.Partition) *Partition {
