@@ -174,7 +174,6 @@ func (s *RpcServer) PSRegister(ctx context.Context,
 		resp.NodeID = ps.ID
 		packPsRegRespWithCfg(resp, &s.config.PsCfg)
 
-		log.Debug("register response [%v]", resp)
 		return resp, nil
 	}
 

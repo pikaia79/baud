@@ -125,10 +125,11 @@ func NewSpaceStateTransitionWorker(cluster *Cluster) *SpaceStateTransitionWorker
 }
 
 func (w *SpaceStateTransitionWorker) getName() string {
-	return "Space State Transition Worker"
+	return "Space-State-Transition-Worker"
 }
 
 func (w *SpaceStateTransitionWorker) getInterval() time.Duration {
+    // TODO: add config
 	return time.Second * 60
 }
 
