@@ -382,16 +382,9 @@ func (s *RpcServer) validateLeader() (error, interface{}) {
 		if leaderInfo.newLeaderId == 0 {
 			return ErrNoMSLeader, nil
 		} else {
-			leaderId := metapb.NodeID(leaderInfo.newLeaderId)
-			ps := s.cluster.PsCache.FindServerById(leaderId)
-			if ps == nil {
-				log.Error("Ps[%v] not found", leaderId)
-				return ErrInternalError, nil
-			}
-
 			return ErrNotMSLeader, &metapb.NotLeader{
-				Leader:     leaderId,
-				LeaderAddr: ps.RpcAddr,
+				Leader:     metapb.NodeID(leaderInfo.newLeaderId),
+				LeaderAddr: leaderInfo.newLeaderAddr,
 			}
 		}
 	}
