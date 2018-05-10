@@ -9,6 +9,10 @@ import (
 	"time"
 )
 
+var (
+	WORKER_RUN_TIMES = 1
+)
+
 type WorkerManager struct {
 	ctx    context.Context
 	cancel context.CancelFunc
@@ -155,8 +159,11 @@ func (w *SpaceStateTransitionWorker) run() {
 							if len(partition.Replicas) == 0 {
 								noReplica = true
 
-								if err := GetPMSingle(nil).PushEvent(NewPartitionCreateEvent(partition)); err != nil {
-									log.Error("fail to push event for creating partition[%v].", partition)
+								if WORKER_RUN_TIMES > 0 {
+									if err := GetPMSingle(nil).PushEvent(NewPartitionCreateEvent(partition)); err != nil {
+										log.Error("fail to push event for creating partition[%v].", partition)
+									}
+									WORKER_RUN_TIMES--
 								}
 							}
 						}
