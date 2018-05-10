@@ -93,6 +93,7 @@ func (s *ApiServer) initAdminHandler() {
 	s.httpServer.Handle(netutil.GET, "/manage/space/list", s.handleSpaceList)
 	s.httpServer.Handle(netutil.GET, "/manage/space/detail", s.handleSpaceDetail)
 
+    s.httpServer.Handle(netutil.GET, "/manage/partition/list", s.handlePartitionList)
 	s.httpServer.Handle(netutil.GET, "/manage/ps/list", s.handlePSList)
 }
 
@@ -290,6 +291,20 @@ func (s *ApiServer) handleSpaceList(w http.ResponseWriter, r *http.Request, para
 	}
 
 	sendReply(w, newHttpSucReply(db.SpaceCache.GetAllSpaces()))
+}
+
+func (s *ApiServer) handlePartitionList(w http.ResponseWriter, r *http.Request, params netutil.UriParams) {
+	if err := s.checkLeader(w); err != nil {
+		return
+	}
+
+	allPs := s.cluster.PartitionCache.GetAllMetaPartitions()
+	if allPs == nil {
+		sendReply(w, newHttpErrReply(ErrDbNotExists))
+		return
+	}
+
+	sendReply(w, newHttpSucReply(allPs))
 }
 
 func (s *ApiServer) handlePSList(w http.ResponseWriter, r *http.Request, params netutil.UriParams) {
