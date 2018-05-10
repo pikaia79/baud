@@ -18,7 +18,7 @@ raft-level="info"
 [cluster]
 cluster-id = "1"
 node-id = 1
-raft-heartbeat-interval="500ms"
+raft-heartbeat-interval=500
 raft-retain-logs-count=100
 
 [[cluster.nodes]]
@@ -48,8 +48,8 @@ raft-replicate-port=8835
 [ps]
 rpc-port=58000
 admin-port=58001
-heartbeat-interval="5s"
-raft-heartbeat-interval="100ms"
+heartbeat-interval=5000
+raft-heartbeat-interval=100
 raft-heartbeat-port=58002
 raft-replicate-port=58003
 raft-retain-logs=10000

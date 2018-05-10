@@ -291,7 +291,7 @@ func (rs *RaftStore) initRaftStoreCfg() error {
 	raftStoreCfg.WalPath = raftDataDir
 
 	raftStoreCfg.RaftRetainLogs = rs.config.ClusterCfg.RaftRetainLogsCount
-	raftStoreCfg.RaftHeartbeatInterval = rs.config.ClusterCfg.RaftHeartbeatInterval.Duration
+	raftStoreCfg.RaftHeartbeatInterval = time.Duration(rs.config.ClusterCfg.RaftHeartbeatInterval) * time.Millisecond
 	raftStoreCfg.RaftHeartbeatAddr = util.BuildAddr(rs.config.ClusterCfg.CurNode.Host,
 		rs.config.ClusterCfg.CurNode.RaftHeartbeatPort)
 	raftStoreCfg.RaftReplicateAddr = util.BuildAddr(rs.config.ClusterCfg.CurNode.Host,

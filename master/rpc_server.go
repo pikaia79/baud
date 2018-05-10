@@ -173,6 +173,8 @@ func (s *RpcServer) PSRegister(ctx context.Context,
 		resp.ResponseHeader = *makeRpcRespHeader(ErrSuc)
 		resp.NodeID = ps.ID
 		packPsRegRespWithCfg(resp, &s.config.PsCfg)
+
+		log.Debug("register response [%v]", resp)
 		return resp, nil
 	}
 
@@ -182,6 +184,8 @@ func (s *RpcServer) PSRegister(ctx context.Context,
 		// illegal ps will register
 		log.Warn("Can not find nodeid[%v] in master.", nodeId)
 		resp.ResponseHeader = *makeRpcRespHeader(ErrPSNotExists)
+
+        log.Debug("register response [%v]", resp)
 		return resp, nil
 	}
 
@@ -452,8 +456,8 @@ func pickReplicaToDelete(info *masterpb.PartitionInfo, nodeId metapb.NodeID) (*m
 func packPsRegRespWithCfg(resp *masterpb.PSRegisterResponse, psCfg *PsConfig) {
 	resp.RPCPort = int(psCfg.RpcPort)
 	resp.AdminPort = int(psCfg.AdminPort)
-	resp.HeartbeatInterval = int(psCfg.HeartbeatInterval.Nanoseconds() / 1000000)
-	resp.RaftHeartbeatInterval = int(psCfg.RaftHeartbeatInterval.Nanoseconds() / 1000000)
+	resp.HeartbeatInterval = int(psCfg.HeartbeatInterval)
+	resp.RaftHeartbeatInterval = int(psCfg.RaftHeartbeatInterval)
 	resp.RaftHeartbeatPort = int(psCfg.RaftHeartbeatPort)
 	resp.RaftReplicatePort = int(psCfg.RaftReplicatePort)
 	resp.RaftRetainLogs = psCfg.RaftRetainLogs
