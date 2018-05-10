@@ -10,8 +10,6 @@ import (
 
 func (p *partition) Apply(command []byte, index uint64) (resp interface{}, err error) {
 	raftCmd := raftpb.CreateRaftCommand()
-	defer raftCmd.Close()
-
 	if err = raftCmd.Unmarshal(command); err != nil {
 		panic(err)
 	}
@@ -26,18 +24,17 @@ func (p *partition) Apply(command []byte, index uint64) (resp interface{}, err e
 		log.Error("unsupported command[%s]", raftCmd.Type)
 	}
 
+	raftCmd.Close()
 	return
 }
 
 func (p *partition) ApplyMemberChange(confChange *proto.ConfChange, index uint64) (interface{}, error) {
 	p.rwMutex.Lock()
-	defer p.rwMutex.Unlock()
-
 	switch confChange.Type {
 	case proto.ConfAddNode:
 		for _, r := range p.meta.Replicas {
 			if confChange.Peer.ID == uint64(r.NodeID) {
-				return nil, nil
+				goto ret
 			}
 		}
 
@@ -66,6 +63,8 @@ func (p *partition) ApplyMemberChange(confChange *proto.ConfChange, index uint64
 
 	}
 
+ret:
+	p.rwMutex.Unlock()
 	return nil, nil
 }
 
@@ -79,24 +78,23 @@ func (p *partition) ApplySnapshot(peers []proto.Peer, iter proto.SnapIterator) e
 
 func (p *partition) HandleLeaderChange(leader uint64) {
 	p.rwMutex.Lock()
-	defer p.rwMutex.Unlock()
 
-	if p.leader == leader {
-		return
+	if p.leader != leader {
+		p.leader = leader
+		_, term := p.server.raftServer.LeaderTerm(p.meta.ID)
+		if p.meta.Epoch.Version < term {
+			p.meta.Epoch.Version = term
+		}
+
+		if leader == uint64(p.server.nodeID) {
+			p.meta.Status = metapb.PA_READWRITE
+			p.server.masterHeartbeat.trigger()
+		} else {
+			p.meta.Status = metapb.PA_READONLY
+		}
 	}
 
-	p.leader = leader
-	_, term := p.server.raftServer.LeaderTerm(p.meta.ID)
-	if p.meta.Epoch.Version < term {
-		p.meta.Epoch.Version = term
-	}
-
-	if leader == uint64(p.server.nodeID) {
-		p.meta.Status = metapb.PA_READWRITE
-		p.server.masterHeartbeat.trigger()
-	} else {
-		p.meta.Status = metapb.PA_READONLY
-	}
+	p.rwMutex.Unlock()
 	return
 }
 

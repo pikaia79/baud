@@ -20,11 +20,6 @@ type ibuffer struct {
 }
 
 func makeSlice(n int) []byte {
-	defer func() {
-		if recover() != nil {
-			panic(ErrTooLarge)
-		}
-	}()
 	return make([]byte, n)
 }
 

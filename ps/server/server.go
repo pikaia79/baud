@@ -182,6 +182,7 @@ func (s *Server) doStart(init bool) error {
 					log.Fatal("Server failed to start api grpc: %v", err)
 				}
 			}()
+			log.Info("Server api grpc listen on: %s", fmt.Sprintf(":%d", s.RPCPort))
 		}
 
 		if ln, err := net.Listen("tcp", fmt.Sprintf(":%d", s.AdminPort)); err != nil {
@@ -194,6 +195,7 @@ func (s *Server) doStart(init bool) error {
 					log.Fatal("Server failed to start admin grpc: %v", err)
 				}
 			}()
+			log.Info("Server admin grpc listen on: %s", fmt.Sprintf(":%d", s.AdminPort))
 		}
 	}
 
@@ -251,7 +253,7 @@ func (s *Server) closeAllRange() {
 
 func (s *Server) register() (*masterpb.PSRegisterResponse, error) {
 	retryOpt := util.DefaultRetryOption
-	retryOpt.MaxRetries = 5
+	retryOpt.MaxRetries = 10
 	retryOpt.Context = s.ctx
 
 	buildInfo := build.GetInfo()
