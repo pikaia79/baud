@@ -247,6 +247,7 @@ func (s *RpcServer) PSHeartbeat(ctx context.Context,
 
 		confVerMS := partitionMS.Epoch.ConfVersion
 		confVerHb := partitionInfo.Epoch.ConfVersion
+		log.Info("partition id[%v], confVerHb[%v], confVerMS[%v]", partitionId, confVerHb, confVerHb)
 		if confVerHb > confVerMS {
 			if !partitionInfo.IsLeader {
 				return resp, nil
