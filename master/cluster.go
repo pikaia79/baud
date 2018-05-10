@@ -62,7 +62,7 @@ func (c *Cluster) recoveryPSCache() error {
 	c.clusterLock.Lock()
 	defer c.clusterLock.Unlock()
 
-	servers, err := c.PsCache.Recovery(c.store)
+	servers, err := c.PsCache.Recovery(c.store, &c.config.PsCfg)
 	if err != nil {
 		return err
 	}
