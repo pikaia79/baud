@@ -16,7 +16,7 @@ import (
 const (
 	PREFIX_PARTITION   = "schema partition "
 	defaultBTreeDegree = 64
-	FIXED_REPLICA_NUM  = 3
+	FIXED_REPLICA_NUM  = 1
 )
 
 type Partition struct {
