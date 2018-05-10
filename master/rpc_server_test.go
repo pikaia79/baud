@@ -5,6 +5,7 @@ import (
     "github.com/tiglabs/baudengine/proto/masterpb"
     "github.com/tiglabs/baudengine/proto/metapb"
     "github.com/golang/mock/gomock"
+    "github.com/tiglabs/baudengine/util/assert"
 )
 
 const (
@@ -64,43 +65,24 @@ func TestPSHeartbeatFirstAdd(t *testing.T) {
     for pIdx := 0; pIdx < T_PARTITION_MAX; pIdx++ {
         partitionId := metapb.PartitionID(T_PARTITIONID_START + pIdx)
         partition := cluster.PartitionCache.FindPartitionById(partitionId)
-        if partition == nil {
-            t.Errorf("partition[%v] not found", partitionId)
-        }
+        assert.NotNil(t, partition)
 
         if pIdx % 2 == 0 {
-            if partition.leader == nil {
-                t.Errorf("partiton[%v] leader is empty", partitionId)
-            }
-            if partition.leader.ID == T_REPLICA_MAX - 1 {
-                t.Errorf("leader replicaid[%v] of partition[%v] error", partition.leader.ID, partitionId)
-            }
+            assert.NotNil(t, partition.leader)
+            assert.NotEqual(t, partition.leader.ID, T_REPLICAID_START + T_REPLICA_MAX - 1, "leader replicaid error")
 
-            if partition.Replicas == nil {
-                t.Errorf("replicas for partition[%v] is empty", partitionId)
-            }
-            replicas := partition.Replicas
-            if len(replicas) != T_REPLICA_MAX {
-                t.Errorf("number of replicas for partition[%v] error", partitionId)
-            }
+            assert.NotNil(t, partition.Replicas)
+            assert.Equal(t, len(partition.Replicas), T_REPLICA_MAX, "number of replicas error")
 
             for rIdx := 0; rIdx < T_REPLICA_MAX; rIdx++ {
-                replica := replicas[rIdx]
-                if replica.ID != metapb.ReplicaID(T_REPLICAID_START+rIdx) {
-                    t.Errorf("unmatched replicaId[%v]", replica.ID)
-                }
-                if replica.NodeID != metapb.NodeID(T_PSID_START + rIdx) {
-                    t.Errorf("unmatched replica nodeId[%v]", replica.NodeID)
-                }
+                replica := partition.Replicas[rIdx]
+
+                assert.NotEqual(t, replica.ID, T_REPLICAID_START+rIdx, "unmatched replicaid")
+                assert.NotEqual(t, replica.NodeID, T_PSID_START + rIdx, "unmatched replica nodeid")
             }
         } else {
-            if partition.leader != nil {
-                t.Errorf("partiton[%v] leader is not empty", partitionId)
-            }
-
-            if partition.Replicas != nil {
-                t.Errorf("replicas for partition[%v] is not empty", partitionId)
-            }
+            assert.Nil(t, partition.leader)
+            assert.Nil(t, partition.Replicas)
         }
     }
 }
