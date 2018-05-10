@@ -173,7 +173,7 @@ func (s *RpcServer) PSRegister(ctx context.Context,
 		resp.ResponseHeader = *makeRpcRespHeader(ErrSuc)
 		resp.NodeID = ps.ID
 		packPsRegRespWithCfg(resp, &s.config.PsCfg)
-
+        log.Debug("new register response [%v]", resp)
 		return resp, nil
 	}
 
@@ -184,7 +184,6 @@ func (s *RpcServer) PSRegister(ctx context.Context,
 		log.Warn("Can not find nodeid[%v] in master.", nodeId)
 		resp.ResponseHeader = *makeRpcRespHeader(ErrPSNotExists)
 
-        log.Debug("register response [%v]", resp)
 		return resp, nil
 	}
 
@@ -195,6 +194,7 @@ func (s *RpcServer) PSRegister(ctx context.Context,
 	resp.NodeID = ps.ID
 	packPsRegRespWithCfg(resp, &s.config.PsCfg)
 	resp.Partitions = *ps.partitionCache.GetAllMetaPartitions()
+    log.Debug("register response [%v]", resp)
 
 	return resp, nil
 }
