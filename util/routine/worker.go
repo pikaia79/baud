@@ -68,8 +68,10 @@ func RunWork(name string, f func() error, panicHandler ...func(interface{})) err
 		return errUnavailable
 	}
 
-	defer Recover(panicHandler...)
-	defer globalWorker.workPostlude(name, false)
+	defer func() {
+		globalWorker.workPostlude(name, false)
+		Recover(panicHandler...)
+	}()
 
 	return f()
 }
@@ -82,8 +84,10 @@ func RunWorkAsync(name string, f func(), panicHandler ...func(interface{})) erro
 	}
 
 	GoWork(func() {
-		defer Recover(panicHandler...)
-		defer globalWorker.workPostlude(name, false)
+		defer func() {
+			globalWorker.workPostlude(name, false)
+			Recover(panicHandler...)
+		}()
 
 		f()
 	})

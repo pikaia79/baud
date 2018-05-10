@@ -37,6 +37,7 @@ var (
 				return err
 			}
 
+			log.Info("Baud server successful startup...")
 			server.WaitShutdown(s.Close)
 			return nil
 		},
