@@ -28,7 +28,7 @@ type Partition struct {
 	taskFlag    bool
 	taskTimeout time.Time
 
-	lastHeartbeat time.Time
+	lastHeartbeat time.Time 	`json:"last_heartbeat"`
 	propertyLock  sync.RWMutex
 }
 
@@ -153,7 +153,6 @@ func (p *Partition) UpdateReplicaGroupUnderGreatOrZeroVer(store Store, info *mas
 		replica := &follower.Replica
 		p.Replicas = append(p.Replicas, *replica)
 	}
-    log.Debug("----------leader=%v, replicas=%v", p.Leader, p.Replicas)
 	key, val, err := doMetaMarshal(p.Partition)
 	if err != nil {
 		return true, err
@@ -215,10 +214,8 @@ func (p *Partition) pickLeaderNodeId() metapb.NodeID {
 	defer p.propertyLock.RUnlock()
 
 	if p.Leader != nil {
-        log.Debug("partition leader is [%p]", p.Leader)
 		return p.Leader.NodeID
 	} else {
-	    log.Debug("partition leader is nil")
 		return 0
 	}
 }

@@ -93,7 +93,6 @@ func (s *RpcServer) GetRoute(ctx context.Context,
 			Partition: *partition.Partition,
 			Leader:    partition.pickLeaderNodeId(),
 		}
-        log.Debug("partition[%p][%v] : leader[%v]", partition, partition.Partition, partition.pickLeaderNodeId())
 
 		replicas := partition.Replicas
 		if replicas != nil || len(replicas) != 0 {
@@ -108,7 +107,8 @@ func (s *RpcServer) GetRoute(ctx context.Context,
 		}
 
 		resp.Routes = append(resp.Routes, route)
-	}
+    }
+    log.Debug("GetRoutes:[%v]", resp.Routes)
 	resp.ResponseHeader = *makeRpcRespHeader(ErrSuc)
 
 	return resp, nil
