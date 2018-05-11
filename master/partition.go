@@ -16,13 +16,13 @@ import (
 const (
 	PREFIX_PARTITION   = "schema partition "
 	defaultBTreeDegree = 64
-	FIXED_REPLICA_NUM  = 1
+	FIXED_REPLICA_NUM  = 1  // TODO: add config
 )
 
 type Partition struct {
 	*metapb.Partition // !!! Do not directly operate the Replicas，must be firstly take the propertyLock
 
-	Leader *masterpb.RaftFollowerStatus
+	Leader *metapb.Replica
 
 	// TODO: temporary policy, finally using global task to replace it
 	taskFlag    bool
@@ -127,7 +127,7 @@ func (p *Partition) addReplica(store Store, metaReplicas ...*metapb.Replica) err
 }
 
 func (p *Partition) UpdateReplicaGroupUnderGreatOrZeroVer(store Store, info *masterpb.PartitionInfo,
-		leaderFollower *masterpb.RaftFollowerStatus,) (conditionOk bool, err error) {
+		leaderFollower *metapb.Replica) (conditionOk bool, err error) {
 	p.propertyLock.Lock()
 	defer p.propertyLock.Unlock()
 
@@ -166,7 +166,7 @@ func (p *Partition) UpdateReplicaGroupUnderGreatOrZeroVer(store Store, info *mas
 }
 
 func (p *Partition) UpdateLeaderUnderSameVer(info *masterpb.PartitionInfo,
-        leaderFollower *masterpb.RaftFollowerStatus) (conditionOk, updateOk bool) {
+        leaderFollower *metapb.Replica) (conditionOk, updateOk bool) {
 	p.propertyLock.Lock()
 	defer p.propertyLock.Unlock()
 

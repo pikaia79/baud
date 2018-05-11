@@ -377,49 +377,40 @@ func (s *RpcServer) validatePartitionInfo(info *masterpb.PartitionInfo) error {
 		return ErrInternalError
 	}
 
-	if info.IsLeader && (info.RaftStatus == nil ||
-			info.RaftStatus.Followers == nil || len(info.RaftStatus.Followers) == 0) {
-		log.Error("!!!Never happened. Cannot report empty replicas when info is leader. info id[%v]", info.ID)
-		return ErrRpcEmptyFollowers
-	}
-
-	if info.IsLeader {
-		followers := info.RaftStatus.Followers
-		leaderReplica := info.RaftStatus.Replica
-
-		var leaderFound bool
-		for _, follower := range followers {
-			if follower.ID == leaderReplica.ID {
-				leaderFound = true
-				break
-			}
-		}
-		if !leaderFound {
-			return ErrRpcNoFollowerLeader
-		}
-	}
+	//if info.IsLeader && (info.RaftStatus == nil ||
+	//		info.RaftStatus.Followers == nil || len(info.RaftStatus.Followers) == 0) {
+	//	log.Error("!!!Never happened. Cannot report empty replicas when info is leader. info id[%v]", info.ID)
+	//	return ErrRpcEmptyFollowers
+	//}
+    //
+	//if info.IsLeader {
+	//	followers := info.RaftStatus.Followers
+	//	leaderReplica := info.RaftStatus.Replica
+    //
+	//	var leaderFound bool
+	//	for _, follower := range followers {
+	//		if follower.ID == leaderReplica.ID {
+	//			leaderFound = true
+	//			break
+	//		}
+	//	}
+	//	if !leaderFound {
+	//		return ErrRpcNoFollowerLeader
+	//	}
+	//}
 	return nil
 }
 
-func pickLeaderFollower(info *masterpb.PartitionInfo) (*masterpb.RaftFollowerStatus, error) {
+func pickLeaderFollower(info *masterpb.PartitionInfo) (*metapb.Replica, error) {
 	if !info.IsLeader {
 		return nil, ErrNotMSLeader
 	}
 
-	var leader *masterpb.RaftFollowerStatus
-	for _, follower := range info.RaftStatus.Followers {
-		if follower.ID == info.RaftStatus.ID {
-			leader = &follower
-			break
-		}
-	}
-
-	return leader, nil
+	return &info.RaftStatus.Replica, nil
 }
 
 func pickReplicaToDelete(info *masterpb.PartitionInfo) (*metapb.Replica) {
-	if info == nil || info.RaftStatus == nil ||
-			info.RaftStatus.Followers == nil || len(info.RaftStatus.Followers) == 0 {
+	if info == nil || info.RaftStatus == nil {
 		return nil
 	}
 
