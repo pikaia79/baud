@@ -260,14 +260,10 @@ func (s *RpcServer) PSHeartbeat(ctx context.Context,
 			}
 
 			// force to update by leader
-			condOk, err := partitionMS.UpdateReplicaGroupUnderGreatOrZeroVer(s.cluster.store, &partitionInfo,
-						leaderFollowerHb)
-			if !condOk {
-				log.Debug("ConfVersion is expired. waiting next heartbeat")
-				return resp, nil
-			}
-			if err != nil {
-				log.Error("fail to update partition[%v] info in ps heartbeat.", partitionInfo.ID, err)
+			if condOk, err := partitionMS.UpdateReplicaGroupUnderGreatOrZeroVer(s.cluster.store, &partitionInfo,
+						leaderFollowerHb); !condOk || err != nil {
+                log.Debug("Fail to update partition[%v] info. waiting next heartbeat. condOk[%v], err[%v]",
+                    partitionInfo.ID, condOk, err)
 				return resp, nil
 			}
 
@@ -324,14 +320,10 @@ func (s *RpcServer) PSHeartbeat(ctx context.Context,
 			}
 
 			if confVerMS == 0 {
-				condOk, err := partitionMS.UpdateReplicaGroupUnderGreatOrZeroVer(s.cluster.store, &partitionInfo,
-					leaderFollowerHb)
-				if !condOk {
-					log.Debug("ConfVersion is expired. waiting next heartbeat")
-					return resp, nil
-				}
-				if err != nil {
-					log.Error("fail to update partition[%v] info in ps heartbeat.", partitionInfo.ID, err)
+				if condOk, err := partitionMS.UpdateReplicaGroupUnderGreatOrZeroVer(s.cluster.store, &partitionInfo,
+					leaderFollowerHb);  !condOk || err != nil {
+					log.Debug("Fail to update partition[%v] info. waiting next heartbeat. condOk[%v], err[%v]",
+					        partitionInfo.ID, condOk, err)
 					return resp, nil
 				}
 
