@@ -150,7 +150,7 @@ func (p *Partition) UpdateReplicaGroupUnderGreatOrZeroVer(store Store, info *mas
     p.Replicas = make([]metapb.Replica, 0, len(info.RaftStatus.Followers) + 1)
     p.Replicas = append(p.Replicas, info.RaftStatus.Replica)
 	for _, follower := range info.RaftStatus.Followers {
-		replica := NewMetaReplicaByFollower(&follower)
+		replica := &follower.Replica
 		p.Replicas = append(p.Replicas, *replica)
 	}
 
@@ -289,13 +289,25 @@ func (c *PartitionCache) AddPartition(partition *Partition) {
 	c.partitions[partition.ID] = partition
 }
 
+func (c *PartitionCache) GetAllPartitions() *[]Partition {
+    c.lock.RLock()
+    defer c.lock.RUnlock()
+
+    partitions := make([]Partition, 0, len(c.partitions))
+    for _, partition := range c.partitions {
+        partitions = append(partitions, *partition)
+    }
+
+    return &partitions
+}
+
 func (c *PartitionCache) GetAllMetaPartitions() *[]metapb.Partition {
 	c.lock.RLock()
 	defer c.lock.RUnlock()
 
 	partitions := make([]metapb.Partition, 0, len(c.partitions))
-	for _, metaPartition := range c.partitions {
-		partitions = append(partitions, *metaPartition.Partition)
+	for _, partition := range c.partitions {
+		partitions = append(partitions, *partition.Partition)
 	}
 
 	return &partitions

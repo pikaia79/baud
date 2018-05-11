@@ -298,13 +298,8 @@ func (s *ApiServer) handlePartitionList(w http.ResponseWriter, r *http.Request, 
 		return
 	}
 
-	allPs := s.cluster.PartitionCache.GetAllMetaPartitions()
-	if allPs == nil {
-		sendReply(w, newHttpErrReply(ErrDbNotExists))
-		return
-	}
-
-	sendReply(w, newHttpSucReply(allPs))
+	partitions := s.cluster.PartitionCache.GetAllPartitions()
+	sendReply(w, newHttpSucReply(partitions))
 }
 
 func (s *ApiServer) handlePSList(w http.ResponseWriter, r *http.Request, params netutil.UriParams) {
@@ -313,11 +308,6 @@ func (s *ApiServer) handlePSList(w http.ResponseWriter, r *http.Request, params 
 	}
 
 	allPs := s.cluster.PsCache.GetAllServers()
-	if allPs == nil {
-		sendReply(w, newHttpErrReply(ErrDbNotExists))
-		return
-	}
-
 	sendReply(w, newHttpSucReply(allPs))
 }
 

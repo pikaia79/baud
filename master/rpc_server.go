@@ -377,7 +377,7 @@ func (s *RpcServer) validatePartitionInfo(info *masterpb.PartitionInfo) error {
 		return ErrInternalError
 	}
 
-	//if info.IsLeader && (info.RaftStatus == nil ||
+	//if info.IsLeader && info.RaftStatus == nil ||
 	//		info.RaftStatus.Followers == nil || len(info.RaftStatus.Followers) == 0) {
 	//	log.Error("!!!Never happened. Cannot report empty replicas when info is leader. info id[%v]", info.ID)
 	//	return ErrRpcEmptyFollowers
@@ -418,7 +418,7 @@ func pickReplicaToDelete(info *masterpb.PartitionInfo) (*metapb.Replica) {
 	var replicaToDelete *metapb.Replica
 
 	if !info.IsLeader {
-		replicaToDelete = NewMetaReplicaByFollower(&followers[0])
+		replicaToDelete = &followers[0].Replica
 		return replicaToDelete
 	}
 
@@ -428,7 +428,7 @@ func pickReplicaToDelete(info *masterpb.PartitionInfo) (*metapb.Replica) {
 			continue
 		}
 
-        replicaToDelete = NewMetaReplicaByFollower(&follower)
+        replicaToDelete = &follower.Replica
 		break
 	}
 	if replicaToDelete != nil {
@@ -448,14 +448,4 @@ func packPsRegRespWithCfg(resp *masterpb.PSRegisterResponse, psCfg *PsConfig) {
 	resp.RaftRetainLogs = psCfg.RaftRetainLogs
 	resp.RaftReplicaConcurrency = int(psCfg.RaftReplicaConcurrency)
 	resp.RaftSnapshotConcurrency = int(psCfg.RaftSnapshotConcurrency)
-}
-
-func NewMetaReplicaByFollower(follower *masterpb.RaftFollowerStatus) *metapb.Replica {
-    return &follower.Replica
-    //return &metapb.Replica{ID: follower.ID, NodeID: follower.NodeID, ReplicaAddrs: metapb.ReplicaAddrs{
-    //    HeartbeatAddr: follower.HeartbeatAddr,
-    //    ReplicateAddr: follower.ReplicateAddr,
-    //    RpcAddr:       follower.RpcAddr,
-    //    AdminAddr:     follower.AdminAddr,
-    //}}
 }
