@@ -22,7 +22,7 @@ const (
 type Partition struct {
 	*metapb.Partition // !!! Do not directly operate the Replicas，must be firstly take the propertyLock
 
-	Leader *metapb.Replica
+	Leader *metapb.Replica      `json:"leader"`
 
 	// TODO: temporary policy, finally using global task to replace it
 	taskFlag    bool
