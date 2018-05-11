@@ -153,7 +153,7 @@ func (p *Partition) UpdateReplicaGroupUnderGreatOrZeroVer(store Store, info *mas
 		replica := &follower.Replica
 		p.Replicas = append(p.Replicas, *replica)
 	}
-
+    log.Debug("----------leader=%v, replicas=%v", p.Leader, p.Replicas)
 	key, val, err := doMetaMarshal(p.Partition)
 	if err != nil {
 		return true, err
