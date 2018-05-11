@@ -451,35 +451,35 @@ func (l *Log) checkLogRotation(logDir, module string) {
 
 func Debug(format string, v ...interface{}) {
 	if glog.level <= DebugLevel {
-		glog.Output(3, glog.SetPrefix(fmt.Sprintf(format+"\r\n", v...), levels[DebugLevel]), false)
+		glog.Output(2, glog.SetPrefix(fmt.Sprintf(format+"\r\n", v...), levels[DebugLevel]), false)
 	}
 }
 
 func Info(format string, v ...interface{}) {
 	if glog.level <= InfoLevel {
-		glog.Output(3, glog.SetPrefix(fmt.Sprintf(format+"\r\n", v...), levels[InfoLevel]), false)
+		glog.Output(2, glog.SetPrefix(fmt.Sprintf(format+"\r\n", v...), levels[InfoLevel]), false)
 	}
 }
 
 func Warn(format string, v ...interface{}) {
 	if glog.level <= WarnLevel {
-		glog.Output(3, glog.SetPrefix(fmt.Sprintf(format+"\r\n", v...), levels[WarnLevel]), false)
+		glog.Output(2, glog.SetPrefix(fmt.Sprintf(format+"\r\n", v...), levels[WarnLevel]), false)
 	}
 }
 
 func Error(format string, v ...interface{}) {
 	if glog.level <= ErrorLevel {
-		glog.Output(3, glog.SetPrefix(fmt.Sprintf(format+"\r\n", v...), levels[ErrorLevel]), false)
+		glog.Output(2, glog.SetPrefix(fmt.Sprintf(format+"\r\n", v...), levels[ErrorLevel]), false)
 	}
 }
 
 func Fatal(format string, v ...interface{}) {
-	glog.Output(3, glog.SetPrefix(fmt.Sprintf(format+"\r\n", v...), levels[FatalLevel]), true)
+	glog.Output(2, glog.SetPrefix(fmt.Sprintf(format+"\r\n", v...), levels[FatalLevel]), true)
 	os.Exit(1)
 }
 
 func Panic(format string, v ...interface{}) {
 	s := fmt.Sprintf(format+"\r\n", v...)
-	glog.Output(3, glog.SetPrefix(fmt.Sprintf(format+"\r\n", v...), levels[FatalLevel]), true)
+	glog.Output(2, glog.SetPrefix(fmt.Sprintf(format+"\r\n", v...), levels[FatalLevel]), true)
 	panic(s)
 }
