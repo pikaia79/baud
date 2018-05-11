@@ -215,8 +215,10 @@ func (p *Partition) pickLeaderNodeId() metapb.NodeID {
 	defer p.propertyLock.RUnlock()
 
 	if p.Leader != nil {
+        log.Debug("partition leader is [%p]", p.Leader)
 		return p.Leader.NodeID
 	} else {
+	    log.Debug("partition leader is nil")
 		return 0
 	}
 }
@@ -295,6 +297,7 @@ func (c *PartitionCache) GetAllPartitions() *[]Partition {
 
     partitions := make([]Partition, 0, len(c.partitions))
     for _, partition := range c.partitions {
+        log.Debug("api get all partition[%p] ", partition)
         partitions = append(partitions, *partition)
     }
 
