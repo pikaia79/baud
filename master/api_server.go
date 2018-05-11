@@ -352,14 +352,17 @@ func (s *ApiServer) checkLeader(w http.ResponseWriter) error {
 		return ErrNoMSLeader
 	}
 
-
 	if !leaderInfo.becomeLeader {
 		if leaderInfo.newLeaderId == 0 {
 			sendReply(w, newHttpErrReply(ErrNoMSLeader))
 			return ErrNoMSLeader
 		} else {
 			log.Debug("current master leader is [%v]", leaderInfo.newLeaderId)
-			sendReply(w, newHttpErrReply(ErrNotMSLeader))
+            reply := newHttpErrReply(ErrNotMSLeader)
+            newMsg := fmt.Sprintf("%s, current leader[%d][%s]", reply.Msg, leaderInfo.newLeaderId,
+                    leaderInfo.newLeaderAddr)
+            reply.Msg = newMsg
+			sendReply(w, reply)
 			return ErrNotMSLeader
 		}
 	}
