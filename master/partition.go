@@ -28,7 +28,7 @@ type Partition struct {
 	taskFlag    bool
 	taskTimeout time.Time
 
-	lastHeartbeat time.Time 	`json:"last_heartbeat"`
+	LastHeartbeat time.Time 	`json:"last_heartbeat"`
 	propertyLock  sync.RWMutex
 }
 
@@ -141,7 +141,7 @@ func (p *Partition) UpdateReplicaGroupUnderGreatOrZeroVer(store Store, info *mas
     p.taskFlag = false
     p.taskTimeout = time.Time{}
 
-    p.lastHeartbeat = time.Now()
+    p.LastHeartbeat = time.Now()
     p.Status = info.Status
     p.Epoch = info.Epoch
 
