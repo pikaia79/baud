@@ -258,7 +258,6 @@ func (s *RpcServer) PSHeartbeat(ctx context.Context,
 				resp.ResponseHeader = *makeRpcRespHeader(err)
 				return resp, nil
 			}
-
 			// force to update by leader
 			if condOk, err := partitionMS.UpdateReplicaGroupUnderGreatOrZeroVer(s.cluster.store, &partitionInfo,
 						leaderFollowerHb); !condOk || err != nil {
