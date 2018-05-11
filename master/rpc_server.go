@@ -246,7 +246,7 @@ func (s *RpcServer) PSHeartbeat(ctx context.Context,
 
 		confVerMS := partitionMS.Epoch.ConfVersion
 		confVerHb := partitionInfo.Epoch.ConfVersion
-		log.Info("partition id[%v], confVerHb[%v], confVerMS[%v]", partitionId, confVerHb, confVerHb)
+		log.Info("partition id[%v], confVerHb[%v], confVerMS[%v]", partitionId, confVerHb, confVerMS)
 		if confVerHb > confVerMS {
 			if !partitionInfo.IsLeader {
 				return resp, nil
@@ -273,7 +273,7 @@ func (s *RpcServer) PSHeartbeat(ctx context.Context,
 				// the count of heartbeat replicas may be great then 4 when making snapshot.
 				// TODO: check partition status is not transfering replica now, then to delete
 
-				log.Info("To many replicas added. cur count:[%v]", replicaCount)
+				log.Info("Too many replicas added. cur count:[%v]", replicaCount)
 				if !partitionMS.takeChangeMemberTask() {
 					return resp, nil
 				}
@@ -285,7 +285,7 @@ func (s *RpcServer) PSHeartbeat(ctx context.Context,
 
 			} else if replicaCount < FIXED_REPLICA_NUM {
 
-				log.Info("To little replicas added. cur count:[%v]", replicaCount)
+				log.Info("Too little replicas added. cur count:[%v]", replicaCount)
 				if !partitionMS.takeChangeMemberTask() {
 					return resp, nil
 				}
