@@ -127,11 +127,11 @@ func (p *Partition) addReplica(store Store, metaReplicas ...*metapb.Replica) err
 }
 
 func (p *Partition) UpdateReplicaGroupUnderGreatOrZeroVer(store Store, info *masterpb.PartitionInfo,
-		leaderFollower *metapb.Replica) (conditionOk bool, err error) {
+		leaderReplica *metapb.Replica) (conditionOk bool, err error) {
 	p.propertyLock.Lock()
 	defer p.propertyLock.Unlock()
 
-	if store == nil || info == nil || leaderFollower == nil {
+	if store == nil || info == nil || leaderReplica == nil {
 		return false, nil
 	}
 	if !(p.Epoch.ConfVersion == 0 && p.Leader == nil) && !(p.Epoch.ConfVersion < info.Epoch.ConfVersion) {
@@ -145,14 +145,13 @@ func (p *Partition) UpdateReplicaGroupUnderGreatOrZeroVer(store Store, info *mas
     p.Status = info.Status
     p.Epoch = info.Epoch
 
-    p.Replicas = make([]metapb.Replica, 0, len(info.RaftStatus.Followers))
+	p.Leader = leaderReplica
+
+    p.Replicas = make([]metapb.Replica, 0, len(info.RaftStatus.Followers) + 1)
+    p.Replicas = append(p.Replicas, info.RaftStatus.Replica)
 	for _, follower := range info.RaftStatus.Followers {
 		replica := NewMetaReplicaByFollower(&follower)
 		p.Replicas = append(p.Replicas, *replica)
-
-		if replica.ID == leaderFollower.ID {
-			p.Leader = leaderFollower
-		}
 	}
 
 	key, val, err := doMetaMarshal(p.Partition)
@@ -166,11 +165,11 @@ func (p *Partition) UpdateReplicaGroupUnderGreatOrZeroVer(store Store, info *mas
 }
 
 func (p *Partition) UpdateLeaderUnderSameVer(info *masterpb.PartitionInfo,
-        leaderFollower *metapb.Replica) (conditionOk, updateOk bool) {
+        leaderReplica *metapb.Replica) (conditionOk, updateOk bool) {
 	p.propertyLock.Lock()
 	defer p.propertyLock.Unlock()
 
-    if info == nil || leaderFollower == nil {
+    if info == nil || leaderReplica == nil {
         return false, false
     }
 	if info.Epoch.ConfVersion != p.Epoch.ConfVersion {
@@ -180,17 +179,7 @@ func (p *Partition) UpdateLeaderUnderSameVer(info *masterpb.PartitionInfo,
         return false, false
     }
 
-	var leaderExists bool
-	for _, replica := range p.Replicas {
-		if replica.ID == leaderFollower.ID {
-			leaderExists = true
-			break
-		}
-	}
-	if !leaderExists {
-		return true, false
-	}
-	p.Leader = leaderFollower
+	p.Leader = leaderReplica
 
 	return true, true
 }

@@ -451,10 +451,11 @@ func packPsRegRespWithCfg(resp *masterpb.PSRegisterResponse, psCfg *PsConfig) {
 }
 
 func NewMetaReplicaByFollower(follower *masterpb.RaftFollowerStatus) *metapb.Replica {
-    return &metapb.Replica{ID: follower.ID, NodeID: follower.NodeID, ReplicaAddrs: metapb.ReplicaAddrs{
-        HeartbeatAddr: follower.HeartbeatAddr,
-        ReplicateAddr: follower.ReplicateAddr,
-        RpcAddr:       follower.RpcAddr,
-        AdminAddr:     follower.AdminAddr,
-    }}
+    return &follower.Replica
+    //return &metapb.Replica{ID: follower.ID, NodeID: follower.NodeID, ReplicaAddrs: metapb.ReplicaAddrs{
+    //    HeartbeatAddr: follower.HeartbeatAddr,
+    //    ReplicateAddr: follower.ReplicateAddr,
+    //    RpcAddr:       follower.RpcAddr,
+    //    AdminAddr:     follower.AdminAddr,
+    //}}
 }
