@@ -39,6 +39,7 @@ const (
 	MASTER_RESP_CODE_ROUTE_NOTEXISTS    RespCode = 605
 	MASTER_RESP_CODE_PS_NOTEXISTS       RespCode = 606
 	MASTER_RESP_CODE_NO_FOLLOWER_LEADER RespCode = 607
+	MASTER_RESP_CODE_NO_LEADER          RespCode = 608
 
 	/** PS Service Response Code **/
 	PS_RESP_CODE_NOT_LEADER     RespCode = 400

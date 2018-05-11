@@ -16,13 +16,13 @@ import (
 const (
 	PREFIX_PARTITION   = "schema partition "
 	defaultBTreeDegree = 64
-	FIXED_REPLICA_NUM  = 3
+	FIXED_REPLICA_NUM  = 1
 )
 
 type Partition struct {
 	*metapb.Partition // !!! Do not directly operate the Replicas，must be firstly take the propertyLock
 
-	leader *masterpb.RaftFollowerStatus
+	Leader *masterpb.RaftFollowerStatus
 
 	// TODO: temporary policy, finally using global task to replace it
 	taskFlag    bool
@@ -38,17 +38,17 @@ func NewPartition(dbId metapb.DBID, spaceId metapb.SpaceID, startSlot, endSlot m
 		log.Error("generate partition id is failed. err:[%v]", err)
 		return nil, ErrGenIdFailed
 	}
-	return &Partition{
-		Partition: &metapb.Partition{
-			ID:        metapb.PartitionID(partId),
-			DB:        dbId,
-			Space:     spaceId,
-			StartSlot: metapb.SlotID(startSlot),
-			EndSlot:   metapb.SlotID(endSlot),
-			Replicas:  make([]metapb.Replica, 0),
-			Status:    metapb.PA_READONLY,
-		},
-	}, nil
+
+	metaPartition := &metapb.Partition{
+		ID:        metapb.PartitionID(partId),
+		DB:        dbId,
+		Space:     spaceId,
+		StartSlot: metapb.SlotID(startSlot),
+		EndSlot:   metapb.SlotID(endSlot),
+		Replicas:  make([]metapb.Replica, 0),
+		Status:    metapb.PA_READONLY,
+	}
+	return NewPartitionByMeta(metaPartition), nil
 }
 
 func NewPartitionByMeta(metaPartition *metapb.Partition) *Partition {
@@ -134,7 +134,7 @@ func (p *Partition) UpdateReplicaGroupUnderGreatOrZeroVer(store Store, info *mas
 	if store == nil || info == nil || leaderFollower == nil {
 		return false, nil
 	}
-	if !(p.Epoch.ConfVersion == 0 && p.leader == nil) && !(p.Epoch.ConfVersion < info.Epoch.ConfVersion) {
+	if !(p.Epoch.ConfVersion == 0 && p.Leader == nil) && !(p.Epoch.ConfVersion < info.Epoch.ConfVersion) {
         return false, nil
     }
 
@@ -151,7 +151,7 @@ func (p *Partition) UpdateReplicaGroupUnderGreatOrZeroVer(store Store, info *mas
 		p.Replicas = append(p.Replicas, *replica)
 
 		if replica.ID == leaderFollower.ID {
-			p.leader = leaderFollower
+			p.Leader = leaderFollower
 		}
 	}
 
@@ -176,7 +176,7 @@ func (p *Partition) UpdateLeaderUnderSameVer(info *masterpb.PartitionInfo,
 	if info.Epoch.ConfVersion != p.Epoch.ConfVersion {
 		return false, false
 	}
-    if p.leader == nil {
+    if p.Leader == nil {
         return false, false
     }
 
@@ -190,7 +190,7 @@ func (p *Partition) UpdateLeaderUnderSameVer(info *masterpb.PartitionInfo,
 	if !leaderExists {
 		return true, false
 	}
-	p.leader = leaderFollower
+	p.Leader = leaderFollower
 
 	return true, true
 }
@@ -218,15 +218,15 @@ func (p *Partition) getAllReplicas() []*metapb.Replica {
 //	p.propertyLock.RLock()
 //	defer p.propertyLock.RUnlock()
 //
-//	return p.leader
+//	return p.Leader
 //}
 
 func (p *Partition) pickLeaderNodeId() metapb.NodeID {
 	p.propertyLock.RLock()
 	defer p.propertyLock.RUnlock()
 
-	if p.leader != nil {
-		return p.leader.NodeID
+	if p.Leader != nil {
+		return p.Leader.NodeID
 	} else {
 		return 0
 	}

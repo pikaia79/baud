@@ -92,6 +92,9 @@ func (s *ApiServer) initAdminHandler() {
 	s.httpServer.Handle(netutil.GET, "/manage/space/rename", s.handleSpaceRename)
 	s.httpServer.Handle(netutil.GET, "/manage/space/list", s.handleSpaceList)
 	s.httpServer.Handle(netutil.GET, "/manage/space/detail", s.handleSpaceDetail)
+
+    s.httpServer.Handle(netutil.GET, "/manage/partition/list", s.handlePartitionList)
+	s.httpServer.Handle(netutil.GET, "/manage/ps/list", s.handlePSList)
 }
 
 func (s *ApiServer) handleDbCreate(w http.ResponseWriter, r *http.Request, params netutil.UriParams) {
@@ -272,6 +275,10 @@ func (s *ApiServer) handleSpaceDetail(w http.ResponseWriter, r *http.Request, pa
 }
 
 func (s *ApiServer) handleSpaceList(w http.ResponseWriter, r *http.Request, params netutil.UriParams) {
+    if err := s.checkLeader(w); err != nil {
+        return
+    }
+
 	dbName, err := checkMissingParam(w, r, DB_NAME)
 	if err != nil {
 		return
@@ -284,6 +291,34 @@ func (s *ApiServer) handleSpaceList(w http.ResponseWriter, r *http.Request, para
 	}
 
 	sendReply(w, newHttpSucReply(db.SpaceCache.GetAllSpaces()))
+}
+
+func (s *ApiServer) handlePartitionList(w http.ResponseWriter, r *http.Request, params netutil.UriParams) {
+	if err := s.checkLeader(w); err != nil {
+		return
+	}
+
+	allPs := s.cluster.PartitionCache.GetAllMetaPartitions()
+	if allPs == nil {
+		sendReply(w, newHttpErrReply(ErrDbNotExists))
+		return
+	}
+
+	sendReply(w, newHttpSucReply(allPs))
+}
+
+func (s *ApiServer) handlePSList(w http.ResponseWriter, r *http.Request, params netutil.UriParams) {
+	if err := s.checkLeader(w); err != nil {
+		return
+	}
+
+	allPs := s.cluster.PsCache.GetAllServers()
+	if allPs == nil {
+		sendReply(w, newHttpErrReply(ErrDbNotExists))
+		return
+	}
+
+	sendReply(w, newHttpSucReply(allPs))
 }
 
 type HttpReply struct {

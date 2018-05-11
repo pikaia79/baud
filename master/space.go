@@ -41,20 +41,18 @@ func NewSpace(dbId metapb.DBID, dbName, spaceName string, policy *PartitionPolic
 		return nil, ErrGenIdFailed
 	}
 
-	return &Space{
-		Space: &metapb.Space{
-			Name:   spaceName,
-			ID:     metapb.SpaceID(spaceId),
-			DB:     dbId,
-			DbName: dbName,
-			Status: metapb.SS_Init,
-			KeyPolicy: &metapb.KeyPolicy{
-				KeyField: policy.Key,
-				KeyFunc:  policy.Function,
-			},
+	metaSpace := &metapb.Space{
+		Name:   spaceName,
+		ID:     metapb.SpaceID(spaceId),
+		DB:     dbId,
+		DbName: dbName,
+		Status: metapb.SS_Init,
+		KeyPolicy: &metapb.KeyPolicy{
+			KeyField: policy.Key,
+			KeyFunc:  policy.Function,
 		},
-		searchTree:   NewPartitionTree(),
-	}, nil
+	}
+	return NewSpaceByMeta(metaSpace), nil
 }
 
 func NewSpaceByMeta(metaSpace *metapb.Space) *Space {

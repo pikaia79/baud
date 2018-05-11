@@ -45,29 +45,26 @@ func NewPartitionServer(ip string, psCfg *PsConfig) (*PartitionServer, error) {
 		return nil, ErrGenIdFailed
 	}
 
-	return &PartitionServer{
-		Node: &metapb.Node{
-			ID: metapb.NodeID(newId),
-			Ip: ip,
-			ReplicaAddrs: metapb.ReplicaAddrs{
-				HeartbeatAddr: util.BuildAddr(ip, psCfg.RaftHeartbeatPort),
-				ReplicateAddr: util.BuildAddr(ip, psCfg.RaftReplicatePort),
-				RpcAddr:       util.BuildAddr(ip, psCfg.RpcPort),
-				AdminAddr:     util.BuildAddr(ip, psCfg.AdminPort),
-			},
+	metaNode := &metapb.Node{
+		ID: metapb.NodeID(newId),
+		Ip: ip,
+		ReplicaAddrs: metapb.ReplicaAddrs{
+			HeartbeatAddr: util.BuildAddr(ip, psCfg.RaftHeartbeatPort),
+			ReplicateAddr: util.BuildAddr(ip, psCfg.RaftReplicatePort),
+			RpcAddr:       util.BuildAddr(ip, psCfg.RpcPort),
+			AdminAddr:     util.BuildAddr(ip, psCfg.AdminPort),
 		},
-		NodeSysStats:   new(masterpb.NodeSysStats),
-		adminPort:      psCfg.AdminPort,
-		status:         PS_INIT,
-		lastHeartbeat:  time.Now(),
-		partitionCache: NewPartitionCache(),
-	}, nil
+	}
+	return NewPartitionServerByMeta(psCfg, metaNode), nil
 }
 
-func NewPartitionServerByMeta(metaPS *metapb.Node) *PartitionServer {
+func NewPartitionServerByMeta(psCfg *PsConfig, metaPS *metapb.Node) *PartitionServer {
 	return &PartitionServer{
 		Node:           metaPS,
+		NodeSysStats:   new(masterpb.NodeSysStats),
 		status:         PS_INIT,
+		adminPort:      psCfg.AdminPort,
+		lastHeartbeat:  time.Now(),
 		partitionCache: NewPartitionCache(),
 	}
 }
@@ -209,7 +206,7 @@ func (c *PSCache) AddServer(server *PartitionServer) {
 	c.ip2Servers[server.Ip] = server
 }
 
-func (c *PSCache) Recovery(store Store) ([]*PartitionServer, error) {
+func (c *PSCache) Recovery(store Store, psCfg *PsConfig) ([]*PartitionServer, error) {
 	prefix := []byte(PREFIX_PARTITION_SERVER)
 	startKey, limitKey := util.BytesPrefix(prefix)
 
@@ -230,7 +227,7 @@ func (c *PSCache) Recovery(store Store) ([]*PartitionServer, error) {
 			return nil, ErrInternalError
 		}
 
-		resultServers = append(resultServers, NewPartitionServerByMeta(metaPS))
+		resultServers = append(resultServers, NewPartitionServerByMeta(psCfg, metaPS))
 	}
 
 	return resultServers, nil

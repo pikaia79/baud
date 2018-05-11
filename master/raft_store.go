@@ -90,6 +90,7 @@ type RaftStoreConfig struct {
 type LeaderInfo struct {
     becomeLeader   bool
     newLeaderId    uint64  // 0: no leader
+    newLeaderAddr  string
 }
 
 func NewRaftStore(config *Config) *RaftStore {
@@ -291,7 +292,7 @@ func (rs *RaftStore) initRaftStoreCfg() error {
 	raftStoreCfg.WalPath = raftDataDir
 
 	raftStoreCfg.RaftRetainLogs = rs.config.ClusterCfg.RaftRetainLogsCount
-	raftStoreCfg.RaftHeartbeatInterval = rs.config.ClusterCfg.RaftHeartbeatInterval.Duration
+	raftStoreCfg.RaftHeartbeatInterval = time.Duration(rs.config.ClusterCfg.RaftHeartbeatInterval) * time.Millisecond
 	raftStoreCfg.RaftHeartbeatAddr = util.BuildAddr(rs.config.ClusterCfg.CurNode.Host,
 		rs.config.ClusterCfg.CurNode.RaftHeartbeatPort)
 	raftStoreCfg.RaftReplicateAddr = util.BuildAddr(rs.config.ClusterCfg.CurNode.Host,
@@ -613,9 +614,17 @@ func (rs *RaftStore) LeaderChangeHandler(leaderId uint64) {
 		return
 	}
 
+	var leaderNode *ClusterNode
+	for _, node := range rs.config.ClusterCfg.Nodes {
+		if node.NodeId == leaderId {
+			leaderNode = node
+			break
+		}
+	}
     info := &LeaderInfo{
         becomeLeader: rs.becomeLeader(leaderId),
         newLeaderId:  leaderId,
+		newLeaderAddr: util.BuildAddr(leaderNode.Host, leaderNode.RpcPort),
     }
     rs.leaderInfo = info
     select {

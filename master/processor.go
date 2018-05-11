@@ -231,6 +231,7 @@ func (p *PartitionProcessor) Run() {
 					// TODO: calling jdos api to allocate a container asynchronously
 					break
 				}
+				log.Debug("psToCreate node=%v, all ps:[%v]", psToCreate.ID, p.cluster.PsCache.GetAllServers())
 
 				p.wg.Add(1)
 				go func() {
