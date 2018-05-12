@@ -14,8 +14,6 @@ import (
 const (
     T_PSID_MAX = 3
     T_PSID_START = 1
-    //T_LEADER_PSID = T_PSID_START + T_PSID_MAX - 1
-    T_PSIP = "192.168.0.1"
 
     T_DB1           = "db1"
     T_DBID          = 1000
@@ -26,7 +24,6 @@ const (
 
     T_REPLICA_MAX     = 3
     T_REPLICAID_START = 100
-    //T_LEADER_REPLICAID = T_REPLICAID_START + T_REPLICA_MAX - 1
 )
 
 func TestPSRegister(t *testing.T) {
@@ -52,45 +49,46 @@ func TestPSHeartbeatNormal(t *testing.T) {
     InitPartitionCache(cluster)
 
     // validate non-leader hb results under confVerHb == confVerMS and confVerMS == 0
-    //for psIdx := 0; psIdx < T_PSID_MAX; psIdx++ {
-    //    psId := T_PSID_START + psIdx
-    //
-    //    // init param
-    //    var psLeaderId = T_PSID_START
-    //    var replicaMax = 1
-    //    var replicaLeaderId = T_REPLICAID_START
-    //    var confVer = 0
-    //
-    //    if psId != psLeaderId {
-    //        req := NewPSHeartbeatRequest(psId, psLeaderId, replicaMax, replicaLeaderId, confVer, 0)
-    //        rpcServer.PSHeartbeat(nil, req)
-    //
-    //        for pIdx := 0; pIdx < T_PARTITION_MAX; pIdx++ {
-    //            partitionId := metapb.PartitionID(T_PARTITIONID_START + pIdx)
-    //            partition := cluster.PartitionCache.FindPartitionById(partitionId)
-    //            assert.NotNil(t, partition)
-    //
-    //            assert.Nil(t, partition.Leader)
-    //            assert.Nil(t, partition.Replicas)
-    //            assert.Equal(t, partition.Epoch.ConfVersion, uint64(confVer), "epoch confVersion != 0")
-    //            assert.Equal(t, partition.Epoch.Version, uint64(0), "epoch Version != 0")
-    //        }
-    //        break
-    //    }
-    //}
+    for psIdx := 0; psIdx < T_PSID_MAX; psIdx++ {
+       psId := T_PSID_START + psIdx
+
+       // init param
+       var psLeaderId = T_PSID_START
+       var replicaMax = 1
+       var replicaLeaderId = T_REPLICAID_START
+       var confVer = 0
+
+       if psId != psLeaderId {
+           req := NewPSHeartbeatRequest(t, psId, psLeaderId, replicaMax, replicaLeaderId, confVer, 0)
+           rpcServer.PSHeartbeat(nil, req)
+
+           for pIdx := 0; pIdx < T_PARTITION_MAX; pIdx++ {
+               partitionId := metapb.PartitionID(T_PARTITIONID_START + pIdx)
+               partition := cluster.PartitionCache.FindPartitionById(partitionId)
+               assert.NotNil(t, partition)
+
+               assert.Nil(t, partition.Leader)
+               assert.Nil(t, partition.Replicas)
+
+               assert.Equal(t, partition.Epoch.ConfVersion, uint64(confVer), "epoch confVersion != 0")
+               assert.Equal(t, partition.Epoch.Version, uint64(0), "epoch Version != 0")
+           }
+           break
+       }
+    }
 
     // validate leader hb results under confVerHb == confVerMS and confVerMS == 0
     for psIdx := 0; psIdx < T_PSID_MAX; psIdx++ {
         psId := T_PSID_START + psIdx
 
         // init param
-        var psLeaderId = T_PSID_START
+        var leaderPsId = T_PSID_START
         var replicaMax = 1
-        var replicaLeaderId = T_REPLICAID_START
+        var leaderReplicaId = T_REPLICAID_START
         var confVer = 0
 
-        if psId == psLeaderId {
-            req := NewPSHeartbeatRequest(psId, psLeaderId, replicaMax, replicaLeaderId, confVer, 0)
+        if psId == leaderPsId {
+            req := NewPSHeartbeatRequest(t, psId, leaderPsId, replicaMax, leaderReplicaId, confVer, 0)
             rpcServer.PSHeartbeat(nil, req)
 
             for pIdx := 0; pIdx < T_PARTITION_MAX; pIdx++ {
@@ -99,18 +97,27 @@ func TestPSHeartbeatNormal(t *testing.T) {
                 assert.NotNil(t, partition)
 
                 assert.NotNil(t, partition.Leader)
-                assert.Equal(t, partition.Leader.ID, metapb.ReplicaID(replicaLeaderId), "unmatched leader replicaid")
-                assert.Equal(t, partition.Leader.NodeID, metapb.NodeID(psLeaderId), "unmatched leader nodeid")
+                assert.Equal(t, partition.Leader.ID, metapb.ReplicaID(leaderReplicaId), "unmatched leader replicaid")
+                assert.Equal(t, partition.Leader.NodeID, metapb.NodeID(leaderPsId), "unmatched leader nodeid")
 
                 assert.NotNil(t, partition.Replicas)
                 assert.Equal(t, len(partition.Replicas), replicaMax, "unmatched number of replicas")
 
                 for rIdx := 0; rIdx < replicaMax; rIdx++ {
-                    replica := partition.Replicas[rIdx]
+                    var replicaId = metapb.ReplicaID(T_REPLICAID_START+rIdx)
 
-                    // order of replica is not necessary from small to large
-                    assert.Equal(t, replica.ID, metapb.ReplicaID(T_REPLICAID_START+rIdx), "unmatched replicaid")
-                    assert.Equal(t, replica.NodeID, metapb.NodeID(T_PSID_START+rIdx), "unmatched replica nodeid")
+                    // order of replica is not necessary from small to large by replicaid
+                    var found bool
+                    var replica metapb.Replica
+                    for _, replica = range partition.Replicas {
+                        if replicaId == replica.ID {
+                            found = true
+                            break
+                        }
+                    }
+                    assert.True(t, found)
+                    assert.Equal(t, replica.ID, metapb.ReplicaID(leaderReplicaId), "unmatched leader replicaid")
+                    assert.Equal(t, replica.NodeID, metapb.NodeID(leaderPsId), "unmatched leader nodeid")
                 }
 
                 assert.Equal(t, partition.Epoch.ConfVersion, uint64(confVer), "epoch confVersion != 0")
@@ -120,92 +127,100 @@ func TestPSHeartbeatNormal(t *testing.T) {
         }
     }
 
-    //// validate leader and non-leader hb results at times, but partition cache not changed
-    //for times := 0; times < 1; times++ {
-    //    // init param
-    //    var psLeaderId = T_PSID_START
-    //    var replicaMax = 1
-    //    var replicaLeaderId = T_REPLICAID_START
-    //    var confVer = 0
-    //
-    //    for psIdx := 0; psIdx < T_PSID_MAX; psIdx++ {
-    //        psId := T_PSID_START + psIdx
-    //
-    //        req := NewPSHeartbeatRequest(psId, psLeaderId, replicaMax, replicaLeaderId, confVer, 0)
-    //        rpcServer.PSHeartbeat(nil, req)
-    //
-    //        for pIdx := 0; pIdx < T_PARTITION_MAX; pIdx++ {
-    //            partitionId := metapb.PartitionID(T_PARTITIONID_START + pIdx)
-    //            partition := cluster.PartitionCache.FindPartitionById(partitionId)
-    //            assert.NotNil(t, partition)
-    //
-    //            assert.NotNil(t, partition.Leader)
-    //            assert.Equal(t, partition.Leader.ID, replicaLeaderId, "unmatched leader replicaid")
-    //            assert.Equal(t, partition.Leader.NodeID, psLeaderId, "unmatched leader nodeid")
-    //
-    //            assert.NotNil(t, partition.Replicas)
-    //            assert.Equal(t, len(partition.Replicas), T_REPLICA_MAX, "unmatched number of replicas")
-    //
-    //            for rIdx := 0; rIdx < T_REPLICA_MAX; rIdx++ {
-    //                replica := partition.Replicas[rIdx]
-    //
-    //                // order of replica is not necessary from small to large
-    //                assert.Equal(t, replica.ID, T_REPLICAID_START+rIdx, "unmatched replicaid")
-    //                assert.Equal(t, replica.NodeID, T_PSID_START+rIdx, "unmatched replica nodeid")
-    //            }
-    //
-    //            assert.Equal(t, partition.Epoch.ConfVersion, uint64(confVer), "epoch confVersion != 0")
-    //            assert.Equal(t, partition.Epoch.Version, uint64(0), "epoch Version != 0")
-    //
-    //            // log.Debug("---------partition=[%v]", partition)
-    //        }
-    //    }
-    //}
+    // validate leader and non-leader hb results at times, but partition cache not changed
+    for times := 0; times < 1; times++ {
+       // init param
+       var leaderPsId = T_PSID_START
+       var replicaMax = 1
+       var leaderReplicaId = T_REPLICAID_START
+       var confVer = 0
+
+       for psIdx := 0; psIdx < T_PSID_MAX; psIdx++ {
+           psId := T_PSID_START + psIdx
+
+           req := NewPSHeartbeatRequest(t, psId, leaderPsId, replicaMax, leaderReplicaId, confVer, 0)
+           rpcServer.PSHeartbeat(nil, req)
+
+           for pIdx := 0; pIdx < T_PARTITION_MAX; pIdx++ {
+               partitionId := metapb.PartitionID(T_PARTITIONID_START + pIdx)
+               partition := cluster.PartitionCache.FindPartitionById(partitionId)
+               assert.NotNil(t, partition)
+
+               assert.NotNil(t, partition.Leader)
+               assert.Equal(t, partition.Leader.ID, metapb.ReplicaID(leaderReplicaId), "unmatched leader replicaid")
+               assert.Equal(t, partition.Leader.NodeID, metapb.NodeID(leaderPsId), "unmatched leader nodeid")
+
+               assert.NotNil(t, partition.Replicas)
+               assert.Equal(t, len(partition.Replicas), replicaMax, "unmatched number of replicas")
+
+               for rIdx := 0; rIdx < replicaMax; rIdx++ {
+                   var replicaId = metapb.ReplicaID(T_REPLICAID_START+rIdx)
+
+                   // order of replica is not necessary from small to large by replicaid
+                   var found bool
+                   var replica metapb.Replica
+                   for _, replica = range partition.Replicas {
+                       if replicaId == replica.ID {
+                           found = true
+                           break
+                       }
+                   }
+                   assert.True(t, found)
+                   assert.Equal(t, replica.ID, metapb.ReplicaID(T_REPLICAID_START+rIdx), "unmatched replicaid")
+                   assert.Equal(t, replica.NodeID, metapb.NodeID(T_PSID_START+rIdx), "unmatched replica nodeid")
+               }
+
+               assert.Equal(t, partition.Epoch.ConfVersion, uint64(confVer), "epoch confVersion != 0")
+               assert.Equal(t, partition.Epoch.Version, uint64(0), "epoch Version != 0")
+           }
+       }
+    }
 
     log.Debug("BEGIN to confVerHb > confVerMS")
     // validate leader hb with confVer greater than 0 under confVerHb > confVerMS
     // init param
-    var psLeaderId = T_PSID_START + T_PSID_MAX - 1
-    var replicaMax = T_PSID_MAX
-    var replicaLeaderId = T_REPLICAID_START + T_REPLICA_MAX - 1
+    var replicaMax = T_REPLICA_MAX
+    var leaderPsId = T_PSID_START + replicaMax - 1
+    var leaderReplicaId = T_REPLICAID_START + T_REPLICA_MAX - 1
     var confVer = 1
-    req := NewPSHeartbeatRequest(psLeaderId, psLeaderId, replicaMax, replicaLeaderId, confVer, 0)
+    req := NewPSHeartbeatRequest(t, leaderPsId, leaderPsId, replicaMax, leaderReplicaId, confVer, 0)
     rpcServer.PSHeartbeat(nil, req)
     for pIdx := 0; pIdx < T_PARTITION_MAX; pIdx++ {
-      partitionId := metapb.PartitionID(T_PARTITIONID_START + pIdx)
-      partition := cluster.PartitionCache.FindPartitionById(partitionId)
-      assert.NotNil(t, partition)
+        partitionId := metapb.PartitionID(T_PARTITIONID_START + pIdx)
+        partition := cluster.PartitionCache.FindPartitionById(partitionId)
+        assert.NotNil(t, partition)
 
-      assert.NotNil(t, partition.Leader)
-      assert.Equal(t, partition.Leader.ID, metapb.ReplicaID(replicaLeaderId), "unmatched leader replicaid")
-      assert.Equal(t, partition.Leader.NodeID, metapb.NodeID(psLeaderId), "unmatched leader nodeid")
+        assert.NotNil(t, partition.Leader)
+        assert.Equal(t, partition.Leader.ID, metapb.ReplicaID(leaderReplicaId), "unmatched leader replicaid")
+        assert.Equal(t, partition.Leader.NodeID, metapb.NodeID(leaderPsId), "unmatched leader nodeid")
 
-      assert.NotNil(t, partition.Replicas)
-      assert.Equal(t, len(partition.Replicas), T_REPLICA_MAX, "unmatched number of replicas")
+        assert.NotNil(t, partition.Replicas)
+        assert.Equal(t, len(partition.Replicas), replicaMax, "unmatched number of replicas")
 
-      for rIdx := 0; rIdx < T_REPLICA_MAX; rIdx++ {
-          var replicaId = metapb.ReplicaID(T_REPLICAID_START+rIdx)
+        for rIdx := 0; rIdx < replicaMax; rIdx++ {
+            var replicaId = metapb.ReplicaID(T_REPLICAID_START + rIdx)
 
-          // order of replica is not necessary from small to large by replicaid
-          var found bool
-          var replica metapb.Replica
-          for _, replica = range partition.Replicas {
-              if replicaId == replica.ID {
-                  found = true
-                  break
-              }
-          }
-          assert.True(t, found)
-          assert.Equal(t, replica.ID, metapb.ReplicaID(T_REPLICAID_START+rIdx), "unmatched replicaid")
-          assert.Equal(t, replica.NodeID, metapb.NodeID(T_PSID_START+rIdx), "unmatched replica nodeid")
-      }
+            // order of replica is not necessary from small to large by replicaid
+            var found bool
+            var replica metapb.Replica
+            for _, replica = range partition.Replicas {
+                if replicaId == replica.ID {
+                    found = true
+                    break
+                }
+            }
+            assert.True(t, found)
+            assert.Equal(t, replica.ID, metapb.ReplicaID(T_REPLICAID_START+rIdx), "unmatched replicaid")
+            assert.Equal(t, replica.NodeID, metapb.NodeID(T_PSID_START+rIdx), "unmatched replica nodeid")
+        }
 
-      assert.Equal(t, partition.Epoch.ConfVersion, uint64(1), "epoch confVersion != 1")
-      assert.Equal(t, partition.Epoch.Version, uint64(0), "epoch Version != 0")
+        assert.Equal(t, partition.Epoch.ConfVersion, uint64(1), "epoch confVersion != 1")
+        assert.Equal(t, partition.Epoch.Version, uint64(0), "epoch Version != 0")
 
-      // log.Debug("---------partition=[%v]", partition)
+        // log.Debug("---------partition=[%v]", partition)
     }
 }
+
 //
 //func TestPSHeartbeatAddReplica(t *testing.T) {
 //    defer time.Sleep(time.Second)
@@ -392,9 +407,12 @@ func InitPartitionCacheWithReplicas(cluster *Cluster) {
     }
 }
 
-func NewPSHeartbeatRequest(psId, leaderPsId, replicaMax, leaderReplicaId,
+func NewPSHeartbeatRequest(t *testing.T, psId, leaderPsId, replicaMax, leaderReplicaId,
             confVer, ver int) *masterpb.PSHeartbeatRequest {
     req := new(masterpb.PSHeartbeatRequest)
+
+    assert.LessEqual(t, leaderReplicaId, T_REPLICAID_START + replicaMax - 1)
+    assert.LessEqual(t, leaderPsId, T_PSID_START + replicaMax - 1)
 
     req.NodeID = metapb.NodeID(psId)
 
