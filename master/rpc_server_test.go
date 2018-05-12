@@ -8,6 +8,7 @@ import (
     "github.com/tiglabs/baudengine/util/assert"
     "github.com/tiglabs/baudengine/util/log"
     "time"
+    "math/rand"
 )
 
 const (
@@ -183,9 +184,18 @@ func TestPSHeartbeatNormal(t *testing.T) {
       assert.Equal(t, len(partition.Replicas), T_REPLICA_MAX, "unmatched number of replicas")
 
       for rIdx := 0; rIdx < T_REPLICA_MAX; rIdx++ {
-          replica := partition.Replicas[rIdx]
+          var replicaId = metapb.ReplicaID(T_REPLICAID_START+rIdx)
 
-          // order of replica is not necessary from small to large
+          // order of replica is not necessary from small to large by replicaid
+          var found bool
+          var replica metapb.Replica
+          for _, replica = range partition.Replicas {
+              if replicaId == replica.ID {
+                  found = true
+                  break
+              }
+          }
+          assert.True(t, found)
           assert.Equal(t, replica.ID, metapb.ReplicaID(T_REPLICAID_START+rIdx), "unmatched replicaid")
           assert.Equal(t, replica.NodeID, metapb.NodeID(T_PSID_START+rIdx), "unmatched replica nodeid")
       }
@@ -397,19 +407,20 @@ func NewPSHeartbeatRequest(psId, leaderPsId, replicaMax, leaderReplicaId,
             info.IsLeader = true
             info.RaftStatus = new(masterpb.RaftStatus)
 
-            // Leader replicaid
-            info.RaftStatus.ID = metapb.ReplicaID(leaderReplicaId)
+            // Leader replica
+            info.RaftStatus.Replica = metapb.Replica{ID:metapb.ReplicaID(leaderReplicaId),
+                    NodeID:metapb.NodeID(leaderPsId)}
 
             info.RaftStatus.Followers = make([]masterpb.RaftFollowerStatus, 0, T_REPLICA_MAX)
             for rIdx := 0; rIdx < replicaMax; rIdx++ {
-                follower := new(masterpb.RaftFollowerStatus)
-                follower.ID = metapb.ReplicaID(T_REPLICAID_START + rIdx)
-
-                if follower.ID == metapb.ReplicaID(leaderReplicaId) {
-                    follower.NodeID = metapb.NodeID(leaderPsId)
-                } else {
-                    follower.NodeID = metapb.NodeID(T_PSID_START + rIdx)
+                var replicaId = metapb.ReplicaID(T_REPLICAID_START + rIdx)
+                if replicaId == metapb.ReplicaID(leaderReplicaId) {
+                    continue
                 }
+
+                follower := new(masterpb.RaftFollowerStatus)
+                follower.ID = replicaId
+                follower.NodeID = metapb.NodeID(T_PSID_START + rIdx)
 
                 info.RaftStatus.Followers = append(info.RaftStatus.Followers, *follower)
             }
@@ -420,13 +431,21 @@ func NewPSHeartbeatRequest(psId, leaderPsId, replicaMax, leaderReplicaId,
         } else {
 
             info.IsLeader = false
-            info.RaftStatus = new(masterpb.RaftStatus)
-            info.RaftStatus.ID = metapb.ReplicaID(T_REPLICAID_START + 99999999999)
-            info.RaftStatus.Followers = make([]masterpb.RaftFollowerStatus, 0, 1)
-            follower := new(masterpb.RaftFollowerStatus)
-            follower.ID = metapb.ReplicaID(T_REPLICAID_START + 99999999999)
-            follower.NodeID = metapb.NodeID(T_PSID_START + 999999999)
-            info.RaftStatus.Followers = append(info.RaftStatus.Followers, *follower)
+
+            rand.Seed(time.Now().Unix())
+            if rand.Intn(2) == 0 {
+                info.RaftStatus = new(masterpb.RaftStatus)
+                info.RaftStatus.Replica = metapb.Replica{ID: metapb.ReplicaID(T_REPLICAID_START + 99999999999),
+                    NodeID: metapb.NodeID(T_PSID_START + 99999)}
+                info.RaftStatus.Followers = make([]masterpb.RaftFollowerStatus, 0, 1)
+                follower := new(masterpb.RaftFollowerStatus)
+                follower.ID = metapb.ReplicaID(T_REPLICAID_START + 99999999999)
+                follower.NodeID = metapb.NodeID(T_PSID_START + 999999999)
+                info.RaftStatus.Followers = append(info.RaftStatus.Followers, *follower)
+            } else {
+                info.RaftStatus = nil
+            }
+
             info.Epoch.ConfVersion = uint64(confVer) + 999999
             info.Epoch.Version = uint64(ver) + 999999
         }

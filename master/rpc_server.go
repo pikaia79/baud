@@ -245,7 +245,7 @@ func (s *RpcServer) PSHeartbeat(ctx context.Context,
 		log.Info("partition id[%v], confVerHb[%v], confVerMS[%v]", partitionId, confVerHb, confVerMS)
 		if confVerHb > confVerMS {
 			leaderReplicaHb := pickLeaderReplica(&partitionInfo)
-			if leaderReplicaHb != nil {
+			if leaderReplicaHb == nil {
 				resp.ResponseHeader = *makeRpcRespHeader(ErrSuc)
 				return resp, nil
 			}
@@ -301,7 +301,7 @@ func (s *RpcServer) PSHeartbeat(ctx context.Context,
 		} else if confVerHb == confVerMS {
 
 			leaderReplicaHb := pickLeaderReplica(&partitionInfo)
-			if leaderReplicaHb != nil {
+			if leaderReplicaHb == nil {
 				resp.ResponseHeader = *makeRpcRespHeader(ErrSuc)
 				return resp, nil
 			}
