@@ -10,11 +10,11 @@ Field: key -> a typed value or a sorted array of values
 
 Any field can be indexed and morever full-text search is a first-class citizen. 
 
-Partitions
+* Schema
 
-primary key = partition key, or primary key = partition key + sort key
+A scalar field is defined as the primary key and a scalar field as the partition key (route key, 16bit integer). 
 
-Each primary key field must be a scalar. 
+Other fields are either single-value or multi-value.
 
 ## Concepts
 
@@ -68,11 +68,7 @@ Note BaudEngine can also run on local filesystems - actually BS is transparent t
 
 ### partitioning 
 
-db -> space -> partition -> slot
-
-partition = slot id range
-
-slotID = hash func of the partitioning field to a uint32
+db -> space -> partition = partition key range
 
 ### replication
 
@@ -161,13 +157,11 @@ Each partition has a single key-value storage engine for both objects and indexe
 
 * the primary index
 
-(primaryKey) ->  a single value of the field
-
-(primaryKey, fieldKey, fieldValue) -> timestamp
+(#PI, primaryKey, fieldName, fieldValue) -> timestamp
 
 * secondary indexes
 
-(fieldKey, term, primaryKey) -> timestamp
+(#SI, fieldName, fieldValue or term, primaryKey) -> timestamp
 
 ### Synonym Table
 
