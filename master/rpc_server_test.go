@@ -278,92 +278,41 @@ func TestPSHeartbeatNormal(t *testing.T) {
     }
 }
 
-//func TestPSHeartbeatNotZeroVerAdd(t *testing.T) {
-//    defer time.Sleep(time.Second)
-//
-//    ctrl := gomock.NewController(t)
-//    defer ctrl.Finish()
-//
-//    assert.GreaterEqual(t, T_PSID_MAX, T_REPLICA_MAX)
-//
-//    mockStore, _, _ := CreateStoreMocks(ctrl)
-//    MockPushEvent(ctrl)
-//    cluster := NewCluster(nil, mockStore)
-//    InitPsCacheAndPartitionCache(cluster)
-//
-//    rpcServer := new(RpcServer)
-//    rpcServer.cluster = cluster
-//}
+func TestPSHeartbeatPartitionNotFound(t *testing.T) {
+   defer time.Sleep(time.Second)
 
-// ok
-//func TestPSHeartbeatPartitionNotFound(t *testing.T) {
-//    defer time.Sleep(time.Second)
-//
-//    ctrl := gomock.NewController(t)
-//    defer ctrl.Finish()
-//
-//    assert.GreaterEqual(t, T_PSID_MAX, T_REPLICA_MAX)
-//
-//    mockStore, _, _ := CreateStoreMocks(ctrl)
-//    MockPushEvent(ctrl)
-//    cluster := NewCluster(nil, mockStore)
-//    rpcServer := new(RpcServer)
-//    rpcServer.cluster = cluster
-//
-//    InitPsCache(cluster)
-//    InitPartitionCache(cluster)
-//
-//    // validate PartitionId not found
-//    req := new(masterpb.PSHeartbeatRequest)
-//    req.NodeID = metapb.NodeID(T_PSID_START)
-//    req.Partitions = make([]masterpb.PartitionInfo, 0, T_PARTITION_MAX)
-//    for pIdx := 0; pIdx < T_PARTITION_MAX; pIdx++ {
-//        info := new(masterpb.PartitionInfo)
-//        info.ID = metapb.PartitionID(T_PARTITIONID_START + pIdx +  99999999)
-//
-//        req.Partitions = append(req.Partitions, *info)
-//    }
-//
-//    rpcServer.PSHeartbeat(nil, req)
-//
-//    for pIdx := 0; pIdx < T_PARTITION_MAX; pIdx++ {
-//        partition := cluster.PartitionCache.FindPartitionById(metapb.PartitionID(T_PARTITIONID_START + pIdx + 99999999))
-//        assert.Nil(t, partition)
-//    }
-//}
+   ctrl := gomock.NewController(t)
+   defer ctrl.Finish()
 
-//
-//type EmptyStore struct {
-//}
-//func (m *EmptyStore) Open() error {
-//    return nil
-//}
-//func (m *EmptyStore) Put(key, value []byte) error {
-//    return nil
-//}
-//func (m *EmptyStore) Delete(key []byte) error{
-//    return nil
-//}
-//func (m *EmptyStore) Get(key []byte) ([]byte, error) {
-//    return nil, nil
-//}
-//func (m *EmptyStore) Scan(startKey, limitKey []byte) raftkvstore.Iterator {
-//    return nil
-//}
-//func (m *EmptyStore) NewBatch() Batch {
-//    return nil
-//}
-//func (m *EmptyStore) GetLeaderAsync(leaderChangingCh chan *LeaderInfo) {
-//    return
-//}
-//func (m *EmptyStore) GetLeaderSync() *LeaderInfo {
-//    return &LeaderInfo{
-//        becomeLeader: true,
-//    }
-//}
-//func (m *EmptyStore) Close() error {
-//    return nil
-//}
+   assert.GreaterEqual(t, T_PSID_MAX, T_REPLICA_MAX)
+
+   mockStore, _, _ := CreateStoreMocks(ctrl)
+   MockPushEvent(ctrl)
+   cluster := NewCluster(nil, mockStore)
+   rpcServer := new(RpcServer)
+   rpcServer.cluster = cluster
+
+   InitPsCache(cluster)
+   InitPartitionCache(cluster)
+
+   // validate PartitionId not found
+   req := new(masterpb.PSHeartbeatRequest)
+   req.NodeID = metapb.NodeID(T_PSID_START)
+   req.Partitions = make([]masterpb.PartitionInfo, 0, T_PARTITION_MAX)
+   for pIdx := 0; pIdx < T_PARTITION_MAX; pIdx++ {
+       info := new(masterpb.PartitionInfo)
+       info.ID = metapb.PartitionID(T_PARTITIONID_START + pIdx +  99999999)
+
+       req.Partitions = append(req.Partitions, *info)
+   }
+
+   rpcServer.PSHeartbeat(nil, req)
+
+   for pIdx := 0; pIdx < T_PARTITION_MAX; pIdx++ {
+       partition := cluster.PartitionCache.FindPartitionById(metapb.PartitionID(T_PARTITIONID_START + pIdx + 99999999))
+       assert.Nil(t, partition)
+   }
+}
 
 func CreateStoreMocks(ctrl *gomock.Controller) (*MockStore, *MockBatch, *MockIterator) {
 
