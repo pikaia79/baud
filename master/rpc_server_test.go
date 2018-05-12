@@ -178,45 +178,47 @@ func TestPSHeartbeatNormal(t *testing.T) {
 
     log.Debug("BEGIN to confVerHb > confVerMS")
     // validate leader hb with confVer greater than 0 under confVerHb > confVerMS
-    // init param
-    var replicaMax = T_REPLICA_MAX
-    var leaderPsId = T_PSID_START + replicaMax - 1
-    var leaderReplicaId = T_REPLICAID_START + T_REPLICA_MAX - 1
-    var confVer = 2
+    {
+        // init param
+        var replicaMax = T_REPLICA_MAX
+        var leaderPsId = T_PSID_START + replicaMax - 1
+        var leaderReplicaId = T_REPLICAID_START + T_REPLICA_MAX - 1
+        var confVer = 2
 
-    req := NewPSHeartbeatRequest(t, leaderPsId, leaderPsId, replicaMax, leaderReplicaId, confVer, 0)
-    rpcServer.PSHeartbeat(nil, req)
-    for pIdx := 0; pIdx < T_PARTITION_MAX; pIdx++ {
-        partitionId := metapb.PartitionID(T_PARTITIONID_START + pIdx)
-        partition := cluster.PartitionCache.FindPartitionById(partitionId)
-        assert.NotNil(t, partition)
+        req := NewPSHeartbeatRequest(t, leaderPsId, leaderPsId, replicaMax, leaderReplicaId, confVer, 0)
+        rpcServer.PSHeartbeat(nil, req)
+        for pIdx := 0; pIdx < T_PARTITION_MAX; pIdx++ {
+            partitionId := metapb.PartitionID(T_PARTITIONID_START + pIdx)
+            partition := cluster.PartitionCache.FindPartitionById(partitionId)
+            assert.NotNil(t, partition)
 
-        assert.NotNil(t, partition.Leader)
-        assert.Equal(t, partition.Leader.ID, metapb.ReplicaID(leaderReplicaId), "unmatched leader replicaid")
-        assert.Equal(t, partition.Leader.NodeID, metapb.NodeID(leaderPsId), "unmatched leader nodeid")
+            assert.NotNil(t, partition.Leader)
+            assert.Equal(t, partition.Leader.ID, metapb.ReplicaID(leaderReplicaId), "unmatched leader replicaid")
+            assert.Equal(t, partition.Leader.NodeID, metapb.NodeID(leaderPsId), "unmatched leader nodeid")
 
-        assert.NotNil(t, partition.Replicas)
-        assert.Equal(t, len(partition.Replicas), replicaMax, "unmatched number of replicas")
+            assert.NotNil(t, partition.Replicas)
+            assert.Equal(t, len(partition.Replicas), replicaMax, "unmatched number of replicas")
 
-        for rIdx := 0; rIdx < replicaMax; rIdx++ {
-            var replicaId = metapb.ReplicaID(T_REPLICAID_START + rIdx)
+            for rIdx := 0; rIdx < replicaMax; rIdx++ {
+                var replicaId = metapb.ReplicaID(T_REPLICAID_START + rIdx)
 
-            // order of replica is not necessary from small to large by replicaid
-            var found bool
-            var replica metapb.Replica
-            for _, replica = range partition.Replicas {
-                if replicaId == replica.ID {
-                    found = true
-                    break
+                // order of replica is not necessary from small to large by replicaid
+                var found bool
+                var replica metapb.Replica
+                for _, replica = range partition.Replicas {
+                    if replicaId == replica.ID {
+                        found = true
+                        break
+                    }
                 }
+                assert.True(t, found)
+                assert.Equal(t, replica.ID, metapb.ReplicaID(T_REPLICAID_START+rIdx), "unmatched replicaid")
+                assert.Equal(t, replica.NodeID, metapb.NodeID(T_PSID_START+rIdx), "unmatched replica nodeid")
             }
-            assert.True(t, found)
-            assert.Equal(t, replica.ID, metapb.ReplicaID(T_REPLICAID_START+rIdx), "unmatched replicaid")
-            assert.Equal(t, replica.NodeID, metapb.NodeID(T_PSID_START+rIdx), "unmatched replica nodeid")
-        }
 
-        assert.Equal(t, partition.Epoch.ConfVersion, uint64(confVer), "epoch confVersion != 2")
-        assert.Equal(t, partition.Epoch.Version, uint64(0), "epoch Version != 0")
+            assert.Equal(t, partition.Epoch.ConfVersion, uint64(confVer), "epoch confVersion != 2")
+            assert.Equal(t, partition.Epoch.Version, uint64(0), "epoch Version != 0")
+        }
     }
 
     //log.Debug("BEGIN to confVerHb < confVerMS")
