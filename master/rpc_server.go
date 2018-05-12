@@ -258,35 +258,6 @@ func (s *RpcServer) PSHeartbeat(ctx context.Context,
 				return resp, nil
 			}
 
-			// add or delete replica
-			replicaCount := partitionMS.countReplicas()
-			if replicaCount > FIXED_REPLICA_NUM {
-				// the count of heartbeat replicas may be great then 4 when making snapshot.
-				// TODO: check partition status is not transfering replica now, then to delete
-
-				log.Info("Too many replicas added. cur count:[%v]", replicaCount)
-				if !partitionMS.takeChangeMemberTask() {
-					return resp, nil
-				}
-
-				if replicaToDelete := pickReplicaToDelete(&partitionInfo); replicaToDelete != nil {
-					GetPMSingle(nil).PushEvent(NewPartitionDeleteEvent(partitionInfo.ID, partitionMS.pickLeaderNodeId(),
-						replicaToDelete))
-				}
-
-			} else if replicaCount < FIXED_REPLICA_NUM {
-
-				log.Info("Too little replicas added. cur count:[%v]", replicaCount)
-				if !partitionMS.takeChangeMemberTask() {
-					return resp, nil
-				}
-
-				GetPMSingle(nil).PushEvent(NewPartitionCreateEvent(partitionMS))
-
-			} else {
-				log.Info("Normal replica count in heartbeat")
-			}
-
 		} else if confVerHb < confVerMS {
 			// force delete all replicas and leader
 			if !partitionMS.takeChangeMemberTask() {
@@ -297,6 +268,7 @@ func (s *RpcServer) PSHeartbeat(ctx context.Context,
 				GetPMSingle(nil).PushEvent(NewPartitionDeleteEvent(partitionInfo.ID, partitionMS.pickLeaderNodeId(),
 					replicaToDelete))
 			}
+			return resp, nil
 
 		} else if confVerHb == confVerMS {
 
@@ -324,7 +296,10 @@ func (s *RpcServer) PSHeartbeat(ctx context.Context,
 					log.Info("To delete replicas of partition[%v] that had same conf version",
 						"but member[%v] is unmatched for cluster.", partitionInfo.ID, leaderReplicaHb)
 
-					if replicaToDelete := pickReplicaToDelete(&partitionInfo); replicaToDelete != nil {
+                    if !partitionMS.takeChangeMemberTask() {
+                        return resp, nil
+                    }
+                    if replicaToDelete := pickReplicaToDelete(&partitionInfo); replicaToDelete != nil {
 						log.Info("try to delete replica[%v]", replicaToDelete)
 						GetPMSingle(nil).PushEvent(NewPartitionDeleteEvent(partitionInfo.ID, leaderReplicaHb.NodeID,
 							replicaToDelete))
@@ -332,10 +307,37 @@ func (s *RpcServer) PSHeartbeat(ctx context.Context,
                     return resp, nil
 				}
 			}
-
-			// TODO: add or delete replicas
 		}
-	}
+
+        // add or delete replica
+        replicaCount := partitionMS.countReplicas()
+        if replicaCount > FIXED_REPLICA_NUM {
+            // the count of heartbeat replicas may be great then 4 when making snapshot.
+            // TODO: check partition status is not transfering replica now, then to delete
+
+            log.Info("Too many replicas added. cur count:[%v]", replicaCount)
+            if !partitionMS.takeChangeMemberTask() {
+                return resp, nil
+            }
+
+            if replicaToDelete := pickReplicaToDelete(&partitionInfo); replicaToDelete != nil {
+                GetPMSingle(nil).PushEvent(NewPartitionDeleteEvent(partitionInfo.ID, partitionMS.pickLeaderNodeId(),
+                    replicaToDelete))
+            }
+
+        } else if replicaCount < FIXED_REPLICA_NUM {
+
+            log.Info("Too little replicas added. cur count:[%v]", replicaCount)
+            if !partitionMS.takeChangeMemberTask() {
+                return resp, nil
+            }
+
+            GetPMSingle(nil).PushEvent(NewPartitionCreateEvent(partitionMS))
+
+        } else {
+            log.Info("Normal replica count in heartbeat")
+        }
+    }
 
 	return resp, nil
 }

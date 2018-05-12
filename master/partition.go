@@ -178,6 +178,16 @@ func (p *Partition) UpdateLeaderUnderSameVer(info *masterpb.PartitionInfo,
         return false, false
     }
 
+	var leaderExists bool
+	for _, replica := range p.Replicas {
+		if replica.ID == leaderReplica.ID {
+			leaderExists = true
+			break
+		}
+	}
+	if !leaderExists {
+		return true, false
+	}
 	p.Leader = leaderReplica
 
 	return true, true
