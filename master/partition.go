@@ -157,7 +157,7 @@ func (p *Partition) UpdateReplicaGroupUnderGreatOrZeroVer(store Store, info *mas
 	if err != nil {
 		return true, err
 	}
-	// TODO: partitions should not be store in db
+
 	store.Put(key, val)
 
 	return true, nil
