@@ -80,6 +80,8 @@ func (p *partition) HandleLeaderChange(leader uint64) {
 	p.rwMutex.Lock()
 
 	if p.leader != leader {
+		log.Debug("partition[%d] change leader from %d to %d", p.meta.ID, p.leader, leader)
+
 		p.leader = leader
 		_, term := p.server.raftServer.LeaderTerm(p.meta.ID)
 		if p.meta.Epoch.Version < term {

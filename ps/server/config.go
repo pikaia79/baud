@@ -5,22 +5,24 @@ import (
 	"strconv"
 
 	"github.com/tiglabs/baudengine/proto/masterpb"
+	"github.com/tiglabs/baudengine/util/bytes"
 	"github.com/tiglabs/baudengine/util/config"
+	"github.com/tiglabs/baudengine/util/json"
 	"github.com/tiglabs/baudengine/util/multierror"
 )
 
 // Config ps server config
 type Config struct {
-	masterpb.PSConfig
+	masterpb.PSConfig `json:"ps-config,omitempty"`
 
-	ClusterID    string
-	MasterServer string
-	DataPath     string
-	DiskQuota    uint64
+	ClusterID    string `json:"cluster-id,omitempty"`
+	MasterServer string `json:"master-server,omitempty"`
+	DataPath     string `json:"data-path,omitempty"`
+	DiskQuota    uint64 `json:"disk-quota,omitempty"`
 
-	LogDir    string
-	LogModule string
-	LogLevel  string
+	LogDir    string `json:"log-dir,omitempty"`
+	LogModule string `json:"log-module,omitempty"`
+	LogLevel  string `json:"log-level,omitempty"`
 }
 
 // loadConfig load server config from environment and file
@@ -117,4 +119,13 @@ func (c *Config) validate() error {
 	}
 
 	return multierr.ErrorOrNil()
+}
+
+func (c *Config) String() string {
+	data, err := json.Marshal(c)
+	if err != nil {
+		return err.Error()
+	}
+
+	return bytes.ByteToString(data)
 }

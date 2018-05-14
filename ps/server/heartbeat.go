@@ -38,6 +38,8 @@ func newHeartbeatWork(server *Server) *heartbeatWork {
 }
 
 func (h *heartbeatWork) start() {
+	log.Info("Server heartbeat worker started...")
+
 	quitCh := make(chan struct{})
 	routine.RunWorkDaemon("MASTER-HEARTBEAT", func() {
 		heartbeatTimer := time.NewTimer(h.tickerInterval)
@@ -56,6 +58,7 @@ func (h *heartbeatWork) start() {
 				return
 
 			case <-heartbeatTimer.C:
+				log.Debug("timer trigger heartbeat to master, tickerInterval is %d", h.tickerInterval)
 				h.doHeartbeat()
 				h.update(heartbeatTimer)
 
@@ -71,6 +74,7 @@ func (h *heartbeatWork) start() {
 					break
 				}
 
+				log.Debug("triggerChan trigger heartbeat to master, tickerInterval is %d", h.tickerInterval)
 				h.doHeartbeat()
 				h.update(heartbeatTimer)
 			}
@@ -109,7 +113,7 @@ func (h *heartbeatWork) doHeartbeat() {
 		}
 		masterClient, err := h.server.masterClient.GetGrpcClient(masterAddr)
 		if err != nil {
-			return fmt.Errorf("get master heartbeat rpc client error: %v", err)
+			return fmt.Errorf("get master heartbeat rpc client[%s] error: %v", masterAddr, err)
 		}
 
 		stats, _ := h.server.systemMetric.Export()
@@ -126,6 +130,7 @@ func (h *heartbeatWork) doHeartbeat() {
 		})
 		req.SysStats = *stats
 
+		log.Debug("heartbeat to master request is: %s", req.String())
 		goCtx, cancel := context.WithTimeout(h.server.ctx, heartbeatTimeout)
 		resp, err := masterClient.(masterpb.MasterRpcClient).PSHeartbeat(goCtx, req)
 		cancel()
@@ -151,7 +156,7 @@ func (h *heartbeatWork) doHeartbeat() {
 		} else if resp.Error.NotLeader != nil {
 			h.server.masterLeader = resp.Error.NotLeader.LeaderAddr
 		}
-		return fmt.Errorf("master heartbeat requeset[%s] ack code not ok[%v], message is: %s", req.ReqId, resp.Code, resp.Message)
+		return fmt.Errorf("master heartbeat requeset[%s] ack code not ok, response is: %s", req.ReqId, resp.String())
 	})
 
 	if err != nil {
