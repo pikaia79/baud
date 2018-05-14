@@ -21,6 +21,12 @@ type TestingT interface {
 // Equal compare the actual value to the expected value and fails the test if
 // they are not equal.
 func Equal(t TestingT, actual, expected interface{}, msg string) {
+	actualType := reflect.TypeOf(actual)
+	expectedType := reflect.TypeOf(expected)
+	if actualType.Kind() != expectedType.Kind() {
+		fatal(t, "Needs two same type, but %s != %s", actualType.Kind(), expectedType.Kind())
+	}
+
 	if expected != actual {
 		fatal(t, "Expected '%v' (%T) got '%v' (%T). msg:%s", expected, expected, actual, actual, msg)
 	}
@@ -29,6 +35,12 @@ func Equal(t TestingT, actual, expected interface{}, msg string) {
 // NotEqual compare the actual value to the expected value and fails the test if
 // they are equal.
 func NotEqual(t TestingT, actual, expected interface{}, msg string) {
+	actualType := reflect.TypeOf(actual)
+	expectedType := reflect.TypeOf(expected)
+	if actualType.Kind() != expectedType.Kind() {
+		fatal(t, "Needs two same type, but %s != %s", actualType.Kind(), expectedType.Kind())
+	}
+
 	if expected == actual {
 		fatal(t, "Not Expected '%v' (%T) got '%v' (%T). msg:%v", expected, expected, actual, actual, msg)
 	}
