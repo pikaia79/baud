@@ -225,19 +225,21 @@ func (p *PartitionProcessor) Run() {
 			}
 
 			if event.typ == EVENT_TYPE_PARTITION_CREATE {
-				psToCreate := p.serverSelector.SelectTarget(p.cluster.PsCache.GetAllServers())
-				if psToCreate == nil {
-					log.Error("Can not distribute suitable ps node")
-					// TODO: calling jdos api to allocate a container asynchronously
-					break
-				}
-				log.Debug("psToCreate node=%v, all ps:[%v]", psToCreate.ID, p.cluster.PsCache.GetAllServers())
 
 				p.wg.Add(1)
 				go func() {
 					defer p.wg.Done()
 
-					p.createPartition(event.body.(*Partition), psToCreate)
+					partitionToCreate := event.body.(*Partition)
+					psToCreate := p.serverSelector.SelectTarget(p.cluster.PsCache.GetAllServers(), partitionToCreate.ID)
+					if psToCreate == nil {
+						log.Error("Can not distribute suitable ps node")
+						// TODO: calling jdos api to allocate a container asynchronously
+						return
+					}
+					log.Debug("psToCreate node[%v], all ps:[%v]", psToCreate.ID, p.cluster.PsCache.GetAllServers())
+
+					p.createPartition(partitionToCreate, psToCreate)
 				}()
 
 			} else if event.typ == EVENT_TYPE_PARTITION_DELETE {
