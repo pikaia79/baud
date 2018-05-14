@@ -243,24 +243,23 @@ func (s *RpcServer) PSHeartbeat(ctx context.Context,
 		confVerMS := partitionMS.Epoch.ConfVersion
 		confVerHb := partitionInfo.Epoch.ConfVersion
 		log.Info("partition id[%v], confVerHb[%v], confVerMS[%v]", partitionId, confVerHb, confVerMS)
+		var needToCheckingReplicasCount bool
 		if confVerHb < confVerMS {
 			// force delete all replicas and leader
 			if !partitionMS.takeChangeMemberTask() {
-				return resp, nil
+				continue
 			}
 
 			if replicaToDelete := pickReplicaToDelete(&partitionInfo); replicaToDelete != nil {
 				GetPMSingle(nil).PushEvent(NewPartitionDeleteEvent(partitionInfo.ID, partitionMS.pickLeaderNodeId(),
 					replicaToDelete))
-				return resp, nil
 			}
-			return resp, nil
+			continue
 
 		} else if confVerHb > confVerMS {
 			leaderReplicaHb := pickLeaderReplica(&partitionInfo)
 			if leaderReplicaHb == nil {
-				resp.ResponseHeader = *makeRpcRespHeader(ErrSuc)
-				return resp, nil
+				continue
 			}
 
 			// To force update whole leader and replicas group
@@ -268,75 +267,78 @@ func (s *RpcServer) PSHeartbeat(ctx context.Context,
 					expired || !ok {
                 log.Debug("Fail to update partition[%v] info. waiting next heartbeat. updateOk[%v]",
                 	partitionInfo.ID, ok)
-				return resp, nil
+				continue
 			}
+
+			needToCheckingReplicasCount = true
 
 		} else if confVerHb == confVerMS {
 			leaderReplicaHb := pickLeaderReplica(&partitionInfo)
 			if leaderReplicaHb == nil {
-				resp.ResponseHeader = *makeRpcRespHeader(ErrSuc)
-				return resp, nil
+				continue
 			}
 
 			// To delete invalid replica group for the leader, because its replicaid is not exists in cluster
 			expired, illegal, ok := partitionMS.ValidateAndUpdateLeaderByCond(&partitionInfo, leaderReplicaHb)
 			if expired {
 				log.Debug("Fail to update partition[%v] info. waiting next heartbeat.", partitionInfo.ID)
-				return resp, nil
+				continue
 			}
 			if illegal {
 				if !partitionMS.takeChangeMemberTask() {
-					return resp, nil
+					continue
 				}
 				if replicaToDelete := pickReplicaToDelete(&partitionInfo); replicaToDelete != nil {
 					log.Info("try to delete replica[%v]", replicaToDelete)
 					GetPMSingle(nil).PushEvent(NewPartitionDeleteEvent(partitionInfo.ID, leaderReplicaHb.NodeID,
 						replicaToDelete))
 				}
-				return resp, nil
+				continue
 			}
-			if ok {
-				log.Debug("Updated leader of partition[%v]", partitionInfo.ID)
-				return resp, nil
+			if !ok {
+				// To update whole leader and replicas group when leader in cluster is empty
+				if expired, ok := partitionMS.UpdateReplicaGroupByCond(s.cluster.store, &partitionInfo, leaderReplicaHb);
+					expired || !ok {
+					log.Debug("Fail to update partition[%v] info. waiting next heartbeat. updateOk[%v]",
+						partitionInfo.ID, ok)
+					continue
+				}
 			}
 
-			// To update whole leader and replicas group when leader in cluster is empty
-			if expired, ok := partitionMS.UpdateReplicaGroupByCond(s.cluster.store, &partitionInfo, leaderReplicaHb);
-				expired || !ok {
-				log.Debug("Fail to update partition[%v] info. waiting next heartbeat. updateOk[%v]",
-					partitionInfo.ID, ok)
-				return resp, nil
-			}
+			log.Debug("Updated leader of partition[%v]", partitionInfo.ID)
+			needToCheckingReplicasCount = true
 		}
 
-        // add or delete replica
-        replicaCount := partitionMS.countReplicas()
-        if replicaCount > FIXED_REPLICA_NUM {
-            // the count of heartbeat replicas may be great then 4 when making snapshot.
-            // TODO: check partition status is not transfering replica now, then to delete
+		if needToCheckingReplicasCount {
+			// add or delete replica
+			replicaCount := partitionMS.countReplicas()
+			if replicaCount > FIXED_REPLICA_NUM {
+				// the count of heartbeat replicas may be great then 4 when making snapshot.
+				// TODO: check partition status is not transfering replica now, then to delete
 
-            log.Info("Too many replicas added. cur count:[%v]", replicaCount)
-            if !partitionMS.takeChangeMemberTask() {
-                return resp, nil
-            }
+				log.Info("Too many replicas added. cur count:[%v]", replicaCount)
+				if !partitionMS.takeChangeMemberTask() {
+					continue
+				}
 
-            if replicaToDelete := pickReplicaToDelete(&partitionInfo); replicaToDelete != nil {
-                GetPMSingle(nil).PushEvent(NewPartitionDeleteEvent(partitionInfo.ID, partitionMS.pickLeaderNodeId(),
-                    replicaToDelete))
-            }
+				if replicaToDelete := pickReplicaToDelete(&partitionInfo); replicaToDelete != nil {
+					GetPMSingle(nil).PushEvent(NewPartitionDeleteEvent(partitionInfo.ID, partitionMS.pickLeaderNodeId(),
+						replicaToDelete))
+				}
 
-        } else if replicaCount < FIXED_REPLICA_NUM {
+			} else if replicaCount < FIXED_REPLICA_NUM {
 
-            log.Info("Too little replicas added. cur count:[%v]", replicaCount)
-            if !partitionMS.takeChangeMemberTask() {
-                return resp, nil
-            }
+				log.Info("Too little replicas added. cur count:[%v]", replicaCount)
+				if !partitionMS.takeChangeMemberTask() {
+					continue
+				}
 
-            GetPMSingle(nil).PushEvent(NewPartitionCreateEvent(partitionMS))
+				GetPMSingle(nil).PushEvent(NewPartitionCreateEvent(partitionMS))
 
-        } else {
-            log.Info("Normal replica count in heartbeat")
-        }
+			} else {
+				log.Info("Normal replica count in heartbeat")
+			}
+		}
     }
 
 	return resp, nil
