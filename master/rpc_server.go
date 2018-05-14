@@ -243,22 +243,7 @@ func (s *RpcServer) PSHeartbeat(ctx context.Context,
 		confVerMS := partitionMS.Epoch.ConfVersion
 		confVerHb := partitionInfo.Epoch.ConfVersion
 		log.Info("partition id[%v], confVerHb[%v], confVerMS[%v]", partitionId, confVerHb, confVerMS)
-		if confVerHb > confVerMS {
-			leaderReplicaHb := pickLeaderReplica(&partitionInfo)
-			if leaderReplicaHb == nil {
-				resp.ResponseHeader = *makeRpcRespHeader(ErrSuc)
-				return resp, nil
-			}
-
-			// To update leader and replicas group
-			if condOk, err := partitionMS.UpdateReplicaGroupUnderGreatOrZeroVer(s.cluster.store, &partitionInfo,
-				leaderReplicaHb); !condOk || err != nil {
-                log.Debug("Fail to update partition[%v] info. waiting next heartbeat. condOk[%v], err[%v]",
-                    partitionInfo.ID, condOk, err)
-				return resp, nil
-			}
-
-		} else if confVerHb < confVerMS {
+		if confVerHb < confVerMS {
 			// force delete all replicas and leader
 			if !partitionMS.takeChangeMemberTask() {
 				return resp, nil
@@ -267,45 +252,60 @@ func (s *RpcServer) PSHeartbeat(ctx context.Context,
 			if replicaToDelete := pickReplicaToDelete(&partitionInfo); replicaToDelete != nil {
 				GetPMSingle(nil).PushEvent(NewPartitionDeleteEvent(partitionInfo.ID, partitionMS.pickLeaderNodeId(),
 					replicaToDelete))
+				return resp, nil
 			}
 			return resp, nil
 
-		} else if confVerHb == confVerMS {
-
+		} else if confVerHb > confVerMS {
 			leaderReplicaHb := pickLeaderReplica(&partitionInfo)
 			if leaderReplicaHb == nil {
 				resp.ResponseHeader = *makeRpcRespHeader(ErrSuc)
 				return resp, nil
 			}
 
-			if confVerMS == 0 {
-				if condOk, err := partitionMS.UpdateReplicaGroupUnderGreatOrZeroVer(s.cluster.store, &partitionInfo,
-					leaderReplicaHb);  !condOk || err != nil {
-					log.Debug("Fail to update partition[%v] info. waiting next heartbeat. condOk[%v], err[%v]",
-					        partitionInfo.ID, condOk, err)
+			// To force update whole leader and replicas group
+			if expired, ok := partitionMS.UpdateReplicaGroupByCond(s.cluster.store, &partitionInfo, leaderReplicaHb);
+					expired || !ok {
+                log.Debug("Fail to update partition[%v] info. waiting next heartbeat. updateOk[%v]",
+                	partitionInfo.ID, ok)
+				return resp, nil
+			}
+
+		} else if confVerHb == confVerMS {
+			leaderReplicaHb := pickLeaderReplica(&partitionInfo)
+			if leaderReplicaHb == nil {
+				resp.ResponseHeader = *makeRpcRespHeader(ErrSuc)
+				return resp, nil
+			}
+
+			// To delete invalid replica group for the leader, because its replicaid is not exists in cluster
+			expired, illegal, ok := partitionMS.ValidateAndUpdateLeaderByCond(&partitionInfo, leaderReplicaHb)
+			if expired {
+				log.Debug("Fail to update partition[%v] info. waiting next heartbeat.", partitionInfo.ID)
+				return resp, nil
+			}
+			if illegal {
+				if !partitionMS.takeChangeMemberTask() {
 					return resp, nil
 				}
-
-			} else {  // if confVerMS != 0
-				condOk, updateOk := partitionMS.UpdateLeaderUnderSameVer(&partitionInfo, leaderReplicaHb)
-				if !condOk {
-					log.Debug("ConfVersion is expired. waiting next heartbeat")
-					return resp, nil
+				if replicaToDelete := pickReplicaToDelete(&partitionInfo); replicaToDelete != nil {
+					log.Info("try to delete replica[%v]", replicaToDelete)
+					GetPMSingle(nil).PushEvent(NewPartitionDeleteEvent(partitionInfo.ID, leaderReplicaHb.NodeID,
+						replicaToDelete))
 				}
-				if !updateOk {
-					log.Info("To delete replicas of partition[%v] that had same conf version",
-						"but member[%v] is unmatched for cluster.", partitionInfo.ID, leaderReplicaHb)
+				return resp, nil
+			}
+			if ok {
+				log.Debug("Updated leader of partition[%v]", partitionInfo.ID)
+				return resp, nil
+			}
 
-                    if !partitionMS.takeChangeMemberTask() {
-                        return resp, nil
-                    }
-                    if replicaToDelete := pickReplicaToDelete(&partitionInfo); replicaToDelete != nil {
-						log.Info("try to delete replica[%v]", replicaToDelete)
-						GetPMSingle(nil).PushEvent(NewPartitionDeleteEvent(partitionInfo.ID, leaderReplicaHb.NodeID,
-							replicaToDelete))
-					}
-                    return resp, nil
-				}
+			// To update whole leader and replicas group when leader in cluster is empty
+			if expired, ok := partitionMS.UpdateReplicaGroupByCond(s.cluster.store, &partitionInfo, leaderReplicaHb);
+				expired || !ok {
+				log.Debug("Fail to update partition[%v] info. waiting next heartbeat. updateOk[%v]",
+					partitionInfo.ID, ok)
+				return resp, nil
 			}
 		}
 
