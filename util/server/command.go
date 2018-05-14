@@ -6,11 +6,11 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
 
 	"gopkg.in/urfave/cli.v2"
 
 	"github.com/tiglabs/baudengine/util/build"
-	"github.com/tiglabs/baudengine/util/log"
 	"github.com/tiglabs/baudengine/util/multierror"
 	"github.com/tiglabs/baudengine/util/routine"
 )
@@ -64,22 +64,31 @@ func WaitShutdown(stops ...stopHook) {
 	sigs := make(chan os.Signal)
 	signal.Notify(sigs, os.Interrupt, os.Kill, syscall.SIGHUP, syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT)
 	<-sigs
-	log.Info("Server Starting Shutdown...")
 
-	merr := &multierror.MultiError{}
-	for _, stop := range stops {
-		merr.Append(stop())
-	}
-	if err := merr.ErrorOrNil(); err != nil {
-		log.Error("Server Shutdown Error...", "Error", err)
-	}
+	go func() {
+		fmt.Println("Initiating server graceful shutdown...")
+		merr := &multierror.MultiError{}
+		for _, stop := range stops {
+			merr.Append(stop())
+		}
+		if err := merr.ErrorOrNil(); err != nil {
+			fmt.Println("Server Shutdown Error is :", err)
+		}
+		// stop routine worker
+		if err := routine.Stop(); err != nil {
+			fmt.Println("Server Stop routine-worker error is :", err)
+		}
 
-	// stop routine worker
-	if err := routine.Stop(); err != nil {
-		log.Error("Server Stop routine-worker error...", "Error", err)
-	}
+		fmt.Println("Server graceful shutdown completed...")
+	}()
 
-	log.Info("Server Shutdown And Exited...")
+	select {
+	case <-sigs:
+		fmt.Println("Second signal received, initiating server hard shutdown...")
+
+	case <-time.After(15 * time.Second):
+		fmt.Println("Time limit reached, initiating server hard shutdown...")
+	}
 }
 
 // SupressGlogWarnings is a hack to make flag.Parsed return true such that glog is happy about the flags having been parsed.
