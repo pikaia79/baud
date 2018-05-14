@@ -316,7 +316,7 @@ func (s *RpcServer) PSHeartbeat(ctx context.Context,
 				// the count of heartbeat replicas may be great then 4 when making snapshot.
 				// TODO: check partition status is not transfering replica now, then to delete
 
-				log.Info("Too many replicas added. cur count:[%v]", replicaCount)
+				log.Info("Too many replicas，need to delete. cur count:[%v]", replicaCount)
 				if !partitionMS.takeChangeMemberTask() {
 					continue
 				}
@@ -328,7 +328,7 @@ func (s *RpcServer) PSHeartbeat(ctx context.Context,
 
 			} else if replicaCount < FIXED_REPLICA_NUM {
 
-				log.Info("Too little replicas added. cur count:[%v]", replicaCount)
+				log.Info("Too little replicas，need to add. cur count:[%v]", replicaCount)
 				if !partitionMS.takeChangeMemberTask() {
 					continue
 				}
@@ -336,7 +336,7 @@ func (s *RpcServer) PSHeartbeat(ctx context.Context,
 				GetPMSingle(nil).PushEvent(NewPartitionCreateEvent(partitionMS))
 
 			} else {
-				log.Info("Normal replica count in heartbeat")
+				log.Info("Normal replica count[%d] in heartbeat", FIXED_REPLICA_NUM)
 			}
 		}
     }
