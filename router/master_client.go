@@ -7,6 +7,8 @@ import (
 	"github.com/tiglabs/baudengine/proto/metapb"
 	"github.com/tiglabs/baudengine/util/rpc"
 	"google.golang.org/grpc"
+	"github.com/tiglabs/baudengine/util/log"
+	"github.com/tiglabs/baudengine/util/json"
 )
 
 type MasterClient struct {
@@ -22,9 +24,11 @@ func NewMasterClient(masterAddr string) *MasterClient {
 	mc.context, mc.cancelFunc = context.WithCancel(context.Background())
 	connMgr := rpc.NewConnectionMgr(mc.context, &connMgrOpt)
 	clientOpt := rpc.DefaultClientOption
-	//clientOpt.ClusterID = serverConf.ClusterID
+	clientOpt.ClusterID = routerCfg.ModuleCfg.ClusterId
 	clientOpt.ConnectMgr = connMgr
-	clientOpt.CreateFunc = func(clientConn *grpc.ClientConn) interface{} { return masterpb.NewMasterRpcClient(clientConn) }
+	clientOpt.CreateFunc = func(clientConn *grpc.ClientConn) interface{} {
+		return masterpb.NewMasterRpcClient(clientConn)
+	}
 	mc.client = rpc.NewClient(1, &clientOpt)
 	return mc
 }
@@ -34,7 +38,11 @@ func (mc *MasterClient) GetRoute(dbId metapb.DBID, spaceId metapb.SpaceID, slotI
 	ctx, cancel := mc.getContext()
 	defer cancel()
 	resp, err := mc.getClient().GetRoute(ctx, request)
-	checkResponseOk(&resp.ResponseHeader, err)
+	mc.checkResponseOk(&resp.ResponseHeader, err)
+	text, err := json.Marshal(resp)
+	if err == nil {
+		log.Debug("GetRoute(slotId=%d) %s", slotId, string(text))
+	}
 	return resp.Routes
 }
 
@@ -43,7 +51,7 @@ func (mc *MasterClient) GetDB(dbName string) metapb.DB {
 	ctx, cancel := mc.getContext()
 	defer cancel()
 	resp, err := mc.getClient().GetDB(ctx, request)
-	checkResponseOk(&resp.ResponseHeader, err)
+	mc.checkResponseOk(&resp.ResponseHeader, err)
 	return resp.Db
 }
 
@@ -52,7 +60,7 @@ func (mc *MasterClient) GetSpace(id metapb.DBID, spaceName string) metapb.Space 
 	ctx, cancel := mc.getContext()
 	defer cancel()
 	resp, err := mc.getClient().GetSpace(ctx, request)
-	checkResponseOk(&resp.ResponseHeader, err)
+	mc.checkResponseOk(&resp.ResponseHeader, err)
 	return resp.Space
 }
 
@@ -61,16 +69,22 @@ func (mc *MasterClient) getContext() (context.Context, context.CancelFunc) {
 }
 
 func (mc *MasterClient) getClient() masterpb.MasterRpcClient {
-	client, _ := mc.client.GetGrpcClient(mc.masterAddr)
+	client, err := mc.client.GetGrpcClient(mc.masterAddr)
+	if err != nil {
+		log.Error("get master client for %s failed", mc.masterAddr)
+		panic(err)
+	}
 	return client.(masterpb.MasterRpcClient)
 }
 
-func checkResponseOk(header *metapb.ResponseHeader, err error) bool {
+func (mc *MasterClient) checkResponseOk(header *metapb.ResponseHeader, err error) {
 	if err != nil {
 		panic(err)
 	}
-	if header.Code != 0 {
+	if header.Code != metapb.RESP_CODE_OK {
+		if header.Code == metapb.MASTER_RESP_CODE_NOT_LEADER {
+			mc.masterAddr = header.Error.NotLeader.LeaderAddr
+		}
 		panic(errors.New(header.Message))
 	}
-	return true
 }
