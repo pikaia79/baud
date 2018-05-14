@@ -158,17 +158,19 @@ type onceDialer struct {
 
 func (d *onceDialer) dial(addr string, timeout time.Duration) (net.Conn, error) {
 	d.Lock()
-	defer d.Unlock()
 
 	if !d.dialed {
 		d.dialed = true
 		dialer := net.Dialer{
 			Timeout: timeout,
 		}
+		d.Unlock()
 		return dialer.Dial("tcp", addr)
 	} else if !d.closed {
 		d.closed = true
 		close(d.redialChan)
 	}
+
+	d.Unlock()
 	return nil, ErrCannotReuseClientConn
 }

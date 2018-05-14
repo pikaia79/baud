@@ -118,11 +118,14 @@ func (r *Retry) NextCh() (<-chan time.Time, int) {
 func RetryMaxAttempt(opt *RetryOption, fn func() error) error {
 	var err error
 	r := NewRetry(opt)
-	for ok, _ := r.Next(); ok; {
+	ok, _ := r.Next()
+
+	for ok {
 		err = fn()
 		if err == nil {
 			return nil
 		}
+		ok, _ = r.Next()
 	}
 	return err
 }

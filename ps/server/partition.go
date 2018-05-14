@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"sync"
+	"time"
 
 	"github.com/tiglabs/baudengine/kernel"
 	"github.com/tiglabs/baudengine/kernel/index"
@@ -137,52 +138,93 @@ func (p *partition) getPartitionInfo() *masterpb.PartitionInfo {
 	p.rwMutex.RLock()
 	info := new(masterpb.PartitionInfo)
 	info.ID = p.meta.ID
+	info.IsLeader = (p.leader == uint64(p.server.nodeID))
 	info.Status = p.meta.Status
 	info.Epoch = p.meta.Epoch
 	info.Statistics = p.statistics
+	replicas := p.meta.Replicas
 	p.rwMutex.RUnlock()
+
+	if info.IsLeader {
+		raftStatus := p.server.raftServer.Status(p.meta.ID)
+		info.RaftStatus = new(masterpb.RaftStatus)
+		for _, r := range replicas {
+			if r.NodeID == p.server.nodeID {
+				info.RaftStatus.Replica = r
+				info.RaftStatus.Term = raftStatus.Term
+				info.RaftStatus.Index = raftStatus.Index
+				info.RaftStatus.Commit = raftStatus.Commit
+				info.RaftStatus.Applied = raftStatus.Applied
+			} else {
+				if replStatus, ok := raftStatus.Replicas[uint64(r.NodeID)]; ok {
+					follower := masterpb.RaftFollowerStatus{
+						Replica: r,
+						Match:   replStatus.Match,
+						Commit:  replStatus.Commit,
+						Next:    replStatus.Next,
+						State:   replStatus.State,
+					}
+					since := time.Since(replStatus.LastActive)
+					// 两次心跳内没活跃就视为Down
+					downDuration := since - time.Duration(2*p.server.raftConfig.HeartbeatTick)*p.server.raftConfig.TickInterval
+					if downDuration > 0 {
+						follower.DownSeconds = uint64(downDuration / time.Second)
+					}
+					info.RaftStatus.Followers = append(info.RaftStatus.Followers, follower)
+				}
+			}
+		}
+	}
 
 	return info
 }
 
-func (p *partition) checkWritable() *metapb.Error {
+func (p *partition) checkWritable() (err *metapb.Error) {
 	p.rwMutex.RLock()
-	defer p.rwMutex.RUnlock()
 
 	if p.meta.Status == metapb.PA_INVALID || p.meta.Status == metapb.PA_NOTREAD {
-		return &metapb.Error{PartitionNotFound: &metapb.PartitionNotFound{p.meta.ID}}
+		err = &metapb.Error{PartitionNotFound: &metapb.PartitionNotFound{p.meta.ID}}
+		goto ret
 	}
 	if p.leader == 0 {
-		return &metapb.Error{NoLeader: &metapb.NoLeader{p.meta.ID}}
+		err = &metapb.Error{NoLeader: &metapb.NoLeader{p.meta.ID}}
+		goto ret
 	}
 	if p.leader != uint64(p.server.nodeID) {
-		return &metapb.Error{NotLeader: &metapb.NotLeader{
+		err = &metapb.Error{NotLeader: &metapb.NotLeader{
 			PartitionID: p.meta.ID,
 			Leader:      metapb.NodeID(p.leader),
 			Epoch:       p.meta.Epoch,
 		}}
+		goto ret
 	}
 
-	return nil
+ret:
+	p.rwMutex.RUnlock()
+	return
 }
 
-func (p *partition) checkReadable(readLeader bool) *metapb.Error {
+func (p *partition) checkReadable(readLeader bool) (err *metapb.Error) {
 	p.rwMutex.RLock()
-	defer p.rwMutex.RUnlock()
 
 	if p.meta.Status == metapb.PA_INVALID || p.meta.Status == metapb.PA_NOTREAD {
-		return &metapb.Error{PartitionNotFound: &metapb.PartitionNotFound{p.meta.ID}}
+		err = &metapb.Error{PartitionNotFound: &metapb.PartitionNotFound{p.meta.ID}}
+		goto ret
 	}
 	if p.leader == 0 {
-		return &metapb.Error{NoLeader: &metapb.NoLeader{p.meta.ID}}
+		err = &metapb.Error{NoLeader: &metapb.NoLeader{p.meta.ID}}
+		goto ret
 	}
 	if readLeader && p.leader != uint64(p.server.nodeID) {
-		return &metapb.Error{NotLeader: &metapb.NotLeader{
+		err = &metapb.Error{NotLeader: &metapb.NotLeader{
 			PartitionID: p.meta.ID,
 			Leader:      metapb.NodeID(p.leader),
 			Epoch:       p.meta.Epoch,
 		}}
+		goto ret
 	}
 
-	return nil
+ret:
+	p.rwMutex.RUnlock()
+	return
 }

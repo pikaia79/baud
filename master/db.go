@@ -16,7 +16,7 @@ const (
 type DB struct {
 	*metapb.DB
 
-	spaceCache   *SpaceCache  `json:"-"`
+	SpaceCache   *SpaceCache  `json:"-"`
 	propertyLock sync.RWMutex `json:"-"`
 }
 
@@ -26,20 +26,18 @@ func NewDB(dbName string) (*DB, error) {
 		log.Error("generate id of db[%v] is failed. err[%v]", dbName, err)
 		return nil, ErrGenIdFailed
 	}
-	db := &DB{
-		DB: &metapb.DB{
-			ID:   metapb.DBID(dbId),
-			Name: dbName,
-		},
-		spaceCache: NewSpaceCache(),
+
+	metaDb := &metapb.DB{
+		ID:   metapb.DBID(dbId),
+		Name: dbName,
 	}
-	return db, nil
+	return NewDBByMeta(metaDb), nil
 }
 
 func NewDBByMeta(metaDb *metapb.DB) *DB {
 	return &DB{
 		DB:         metaDb,
-		spaceCache: NewSpaceCache(),
+		SpaceCache: NewSpaceCache(),
 	}
 }
 
@@ -95,7 +93,7 @@ func NewDBCache() *DBCache {
 	}
 }
 
-func (c *DBCache) findDbByName(dbName string) *DB {
+func (c *DBCache) FindDbByName(dbName string) *DB {
 	c.lock.RLock()
 	defer c.lock.RUnlock()
 
@@ -112,7 +110,7 @@ func (c *DBCache) findDbByName(dbName string) *DB {
 	return db
 }
 
-func (c *DBCache) findDbById(dbId metapb.DBID) *DB {
+func (c *DBCache) FindDbById(dbId metapb.DBID) *DB {
 	c.lock.RLock()
 	defer c.lock.RUnlock()
 
@@ -124,7 +122,7 @@ func (c *DBCache) findDbById(dbId metapb.DBID) *DB {
 	return db
 }
 
-func (c *DBCache) addDb(db *DB) {
+func (c *DBCache) AddDb(db *DB) {
 	c.lock.Lock()
 	defer c.lock.Unlock()
 
@@ -132,7 +130,7 @@ func (c *DBCache) addDb(db *DB) {
 	c.name2Ids[db.Name] = db.ID
 }
 
-func (c *DBCache) deleteDb(db *DB) {
+func (c *DBCache) DeleteDb(db *DB) {
 	c.lock.Lock()
 	defer c.lock.Unlock()
 
@@ -140,7 +138,7 @@ func (c *DBCache) deleteDb(db *DB) {
 	delete(c.name2Ids, db.Name)
 }
 
-func (c *DBCache) getAllDBs() []*DB {
+func (c *DBCache) GetAllDBs() []*DB {
 	c.lock.RLock()
 	defer c.lock.RUnlock()
 
@@ -152,7 +150,7 @@ func (c *DBCache) getAllDBs() []*DB {
 	return dbs
 }
 
-func (c *DBCache) recovery(store Store) ([]*DB, error) {
+func (c *DBCache) Recovery(store Store) ([]*DB, error) {
 	prefix := []byte(PREFIX_DB)
 	startKey, limitKey := util.BytesPrefix(prefix)
 
@@ -179,7 +177,7 @@ func (c *DBCache) recovery(store Store) ([]*DB, error) {
 	return resultDBs, nil
 }
 
-func (c *DBCache) clear() {
+func (c *DBCache) Clear() {
 	c.lock.Lock()
 	defer c.lock.Unlock()
 

@@ -2,10 +2,12 @@ package server
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"github.com/tiglabs/baudengine/proto/masterpb"
 	"github.com/tiglabs/baudengine/proto/metapb"
+	"github.com/tiglabs/baudengine/util"
 	"github.com/tiglabs/baudengine/util/log"
 	"github.com/tiglabs/baudengine/util/routine"
 	"github.com/tiglabs/baudengine/util/uuid"
@@ -96,39 +98,63 @@ func (h *heartbeatWork) update(timer *time.Timer) {
 }
 
 func (h *heartbeatWork) doHeartbeat() {
-	masterClient, err := h.server.masterClient.GetGrpcClient(h.server.MasterServer)
-	if err != nil {
-		log.Error("get master heartbeat rpc client error: %v", err)
-		return
-	}
+	retryOpt := util.DefaultRetryOption
+	retryOpt.MaxRetries = 3
+	retryOpt.Context = h.server.ctx
 
-	stats, _ := h.server.systemMetric.Export()
-	req := &masterpb.PSHeartbeatRequest{
-		RequestHeader: metapb.RequestHeader{ReqId: uuid.FlakeUUID()},
-		NodeID:        h.server.nodeID,
-		Partitions:    make([]masterpb.PartitionInfo, 0),
-	}
-	h.server.partitions.Range(func(key, value interface{}) bool {
-		pinfo := value.(*partition).getPartitionInfo()
-		req.Partitions = append(req.Partitions, *pinfo)
-		stats.Ops += pinfo.Statistics.Ops
-		return true
-	})
-	req.SysStats = *stats
+	err := util.RetryMaxAttempt(&retryOpt, func() error {
+		masterAddr := h.server.MasterServer
+		if h.server.masterLeader != "" {
+			masterAddr = h.server.masterLeader
+		}
+		masterClient, err := h.server.masterClient.GetGrpcClient(masterAddr)
+		if err != nil {
+			return fmt.Errorf("get master heartbeat rpc client error: %v", err)
+		}
 
-	goCtx, cancel := context.WithTimeout(h.server.ctx, heartbeatTimeout)
-	resp, err := masterClient.(masterpb.MasterRpcClient).PSHeartbeat(goCtx, req)
-	cancel()
-
-	if err != nil {
-		log.Error("master heartbeat request[%s] failed error: %v", req.ReqId, err)
-		return
-	}
-
-	if resp.Code == metapb.MASTER_RESP_CODE_HEARTBEAT_REGISTRY {
-		log.Error("master heartbeat request[%s] ack registry, message is: %s", req.ReqId, resp.Message)
-		routine.RunWorkAsync("SERVER-RESTART", func() {
-			h.server.restart()
+		stats, _ := h.server.systemMetric.Export()
+		req := &masterpb.PSHeartbeatRequest{
+			RequestHeader: metapb.RequestHeader{ReqId: uuid.FlakeUUID()},
+			NodeID:        h.server.nodeID,
+			Partitions:    make([]masterpb.PartitionInfo, 0),
+		}
+		h.server.partitions.Range(func(key, value interface{}) bool {
+			pinfo := value.(*partition).getPartitionInfo()
+			req.Partitions = append(req.Partitions, *pinfo)
+			stats.Ops += pinfo.Statistics.Ops
+			return true
 		})
+		req.SysStats = *stats
+
+		goCtx, cancel := context.WithTimeout(h.server.ctx, heartbeatTimeout)
+		resp, err := masterClient.(masterpb.MasterRpcClient).PSHeartbeat(goCtx, req)
+		cancel()
+
+		if err != nil {
+			return fmt.Errorf("master heartbeat request[%s] failed error: %v", req.ReqId, err)
+		}
+
+		if resp.Code == metapb.RESP_CODE_OK {
+			return nil
+		}
+
+		if resp.Code == metapb.MASTER_RESP_CODE_HEARTBEAT_REGISTRY {
+			log.Error("master heartbeat request[%s] ack registry, message is: %s", req.ReqId, resp.Message)
+			routine.RunWorkAsync("SERVER-RESTART", func() {
+				h.server.restart()
+			})
+			return nil
+		}
+
+		if resp.Error.NoLeader != nil {
+			h.server.masterLeader = ""
+		} else if resp.Error.NotLeader != nil {
+			h.server.masterLeader = resp.Error.NotLeader.LeaderAddr
+		}
+		return fmt.Errorf("master heartbeat requeset[%s] ack code not ok[%v], message is: %s", req.ReqId, resp.Code, resp.Message)
+	})
+
+	if err != nil {
+		log.Error(err.Error())
 	}
 }

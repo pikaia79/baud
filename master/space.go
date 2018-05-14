@@ -41,20 +41,18 @@ func NewSpace(dbId metapb.DBID, dbName, spaceName string, policy *PartitionPolic
 		return nil, ErrGenIdFailed
 	}
 
-	return &Space{
-		Space: &metapb.Space{
-			Name:   spaceName,
-			ID:     metapb.SpaceID(spaceId),
-			DB:     dbId,
-			DbName: dbName,
-			Status: metapb.SS_Init,
-			KeyPolicy: &metapb.KeyPolicy{
-				KeyField: policy.Key,
-				KeyFunc:  policy.Function,
-			},
+	metaSpace := &metapb.Space{
+		Name:   spaceName,
+		ID:     metapb.SpaceID(spaceId),
+		DB:     dbId,
+		DbName: dbName,
+		Status: metapb.SS_Init,
+		KeyPolicy: &metapb.KeyPolicy{
+			KeyField: policy.Key,
+			KeyFunc:  policy.Function,
 		},
-		searchTree:   NewPartitionTree(),
-	}, nil
+	}
+	return NewSpaceByMeta(metaSpace), nil
 }
 
 func NewSpaceByMeta(metaSpace *metapb.Space) *Space {
@@ -126,6 +124,24 @@ func (s *Space) putPartition(partition *Partition) {
 	s.searchTree.update(partition)
 }
 
+func (s *Space) AscendScanPartition(pivotSlot metapb.SlotID, batchNum int) []*Partition {
+    searchPivot := &Partition{
+        Partition: &metapb.Partition{
+            StartSlot: pivotSlot,
+        },
+    }
+    items := s.searchTree.ascendScan(searchPivot, batchNum)
+    if items == nil || len(items) == 0 {
+        return nil
+    }
+
+    result := make([]*Partition, 0, len(items))
+    for _, item := range items {
+        result = append(result, item.partition)
+    }
+    return result
+}
+
 type SpaceCache struct {
 	lock     sync.RWMutex
 	name2Ids map[string]metapb.SpaceID
@@ -139,7 +155,7 @@ func NewSpaceCache() *SpaceCache {
 	}
 }
 
-func (c *SpaceCache) findSpaceByName(spaceName string) *Space {
+func (c *SpaceCache) FindSpaceByName(spaceName string) *Space {
 	c.lock.RLock()
 	defer c.lock.RUnlock()
 
@@ -155,7 +171,7 @@ func (c *SpaceCache) findSpaceByName(spaceName string) *Space {
 	return space
 }
 
-func (c *SpaceCache) findSpaceById(spaceId metapb.SpaceID) *Space {
+func (c *SpaceCache) FindSpaceById(spaceId metapb.SpaceID) *Space {
 	c.lock.RLock()
 	defer c.lock.RUnlock()
 
@@ -166,7 +182,7 @@ func (c *SpaceCache) findSpaceById(spaceId metapb.SpaceID) *Space {
 	return space
 }
 
-func (c *SpaceCache) getAllSpaces() []*Space {
+func (c *SpaceCache) GetAllSpaces() []*Space {
 	c.lock.RLock()
 	defer c.lock.RUnlock()
 
@@ -178,7 +194,7 @@ func (c *SpaceCache) getAllSpaces() []*Space {
 	return spaces
 }
 
-func (c *SpaceCache) addSpace(space *Space) {
+func (c *SpaceCache) AddSpace(space *Space) {
 	c.lock.Lock()
 	defer c.lock.Unlock()
 
@@ -186,7 +202,7 @@ func (c *SpaceCache) addSpace(space *Space) {
 	c.spaces[space.ID] = space
 }
 
-func (c *SpaceCache) deleteSpace(space *Space) {
+func (c *SpaceCache) DeleteSpace(space *Space) {
 	c.lock.Lock()
 	defer c.lock.Unlock()
 
@@ -197,7 +213,7 @@ func (c *SpaceCache) deleteSpace(space *Space) {
 	delete(c.name2Ids, oldSpace.Name)
 }
 
-func (c *SpaceCache) recovery(store Store) ([]*Space, error) {
+func (c *SpaceCache) Recovery(store Store) ([]*Space, error) {
 	prefix := []byte(PREFIX_SPACE)
 	startKey, limitKey := util.BytesPrefix(prefix)
 

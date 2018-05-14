@@ -31,35 +31,40 @@ type PartitionServer struct {
 	*metapb.Node
 	*masterpb.NodeSysStats
 
+	adminPort 	   uint32
 	status         PSStatus
 	lastHeartbeat  time.Time
 	partitionCache *PartitionCache
 	propertyLock   sync.RWMutex
 }
 
-func NewPartitionServer(ip string) (*PartitionServer, error) {
+func NewPartitionServer(ip string, psCfg *PsConfig) (*PartitionServer, error) {
 	newId, err := GetIdGeneratorSingle(nil).GenID()
 	if err != nil {
 		log.Error("fail to generate ps id. err[%v]", err)
 		return nil, ErrGenIdFailed
 	}
 
-	return &PartitionServer{
-		Node: &metapb.Node{
-			ID: metapb.NodeID(newId),
-			Ip: ip,
+	metaNode := &metapb.Node{
+		ID: metapb.NodeID(newId),
+		Ip: ip,
+		ReplicaAddrs: metapb.ReplicaAddrs{
+			HeartbeatAddr: util.BuildAddr(ip, psCfg.RaftHeartbeatPort),
+			ReplicateAddr: util.BuildAddr(ip, psCfg.RaftReplicatePort),
+			RpcAddr:       util.BuildAddr(ip, psCfg.RpcPort),
+			AdminAddr:     util.BuildAddr(ip, psCfg.AdminPort),
 		},
-		NodeSysStats:   new(masterpb.NodeSysStats),
-		status:         PS_INIT,
-		lastHeartbeat:  time.Now(),
-		partitionCache: NewPartitionCache(),
-	}, nil
+	}
+	return NewPartitionServerByMeta(psCfg, metaNode), nil
 }
 
-func NewPartitionServerByMeta(metaPS *metapb.Node) *PartitionServer {
+func NewPartitionServerByMeta(psCfg *PsConfig, metaPS *metapb.Node) *PartitionServer {
 	return &PartitionServer{
 		Node:           metaPS,
+		NodeSysStats:   new(masterpb.NodeSysStats),
 		status:         PS_INIT,
+		adminPort:      psCfg.AdminPort,
+		lastHeartbeat:  time.Now(),
 		partitionCache: NewPartitionCache(),
 	}
 }
@@ -91,7 +96,7 @@ func (p *PartitionServer) addPartition(partition *Partition) {
 	p.propertyLock.Lock()
 	defer p.propertyLock.Unlock()
 
-	p.partitionCache.addPartition(partition)
+	p.partitionCache.AddPartition(partition)
 }
 
 func (p *PartitionServer) updateHb() {
@@ -131,7 +136,7 @@ func (p *PartitionServer) getRpcAddr() string {
 	p.propertyLock.RLock()
 	defer p.propertyLock.RUnlock()
 
-	return util.BuildAddr(p.Ip, p.Port)
+	return util.BuildAddr(p.Ip, p.adminPort)
 }
 
 type PSCache struct {
@@ -147,7 +152,7 @@ func NewPSCache() *PSCache {
 	}
 }
 
-func (c *PSCache) getAllServers() []*PartitionServer {
+func (c *PSCache) GetAllServers() []*PartitionServer {
 	c.lock.RLock()
 	defer c.lock.RUnlock()
 
@@ -159,7 +164,7 @@ func (c *PSCache) getAllServers() []*PartitionServer {
 	return servers
 }
 
-func (c *PSCache) findServerByAddr(addr string) *PartitionServer {
+func (c *PSCache) FindServerByAddr(addr string) *PartitionServer {
 	if len(addr) == 0 {
 		return nil
 	}
@@ -174,7 +179,7 @@ func (c *PSCache) findServerByAddr(addr string) *PartitionServer {
 	return ps
 }
 
-func (c *PSCache) findServerById(psId metapb.NodeID) *PartitionServer {
+func (c *PSCache) FindServerById(psId metapb.NodeID) *PartitionServer {
 	if psId == 0 {
 		return nil
 	}
@@ -189,7 +194,7 @@ func (c *PSCache) findServerById(psId metapb.NodeID) *PartitionServer {
 	return ps
 }
 
-func (c *PSCache) addServer(server *PartitionServer) {
+func (c *PSCache) AddServer(server *PartitionServer) {
 	if server == nil {
 		return
 	}
@@ -201,7 +206,7 @@ func (c *PSCache) addServer(server *PartitionServer) {
 	c.ip2Servers[server.Ip] = server
 }
 
-func (c *PSCache) recovery(store Store) ([]*PartitionServer, error) {
+func (c *PSCache) Recovery(store Store, psCfg *PsConfig) ([]*PartitionServer, error) {
 	prefix := []byte(PREFIX_PARTITION_SERVER)
 	startKey, limitKey := util.BytesPrefix(prefix)
 
@@ -222,13 +227,13 @@ func (c *PSCache) recovery(store Store) ([]*PartitionServer, error) {
 			return nil, ErrInternalError
 		}
 
-		resultServers = append(resultServers, NewPartitionServerByMeta(metaPS))
+		resultServers = append(resultServers, NewPartitionServerByMeta(psCfg, metaPS))
 	}
 
 	return resultServers, nil
 }
 
-func (c *PSCache) clear() {
+func (c *PSCache) Clear() {
 	c.lock.Lock()
 	defer c.lock.Unlock()
 
