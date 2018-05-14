@@ -26,17 +26,19 @@ func newServerMeta(root string) *serverMeta {
 }
 
 func (m *serverMeta) reset(info *pspb.MetaInfo) {
-	m.mkMetaFile()
-
 	if b, err := info.Marshal(); err == nil {
-		ioutil.WriteFile(m.metaFile, b, 0666)
+		if err := ioutil.WriteFile(m.metaFile, b, 0666); err != nil {
+			panic(err)
+		}
 	}
 }
 
 func (m *serverMeta) getInfo() *pspb.MetaInfo {
 	info := &pspb.MetaInfo{}
-	if b, err := ioutil.ReadFile(m.metaFile); err != nil && len(b) > 0 {
+	if b, err := ioutil.ReadFile(m.metaFile); err == nil && len(b) > 0 {
 		info.Unmarshal(b)
+	} else if err != nil {
+		panic(err)
 	}
 
 	return info
@@ -53,41 +55,47 @@ func (m *serverMeta) mkMetaFile() {
 		}
 		if file, err := os.Create(m.metaFile); err == nil {
 			file.Close()
+		} else {
+			panic(err)
 		}
 	}
 }
 
-func getPartitionPath(id metapb.PartitionID, path string, create bool) (dir string, err error) {
-	dir = filepath.Join(path, fmt.Sprintf("%d", id))
-	if create {
-		err = os.MkdirAll(dir, os.ModePerm)
-	}
-
-	return
-}
-
-func getDataAndRaftPath(id metapb.PartitionID, path string) (data, raft string, err error) {
-	data = filepath.Join(path, fmt.Sprintf("%d", id), "data")
+func (m *serverMeta) getDataAndRaftPath(id metapb.PartitionID) (data, raft string, err error) {
+	data = filepath.Join(m.rootPath, "data", fmt.Sprintf("%d", id))
 	if err = os.MkdirAll(data, os.ModePerm); err != nil {
 		return
 	}
 
-	raft = filepath.Join(path, fmt.Sprintf("%d", id), "raft")
+	raft = filepath.Join(m.rootPath, "raft", fmt.Sprintf("%d", id))
 	err = os.MkdirAll(raft, os.ModePerm)
-
 	return
 }
 
-type PartitionByIdSlice []metapb.Partition
+func (m *serverMeta) clear(id metapb.PartitionID) {
+	data := filepath.Join(m.rootPath, "data", fmt.Sprintf("%d", id))
+	raft := filepath.Join(m.rootPath, "raft", fmt.Sprintf("%d", id))
+	os.RemoveAll(data)
+	os.RemoveAll(raft)
+}
 
-func (r PartitionByIdSlice) Len() int {
+func (m *serverMeta) clearAll() {
+	data := filepath.Join(m.rootPath, "data")
+	raft := filepath.Join(m.rootPath, "raft")
+	os.RemoveAll(data)
+	os.RemoveAll(raft)
+}
+
+type partitionByIDSlice []metapb.Partition
+
+func (r partitionByIDSlice) Len() int {
 	return len(r)
 }
 
-func (r PartitionByIdSlice) Swap(i int, j int) {
+func (r partitionByIDSlice) Swap(i int, j int) {
 	r[i], r[j] = r[j], r[i]
 }
 
-func (r PartitionByIdSlice) Less(i int, j int) bool {
+func (r partitionByIDSlice) Less(i int, j int) bool {
 	return r[i].ID < r[j].ID
 }

@@ -14,9 +14,10 @@ type snappyWriter struct {
 	*snappy.Writer
 }
 
-func (w *snappyWriter) Close() error {
-	defer snappyWriterPool.Put(w)
-	return w.Writer.Close()
+func (w *snappyWriter) Close() (err error) {
+	err = w.Writer.Close()
+	snappyWriterPool.Put(w)
+	return
 }
 
 type snappyReader struct {

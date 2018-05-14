@@ -2,9 +2,9 @@ package server
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"net"
+	"path"
 	"sort"
 	"sync"
 	"time"
@@ -28,6 +28,8 @@ import (
 	"github.com/tiglabs/baudengine/util/timeutil"
 	"github.com/tiglabs/baudengine/util/uuid"
 	"github.com/tiglabs/raft"
+	"github.com/tiglabs/raft/logger"
+	raftlog "github.com/tiglabs/raft/util/log"
 )
 
 const (
@@ -43,6 +45,7 @@ type Server struct {
 	ctxCancel context.CancelFunc
 
 	nodeResolver *NodeResolver
+	raftConfig   *raft.Config
 	raftServer   *raft.RaftServer
 	apiServer    *grpc.Server
 	adminServer  *grpc.Server
@@ -50,6 +53,7 @@ type Server struct {
 	systemMetric *metric.SystemMetric
 
 	connMgr         *rpc.ConnectionMgr
+	masterLeader    string
 	masterClient    *rpc.Client
 	masterHeartbeat *heartbeatWork
 
@@ -63,6 +67,12 @@ type Server struct {
 // NewServer create server instance
 func NewServer(conf *config.Config) *Server {
 	serverConf := loadConfig(conf)
+	// init log
+	log.InitFileLog(serverConf.LogDir, serverConf.LogModule, serverConf.LogLevel)
+	// init raft log
+	if raftLog, err := raftlog.NewLog(path.Join(serverConf.LogDir, "raft"), "raft", serverConf.LogLevel); err == nil {
+		logger.SetLogger(raftLog)
+	}
 
 	s := &Server{
 		Config:       *serverConf,
@@ -89,8 +99,6 @@ func NewServer(conf *config.Config) *Server {
 	clientOpt.CreateFunc = func(cc *grpc.ClientConn) interface{} { return masterpb.NewMasterRpcClient(cc) }
 	s.masterClient = rpc.NewClient(1, &clientOpt)
 
-	s.masterHeartbeat = newHeartbeatWork(s)
-	routine.RunWorkDaemon("ADMIN-EVENTHANDLER", s.adminEventHandler, s.ctx.Done())
 	return s
 
 }
@@ -105,6 +113,7 @@ func (s *Server) doStart(init bool) error {
 	if init {
 		metaInfo := s.meta.getInfo()
 		s.nodeID = metaInfo.NodeID
+		log.Info("Server load meta from file is: %s", metaInfo.String())
 		if metaInfo.ClusterID != s.ClusterID {
 			s.reset()
 		}
@@ -115,7 +124,10 @@ func (s *Server) doStart(init bool) error {
 	if err != nil {
 		return err
 	}
+	s.meta.reset(&pspb.MetaInfo{ClusterID: s.ClusterID, NodeID: registerResp.NodeID})
+
 	if s.nodeID != registerResp.NodeID {
+		log.Info("Server get NodeID from register to master is: %d", registerResp.NodeID)
 		s.nodeID = registerResp.NodeID
 		if s.raftServer != nil {
 			s.raftServer.Stop()
@@ -126,6 +138,7 @@ func (s *Server) doStart(init bool) error {
 	if err := s.Config.validate(); err != nil {
 		return err
 	}
+	log.Info("Server start with config is: %s", s.Config.String())
 
 	// clear old partition
 	if len(registerResp.Partitions) == 0 {
@@ -133,7 +146,6 @@ func (s *Server) doStart(init bool) error {
 	} else {
 		s.destroyExcludePartition(registerResp.Partitions)
 	}
-	s.meta.reset(&pspb.MetaInfo{ClusterID: s.ClusterID, NodeID: s.nodeID})
 
 	// create raft server
 	if s.raftServer == nil {
@@ -161,6 +173,7 @@ func (s *Server) doStart(init bool) error {
 			return fmt.Errorf("boot raft server failed, error: %v", err)
 		}
 		s.raftServer = rs
+		s.raftConfig = rc
 	}
 
 	// create and recover partitions
@@ -178,6 +191,7 @@ func (s *Server) doStart(init bool) error {
 					log.Fatal("Server failed to start api grpc: %v", err)
 				}
 			}()
+			log.Info("Server api grpc listen on: %s", fmt.Sprintf(":%d", s.RPCPort))
 		}
 
 		if ln, err := net.Listen("tcp", fmt.Sprintf(":%d", s.AdminPort)); err != nil {
@@ -190,13 +204,18 @@ func (s *Server) doStart(init bool) error {
 					log.Fatal("Server failed to start admin grpc: %v", err)
 				}
 			}()
+			log.Info("Server admin grpc listen on: %s", fmt.Sprintf(":%d", s.AdminPort))
 		}
+
+		s.masterHeartbeat = newHeartbeatWork(s)
+		routine.RunWorkDaemon("ADMIN-EVENTHANDLER", s.adminEventHandler, s.ctx.Done())
 	}
 
 	// start heartbeat to master
 	s.stopping.Set(false)
 	s.masterHeartbeat.start()
 	s.masterHeartbeat.trigger()
+	log.Info("Baud server successful startup...")
 
 	return nil
 }
@@ -247,7 +266,7 @@ func (s *Server) closeAllRange() {
 
 func (s *Server) register() (*masterpb.PSRegisterResponse, error) {
 	retryOpt := util.DefaultRetryOption
-	retryOpt.MaxRetries = 5
+	retryOpt.MaxRetries = 10
 	retryOpt.Context = s.ctx
 
 	buildInfo := build.GetInfo()
@@ -265,35 +284,44 @@ func (s *Server) register() (*masterpb.PSRegisterResponse, error) {
 	var response *masterpb.PSRegisterResponse
 
 	err := util.RetryMaxAttempt(&retryOpt, func() error {
-		masterClient, err := s.masterClient.GetGrpcClient(s.MasterServer)
-		if err != nil {
-			log.Error("get master register rpc client error: %v", err)
-			return err
+		masterAddr := s.MasterServer
+		if s.masterLeader != "" {
+			masterAddr = s.masterLeader
 		}
+		masterClient, err := s.masterClient.GetGrpcClient(masterAddr)
+		if err != nil {
+			return fmt.Errorf("get master register rpc client[%s] error: %v", masterAddr, err)
+		}
+
 		goCtx, cancel := context.WithTimeout(s.ctx, registerTimeout)
 		resp, err := masterClient.(masterpb.MasterRpcClient).PSRegister(goCtx, request)
 		cancel()
 
 		if err != nil {
-			log.Error("master register requeset[%s] failed error: %v", request.ReqId, err)
-			return err
+			return fmt.Errorf("master register requeset[%s] failed error: %v", request.ReqId, err)
 		}
 		if resp.Code != metapb.RESP_CODE_OK {
-			msg := fmt.Sprintf("master register requeset[%s] ack code not ok[%v], message is: %s", request.ReqId, resp.Code, resp.Message)
-			log.Error(msg)
-			return errors.New(msg)
+			if resp.Error.NoLeader != nil {
+				s.masterLeader = ""
+			} else if resp.Error.NotLeader != nil {
+				s.masterLeader = resp.Error.NotLeader.LeaderAddr
+			}
+			return fmt.Errorf("master register requeset[%s] ack code not ok, response is: %s", request.ReqId, resp.String())
 		}
 
 		response = resp
 		return nil
 	})
 
+	if err != nil {
+		log.Error(err.Error())
+	}
 	return response, err
 }
 
 func (s *Server) recoverPartitions(partitions []metapb.Partition) {
 	// sort by partition id
-	sort.Sort(PartitionByIdSlice(partitions))
+	sort.Sort(partitionByIDSlice(partitions))
 	wg := new(sync.WaitGroup)
 	wg.Add(len(partitions))
 
@@ -303,6 +331,7 @@ func (s *Server) recoverPartitions(partitions []metapb.Partition) {
 		routine.RunWorkAsync("RECOVER-PARTITION", func() {
 			defer wg.Done()
 
+			log.Debug("starting recover partition[%d]...", p.ID)
 			s.doPartitionCreate(p)
 		}, routine.LogPanic(false))
 	}

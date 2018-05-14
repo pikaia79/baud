@@ -41,5 +41,8 @@ while read line; do
 done < "${BUILDINFO}"
 
 # go build
+echo GOOS=${GOOS} GOARCH=${GOARCH} ${GOBINARY} build ${V} ${GOBUILDFLAGS:-"-tags=jsoniter" "${GOBUILDFLAGS}"} ${GCFLAGS:+-gcflags "${GCFLAGS}"} -o ${BUILDOUT} \
+            -pkgdir=${GOPKG}/${GOOS}_${GOARCH} -ldflags "${LDFLAGS}${LD_BUILDFLAGS}" "${BUILDPATH}"
+
 time GOOS=${GOOS} GOARCH=${GOARCH} ${GOBINARY} build ${V} ${GOBUILDFLAGS:-"-tags=jsoniter" "${GOBUILDFLAGS}"} ${GCFLAGS:+-gcflags "${GCFLAGS}"} -o ${BUILDOUT} \
        -pkgdir=${GOPKG}/${GOOS}_${GOARCH} -ldflags "${LDFLAGS}${LD_BUILDFLAGS}" "${BUILDPATH}"

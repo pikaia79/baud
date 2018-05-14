@@ -98,10 +98,9 @@ func (cw *clientWrapper) getClient() (interface{}, error) {
 	cw.rwMutex.RUnlock()
 
 	cw.rwMutex.Lock()
-	defer cw.rwMutex.Unlock()
-
 	if cw.conn != nil {
 		if _, err := cw.conn.connect(); err == nil {
+			cw.rwMutex.Unlock()
 			return cw.clientRaw, nil
 		}
 		cw.option.ConnectMgr.removeConn(cw.key, cw.conn)
@@ -118,6 +117,7 @@ func (cw *clientWrapper) getClient() (interface{}, error) {
 	}
 	cw.clientRaw = cli
 
+	cw.rwMutex.Unlock()
 	return cli, err
 }
 
