@@ -3,10 +3,11 @@ package master
 import (
 	"math/rand"
 	"time"
+	"github.com/tiglabs/baudengine/proto/metapb"
 )
 
 type Selector interface {
-	SelectTarget(servers []*PartitionServer) *PartitionServer
+	SelectTarget(servers []*PartitionServer, partitionId metapb.PartitionID) *PartitionServer
 }
 
 type IdleSelector struct {
@@ -17,12 +18,22 @@ func NewIdleSelector() Selector {
 	return &IdleSelector{}
 }
 
-func (s *IdleSelector) SelectTarget(servers []*PartitionServer) *PartitionServer {
+func (s *IdleSelector) SelectTarget(servers []*PartitionServer, partitionId metapb.PartitionID) *PartitionServer {
 	if servers == nil || len(servers) == 0 {
 		return nil
 	}
 
-	startIdx := rand.Intn(len(servers))
+	candidatePs := make([]*PartitionServer, 0)
+	for _, ps := range servers {
+		if ps.partitionCache.FindPartitionById(partitionId) != nil {
+			continue
+		}
 
-	return servers[startIdx]
+		candidatePs = append(candidatePs, ps)
+	}
+	if len(candidatePs) == 0 {
+		return nil
+	}
+
+	return candidatePs[rand.Intn(len(candidatePs))]
 }

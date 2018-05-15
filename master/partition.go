@@ -16,19 +16,19 @@ import (
 const (
 	PREFIX_PARTITION   = "schema partition "
 	defaultBTreeDegree = 64
-	FIXED_REPLICA_NUM  = 1
+	FIXED_REPLICA_NUM  = 1  // TODO: add config
 )
 
 type Partition struct {
 	*metapb.Partition // !!! Do not directly operate the Replicas，must be firstly take the propertyLock
 
-	Leader *masterpb.RaftFollowerStatus
+	Leader *metapb.Replica      `json:"leader"`
 
 	// TODO: temporary policy, finally using global task to replace it
 	taskFlag    bool
 	taskTimeout time.Time
 
-	lastHeartbeat time.Time
+	LastHeartbeat time.Time 	`json:"last_heartbeat"`
 	propertyLock  sync.RWMutex
 }
 
@@ -100,7 +100,9 @@ func (p *Partition) deleteReplica(store Store, metaReplicas ...*metapb.Replica) 
 	if err != nil {
 		return err
 	}
-	store.Put(key, val)
+	if err := store.Put(key, val); err != nil {
+		return err
+	}
 
 	p.Partition = copy
 	return nil
@@ -119,80 +121,87 @@ func (p *Partition) addReplica(store Store, metaReplicas ...*metapb.Replica) err
 	if err != nil {
 		return err
 	}
-	store.Put(key, val)
+	if err := store.Put(key, val); err != nil {
+		return err
+	}
 
 	p.Partition = copy
 
 	return nil
 }
 
-func (p *Partition) UpdateReplicaGroupUnderGreatOrZeroVer(store Store, info *masterpb.PartitionInfo,
-		leaderFollower *masterpb.RaftFollowerStatus,) (conditionOk bool, err error) {
+// updating policy :
+// 1. update the leader and replicas group when confVer of partitionInfo is greater than confVer of cluster partition
+//    or current cluster partition have no leader
+// 2. update only the leader when confVer of partitionInfo is equals to confVer of cluster partition,
+//    and the leader of partitionInfo is exists in replica group of current cluster partition
+func (p *Partition) UpdateReplicaGroupByCond(store Store, info *masterpb.PartitionInfo,
+		leaderReplica *metapb.Replica) (verExpired, updateOk bool) {
 	p.propertyLock.Lock()
 	defer p.propertyLock.Unlock()
 
-	if store == nil || info == nil || leaderFollower == nil {
-		return false, nil
+	if info.Epoch.ConfVersion < p.Epoch.ConfVersion ||
+		(info.Epoch.ConfVersion == p.Epoch.ConfVersion && p.Leader != nil) {
+		return true, false
 	}
-	if !(p.Epoch.ConfVersion == 0 && p.Leader == nil) && !(p.Epoch.ConfVersion < info.Epoch.ConfVersion) {
-        return false, nil
-    }
 
-    p.taskFlag = false
-    p.taskTimeout = time.Time{}
+	copy := deepcopy.Iface(p.Partition).(*metapb.Partition)
+	copy.Epoch = info.Epoch
+	copy.Status = info.Status
 
-    p.lastHeartbeat = time.Now()
-    p.Status = info.Status
-    p.Epoch = info.Epoch
-
-    p.Replicas = make([]metapb.Replica, 0, len(info.RaftStatus.Followers))
+	copy.Replicas = make([]metapb.Replica, 0, len(info.RaftStatus.Followers)+1)
+	copy.Replicas = append(copy.Replicas, info.RaftStatus.Replica)
 	for _, follower := range info.RaftStatus.Followers {
-		replica := NewMetaReplicaByFollower(&follower)
-		p.Replicas = append(p.Replicas, *replica)
-
-		if replica.ID == leaderFollower.ID {
-			p.Leader = leaderFollower
-		}
+		replica := &follower.Replica
+		copy.Replicas = append(copy.Replicas, *replica)
 	}
-
-	key, val, err := doMetaMarshal(p.Partition)
+	key, val, err := doMetaMarshal(copy)
 	if err != nil {
-		return true, err
-	}
-	// TODO: partitions should not be store in db
-	store.Put(key, val)
-
-	return true, nil
-}
-
-func (p *Partition) UpdateLeaderUnderSameVer(info *masterpb.PartitionInfo,
-        leaderFollower *masterpb.RaftFollowerStatus) (conditionOk, updateOk bool) {
-	p.propertyLock.Lock()
-	defer p.propertyLock.Unlock()
-
-    if info == nil || leaderFollower == nil {
-        return false, false
-    }
-	if info.Epoch.ConfVersion != p.Epoch.ConfVersion {
 		return false, false
 	}
-    if p.Leader == nil {
-        return false, false
-    }
+	if err := store.Put(key, val); err != nil {
+		return false, false
+	}
+
+	p.Partition = copy
+
+	p.taskFlag = false
+	p.taskTimeout = time.Time{}
+
+	p.LastHeartbeat = time.Now()
+	p.Leader = leaderReplica
+
+	return false, true
+}
+
+func (p *Partition) ValidateAndUpdateLeaderByCond(info *masterpb.PartitionInfo,
+       leaderReplica *metapb.Replica) (verExpired, illegal, updateOk bool) {
+	p.propertyLock.Lock()
+	defer p.propertyLock.Unlock()
+
+	if info.Epoch.ConfVersion != p.Epoch.ConfVersion {
+		return true, false, false
+	}
+
+	if p.Leader == nil {
+		return false, false, false
+	}
 
 	var leaderExists bool
 	for _, replica := range p.Replicas {
-		if replica.ID == leaderFollower.ID {
+		if replica.ID == leaderReplica.ID {
 			leaderExists = true
 			break
 		}
 	}
 	if !leaderExists {
-		return true, false
+		return false, true, false
 	}
-	p.Leader = leaderFollower
 
-	return true, true
+	p.LastHeartbeat = time.Now()
+	p.Leader = leaderReplica
+
+	return false, false, true
 }
 
 func (p *Partition) countReplicas() int {
@@ -213,13 +222,6 @@ func (p *Partition) getAllReplicas() []*metapb.Replica {
 
 	return replicas
 }
-
-//func (p *Partition) pickLeaderReplica() *metapb.Replica {
-//	p.propertyLock.RLock()
-//	defer p.propertyLock.RUnlock()
-//
-//	return p.Leader
-//}
 
 func (p *Partition) pickLeaderNodeId() metapb.NodeID {
 	p.propertyLock.RLock()
@@ -300,13 +302,26 @@ func (c *PartitionCache) AddPartition(partition *Partition) {
 	c.partitions[partition.ID] = partition
 }
 
+func (c *PartitionCache) GetAllPartitions() *[]Partition {
+    c.lock.RLock()
+    defer c.lock.RUnlock()
+
+    partitions := make([]Partition, 0, len(c.partitions))
+    for _, partition := range c.partitions {
+        log.Debug("api get all partition[%p] ", partition)
+        partitions = append(partitions, *partition)
+    }
+
+    return &partitions
+}
+
 func (c *PartitionCache) GetAllMetaPartitions() *[]metapb.Partition {
 	c.lock.RLock()
 	defer c.lock.RUnlock()
 
 	partitions := make([]metapb.Partition, 0, len(c.partitions))
-	for _, metaPartition := range c.partitions {
-		partitions = append(partitions, *metaPartition.Partition)
+	for _, partition := range c.partitions {
+		partitions = append(partitions, *partition.Partition)
 	}
 
 	return &partitions

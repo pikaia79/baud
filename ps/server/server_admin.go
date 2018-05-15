@@ -4,18 +4,20 @@ import (
 	"context"
 	"fmt"
 	"io/ioutil"
-	"os"
 	"strconv"
 
 	"github.com/gogo/protobuf/proto"
 
 	"github.com/tiglabs/baudengine/proto/metapb"
 	"github.com/tiglabs/baudengine/proto/pspb"
+	"github.com/tiglabs/baudengine/util/log"
 	raftproto "github.com/tiglabs/raft/proto"
 )
 
 // CreatePartition admin grpc service for create partition
 func (s *Server) CreatePartition(ctx context.Context, request *pspb.CreatePartitionRequest) (*pspb.CreatePartitionResponse, error) {
+	log.Debug("CreatePartition recive request:\n %s", request)
+
 	response := &pspb.CreatePartitionResponse{
 		ResponseHeader: metapb.ResponseHeader{
 			ReqId: request.ReqId,
@@ -35,6 +37,8 @@ func (s *Server) CreatePartition(ctx context.Context, request *pspb.CreatePartit
 
 // DeletePartition admin grpc service for delete partition
 func (s *Server) DeletePartition(ctx context.Context, request *pspb.DeletePartitionRequest) (*pspb.DeletePartitionResponse, error) {
+	log.Debug("DeletePartition recive request:\n %s", request)
+
 	response := &pspb.DeletePartitionResponse{
 		ResponseHeader: metapb.ResponseHeader{
 			ReqId: request.ReqId,
@@ -54,6 +58,8 @@ func (s *Server) DeletePartition(ctx context.Context, request *pspb.DeletePartit
 
 // ChangeReplica admin grpc service for change replica of partition
 func (s *Server) ChangeReplica(ctx context.Context, request *pspb.ChangeReplicaRequest) (*pspb.ChangeReplicaResponse, error) {
+	log.Debug("ChangeReplica recive request:\n %s", request)
+
 	response := &pspb.ChangeReplicaResponse{
 		ResponseHeader: metapb.ResponseHeader{
 			ReqId: request.ReqId,
@@ -138,8 +144,7 @@ func (s *Server) doPartitionDelete(id metapb.PartitionID) {
 		}
 	}
 
-	path, _ := getPartitionPath(id, s.DataPath, false)
-	os.RemoveAll(path)
+	s.meta.clear(id)
 }
 
 func (s *Server) destroyExcludePartition(partitions []metapb.Partition) {
@@ -160,8 +165,7 @@ func (s *Server) destroyExcludePartition(partitions []metapb.Partition) {
 				}
 
 				if delete {
-					path, _ := getPartitionPath(id, s.DataPath, false)
-					os.RemoveAll(path)
+					s.meta.clear(id)
 				}
 			}
 		}
@@ -169,7 +173,7 @@ func (s *Server) destroyExcludePartition(partitions []metapb.Partition) {
 }
 
 func (s *Server) reset() {
-	os.RemoveAll(s.DataPath)
+	s.meta.clearAll()
 }
 
 func (s *Server) adminEventHandler() {

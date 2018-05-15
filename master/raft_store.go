@@ -615,16 +615,21 @@ func (rs *RaftStore) LeaderChangeHandler(leaderId uint64) {
 	}
 
 	var leaderNode *ClusterNode
+	var leaderAddr string
 	for _, node := range rs.config.ClusterCfg.Nodes {
 		if node.NodeId == leaderId {
 			leaderNode = node
 			break
 		}
 	}
+	if leaderNode != nil {
+		leaderAddr = util.BuildAddr(leaderNode.Host, leaderNode.RpcPort)
+    }
+
     info := &LeaderInfo{
         becomeLeader: rs.becomeLeader(leaderId),
         newLeaderId:  leaderId,
-		newLeaderAddr: util.BuildAddr(leaderNode.Host, leaderNode.RpcPort),
+		newLeaderAddr: leaderAddr,
     }
     rs.leaderInfo = info
     select {
