@@ -40,7 +40,7 @@ type Store interface {
 	Get(key []byte) ([]byte, error)
 	Scan(startKey, limitKey []byte) raftkvstore.Iterator
 	NewBatch() Batch
-    GetLeaderAsync(leaderChangingCh chan *LeaderInfo)
+    GetLeaderAsync() <- chan *LeaderInfo
 	GetLeaderSync() *LeaderInfo
     Close() error
 }
@@ -95,8 +95,9 @@ type LeaderInfo struct {
 
 func NewRaftStore(config *Config) *RaftStore {
 	rs := &RaftStore{
-		config:         config,
-		localRead:      true,
+		config:           config,
+		localRead:        true,
+		leaderChangingCh: make(chan *LeaderInfo, 4),
 	}
 	rs.ctx, rs.ctxCancel = context.WithCancel(context.Background())
 	return rs
@@ -183,8 +184,8 @@ func (rs *RaftStore) NewBatch() Batch {
 	return NewSaveBatch(rs.raftGroup)
 }
 
-func (rs *RaftStore) GetLeaderAsync(leaderChangingCh chan *LeaderInfo) {
-	rs.leaderChangingCh = leaderChangingCh
+func (rs *RaftStore) GetLeaderAsync() <- chan *LeaderInfo {
+	return rs.leaderChangingCh
 }
 
 func (rs *RaftStore) GetLeaderSync() *LeaderInfo {
@@ -193,6 +194,11 @@ func (rs *RaftStore) GetLeaderSync() *LeaderInfo {
 
 func (rs *RaftStore) Close() error {
 	var lastErr error
+	if rs.leaderChangingCh != nil {
+		close(rs.leaderChangingCh)
+		rs.leaderChangingCh = nil
+	}
+
 	if rs.raftGroup != nil {
 		if err := rs.raftGroup.Release(); err != nil {
 			log.Error("fail to close raftgroup. err:[%v]", err)
@@ -609,10 +615,6 @@ func (rs *RaftStore) HandleApplySnapshot(peers []raftproto.Peer, iter *SnapshotK
 
 func (rs *RaftStore) LeaderChangeHandler(leaderId uint64) {
 	log.Info("raft leader had changed to id[%v]", leaderId)
-
-	if rs.leaderChangingCh == nil {
-		return
-	}
 
 	var leaderNode *ClusterNode
 	var leaderAddr string
