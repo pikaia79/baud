@@ -3,30 +3,50 @@ package router
 import (
 	"github.com/BurntSushi/toml"
 	"github.com/tiglabs/baudengine/util/log"
+	"time"
 )
 
 const defaultConfig = `
+# Router Configuration.
+
+[module]
 role = "router"
+clusterId = "1"
 ip = "0.0.0.0"
 httpPort = 9000
 pprof = 10088
-masterAddr = "10.1.86.118:3456"
+masterAddr = "localhost:18817"
 logDir = "/export/log/ps"
 masterConnPoolSize = 10
 psConnPoolSize = 10
+
+[log]
+log-path = "/tmp/baudengine/router/log"
+#debug, info, warn, error
+level="debug"
 `
 
-const rpcTimeoutDef  = 100
+const rpcTimeoutDef  = 5 * time.Second
 
-type Config struct {
+type ModuleConfig struct {
 	Role               string `toml:"role,omitempty" json:"role"`
+	ClusterId          string `toml:"clusterId,omitempty" json:"clusterId"`
 	Ip                 string
 	HttpPort           uint16
 	Pprof              uint16
 	MasterAddr         string
-	LogDir             string
-	masterConnPoolSize uint16
-	psConnPoolSize     uint16
+	MasterConnPoolSize uint16
+	PsConnPoolSize     uint16
+}
+
+type LogConfig struct {
+	LogPath   string `toml:"log-path,omitempty" json:"log-path"`
+	Level     string `toml:"level,omitempty" json:"level"`
+}
+
+type Config struct {
+	ModuleCfg  ModuleConfig  `toml:"module,omitempty" json:"module"`
+	LogCfg     LogConfig     `toml:"log,omitempty" json:"log"`
 }
 
 func LoadConfig(fileName string) *Config {

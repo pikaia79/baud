@@ -21,7 +21,6 @@ const (
 
 var (
 	configFile = flag.String("c", "", "config file path")
-	logLevel   = flag.Int("log", 0, "log level, as DebugLevel = 0")
 
 	mainWg sync.WaitGroup
 )
@@ -39,17 +38,20 @@ func interceptSignal(s *router.Router) {
 }
 
 func main() {
-	fmt.Println("Hello, Baud! I router!!!")
+	fmt.Println("Hello, BaudEngine! I router!!!")
 	flag.Parse()
 
 	cfg := router.LoadConfig(*configFile)
+
+	log.InitFileLog(cfg.LogCfg.LogPath, cfg.ModuleCfg.Role, cfg.LogCfg.Level)
+	log.Debug("log has been initialized")
 
 	//for multi-cpu scheduling
 	runtime.GOMAXPROCS(runtime.NumCPU())
 
 	//init profile server
 	go func() {
-		fmt.Println(http.ListenAndServe(fmt.Sprintf(":%d", cfg.Pprof), nil))
+		fmt.Println(http.ListenAndServe(fmt.Sprintf(":%d", cfg.ModuleCfg.Pprof), nil))
 	}()
 
 	server := router.NewServer()
@@ -60,7 +62,7 @@ func main() {
 	//start the server
 	err := server.Start(cfg)
 	if err != nil {
-		log.Fatal("Fatal: failed to start the Baud daemon - ", err)
+		log.Fatal("Fatal: failed to start the router daemon - ", err)
 	}
 
 	log.Info("main waiting")
