@@ -58,10 +58,10 @@ message GetRequest {
 message GetResponse {
     option (gogoproto.goproto_stringer) = false;
 
-    ResponseHeader      header = 1 [(gogoproto.nullable) = false, (gogoproto.embed) = true];
-    bytes               id     = 2 [(gogoproto.casttype) = "github.com/tiglabs/baudengine/proto/metapb.Key"];
-    bool                found  = 3;
-    repeated FieldValue fields = 4 [(gogoproto.nullable) = false];
+    ResponseHeader          header = 1 [(gogoproto.nullable) = false, (gogoproto.embed) = true];
+    bytes                   id     = 2 [(gogoproto.casttype) = "github.com/tiglabs/baudengine/proto/metapb.Key"];
+    bool                    found  = 3;
+    map<uint32, FieldValue> fields = 4 [(gogoproto.nullable) = false];
 }
 
 message BulkRequest {
@@ -95,8 +95,7 @@ message BulkItemResponse {
 
 
 message CreateRequest {
-    uint32    slot = 1 [(gogoproto.casttype) = "github.com/tiglabs/baudengine/proto/metapb.SlotID"];
-    Document  doc  = 2 [(gogoproto.nullable) = false];
+    Document  doc  = 1 [(gogoproto.nullable) = false];
 }
 
 message CreateResponse {
@@ -105,9 +104,8 @@ message CreateResponse {
 }
 
 message UpdateRequest {
-    uint32    slot   = 1 [(gogoproto.casttype) = "github.com/tiglabs/baudengine/proto/metapb.SlotID"];
-    Document  doc    = 2 [(gogoproto.nullable) = false];
-    bool      upsert = 3;
+    Document  doc    = 1 [(gogoproto.nullable) = false];
+    bool      upsert = 2;
 }
 
 message UpdateResponse {
@@ -134,14 +132,15 @@ message Failure {
 
 // Representing the field value for various types.
 enum ValueType {
-    NULL    = 0;
-    INT     = 1;
-    FLOAT   = 2;
-    DECIMAL = 3;
-    BOOL    = 4;
-    STRING  = 5;
-    TIME    = 6;
-    BLOB    = 7;
+    UNKNOWN = 0;
+    NULL    = 1;
+    INT     = 2;
+    FLOAT   = 3;
+    DECIMAL = 4;
+    BOOL    = 5;
+    STRING  = 6;
+    TIME    = 7;
+    BLOB    = 8;
 }
 
 // Controls how much information is stored in the postings lists
@@ -179,9 +178,9 @@ message Field {
 message FieldValue {
     option (gogoproto.goproto_stringer) = false;
 
-    uint32    id         = 1;
-    ValueType type       = 2;
-    repeated bytes datas = 3 [(gogoproto.casttype) = "github.com/tiglabs/baudengine/proto/metapb.Value"];
+    uint32    id    = 1;
+    ValueType type  = 2;
+    bytes     data  = 3 [(gogoproto.casttype) = "github.com/tiglabs/baudengine/proto/metapb.Value"];
 }
 
 message FieldDesc {
