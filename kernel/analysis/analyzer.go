@@ -3,7 +3,7 @@ package analysis
 import "time"
 
 type Analyzer interface {
-	Analyze(val []byte) []*Token
+	Analyze([]byte) TokenSet
 }
 
 type DateTimeParser interface {

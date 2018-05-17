@@ -1,5 +1,7 @@
 package analysis
 
+import "fmt"
+
 type TokenType int
 
 const (
@@ -10,18 +12,34 @@ const (
 	KeyWord
 )
 
-type Token struct {
-	// Start specifies the byte offset of the beginning of the term in the
-	// field.
-	Start int   `json:"start"`
+type TokenSet  []*Token
 
-	// End specifies the byte offset of the end of the term in the field.
+type Token struct {
+	Start int   `json:"start"`
 	End  int    `json:"end"`
 	Term []byte `json:"term"`
 
-	// Position specifies the 1-based index of the token in the sequence of
-	// occurrences of its term in the field.
 	Position int       `json:"position"`
 	Type     TokenType `json:"type"`
 }
 
+func (t *Token) String() string {
+	return fmt.Sprintf("start: %d, end: %d, term: %s, position %d", t.Start, t.End, string(t.Term), &t.Position)
+}
+
+type Tokenizer interface {
+	Tokenize([]byte) TokenSet
+}
+
+type CharFilter interface {
+	// filter char return true if the input need filter out
+	Filter(rune) bool
+}
+
+type TextFilter interface {
+	Filter([]rune) []rune
+}
+
+type TokenFilter interface {
+	Filter(TokenSet) TokenSet
+}

@@ -5,20 +5,18 @@ package triedb
 
 import (
 	"sort"
-	"fmt"
-
-	"github.com/tiglabs/baudengine/util/bufalloc"
+	"unicode/utf8"
 )
 
 type NodeIterator func(key []byte, val interface{}) bool
 
 type Node struct {
-	val      byte         // value of node
+	val      rune         // value of node
 	term     bool         // last node flag
 	depth    int
 	property interface{}  // property of node
 	parent   *Node
-	children map[byte]*Node
+	children map[rune]*Node
 }
 
 type Trie struct {
@@ -26,15 +24,15 @@ type Trie struct {
 	size int
 }
 
-type ByBytes []byte
-func (a ByBytes) Len() int           { return len(a) }
-func (a ByBytes) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
-func (a ByBytes) Less(i, j int) bool { return a[i] < a[j] }
+type ByRune []rune
+func (a ByRune) Len() int           { return len(a) }
+func (a ByRune) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
+func (a ByRune) Less(i, j int) bool { return a[i] < a[j] }
 
 // Creates a new Trie with an initialized root Node.
 func NewTrie() *Trie {
 	return &Trie{
-		root: &Node{children: make(map[byte]*Node), depth: 0},
+		root: &Node{children: make(map[rune]*Node), depth: 0},
 		size: 0,
 	}
 }
@@ -57,15 +55,22 @@ func (t *Trie) ReplaceOrInsert(key []byte, property interface{}) *Node {
 	}
 	node := t.root
 	var pre *Node
-	for _, k := range key {
-		if n, ok := node.children[k]; ok {
+	offset := 0
+	for len(key[offset:]) > 0 {
+		e, size := utf8.DecodeRune(key[offset:])
+		if e == utf8.RuneError {
+			return nil
+		}
+		offset += size
+		if n, ok := node.children[e]; ok {
 			node = n
 			pre = n
 		} else {
-			node = node.NewChildNode(k, nil, false)
+			node = node.NewChildNode(e, nil, false)
 			pre = nil
 		}
 	}
+
 	// new node
 	if pre == nil {
 		node.property = property
@@ -88,7 +93,8 @@ func (t *Trie) ReplaceOrInsert(key []byte, property interface{}) *Node {
 // Finds and returns property data associated
 // with `key`.
 func (t *Trie) Find(key []byte) (*Node, bool) {
-	node := findNode(t.Root(), key)
+	keyRune := parseTextToRunes(key)
+	node := findNode(t.Root(), keyRune)
 	if node == nil {
 		return nil, false
 	}
@@ -106,7 +112,8 @@ func (t *Trie) Find(key []byte) (*Node, bool) {
 }
 
 func (t *Trie) HasKeysWithPrefix(key []byte) bool {
-	node := findNode(t.Root(), key)
+	keyRune := parseTextToRunes(key)
+	node := findNode(t.Root(), keyRune)
 	return node != nil
 }
 
@@ -114,7 +121,8 @@ func (t *Trie) HasKeysWithPrefix(key []byte) bool {
 // Return delete node if exist
 // Note make sure the key is not only a prefix
 func (t *Trie) Delete(key []byte) *Node {
-	node := findNode(t.Root(), key)
+	keyRune := parseTextToRunes(key)
+	node := findNode(t.Root(), keyRune)
 	var del *Node
 	if node.term {
 		t.size--
@@ -163,22 +171,23 @@ func (t *Trie) Keys() [][]byte {
 // Performs a prefix search against the keys in the trie.
 // The key and value are only valid for the life of the iterator.
 func (t *Trie) PrefixSearch(pre []byte, iter NodeIterator) {
-	node := findNode(t.Root(), pre)
+	preRune := parseTextToRunes(pre)
+	node := findNode(t.Root(), preRune)
 	if node == nil {
 		return
 	}
 
-	preTraverse(node, pre, iter)
+	preTraverse(node, preRune, iter)
 }
 
 // Creates and returns a pointer to a new child for the node.
-func (n *Node) NewChildNode(val byte, property interface{}, term bool) *Node {
+func (n *Node) NewChildNode(val rune, property interface{}, term bool) *Node {
 	node := &Node{
 		val:      val,
 		term:     term,
 		property: property,
 		parent:   n,
-		children: make(map[byte]*Node),
+		children: make(map[rune]*Node),
 		depth:    n.depth + 1,
 	}
 	n.children[val] = node
@@ -189,7 +198,7 @@ func (n *Node) ReplaceOrInsertChildNode(node *Node) {
 	n.children[node.Val()] = node
 }
 
-func (n *Node) RemoveChild(r byte) {
+func (n *Node) RemoveChild(r rune) {
 	delete(n.children, r)
 }
 
@@ -204,7 +213,7 @@ func (n Node) Property() interface{} {
 }
 
 // Returns the children of this node.
-func (n Node) Children() map[byte]*Node {
+func (n Node) Children() map[rune]*Node {
 	return n.children
 }
 
@@ -212,7 +221,7 @@ func (n Node) Terminating() bool {
 	return n.term
 }
 
-func (n Node) Val() byte {
+func (n Node) Val() rune {
 	return n.val
 }
 
@@ -220,7 +229,7 @@ func (n Node) Depth() int {
 	return n.depth
 }
 
-func findNode(node *Node, key []byte) *Node {
+func findNode(node *Node, key []rune) *Node {
 	if node == nil {
 		return nil
 	}
@@ -234,7 +243,7 @@ func findNode(node *Node, key []byte) *Node {
 		return nil
 	}
 
-	var subKey []byte
+	var subKey []rune
 	if len(key) > 1 {
 		subKey = key[1:]
 	} else {
@@ -245,37 +254,60 @@ func findNode(node *Node, key []byte) *Node {
 }
 
 // Preorder traverse trie
-func preTraverse(node *Node, prefix []byte, iter NodeIterator) {
+func preTraverse(node *Node, prefix []rune, iter NodeIterator) {
 	if node == nil {
 		return
 	}
 	if node.term {
-		l := len(prefix)
-		buffer := bufalloc.AllocBuffer(l)
-		_, err := buffer.Write(prefix)
-		if err != nil {
-			fmt.Println("copy prefix failed ", err)
+		if !iter(parseRunesToText(prefix), node.Property()) {
 			return
 		}
-		if !iter(buffer.Bytes(), node.Property()) {
-			bufalloc.FreeBuffer(buffer)
-			return
-		}
-		bufalloc.FreeBuffer(buffer)
 	}
 	if len(node.Children()) == 0 {
 		return
 	}
 	// sort key
-	bs := make([]byte, 0, len(node.Children()))
+	bs := make([]rune, 0, len(node.Children()))
 	for val, _ := range node.children {
 		bs = append(bs, val)
 	}
-	sort.Sort(ByBytes(bs))
+	sort.Sort(ByRune(bs))
 	for _, c := range bs {
 		if n, ok := node.children[c]; ok {
 			preTraverse(n, append(prefix, n.val), iter)
 		}
 	}
+}
+
+func parseTextToRunes(str []byte) []rune {
+	if len(str) == 0 {
+		return nil
+	}
+
+	var keyRune []rune
+	offset := 0
+	for len(str[offset:]) > 0 {
+		e, size := utf8.DecodeRune(str[offset:])
+		if e == utf8.RuneError {
+			return nil
+		}
+		offset += size
+		keyRune = append(keyRune, e)
+	}
+	return keyRune
+}
+
+func parseRunesToText(runes []rune) []byte {
+	var l int
+	for _, r := range runes {
+		l += utf8.RuneLen(r)
+	}
+	_key := make([]byte, l)
+	offset := 0
+	for _, k := range runes {
+		n := utf8.EncodeRune(_key[offset:], k)
+		offset += n
+	}
+	return _key
 }
 
