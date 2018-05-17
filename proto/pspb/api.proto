@@ -20,6 +20,11 @@ option (gogoproto.testgen_all) = false;
 option (gogoproto.benchgen_all) = false;
 option (gogoproto.goproto_getters_all) = false;
 
+service ApiGrpc {
+    rpc Get (GetRequest) returns (GetResponse) {}
+    rpc BulkWrite (BulkRequest) returns (BulkResponse) {}
+}
+
 enum OpType{
     // Creates the resource. If there is an existing document with the id, then it won't be removed.
     CREATE   = 0;
@@ -175,10 +180,9 @@ message Field {
 message FieldValue {
     option (gogoproto.goproto_stringer) = false;
 
-    uint32    id      = 1;
-    ValueType type    = 2;
-    // protobuf-based codec,maybe an array of values
-    bytes     data    = 3;
+    uint32    id         = 1;
+    ValueType type       = 2;
+    repeated bytes datas = 3 [(gogoproto.casttype) = "github.com/tiglabs/baudengine/proto/metapb.Value"];
 }
 
 message FieldDesc {
@@ -187,4 +191,5 @@ message FieldDesc {
     bool        stored      = 1;
     bool        tokenized   = 2;
     IndexOption indexOption = 3;
+    string      analyzer    = 4;
 }
