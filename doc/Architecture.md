@@ -18,6 +18,8 @@ Field: key -> a scalar value, an array of values, or a nested structure
 
 Any field can be indexed and morever full-text search is a first-class citizen. 
 
+Formally, a field is defined as (name, value, property) where property = (dataType, indexType, analyzer).
+
 * Field Datatypes
 
 string, numberic, date, boolen, binary
@@ -109,12 +111,6 @@ db -> space -> partition = partition key hash range
 
 The partition count is planned according to the maximum write throughput that the space should provision. 
 
-* dynamic re-sharding
-
-It will implemented via filtered replication. 
-
-However, we recommand that a space is pre-sharded and somehow over-sharded to avoid re-sharding on runtime.
-
 ### replication
 
 * cross-zone replication
@@ -125,15 +121,29 @@ Each partition has a Raft state machine located in three 'writer-role' partition
 
 In any zone, a partition can have any number of read-only replicas, which are served by the 'Reader-Role' partitionservers reading the underlying Baudstorage files. 
 
-### scalability guarantee
+### scalability
+
+* goal
 
 One Baud cluster can host one to thousands of databases; 
 one DB can host billions of spaces;
 one space can host unlimited number of objects;
 
+* scaling up/down - resizing partitions
+
+Moving partitions between PS nodes for load balancing is easy by leveraging the BaudStorage DCFS: stop a partition replica and restart from another partitionserver.
+
+* scaling out/in - online re-sharding
+
+Partition splitting & merging is implemented via filtered replication. 
+
+However, we recommand that a space is pre-sharded and somehow over-sharded to avoid re-sharding on runtime.
+
+
 ### local index vs. global index
 
 currently local index only. 
+
 
 ## Master
 
@@ -173,16 +183,13 @@ distributed voting of PS health
 
 * placement driver (PD)
 
-move partitions between PS nodes for load balancing
 
-### availability & reliability
+### implementation
 
-raft replication
-
-data structures are in memory but also marshalled and written to the underlying key-value store
+based on a distributed coordination service like etcd.
 
 
-## PS
+## PartitionServer
 
 there are two PS roles, i.e. two modes of running instances: 
 
@@ -202,7 +209,7 @@ Each partition has a single key-value storage engine for both objects and indexe
 
 (#SI, fieldName, fieldValue or term, primaryKey) -> timestamp
 
-### Synonym Table
+### analyzer
 
 term synonyms are stored as a file of Baudstorage and loaded by PS for document analysis.
 
@@ -240,6 +247,11 @@ Tables sharing the same partition key = one space
 * the BaudStorage datacenter filesystem or local filesystems
 
 * Kubernetes or bare metal
+
+
+## Backup and Restore
+
+provide a point-in-time snapshot of the data on a partition
 
 
 ## Manageability
