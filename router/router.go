@@ -2,20 +2,21 @@ package router
 
 import (
 	"encoding/json"
-	"github.com/julienschmidt/httprouter"
-	"github.com/pkg/errors"
 	"github.com/spaolacci/murmur3"
-	"github.com/tiglabs/baudengine/keys"
+	"github.com/tiglabs/baudengine/common/keys"
 	"github.com/tiglabs/baudengine/proto/metapb"
-	"github.com/tiglabs/raft/util/log"
+	"github.com/tiglabs/baudengine/util/log"
 	"net/http"
 	"strconv"
 	"sync"
+	"github.com/tiglabs/baudengine/util/netutil"
+	"errors"
 )
 
+var routerCfg 	*Config
+
 type Router struct {
-	httpRouter   *httprouter.Router
-	httpServer   *http.Server
+	httpServer   *netutil.Server
 	masterClient *MasterClient
 	dbMap        sync.Map
 	lock         sync.RWMutex
@@ -32,51 +33,55 @@ func NewServer() *Router {
 }
 
 func (router *Router) Start(cfg *Config) error {
-	router.masterClient = NewMasterClient(cfg.MasterAddr)
-	router.httpRouter = httprouter.New()
+	routerCfg = cfg
+	router.masterClient = NewMasterClient(cfg.ModuleCfg.MasterAddr)
 
-	router.httpRouter.PUT("/doc/:db/:space", router.handleCreate)
-	router.httpRouter.GET("/doc/:db/:space/:docId", router.handleRead)
-	router.httpRouter.POST("/doc/:db/:space/:docId", router.handleUpdate)
-	router.httpRouter.DELETE("/doc/:db/:space/:docId", router.handleDelete)
-
-	router.httpRouter.GET("/status", router.handleStatus)
-	router.httpRouter.GET("/debug/ppro", router.handlePprof)
-
-	router.httpServer = &http.Server{
-		Addr:    cfg.Ip + ":" + strconv.Itoa(int(cfg.HttpPort)),
-		Handler: router.httpRouter,
+	httpServerConfig := &netutil.ServerConfig{
+		Name: "router",
+		Addr: cfg.ModuleCfg.Ip + ":" + strconv.Itoa(int(cfg.ModuleCfg.HttpPort)),
+		ConnLimit: 10000,
 	}
-	return router.httpServer.ListenAndServe()
+	router.httpServer = netutil.NewServer(httpServerConfig)
+
+	router.httpServer.Handle(netutil.PUT, "/doc/:db/:space", router.handleCreate)
+	router.httpServer.Handle(netutil.GET, "/doc/:db/:space/:docId", router.handleRead)
+	router.httpServer.Handle(netutil.POST,"/doc/:db/:space/:docId", router.handleUpdate)
+	router.httpServer.Handle(netutil.DELETE, "/doc/:db/:space/:docId", router.handleDelete)
+
+	return router.httpServer.Run()
 }
 
 func (router *Router) Shutdown() {
 	router.httpServer.Close()
 }
 
-func (router *Router) handleCreate(writer http.ResponseWriter, request *http.Request, params httprouter.Params) {
+func (router *Router) handleCreate(writer http.ResponseWriter, request *http.Request, params netutil.UriParams) {
 	defer router.catchPanic(writer)
 
-	db, space, _, _ := router.getParams(params, true)
+	db, space, _, _ := router.getParams(params, false)
 	docBody := router.readDocBody(request)
 	var partition *Partition
 	keyField := space.GetKeyField()
 	if keyField != "" {
-		var docObj map[string]string
-		if err := json.Unmarshal(docBody, docObj); err != nil {
+		docObj := make(map[string]interface{})
+		if err := json.Unmarshal(docBody, &docObj); err != nil {
 			panic(err)
 		}
 		if slotData, ok := docObj[keyField]; ok {
 			h32 := murmur3.New32()
-			h32.Write([]byte(slotData))
-			partition = space.GetPartition(h32.Sum32())
-		} else {
-			panic(errors.New("cannot get slot data"))
+			switch data := slotData.(type) {
+			case string:
+				h32.Write([]byte(data))
+			default:
+				panic(errors.New("bad slot data type"))
+			}
+			partition = space.GetPartition(metapb.SlotID(h32.Sum32()))
 		}
-	} else {
+	}
+	if partition == nil {
 		h32 := murmur3.New32()
 		h32.Write(docBody)
-		partition = space.GetPartition(h32.Sum32())
+		partition = space.GetPartition(metapb.SlotID(h32.Sum32()))
 	}
 	docId := partition.Create(docBody)
 
@@ -90,27 +95,27 @@ func (router *Router) handleCreate(writer http.ResponseWriter, request *http.Req
 	sendReply(writer, &HttpReply{ERRCODE_SUCCESS, ErrSuccess.Error(), respMap})
 }
 
-func (router *Router) handleRead(writer http.ResponseWriter, request *http.Request, params httprouter.Params) {
+func (router *Router) handleRead(writer http.ResponseWriter, request *http.Request, params netutil.UriParams) {
 	defer router.catchPanic(writer)
 
-	_, _, partition, docId := router.getParams(params, false)
+	_, _, partition, docId := router.getParams(params, true)
 	docBody := partition.Read(docId)
 	sendReply(writer, &HttpReply{ERRCODE_SUCCESS, ErrSuccess.Error(), docBody})
 }
 
-func (router *Router) handleUpdate(writer http.ResponseWriter, request *http.Request, params httprouter.Params) {
+func (router *Router) handleUpdate(writer http.ResponseWriter, request *http.Request, params netutil.UriParams) {
 	defer router.catchPanic(writer)
 
-	_, _, partition, docId := router.getParams(params, false)
+	_, _, partition, docId := router.getParams(params, true)
 	docBody := router.readDocBody(request)
 	partition.Update(docId, docBody)
 	sendReply(writer, &HttpReply{ERRCODE_SUCCESS, ErrSuccess.Error(), nil})
 }
 
-func (router *Router) handleDelete(writer http.ResponseWriter, request *http.Request, params httprouter.Params) {
+func (router *Router) handleDelete(writer http.ResponseWriter, request *http.Request, params netutil.UriParams) {
 	defer router.catchPanic(writer)
 
-	_, _, partition, docId := router.getParams(params, false)
+	_, _, partition, docId := router.getParams(params, true)
 	if ok := partition.Delete(docId); ok {
 		sendReply(writer, &HttpReply{ERRCODE_SUCCESS, ErrSuccess.Error(), nil})
 	} else {
@@ -118,33 +123,19 @@ func (router *Router) handleDelete(writer http.ResponseWriter, request *http.Req
 	}
 }
 
-func (router *Router) handleStatus(writer http.ResponseWriter, request *http.Request, params httprouter.Params) {
-	defer router.catchPanic(writer)
-
-	panic(errors.New("test"))
-}
-
-func (router *Router) handlePprof(writer http.ResponseWriter, request *http.Request, params httprouter.Params) {
-	defer router.catchPanic(writer)
-
-}
-
-func (router *Router) getParams(params httprouter.Params, decodeSlot bool) (db *DB, space *Space, partition *Partition, docId *metapb.DocID) {
+func (router *Router) getParams(params netutil.UriParams, decodeDocId bool) (db *DB, space *Space, partition *Partition, docId *metapb.DocID) {
 	defer func() {
 		if p := recover(); p != nil {
+			if err, ok := p.(error); ok {
+				log.Error("getParams() failed: %s", err.Error())
+			}
 			panic(&HttpReply{ERRCODE_PARAM_ERROR, ErrParamError.Error(), nil})
 		}
 	}()
 
 	db = router.GetDB(params.ByName("db"))
 	space = db.GetSpace(params.ByName("space"))
-	if decodeSlot {
-		slot, err := strconv.ParseUint(params.ByName("slot"), 10, 32)
-		if err != nil {
-			panic(err)
-		}
-		partition = space.GetPartition(uint32(slot))
-	} else {
+	if decodeDocId {
 		id, err := keys.DecodeDocIDFromString(params.ByName("docId"))
 		if err != nil {
 			panic(err)
@@ -155,11 +146,8 @@ func (router *Router) getParams(params httprouter.Params, decodeSlot bool) (db *
 }
 
 func (router *Router) readDocBody(request *http.Request) []byte {
-	var docBody []byte
-	_, err := request.Body.Read(docBody)
-	if err != nil {
-		panic(err)
-	}
+	var docBody = make([]byte, request.ContentLength)
+	request.Body.Read(docBody)
 	return docBody
 }
 
@@ -178,6 +166,7 @@ func (router *Router) catchPanic(writer http.ResponseWriter) {
 			sendReply(writer, t)
 		case error:
 			sendReply(writer, &HttpReply{ERRCODE_INTERNAL_ERROR, t.Error(), nil})
+			log.Error("catchPanic() error: %s", t.Error())
 		default:
 			sendReply(writer, &HttpReply{ERRCODE_INTERNAL_ERROR, ErrInternalError.Error(), nil})
 		}

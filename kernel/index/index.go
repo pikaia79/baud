@@ -2,15 +2,16 @@ package index
 
 import (
 	"bytes"
-	"errors"
 	"encoding/binary"
+	"errors"
+
 	"golang.org/x/net/context"
 
+	"github.com/tiglabs/baudengine/kernel"
 	"github.com/tiglabs/baudengine/kernel/document"
 	"github.com/tiglabs/baudengine/kernel/mapping"
 	"github.com/tiglabs/baudengine/kernel/store/kvstore"
 	"github.com/tiglabs/baudengine/kernel/util"
-	"github.com/tiglabs/baudengine/kernel"
 )
 
 var RAFT_APPLY_ID []byte = []byte("Raft_apply_id")
@@ -155,7 +156,7 @@ func (id *IndexDriver) DeleteDocument(ctx context.Context, docID []byte, applyID
 		return count, err
 	}
 	if n > 0 {
-		count ++
+		count++
 	}
 	if applyID > 0 {
 		var buff [8]byte
@@ -199,7 +200,7 @@ func (id *IndexDriver) GetDocument(ctx context.Context, docID []byte, fields []s
 			fieldValues[name] = v
 		} else {
 			var vs []interface{}
-			for _, f :=  range fs {
+			for _, f := range fs {
 				v, err := getFieldValue(f)
 				if err != nil {
 					return nil, false
@@ -244,7 +245,7 @@ func (id *IndexDriver) ApplyDocSnapshot(ctx context.Context, iter kernel.Iterato
 		}
 		batch.Set(iter.Key(), iter.Value())
 		count++
-		if count % 100 == 0 {
+		if count%100 == 0 {
 			err := id.store.ExecuteBatch(batch)
 			if err != nil {
 				return err
@@ -266,6 +267,9 @@ func (id *IndexDriver) GetApplyID() (uint64, error) {
 	v, err := id.store.Get(RAFT_APPLY_ID)
 	if err != nil {
 		return 0, err
+	}
+	if len(v) == 0 {
+		return 0, nil
 	}
 	if len(v) != 8 {
 		return 0, errors.New("invalid applyID value in store")

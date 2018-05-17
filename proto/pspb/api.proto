@@ -20,24 +20,13 @@ option (gogoproto.testgen_all) = false;
 option (gogoproto.benchgen_all) = false;
 option (gogoproto.goproto_getters_all) = false;
 
-service ApiGrpc {
-    rpc Get (GetRequest) returns (GetResponse) {}
-    rpc BulkWrite (BulkRequest) returns (BulkResponse) {}
-}
-
-enum RequestContentType {
-    JSON = 0;
-}
-
 enum OpType{
-    // Index the source. If there an existing document with the id, it will be replaced.
-    INDEX    = 0;
-    // Creates the resource. Simply adds it to the index, if there is an existing document with the id, then it won't be removed.
-    CREATE   = 1;
-    // Updates a document
-    UPDATE   = 2;
+    // Creates the resource. If there is an existing document with the id, then it won't be removed.
+    CREATE   = 0;
+    // Updates a document. If there an existing document with the id, it will be replaced.
+    UPDATE   = 1;
     // Deletes a document
-    DELETE   = 3;
+    DELETE   = 2;
 }
 
 enum WriteResult {
@@ -49,11 +38,26 @@ enum WriteResult {
 }
 
 message ActionRequestHeader {
-    uint32  space_id                = 1 [(gogoproto.customname) = "SpaceID", (gogoproto.casttype) = "github.com/tiglabs/baudengine/proto/metapb.SpaceID"];
-    uint32  partition_id            = 2 [(gogoproto.customname) = "PartitionID", (gogoproto.casttype) = "github.com/tiglabs/baudengine/proto/metapb.PartitionID"];
-    string  timeout                 = 3;
-    RequestContentType  content_type = 4;
-    string  req_id                  = 5;
+    RequestHeader header  = 1 [(gogoproto.nullable) = false, (gogoproto.embed) = true];
+    uint32  space         = 2 [(gogoproto.casttype) = "github.com/tiglabs/baudengine/proto/metapb.SpaceID"];
+    uint32  partition     = 3 [(gogoproto.casttype) = "github.com/tiglabs/baudengine/proto/metapb.PartitionID"];
+}
+
+message GetRequest {
+    option (gogoproto.goproto_stringer) = false;
+
+    ActionRequestHeader header    = 1 [(gogoproto.nullable) = false, (gogoproto.embed) = true];
+    string              id        = 2;
+    repeated uint32     fields    = 3;
+}
+
+message GetResponse {
+    option (gogoproto.goproto_stringer) = false;
+
+    ResponseHeader      header = 1 [(gogoproto.nullable) = false, (gogoproto.embed) = true];
+    string              id     = 2;
+    bool                found  = 3;
+    repeated FieldValue fields = 4 [(gogoproto.nullable) = false];
 }
 
 message BulkRequest {
@@ -72,33 +76,34 @@ message BulkResponse {
 
 message BulkItemRequest {
     OpType          op_type = 1;
-    IndexRequest    index   = 2;
+    CreateRequest   create  = 2;
     UpdateRequest   update  = 3;
     DeleteRequest   delete  = 4;
 }
 
 message BulkItemResponse {
     OpType          op_type = 1;
-    IndexResponse   index   = 2;
+    CreateResponse  create  = 2;
     UpdateResponse  update  = 3;
     DeleteResponse  delete  = 4;
     Failure         failure = 5;
 }
 
-message IndexRequest {
-    uint32 slot   = 1 [(gogoproto.customname) = "Slot", (gogoproto.casttype) = "github.com/tiglabs/baudengine/proto/metapb.SlotID"];
-    bytes  source = 2;
+
+message CreateRequest {
+    uint32    slot = 1 [(gogoproto.casttype) = "github.com/tiglabs/baudengine/proto/metapb.SlotID"];
+    Document  doc  = 2 [(gogoproto.nullable) = false];
 }
 
-message IndexResponse {
+message CreateResponse {
     string         id     = 1;
     WriteResult    result = 2;
 }
 
 message UpdateRequest {
-    DocID     id            = 1 [(gogoproto.nullable) = false, (gogoproto.casttype) = "github.com/tiglabs/baudengine/proto/metapb.DocID"];
-    bytes     doc           = 2;
-    bool      doc_as_upsert = 3;
+    uint32    slot   = 1 [(gogoproto.casttype) = "github.com/tiglabs/baudengine/proto/metapb.SlotID"];
+    Document  doc    = 2 [(gogoproto.nullable) = false];
+    bool      upsert = 3;
 }
 
 message UpdateResponse {
@@ -107,29 +112,12 @@ message UpdateResponse {
 }
 
 message DeleteRequest {
-    DocID id = 1 [(gogoproto.nullable) = false, (gogoproto.casttype) = "github.com/tiglabs/baudengine/proto/metapb.DocID"];
+    string   id  = 1;
 }
 
 message DeleteResponse {
     string         id     = 1;
     WriteResult    result = 2;
-}
-
-message GetRequest {
-    option (gogoproto.goproto_stringer) = false;
-
-    ActionRequestHeader header    = 1 [(gogoproto.nullable) = false, (gogoproto.embed) = true];
-    DocID               id        = 2 [(gogoproto.nullable) = false, (gogoproto.casttype) = "github.com/tiglabs/baudengine/proto/metapb.DocID"];
-    repeated string stored_fields = 3;
-}
-
-message GetResponse {
-    option (gogoproto.goproto_stringer) = false;
-
-    ResponseHeader   header    = 1 [(gogoproto.nullable) = false, (gogoproto.embed) = true];
-    string           id        = 2;
-    bool             found     = 3;
-    bytes            fields    = 4;
 }
 
 message Failure {
@@ -138,4 +126,65 @@ message Failure {
     string id      = 1;
     string cause   = 2;
     bool   aborted = 3;
+}
+
+// Representing the field value for various types.
+enum ValueType {
+    NULL    = 0;
+    INT     = 1;
+    FLOAT   = 2;
+    DECIMAL = 3;
+    BOOL    = 4;
+    STRING  = 5;
+    TIME    = 6;
+    BLOB    = 7;
+}
+
+// Controls how much information is stored in the postings lists
+enum IndexOption {
+    // Not indexed
+    NONE                      = 0;
+    // Only documents are indexed: term frequencies and positions are omitted.
+    // Phrase and other positional queries on the field will throw an exception, and scoring will behave as if any term in the document appears only once.
+    DOCS                      = 1;
+    // Only documents and term frequencies are indexed: positions are omitted.
+    // This enables normal scoring, except Phrase and other positional queries will throw an exception.
+    DOCS_FREQ                 = 2;
+    // Indexes documents, frequencies and positions.
+    // This is a typical default for full-text search: full scoring is enabled and positional queries are supported.
+    DOCS_FREQ_POSITION        = 3;
+    // Indexes documents, frequencies, positions and offsets.
+    // Character offsets are encoded alongside the positions.
+    DOCS_FREQ_POSITION_OFFSET = 4;
+}
+
+message Document {
+    option (gogoproto.goproto_stringer) = false;
+
+    string   id           = 1;
+    repeated Field fields = 2 [(gogoproto.nullable) = false];
+}
+
+message Field {
+    option (gogoproto.goproto_stringer) = false;
+
+    FieldValue value = 1 [(gogoproto.nullable) = false, (gogoproto.embed) = true];
+    FieldDesc  desc  = 2 [(gogoproto.nullable) = false];
+}
+
+message FieldValue {
+    option (gogoproto.goproto_stringer) = false;
+
+    uint32    id      = 1;
+    ValueType type    = 2;
+    // protobuf-based codec,maybe an array of values
+    bytes     data    = 3;
+}
+
+message FieldDesc {
+    option (gogoproto.goproto_stringer) = false;
+
+    bool        stored      = 1;
+    bool        tokenized   = 2;
+    IndexOption indexOption = 3;
 }

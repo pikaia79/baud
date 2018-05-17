@@ -1,11 +1,13 @@
 package router
 
 import (
+	"encoding/json"
 	"github.com/pkg/errors"
 	"github.com/tiglabs/baudengine/proto/masterpb"
 	"github.com/tiglabs/baudengine/proto/metapb"
 	"sort"
 	"sync"
+	"github.com/tiglabs/baudengine/util/log"
 )
 
 type Space struct {
@@ -16,6 +18,9 @@ type Space struct {
 }
 
 func NewSpace(parent *DB, meta metapb.Space) *Space {
+	if str, err := json.Marshal(meta); err == nil {
+		log.Debug("NewSpace(): %s", string(str))
+	}
 	return &Space{meta: meta, parent: parent}
 }
 

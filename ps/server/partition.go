@@ -49,7 +49,7 @@ func newPartition(server *Server, meta metapb.Partition) *partition {
 
 func (p *partition) start() {
 	// create and open store engine
-	dataPath, raftPath, err := getDataAndRaftPath(p.meta.ID, p.server.Config.DataPath)
+	dataPath, raftPath, err := p.server.meta.getDataAndRaftPath(p.meta.ID)
 	if err != nil {
 		p.rwMutex.Lock()
 		p.meta.Status = metapb.PA_INVALID
@@ -128,7 +128,9 @@ func (p *partition) Close() error {
 
 		p.ctxCancel()
 		p.server.raftServer.RemoveRaft(p.meta.ID)
-		p.store.Close()
+		if p.store != nil {
+			p.store.Close()
+		}
 	})
 
 	return nil

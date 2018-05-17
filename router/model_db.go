@@ -14,7 +14,8 @@ type DB struct {
 }
 
 func NewDB(masterClient *MasterClient, meta metapb.DB) *DB {
-	return &DB{meta: meta, masterClient: masterClient}
+	ctx, _ := context.WithCancel(context.Background())
+	return &DB{meta: meta, masterClient: masterClient, context: ctx}
 }
 
 func (db *DB) GetSpace(spaceName string) *Space {
