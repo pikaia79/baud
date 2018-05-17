@@ -20,7 +20,7 @@ func (s *Server) Get(ctx context.Context, request *pspb.GetRequest) (*pspb.GetRe
 			ReqId: request.ReqId,
 			Code:  metapb.RESP_CODE_OK,
 		},
-		Id: keys.EncodeDocIDToString(&request.Id),
+		Id: request.Id,
 	}
 
 	if s.stopping.Get() {
@@ -30,11 +30,11 @@ func (s *Server) Get(ctx context.Context, request *pspb.GetRequest) (*pspb.GetRe
 		return response, nil
 	}
 
-	if p, ok := s.partitions.Load(request.PartitionID); ok {
+	if p, ok := s.partitions.Load(request.Partition); ok {
 		p.(*partition).getInternal(request, response)
 	} else {
 		response.Code = metapb.PS_RESP_CODE_NO_PARTITION
-		response.Message = fmt.Sprintf("node[%d] has not found partition[%d]", s.nodeID, request.PartitionID)
+		response.Message = fmt.Sprintf("node[%d] has not found partition[%d]", s.nodeID, request.Partition)
 	}
 
 	return response, nil
