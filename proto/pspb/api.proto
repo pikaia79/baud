@@ -44,15 +44,14 @@ enum WriteResult {
 
 message ActionRequestHeader {
     RequestHeader header  = 1 [(gogoproto.nullable) = false, (gogoproto.embed) = true];
-    uint32  space         = 2 [(gogoproto.casttype) = "github.com/tiglabs/baudengine/proto/metapb.SpaceID"];
-    uint32  partition     = 3 [(gogoproto.casttype) = "github.com/tiglabs/baudengine/proto/metapb.PartitionID"];
+    uint32  partition     = 2 [(gogoproto.casttype) = "github.com/tiglabs/baudengine/proto/metapb.PartitionID"];
 }
 
 message GetRequest {
     option (gogoproto.goproto_stringer) = false;
 
     ActionRequestHeader header    = 1 [(gogoproto.nullable) = false, (gogoproto.embed) = true];
-    string              id        = 2;
+    bytes               id        = 2 [(gogoproto.casttype) = "github.com/tiglabs/baudengine/proto/metapb.Key"];
     repeated uint32     fields    = 3;
 }
 
@@ -60,7 +59,7 @@ message GetResponse {
     option (gogoproto.goproto_stringer) = false;
 
     ResponseHeader      header = 1 [(gogoproto.nullable) = false, (gogoproto.embed) = true];
-    string              id     = 2;
+    bytes               id     = 2 [(gogoproto.casttype) = "github.com/tiglabs/baudengine/proto/metapb.Key"];
     bool                found  = 3;
     repeated FieldValue fields = 4 [(gogoproto.nullable) = false];
 }
@@ -112,23 +111,23 @@ message UpdateRequest {
 }
 
 message UpdateResponse {
-    string         id     = 1;
+    bytes          id     = 1 [(gogoproto.casttype) = "github.com/tiglabs/baudengine/proto/metapb.Key"];
     WriteResult    result = 2;
 }
 
 message DeleteRequest {
-    string   id  = 1;
+    bytes          id     = 1 [(gogoproto.casttype) = "github.com/tiglabs/baudengine/proto/metapb.Key"];
 }
 
 message DeleteResponse {
-    string         id     = 1;
+    bytes          id     = 1 [(gogoproto.casttype) = "github.com/tiglabs/baudengine/proto/metapb.Key"];
     WriteResult    result = 2;
 }
 
 message Failure {
     option (gogoproto.goproto_stringer) = false;
 
-    string id      = 1;
+    bytes  id      = 1 [(gogoproto.casttype) = "github.com/tiglabs/baudengine/proto/metapb.Key"];
     string cause   = 2;
     bool   aborted = 3;
 }
@@ -166,7 +165,7 @@ enum IndexOption {
 message Document {
     option (gogoproto.goproto_stringer) = false;
 
-    string   id           = 1;
+    bytes          id     = 1 [(gogoproto.casttype) = "github.com/tiglabs/baudengine/proto/metapb.Key"];
     repeated Field fields = 2 [(gogoproto.nullable) = false];
 }
 
