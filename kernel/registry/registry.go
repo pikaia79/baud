@@ -20,15 +20,25 @@ func GetTokenizer(name string) analysis.Tokenizer {
 	return analyzers.GetTokenizer(name)
 }
 
+func RegisterTokenFilter(name string, filter analysis.TokenFilter) {
+	analyzers.RegisterTokenFilter(name, filter)
+}
+
+func GetTokenFilter(name string) analysis.TokenFilter {
+	return analyzers.GetTokenFilter(name)
+}
+
 type Registry struct {
 	analyzers map[string]analysis.Analyzer
 	tokenizer map[string]analysis.Tokenizer
+	filter    map[string]analysis.TokenFilter
 }
 
 func NewRegistry() *Registry {
 	return &Registry{
 		analyzers: make(map[string]analysis.Analyzer),
-		tokenizer: make(map[string]analysis.Tokenizer),}
+		tokenizer: make(map[string]analysis.Tokenizer),
+		filter: make(map[string]analysis.TokenFilter)}
 }
 
 func (r *Registry) RegisterAnalyzer(name string, analyzer analysis.Analyzer) {
@@ -57,6 +67,22 @@ func (r *Registry) RegisterTokenizer(name string, tokenizer analysis.Tokenizer) 
 
 func (r *Registry) GetTokenizer(name string) analysis.Tokenizer {
 	if ar, ok := r.tokenizer[name]; ok {
+		return ar
+	}
+	// TODO panic ??
+	return nil
+}
+
+func (r *Registry) RegisterTokenFilter(name string, filter analysis.TokenFilter) {
+	if _, ok := r.filter[name]; ok {
+		// TODO panic ??
+		return
+	}
+	r.filter[name] = filter
+}
+
+func (r *Registry) GetTokenFilter(name string) analysis.TokenFilter {
+	if ar, ok := r.filter[name]; ok {
 		return ar
 	}
 	// TODO panic ??

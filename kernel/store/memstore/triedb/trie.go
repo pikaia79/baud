@@ -6,6 +6,7 @@ import (
 	"bytes"
 
 	"github.com/tiglabs/baudengine/util/match"
+	"github.com/heidawei/gotrie/trie"
 )
 
 type IterFunc func(key []byte, value interface{}) bool
@@ -37,7 +38,7 @@ type Tx struct {
 }
 
 type txWriteContext struct {
-	rbKeys *Trie      // a tree of all item ordered by key
+	rbKeys *trie.Trie      // a tree of all item ordered by key
 
 	rollbackItems   map[string]*dbItem // details for rolling back tx.
 	iterCount       int                // stack of iterators
@@ -69,13 +70,13 @@ var (
 
 type DB struct {
 	mu        sync.RWMutex
-	keys      *Trie
+	keys      *trie.Trie
 
 	closed    bool              // set when the database has been closed
 }
 
 func NewDB() (*DB, error) {
-	return &DB{keys: NewTrie()}, nil
+	return &DB{keys: trie.NewTrie()}, nil
 }
 
 // Close releases all database resources.
@@ -285,7 +286,7 @@ func (tx *Tx) AscendPrefixKeys(pattern []byte, iterator IterFunc) error {
 	if tx.db == nil {
 		return ErrTxClosed
 	}
-	var tr *Trie
+	var tr *trie.Trie
 	tr = tx.db.keys
 	// execute the scan on the underlying tree.
 	if tx.wc != nil {
@@ -369,7 +370,7 @@ func (db *DB) insertIntoDatabase(item *dbItem) *dbItem {
 	if prev != nil {
 		// A previous item was removed from the keys tree. Let's
 		// fully delete this item from all indexes.
-		pdbi = &dbItem{key: item.Key(), value: prev.Property()}
+		pdbi = &dbItem{key: item.Key(), value: prev.Value()}
 	}
 
 	// we must return the previous item to the caller.
@@ -386,7 +387,7 @@ func (db *DB) deleteFromDatabase(item *dbItem) *dbItem {
 	var pdbi *dbItem
 	prev := db.keys.Delete(item.Key())
 	if prev != nil {
-		pdbi = &dbItem{key: item.Key(), value: prev.Property()}
+		pdbi = &dbItem{key: item.Key(), value: prev.Value()}
 	}
 	return pdbi
 }
@@ -450,5 +451,5 @@ func (db *DB) get(key []byte) interface {} {
 	if !find {
 		return nil
 	}
-	return node.Property()
+	return node.Value()
 }
