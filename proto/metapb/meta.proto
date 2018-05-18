@@ -18,11 +18,6 @@ option (gogoproto.testgen_all) = false;
 option (gogoproto.benchgen_all) = false;
 option (gogoproto.goproto_getters_all) = false;
 
-message DocID {
-    uint32 slot_id = 1 [(gogoproto.customname) = "SlotID", (gogoproto.casttype) = "SlotID"];
-    uint64 seq_no  = 2;
-}
-
 message DB {
     uint32 id   = 1 [(gogoproto.customname) = "ID", (gogoproto.casttype) = "DBID"];
     string name = 2;
@@ -109,7 +104,8 @@ message ReplicaAddrs {
 }
 
 message RequestHeader {
-    string req_id = 1;
+    string req_id  = 1;
+    string timeout = 2;
 }
 
 message ResponseHeader {
