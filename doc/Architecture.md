@@ -1,6 +1,16 @@
 # The Architecture of BaudEngine
 
-BaudEngine is distributed database engine with elastic storage and flexible search.
+BaudEngine is a unified multi-model distributed database.
+
+## Features
+
+* the best of SQL and NoSQL in one system
+
+* dynamic schema
+
+* unlimited scalability
+
+* cloud-native
 
 ## Data Model
 
@@ -85,7 +95,7 @@ the Go SDK directly talking with masters and PSes.
 
 * Gateway Servers
 
-BaudSQL - the NewSQL gateway with MySQL-compatible protocol
+MyGate - the NewSQL gateway with MySQL-compatible protocol
 
 Router - the NoSQL gateway with ElasticSearch-compatible protocol
 
@@ -235,9 +245,26 @@ Router extends elasticsearch DSL:
 
 * Graph
 
-## BaudSQL 
+## MyGate
 
-Tables sharing the same partition key = one space
+MySQL driver --> MyGate
+
+### Data Model Mapping
+
+table vs space
+
+space = tables sharing the same partitioning key
+
+
+row vs object
+
+object fields = row fields + the field of 'tableid'
+
+### Schema Management
+
+There is a 'system' DB on BaudEngine.
+
+### SQL Parsing, Planning, and Executing
 
 
 ## Deployment Flexibility
@@ -245,6 +272,8 @@ Tables sharing the same partition key = one space
 * single zone or multiple zones
 
 * the BaudStorage datacenter filesystem or local filesystems
+
+* raft-based write replication and/or storage-shared read replication
 
 * Kubernetes or bare metal
 
