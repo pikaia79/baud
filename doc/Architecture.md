@@ -155,6 +155,15 @@ However, we recommand that a space is pre-sharded and somehow over-sharded to av
 currently local index only. 
 
 
+### distributed transactions across partitions
+
+the intent-based protocol: 
+
+1, a space for trx records with UUID as keys
+
+2, write intents for fields
+
+
 ## Master
 
 There are two tiers for the cluster topo metadata managment. 
@@ -223,33 +232,23 @@ Each partition has a single key-value storage engine for both objects and indexe
 
 term synonyms are stored as a file of Baudstorage and loaded by PS for document analysis.
 
-### Key Operations
-
-
-## Client
-
-* PartitionClient
-
-* ZoneMasterClient
-
-* GlobalMasterClient
-
 
 ## Router
 
 A zone has a group of router nodes as the service gateway for the application of the same zone. Note a router needs to interact with not only the zonemaster of its own zone but also the zonemasters of other zones. 
 
-### Query Language
+### query language
 
 Router extends elasticsearch DSL: 
 
 * Graph
 
+
 ## MyGate
 
 MySQL driver --> MyGate
 
-### Data Model Mapping
+### data model mapping
 
 table vs space
 
@@ -260,14 +259,16 @@ row vs object
 
 object fields = row fields + the field of 'tableid'
 
-### Schema Management
+### schema management
 
 There is a 'system' DB on BaudEngine.
 
-### SQL Parsing, Planning, and Executing
+### SQL parsing, planning, and executing
 
 
-## Deployment Flexibility
+## Manageability
+
+### Deployment Flexibility
 
 * single zone or multiple zones
 
@@ -277,17 +278,9 @@ There is a 'system' DB on BaudEngine.
 
 * Kubernetes or bare metal
 
-
-## Backup and Restore
+### Backup and Restore
 
 provide a point-in-time snapshot of the data on a partition
-
-
-## Manageability
-
-Ops Center
-
-Dashboard
 
 ### Monitoring
 
@@ -301,7 +294,7 @@ GC
 
 SlowLog
 
-### Upgrade
+### Ops Center
 
 
 ## Applications
@@ -313,5 +306,7 @@ email
 messaging
 
 blogging
+
+knowledge graphs
 
 
