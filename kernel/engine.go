@@ -2,42 +2,60 @@ package kernel
 
 import (
 	"context"
+	"io"
 
 	"github.com/tiglabs/baudengine/proto/metapb"
 	"github.com/tiglabs/baudengine/proto/pspb"
 )
 
+// Snapshot is an interface for read-only snapshot in an engine.
 type Snapshot interface {
-	GetLastApplyID() (uint64, error)
-	NewIterator() Iterator
-	Close()
-}
-
-type Iterator interface {
-	// Next will advance the iterator to the next key
-	Next()
-
-	Key() metapb.Key
-
-	Value() metapb.Value
-
-	// Valid returns whether or not the iterator is in a valid state
-	Valid() bool
-
-	// Close closes the iterator
-	Close() error
-}
-
-type Engine interface {
-	// for raft server init
-	SetApplyID(uint64) error
+	io.Closer
 	GetApplyID() (uint64, error)
-	GetSnapshot() (Snapshot, error)
-	ApplySnapshot(ctx context.Context, iter Iterator) error
-	AddDocument(ctx context.Context, doc *pspb.Document, applyID uint64) error
-	UpdateDocument(ctx context.Context, doc *pspb.Document, upsert bool, applyID uint64) (found bool, err error)
-	DeleteDocument(ctx context.Context, docID metapb.Key, applyID uint64) (int, error)
+	NewIterator() Iterator
+}
+
+// Iterator is an interface for iterating over key/value pairs in an engine.
+type Iterator interface {
+	io.Closer
+	Next()
+	Valid() bool
+	Key() metapb.Key
+	Value() metapb.Value
+}
+
+// Reader is the read interface to an engine's data.
+type Reader interface {
+	io.Closer
+	GetApplyID() (uint64, error)
 	GetDocument(ctx context.Context, docID metapb.Key, fields []uint32) (map[uint32]pspb.FieldValue, bool)
-	Close() error
-	// TODO search
+}
+
+// Writer is the write interface to an engine's data.
+type Writer interface {
+	SetApplyID(uint64) error
+	AddDocument(ctx context.Context, doc *pspb.Document) error
+	UpdateDocument(ctx context.Context, doc *pspb.Document, upsert bool) (found bool, err error)
+	DeleteDocument(ctx context.Context, docID metapb.Key) (int, error)
+}
+
+// ReadWriter is the read/write interface to an engine's data.
+type ReadWriter interface {
+	Reader
+	Writer
+}
+
+// Transaction is the interface for batch operations.
+type Transaction interface {
+	Writer
+	Commit() error
+	Rollback() error
+}
+
+// Engine is the interface that wraps the core operations of a document store.
+type Engine interface {
+	ReadWriter
+	NewTransaction(update bool) (Transaction, error)
+	NewSnapshot() (Snapshot, error)
+	ApplySnapshot(ctx context.Context, iter Iterator) error
 }
