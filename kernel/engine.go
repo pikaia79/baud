@@ -45,8 +45,8 @@ type ReadWriter interface {
 	Writer
 }
 
-// Transaction is the interface for batch operations.
-type Transaction interface {
+// Batch is the interface for batch operations.
+type Batch interface {
 	Writer
 	Commit() error
 	Rollback() error
@@ -55,7 +55,7 @@ type Transaction interface {
 // Engine is the interface that wraps the core operations of a document store.
 type Engine interface {
 	ReadWriter
-	NewTransaction(update bool) (Transaction, error)
+	NewWriteBatch() Batch
 	NewSnapshot() (Snapshot, error)
 	ApplySnapshot(ctx context.Context, iter Iterator) error
 }
