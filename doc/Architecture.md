@@ -1,6 +1,16 @@
 # The Architecture of BaudEngine
 
-BaudEngine is distributed database engine with elastic storage and flexible search.
+BaudEngine is a unified multi-model distributed database.
+
+## Features
+
+* the best of SQL and NoSQL in one system
+
+* dynamic schema
+
+* unlimited scalability
+
+* cloud-native
 
 ## Data Model
 
@@ -85,7 +95,7 @@ the Go SDK directly talking with masters and PSes.
 
 * Gateway Servers
 
-BaudSQL - the NewSQL gateway with MySQL-compatible protocol
+MyGate - the NewSQL gateway with MySQL-compatible protocol
 
 Router - the NoSQL gateway with ElasticSearch-compatible protocol
 
@@ -143,6 +153,15 @@ However, we recommand that a space is pre-sharded and somehow over-sharded to av
 ### local index vs. global index
 
 currently local index only. 
+
+
+### distributed transactions across partitions
+
+the intent-based protocol: 
+
+1, a space for trx records with UUID as keys
+
+2, write intents for fields
 
 
 ## Master
@@ -213,52 +232,55 @@ Each partition has a single key-value storage engine for both objects and indexe
 
 term synonyms are stored as a file of Baudstorage and loaded by PS for document analysis.
 
-### Key Operations
-
-
-## Client
-
-* PartitionClient
-
-* ZoneMasterClient
-
-* GlobalMasterClient
-
 
 ## Router
 
 A zone has a group of router nodes as the service gateway for the application of the same zone. Note a router needs to interact with not only the zonemaster of its own zone but also the zonemasters of other zones. 
 
-### Query Language
+### query language
 
 Router extends elasticsearch DSL: 
 
 * Graph
 
-## BaudSQL 
 
-Tables sharing the same partition key = one space
+## MyGate
+
+MySQL driver --> MyGate
+
+### data model mapping
+
+table vs space
+
+space = tables sharing the same partitioning key
 
 
-## Deployment Flexibility
+row vs object
+
+object fields = row fields + the field of 'tableid'
+
+### schema management
+
+There is a 'system' DB on BaudEngine.
+
+### SQL parsing, planning, and executing
+
+
+## Manageability
+
+### Deployment Flexibility
 
 * single zone or multiple zones
 
 * the BaudStorage datacenter filesystem or local filesystems
 
+* raft-based write replication and/or storage-shared read replication
+
 * Kubernetes or bare metal
 
-
-## Backup and Restore
+### Backup and Restore
 
 provide a point-in-time snapshot of the data on a partition
-
-
-## Manageability
-
-Ops Center
-
-Dashboard
 
 ### Monitoring
 
@@ -272,7 +294,7 @@ GC
 
 SlowLog
 
-### Upgrade
+### Ops Center
 
 
 ## Applications
@@ -284,5 +306,7 @@ email
 messaging
 
 blogging
+
+knowledge graphs
 
 
