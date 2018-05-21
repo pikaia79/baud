@@ -1,0 +1,6 @@
+/*
+
+the GlobalMaster
+
+*/
+package gm
