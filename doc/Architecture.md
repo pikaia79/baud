@@ -218,7 +218,7 @@ there are two PS roles, i.e. two modes of running instances:
 
 ### partition data store
 
-Each partition has a single key-value storage engine for both objects and indexes, which is persisted onto the Baudstorage datacenter filesystem
+Each partition has a single log-structured sorted key-value storage engine for both objects and indexes, which is persisted onto the Baudstorage datacenter filesystem
 
 * the primary index
 
@@ -232,6 +232,13 @@ Each partition has a single key-value storage engine for both objects and indexe
 
 term synonyms are stored as a file of Baudstorage and loaded by PS for document analysis.
 
+### batch operations
+
+multiple writes grouped into one batch within a partition
+
+### change streaming
+
+each individual change record contains the change type (insert/update/delete) and the pre and post-image of the fields modified. 
 
 ## Router
 
@@ -258,6 +265,12 @@ space = tables sharing the same partitioning key
 row vs object
 
 object fields = row fields + the field of 'tableid'
+
+
+compound indexes
+
+multiple columns form a new field
+
 
 ### schema management
 
