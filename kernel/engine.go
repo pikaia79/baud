@@ -1,42 +1,61 @@
 package kernel
 
 import (
-	"github.com/tiglabs/baudengine/kernel/document"
-	"golang.org/x/net/context"
+	"context"
+	"io"
+
+	"github.com/tiglabs/baudengine/proto/metapb"
+	"github.com/tiglabs/baudengine/proto/pspb"
 )
 
+// Snapshot is an interface for read-only snapshot in an engine.
 type Snapshot interface {
-	GetLastApplyID() (uint64, error)
-	NewIterator() Iterator
-	Close()
-}
-
-type Iterator interface {
-	// Next will advance the iterator to the next key
-	Next()
-
-	Key() []byte
-
-	Value() []byte
-
-	// Valid returns whether or not the iterator is in a valid state
-	Valid() bool
-
-	// Close closes the iterator
-	Close() error
-}
-
-type Engine interface {
-	// for raft server init
-	SetApplyID(uint64) error
+	io.Closer
 	GetApplyID() (uint64, error)
-	GetDocSnapshot() (Snapshot, error)
-	ApplyDocSnapshot(ctx context.Context, iter Iterator) error
-	AddDocument(ctx context.Context, doc *document.Document, applyID uint64) error
-	UpdateDocument(ctx context.Context, doc *document.Document, upsert bool, applyID uint64) (found bool, err error)
-	DeleteDocument(ctx context.Context, docID []byte, applyID uint64) (int, error)
-	// _source, _all as system field
-	GetDocument(ctx context.Context, docID []byte, fields []string) (map[string]interface{}, bool)
-	Close() error
-	// TODO search
+	NewIterator() Iterator
+}
+
+// Iterator is an interface for iterating over key/value pairs in an engine.
+type Iterator interface {
+	io.Closer
+	Next()
+	Valid() bool
+	Key() metapb.Key
+	Value() metapb.Value
+}
+
+// Reader is the read interface to an engine's data.
+type Reader interface {
+	io.Closer
+	GetApplyID() (uint64, error)
+	GetDocument(ctx context.Context, docID metapb.Key, fields []uint32) (map[uint32]pspb.FieldValue, bool)
+}
+
+// Writer is the write interface to an engine's data.
+type Writer interface {
+	SetApplyID(uint64) error
+	AddDocument(ctx context.Context, doc *pspb.Document) error
+	UpdateDocument(ctx context.Context, doc *pspb.Document, upsert bool) (found bool, err error)
+	DeleteDocument(ctx context.Context, docID metapb.Key) (int, error)
+}
+
+// ReadWriter is the read/write interface to an engine's data.
+type ReadWriter interface {
+	Reader
+	Writer
+}
+
+// Batch is the interface for batch operations.
+type Batch interface {
+	Writer
+	Commit() error
+	Rollback() error
+}
+
+// Engine is the interface that wraps the core operations of a document store.
+type Engine interface {
+	ReadWriter
+	NewWriteBatch() Batch
+	NewSnapshot() (Snapshot, error)
+	ApplySnapshot(ctx context.Context, iter Iterator) error
 }

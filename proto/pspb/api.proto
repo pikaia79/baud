@@ -20,6 +20,11 @@ option (gogoproto.testgen_all) = false;
 option (gogoproto.benchgen_all) = false;
 option (gogoproto.goproto_getters_all) = false;
 
+service ApiGrpc {
+    rpc Get (GetRequest) returns (GetResponse) {}
+    rpc BulkWrite (BulkRequest) returns (BulkResponse) {}
+}
+
 enum OpType{
     // Creates the resource. If there is an existing document with the id, then it won't be removed.
     CREATE   = 0;
@@ -39,25 +44,24 @@ enum WriteResult {
 
 message ActionRequestHeader {
     RequestHeader header  = 1 [(gogoproto.nullable) = false, (gogoproto.embed) = true];
-    uint32  space         = 2 [(gogoproto.casttype) = "github.com/tiglabs/baudengine/proto/metapb.SpaceID"];
-    uint32  partition     = 3 [(gogoproto.casttype) = "github.com/tiglabs/baudengine/proto/metapb.PartitionID"];
+    uint32  partition     = 2 [(gogoproto.casttype) = "github.com/tiglabs/baudengine/proto/metapb.PartitionID"];
 }
 
 message GetRequest {
     option (gogoproto.goproto_stringer) = false;
 
     ActionRequestHeader header    = 1 [(gogoproto.nullable) = false, (gogoproto.embed) = true];
-    string              id        = 2;
+    bytes               id        = 2 [(gogoproto.casttype) = "github.com/tiglabs/baudengine/proto/metapb.Key"];
     repeated uint32     fields    = 3;
 }
 
 message GetResponse {
     option (gogoproto.goproto_stringer) = false;
 
-    ResponseHeader      header = 1 [(gogoproto.nullable) = false, (gogoproto.embed) = true];
-    string              id     = 2;
-    bool                found  = 3;
-    repeated FieldValue fields = 4 [(gogoproto.nullable) = false];
+    ResponseHeader          header = 1 [(gogoproto.nullable) = false, (gogoproto.embed) = true];
+    bytes                   id     = 2 [(gogoproto.casttype) = "github.com/tiglabs/baudengine/proto/metapb.Key"];
+    bool                    found  = 3;
+    map<uint32, FieldValue> fields = 4 [(gogoproto.nullable) = false];
 }
 
 message BulkRequest {
@@ -91,53 +95,52 @@ message BulkItemResponse {
 
 
 message CreateRequest {
-    uint32    slot = 1 [(gogoproto.casttype) = "github.com/tiglabs/baudengine/proto/metapb.SlotID"];
-    Document  doc  = 2 [(gogoproto.nullable) = false];
+    Document  doc  = 1 [(gogoproto.nullable) = false];
 }
 
 message CreateResponse {
-    string         id     = 1;
+    bytes          id     = 1 [(gogoproto.casttype) = "github.com/tiglabs/baudengine/proto/metapb.Key"];
     WriteResult    result = 2;
 }
 
 message UpdateRequest {
-    uint32    slot   = 1 [(gogoproto.casttype) = "github.com/tiglabs/baudengine/proto/metapb.SlotID"];
-    Document  doc    = 2 [(gogoproto.nullable) = false];
-    bool      upsert = 3;
+    Document  doc    = 1 [(gogoproto.nullable) = false];
+    bool      upsert = 2;
 }
 
 message UpdateResponse {
-    string         id     = 1;
+    bytes          id     = 1 [(gogoproto.casttype) = "github.com/tiglabs/baudengine/proto/metapb.Key"];
     WriteResult    result = 2;
 }
 
 message DeleteRequest {
-    string   id  = 1;
+    bytes          id     = 1 [(gogoproto.casttype) = "github.com/tiglabs/baudengine/proto/metapb.Key"];
 }
 
 message DeleteResponse {
-    string         id     = 1;
+    bytes          id     = 1 [(gogoproto.casttype) = "github.com/tiglabs/baudengine/proto/metapb.Key"];
     WriteResult    result = 2;
 }
 
 message Failure {
     option (gogoproto.goproto_stringer) = false;
 
-    string id      = 1;
+    bytes  id      = 1 [(gogoproto.casttype) = "github.com/tiglabs/baudengine/proto/metapb.Key"];
     string cause   = 2;
     bool   aborted = 3;
 }
 
 // Representing the field value for various types.
 enum ValueType {
-    NULL    = 0;
-    INT     = 1;
-    FLOAT   = 2;
-    DECIMAL = 3;
-    BOOL    = 4;
-    STRING  = 5;
-    TIME    = 6;
-    BLOB    = 7;
+    UNKNOWN = 0;
+    NULL    = 1;
+    INT     = 2;
+    FLOAT   = 3;
+    DECIMAL = 4;
+    BOOL    = 5;
+    STRING  = 6;
+    TIME    = 7;
+    BLOB    = 8;
 }
 
 // Controls how much information is stored in the postings lists
@@ -161,7 +164,7 @@ enum IndexOption {
 message Document {
     option (gogoproto.goproto_stringer) = false;
 
-    string   id           = 1;
+    bytes          id     = 1 [(gogoproto.casttype) = "github.com/tiglabs/baudengine/proto/metapb.Key"];
     repeated Field fields = 2 [(gogoproto.nullable) = false];
 }
 
@@ -175,10 +178,9 @@ message Field {
 message FieldValue {
     option (gogoproto.goproto_stringer) = false;
 
-    uint32    id      = 1;
-    ValueType type    = 2;
-    // protobuf-based codec,maybe an array of values
-    bytes     data    = 3;
+    uint32    id    = 1;
+    ValueType type  = 2;
+    bytes     data  = 3 [(gogoproto.casttype) = "github.com/tiglabs/baudengine/proto/metapb.Value"];
 }
 
 message FieldDesc {
@@ -187,4 +189,5 @@ message FieldDesc {
     bool        stored      = 1;
     bool        tokenized   = 2;
     IndexOption indexOption = 3;
+    string      analyzer    = 4;
 }
