@@ -23,7 +23,8 @@ type (
 
 const (
 	/** Common Response Code **/
-	RESP_CODE_OK           RespCode = 200
+	RESP_CODE_OK           RespCode = 0
+	//RESP_CODE_OK           RespCode = 200
 	RESP_CODE_MSG_TOOLARGE RespCode = 414
 	RESP_CODE_SERVER_ERROR RespCode = 500
 	RESP_CODE_TIMEOUT      RespCode = 504
