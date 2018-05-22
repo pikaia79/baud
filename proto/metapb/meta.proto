@@ -18,6 +18,12 @@ option (gogoproto.testgen_all) = false;
 option (gogoproto.benchgen_all) = false;
 option (gogoproto.goproto_getters_all) = false;
 
+message Zone {
+    string name = 1;
+    string etcd_addr = 2;
+    string etcd_root_dir = 3;
+}
+
 message DB {
     uint32 id   = 1 [(gogoproto.customname) = "ID", (gogoproto.casttype) = "DBID"];
     string name = 2;
