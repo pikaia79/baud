@@ -2,39 +2,36 @@ package chinese
 
 import (
 	"github.com/tiglabs/baudengine/kernel/analysis"
-	"github.com/tiglabs/baudengine/kernel/registry"
 	"github.com/yanyiwu/gojieba"
 	"github.com/tiglabs/baudengine/kernel/config"
 )
 
-const Name = "zh"
-
-type ChineseTokenizer struct {
+type ZhTokenizer struct {
 	tokenizer     *gojieba.Jieba
 }
 
-var _ analysis.Tokenizer = &ChineseTokenizer{}
+var _ analysis.Tokenizer = &ZhTokenizer{}
 
-func New() *ChineseTokenizer {
+func NewZh() *ZhTokenizer {
 	dictpath := config.GetWordDictPath("baud_zh.dict")
 	hmmpath := config.GetWordDictPath("hmm_model.utf8")
 	userdictpath := config.GetWordDictPath("user.dict")
 	idf := config.GetWordDictPath("idf.utf8")
 	stop_words := config.GetWordDictPath("stop.dict")
-	return NewChineseTokenizer(dictpath, hmmpath, userdictpath, idf, stop_words)
+	return NewZhTokenizer(dictpath, hmmpath, userdictpath, idf, stop_words)
 }
 
 
-func NewChineseTokenizer(dictpath, hmmpath, userdictpath, idf, stop_words string) *ChineseTokenizer {
+func NewZhTokenizer(dictpath, hmmpath, userdictpath, idf, stop_words string) *ZhTokenizer {
 	x := gojieba.NewJieba(dictpath, hmmpath, userdictpath, idf, stop_words)
-	return &ChineseTokenizer{x}
+	return &ZhTokenizer{x}
 }
 
-func (x *ChineseTokenizer) Free() {
+func (x *ZhTokenizer) Free() {
 	x.tokenizer.Free()
 }
 
-func (x *ChineseTokenizer) Tokenize(input []byte) analysis.TokenSet {
+func (x *ZhTokenizer) Tokenize(input []byte) analysis.TokenSet {
 	result := make(analysis.TokenSet, 0)
 	pos := 1
 	words := x.tokenizer.Tokenize(string(input), gojieba.SearchMode, false)
@@ -50,8 +47,4 @@ func (x *ChineseTokenizer) Tokenize(input []byte) analysis.TokenSet {
 		pos++
 	}
 	return result
-}
-
-func init() {
-	registry.RegisterTokenizer(Name, New())
 }

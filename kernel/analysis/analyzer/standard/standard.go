@@ -3,9 +3,12 @@ package standard
 import (
 	"github.com/tiglabs/baudengine/kernel/analysis"
 	"github.com/tiglabs/baudengine/kernel/registry"
+	"github.com/tiglabs/baudengine/kernel/analysis/tokenizer/unicode"
+	"github.com/tiglabs/baudengine/kernel/analysis/filter/stop"
+	"github.com/tiglabs/baudengine/kernel/analysis/filter/lower"
 )
 
-const Name = "keyword"
+const Name = "standard"
 
 var _ analysis.Analyzer = &Analyzer{}
 
@@ -19,6 +22,13 @@ func New() *Analyzer {
 }
 
 func (a *Analyzer)Analyze(input []byte) analysis.TokenSet {
+	if a.tokenizer == nil {
+		a.tokenizer = registry.GetTokenizer(unicode.Name)
+	}
+	if a.filters == nil {
+		a.filters = append(a.filters, registry.GetTokenFilter(lower.Name))
+		a.filters = append(a.filters, registry.GetTokenFilter(stop.Name))
+	}
 	tokensets := a.tokenizer.Tokenize(input)
 	for _, filter := range a.filters {
 		tokensets = filter.Filter(tokensets)

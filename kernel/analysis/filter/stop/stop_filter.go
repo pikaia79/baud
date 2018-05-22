@@ -28,7 +28,7 @@ func New() *StopFilter {
 
 func (sf *StopFilter) loadDict() error {
 	sf.dict = trie.NewTrie()
-	f, err := os.Open(config.GetStopWordDictPath())
+	f, err := os.Open(config.GetWordDictPath("stop_word.dict"))
 	if err != nil {
 		return err
 	}

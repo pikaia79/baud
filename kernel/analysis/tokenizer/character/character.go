@@ -5,6 +5,7 @@ import (
 
 	"github.com/tiglabs/baudengine/kernel/analysis"
 	"github.com/tiglabs/baudengine/kernel/analysis/filter/character"
+	"github.com/tiglabs/baudengine/util/bytes"
 )
 
 type Tokenizer struct {
@@ -15,49 +16,36 @@ func NewCharTokenizer(f character.FilterOutFunc) *Tokenizer {
 	return &Tokenizer{filter: character.New(f)}
 }
 
-func (t *Tokenizer) Tokenize(data []byte) analysis.TokenSet {
-	offset := 0
-	start := 0
-	end := 0
-	pos := 0
+func (t *Tokenizer) Tokenize(input []byte) analysis.TokenSet {
 	var sets analysis.TokenSet
-	for offset < len(data) {
-		r, size := utf8.DecodeRune(data[offset:])
+	var token *analysis.Token
+	var i, pos int
+	for i = 0; i < len(input); {
+		r, size := utf8.DecodeRune(input[i:])
 		if r == utf8.RuneError {
 			return sets
 		}
-		offset += size
-		// not char
-		if t.filter.Filter(r){
-			if end == start {
-				start += size
-				end += size
-				continue
-			}
-			if end > start {
-				// Complete token
-				sets = append(sets, &analysis.Token{
-					Start: start,
-					End: end,
-					Term: data[start:end],
-					Position: pos,
-				})
+		if t.filter.Filter(r) {
+			if token != nil {
+				token.End = i
+				token.Term = bytes.CloneBytes(input[token.Start: token.End])
+				token.Position = pos
+				sets = append(sets, token)
+				token = nil
 				pos++
-				// next index
-				end += size
-				start = end
 			}
 		} else {
-			end += size
+			if token == nil {
+				token = &analysis.Token{Start: i}
+			}
 		}
+		i += size
 	}
-	if end > start {
-		sets = append(sets, &analysis.Token{
-			Start: start,
-			End: end,
-			Term: data[start:end],
-			Position: pos,
-		})
+	if token != nil {
+		token.End = i
+		token.Term = bytes.CloneBytes(input[token.Start: token.End])
+		token.Position = pos
+		sets = append(sets, token)
 	}
 	return sets
 }
