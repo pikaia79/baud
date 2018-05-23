@@ -19,9 +19,9 @@ option (gogoproto.benchgen_all) = false;
 option (gogoproto.goproto_getters_all) = false;
 
 message Zone {
-    string name = 1;
-    string etcd_addr = 2;
-    string etcd_root_dir = 3;
+    string name         = 1;
+    string server_addrs = 2;
+    string root_dir     = 3;
 }
 
 message DB {

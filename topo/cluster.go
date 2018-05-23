@@ -4,19 +4,63 @@ import (
     "github.com/tiglabs/baudengine/proto/metapb"
     "github.com/tiglabs/baudengine/proto/masterpb"
     "context"
+    "errors"
+)
+
+const (
+    // Path components
+    cellsPath     = "cells"
+    keyspacesPath = "keyspaces"
+    shardsPath    = "shards"
+    tabletsPath   = "tablets"
 )
 
 var (
     topoImplementation = "etcd3"
 
-    globalZone = "global"
-    globalAddr = "127.0.0.1:9301"
+    //globalAddr = "127.0.0.1:9301"
 
-    zoneName   = []string{"myzone2", "myzone3"}
-    zoneAddr   = []string{"127.0.0.1:9302", "127.0.0.1:9303"}
+    //zoneName   = []string{"myzone2", "myzone3"}
+    //zoneAddr   = []string{"127.0.0.1:9302", "127.0.0.1:9303"}
+)
+
+var (
+    // ErrNodeExists is returned by functions to specify the
+    // requested resource already exists.
+    ErrNodeExists = errors.New("node already exists")
+
+    // ErrNoNode is returned by functions to specify the requested
+    // resource does not exist.
+    ErrNoNode = errors.New("node doesn't exist")
+
+    // ErrNotEmpty is returned by functions to specify a child of the
+    // resource is still present and prevents the action from completing.
+    ErrNotEmpty = errors.New("node not empty")
+
+    // ErrTimeout is returned by functions that wait for a result
+    // when the timeout value is reached.
+    ErrTimeout = errors.New("deadline exceeded")
+
+    // ErrInterrupted is returned by functions that wait for a result
+    // when they are interrupted.
+    ErrInterrupted = errors.New("interrupted")
+
+    // ErrBadVersion is returned by an update function that
+    // failed to update the data because the version was different
+    ErrBadVersion = errors.New("bad node version")
+
+    // ErrPartialResult is returned by a function that could only
+    // get a subset of its results
+    ErrPartialResult = errors.New("partial result")
+
+    // ErrNoUpdateNeeded can be returned by an 'UpdateFields' method
+    // to skip any update.
+    ErrNoUpdateNeeded = errors.New("no update needed")
 )
 
 type Impl interface {
+    Backend
+
     GetAllZones(ctx context.Context) ([]*metapb.Zone, error)
     GetZone(ctx context.Context, zoneName string) (*metapb.Zone, error)
     AddZone(ctx context.Context, zone *metapb.Zone) error
