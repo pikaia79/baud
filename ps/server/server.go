@@ -73,7 +73,6 @@ func NewServer(conf *config.Config) *Server {
 	if raftLog, err := raftlog.NewLog(path.Join(serverConf.LogDir, "raft"), "raft", serverConf.LogLevel); err == nil {
 		logger.SetLogger(raftLog)
 	}
-
 	s := &Server{
 		Config:       *serverConf,
 		ip:           netutil.GetPrivateIP().String(),

@@ -151,3 +151,7 @@ func BitLen(x int64) (n int64) {
 	}
 	return
 }
+
+func CloneBytes(b []byte) []byte {
+	return append([]byte(nil), b...)
+}

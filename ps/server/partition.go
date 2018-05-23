@@ -18,7 +18,6 @@ import (
 )
 
 var (
-	errorPartitonClosed  = errors.New("partition has closed")
 	errorPartitonCommand = errors.New("unsupported command")
 )
 
@@ -32,6 +31,7 @@ type partition struct {
 
 	rwMutex    sync.RWMutex
 	leader     uint64
+	leaderAddr string
 	meta       metapb.Partition
 	statistics masterpb.PartitionStats
 }
@@ -181,31 +181,6 @@ func (p *partition) getPartitionInfo() *masterpb.PartitionInfo {
 	return info
 }
 
-func (p *partition) checkWritable() (err *metapb.Error) {
-	p.rwMutex.RLock()
-
-	if p.meta.Status == metapb.PA_INVALID || p.meta.Status == metapb.PA_NOTREAD {
-		err = &metapb.Error{PartitionNotFound: &metapb.PartitionNotFound{p.meta.ID}}
-		goto ret
-	}
-	if p.leader == 0 {
-		err = &metapb.Error{NoLeader: &metapb.NoLeader{p.meta.ID}}
-		goto ret
-	}
-	if p.leader != uint64(p.server.nodeID) {
-		err = &metapb.Error{NotLeader: &metapb.NotLeader{
-			PartitionID: p.meta.ID,
-			Leader:      metapb.NodeID(p.leader),
-			Epoch:       p.meta.Epoch,
-		}}
-		goto ret
-	}
-
-ret:
-	p.rwMutex.RUnlock()
-	return
-}
-
 func (p *partition) checkReadable(readLeader bool) (err *metapb.Error) {
 	p.rwMutex.RLock()
 
@@ -221,6 +196,7 @@ func (p *partition) checkReadable(readLeader bool) (err *metapb.Error) {
 		err = &metapb.Error{NotLeader: &metapb.NotLeader{
 			PartitionID: p.meta.ID,
 			Leader:      metapb.NodeID(p.leader),
+			LeaderAddr:  p.leaderAddr,
 			Epoch:       p.meta.Epoch,
 		}}
 		goto ret

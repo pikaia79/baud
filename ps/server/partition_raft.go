@@ -16,7 +16,7 @@ func (p *partition) Apply(command []byte, index uint64) (resp interface{}, err e
 
 	switch raftCmd.Type {
 	case raftpb.CmdType_WRITE:
-		resp, err = p.execWriteCommand(index, raftCmd.WriteCommand)
+		resp, err = p.execWriteCommand(index, raftCmd.WriteCommands)
 
 	default:
 		p.store.SetApplyID(index)
@@ -83,6 +83,14 @@ func (p *partition) HandleLeaderChange(leader uint64) {
 		log.Debug("partition[%d] change leader from %d to %d", p.meta.ID, p.leader, leader)
 
 		p.leader = leader
+		p.leaderAddr = ""
+		for _, repl := range p.meta.Replicas {
+			if uint64(repl.NodeID) == p.leader {
+				p.leaderAddr = repl.RpcAddr
+				break
+			}
+		}
+
 		_, term := p.server.raftServer.LeaderTerm(p.meta.ID)
 		if p.meta.Epoch.Version < term {
 			p.meta.Epoch.Version = term
