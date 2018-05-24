@@ -38,6 +38,9 @@ func NewBatch() *Batch {
 }
 
 func (b *Batch) Set(key, val []byte) {
+	if len(key) == 0 || len(val) == 0 {
+		return
+	}
 	ck := make([]byte, len(key))
 	copy(ck, key)
 	cv := make([]byte, len(val))

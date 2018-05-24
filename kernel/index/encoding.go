@@ -3,122 +3,248 @@ package index
 import (
 	"errors"
 
-	"github.com/tiglabs/baudengine/kernel/document"
 	"github.com/tiglabs/baudengine/util/encoding"
+	"github.com/tiglabs/baudengine/proto/pspb"
+	"github.com/tiglabs/baudengine/proto/metapb"
 )
 
 type KEY_TYPE byte
 type FIELD_TYPE byte
 
 const (
+	// field value
 	KEY_TYPE_F KEY_TYPE = 'F'
 	// raft apply ID
 	KEY_TYPE_R KEY_TYPE = 'R'
+	// term index
+	KEY_TYPE_I KEY_TYPE = 'I'
+	// term vector
+	KEY_TYPE_V KEY_TYPE = 'V'
+	// term position
+	KEY_TYPE_P KEY_TYPE = 'P'
+	// term entity info
+	KEY_TYPE_T KEY_TYPE = 'T'
 )
 
 const (
-	FIELD_TYPE_T FIELD_TYPE = 'T'
-	FIELD_TYPE_N FIELD_TYPE = 'N'
+	// unknown field
+	FIELD_TYPE_U FIELD_TYPE = 'U'
+	// string field
+	FIELD_TYPE_S FIELD_TYPE = 'S'
+	// int field
+	FIELD_TYPE_I FIELD_TYPE = 'I'
+	// float field
+	FIELD_TYPE_F FIELD_TYPE = 'F'
+	// decimal field
 	FIELD_TYPE_D FIELD_TYPE = 'D'
+	// bool field
+	FIELD_TYPE_BOOL FIELD_TYPE = 'b'
+	// null field
+	FIELD_TYPE_N FIELD_TYPE = 'N'
+	// date field
+	FIELD_TYPE_T FIELD_TYPE = 'T'
+	// blob field
 	FIELD_TYPE_B FIELD_TYPE = 'B'
+	// geo field
+	FIELD_TYPE_G FIELD_TYPE = 'G'
 )
 
-func encodeStoreFieldKey(docID []byte, fieldName string) (key []byte) {
-	key = encoding.EncodeBytesAscending(key, append(docID, byte(KEY_TYPE_F)))
-	if len(fieldName) > 0 {
-		key = encoding.EncodeBytesAscending(key, []byte(fieldName))
+func fieldTypeOuter(_type FIELD_TYPE) pspb.ValueType {
+	switch _type {
+	case FIELD_TYPE_S:
+		return pspb.ValueType_STRING
+	case FIELD_TYPE_I:
+		return pspb.ValueType_INT
+	case FIELD_TYPE_F:
+		return pspb.ValueType_FLOAT
+	case FIELD_TYPE_D:
+		return pspb.ValueType_DECIMAL
+	case FIELD_TYPE_BOOL:
+		return pspb.ValueType_BOOL
+	case FIELD_TYPE_N:
+		return pspb.ValueType_NULL
+	case FIELD_TYPE_T:
+		return pspb.ValueType_TIME
+	case FIELD_TYPE_B:
+		return pspb.ValueType_BLOB
+	default:
+		// TODO geo
+		return pspb.ValueType_UNKNOWN
+	}
+}
+
+func fieldTypeInner(_type pspb.ValueType) FIELD_TYPE {
+	switch _type {
+	case pspb.ValueType_STRING:
+		return FIELD_TYPE_S
+	case pspb.ValueType_INT:
+		return FIELD_TYPE_I
+	case pspb.ValueType_FLOAT:
+		return FIELD_TYPE_F
+	case pspb.ValueType_DECIMAL:
+		return FIELD_TYPE_D
+	case pspb.ValueType_BOOL:
+		return FIELD_TYPE_BOOL
+	case pspb.ValueType_NULL:
+		return FIELD_TYPE_N
+	case pspb.ValueType_TIME:
+		return FIELD_TYPE_T
+	case pspb.ValueType_BLOB:
+		return FIELD_TYPE_B
+	default:
+		return FIELD_TYPE_U
+	}
+}
+
+// field key format: [type][doc ID][field ID]
+func encodeStoreFieldKey(docID []byte, fieldId uint32) (key []byte) {
+	key = append(key, byte(KEY_TYPE_F))
+	key = encoding.EncodeBytesAscending(key, docID)
+	if fieldId > 0 {
+		key = encoding.EncodeUint32Ascending(key, fieldId)
 	}
 	return
 }
 
-func decodeStoreFieldKey(key []byte) (string, error) {
+func decodeStoreFieldKey(key []byte) (docId []byte, fileId uint32, err error) {
 	if len(key) <= 2 {
-		return "", errors.New("invalid store field key")
+		err = errors.New("invalid field key")
+		return
 	}
-	var err error
-	key, _, err = encoding.DecodeBytesAscending(key, nil)
+	if key[0] != byte(KEY_TYPE_F) {
+		err = errors.New("invalid field key")
+		return
+	}
+	key, docId, err = encoding.DecodeBytesAscending(key[1:], nil)
 	if err != nil {
-		return "", err
+		return
 	}
-	// todo check docID and type
 
-	_, fileName, err := encoding.DecodeBytesAscending(key, nil)
+	_, fileId, err = encoding.DecodeUint32Ascending(key)
 	if err != nil {
-		return "", err
+		return
 	}
-	return string(fileName), nil
+	return
 }
 
 // fields must have the same field type
-func encodeStoreField(docID []byte, fields []document.Field) (key []byte, row []byte, err error) {
-	var fieldType FIELD_TYPE
-	for i, field := range fields {
-		if !field.Property().IsStored() {
-			return
-		}
-		if fieldType == 0 {
-			switch field.(type) {
-			case *document.TextField:
-				fieldType = FIELD_TYPE_T
-			case *document.NumericField:
-				fieldType = FIELD_TYPE_N
-			case *document.BooleanField:
-				fieldType = FIELD_TYPE_B
-			case *document.DateTimeField:
-				fieldType = FIELD_TYPE_D
-			case *document.CompositeField:
-				fieldType = FIELD_TYPE_T
-			default:
-				err = errors.New("invalid field type")
-				return
-			}
-			key = encodeStoreFieldKey(docID, field.Name())
-			row = append(row, byte(fieldType), byte(field.Property()))
-		}
-		row = encoding.EncodeBytesValue(row, uint32(i), field.Value())
+func encodeStoreField(docID []byte, field *pspb.Field) (key []byte, row []byte, err error) {
+	if !field.Desc.Stored {
+		return nil, nil, nil
+	}
+	fieldType := fieldTypeInner(field.Type)
+	key = encodeStoreFieldKey(docID, field.Id)
+	row = append(row, byte(fieldType))
+	if len(field.Data) > 0 {
+		row = append(row, []byte(field.Data)...)
 	}
 	return
 }
 
-func decodeStoreField(fieldName string, row []byte) ([]document.Field, error) {
-	if len(row) <= 2 {
+func decodeStoreField(fieldId uint32, row []byte) (*pspb.Field, error) {
+	if len(row) == 0 {
 		return nil, errors.New("invalid field row")
 	}
-	var fields []document.Field
-	var err error
+
 	fieldType := FIELD_TYPE(row[0])
-	property := document.Property(row[1])
-	row = row[2:]
-	for len(row) > 0 {
-		var val []byte
-		switch fieldType {
-		case FIELD_TYPE_D:
-			row, val, err = encoding.DecodeBytesValue(row)
-			if err != nil {
-				return nil, err
-			}
-			fields = append(fields, document.NewDateTimeFieldByBytes(fieldName, val, property))
-		case FIELD_TYPE_B:
-			row, val, err = encoding.DecodeBytesValue(row)
-			if err != nil {
-				return nil, err
-			}
-			fields = append(fields, document.NewBooleanFieldByBytes(fieldName, val, property))
-		case FIELD_TYPE_N:
-			row, val, err = encoding.DecodeBytesValue(row)
-			if err != nil {
-				return nil, err
-			}
-			fields = append(fields, document.NewNumericFieldFromBytes(fieldName, val, property))
-		case FIELD_TYPE_T:
-			row, val, err = encoding.DecodeBytesValue(row)
-			if err != nil {
-				return nil, err
-			}
-			fields = append(fields, document.NewTextField(fieldName, val, property))
-		default:
-			return nil, errors.New("invalid field type")
-		}
+	field := &pspb.Field{}
+	field.Id = fieldId
+	field.Type = fieldTypeOuter(fieldType)
+	if fieldType == FIELD_TYPE_N {
+		return field, nil
 	}
-	return fields, nil
+	if len(row[1:]) == 0 {
+		return nil, errors.New("invalid field row")
+	}
+	field.Data = metapb.Value(row[1:])
+	return field, nil
+}
+
+// index key format: [type][field ID][term][doc ID]
+func encodeIndexKey(docID []byte, fieldId uint32, term []byte) (key []byte) {
+	key = append(key, byte(KEY_TYPE_I))
+	key = encoding.EncodeUint32Ascending(key, fieldId)
+	key = encoding.EncodeBytesAscending(key, term)
+	key = encoding.EncodeBytesAscending(key, docID)
+	return
+}
+
+// freq == 0 for doc only
+func encodeIndex(docID []byte, fieldId uint32, term []byte, freq int) (key []byte, row []byte, err error) {
+	key = encodeIndexKey(docID, fieldId, term)
+	row = encoding.EncodeIntValue(row, 0, int64(freq))
+	return
+}
+
+// index position key format: [type][field ID][term][doc ID][pos]
+func encodeIndexPositionKey(docID []byte, fieldId uint32, term []byte, pos int) (key []byte) {
+	key = append(key, byte(KEY_TYPE_P))
+	key = encoding.EncodeUint32Ascending(key, fieldId)
+	key = encoding.EncodeBytesAscending(key, term)
+	key = encoding.EncodeBytesAscending(key, docID)
+	if pos > 0 {
+		key = encoding.EncodeUint32Ascending(key, uint32(pos))
+	}
+	return
+}
+
+func encodeIndexPosition(docID []byte, fieldId uint32, term []byte, pos, start, end int) (key []byte, row []byte, err error) {
+	key = encodeIndexPositionKey(docID, fieldId, term, pos)
+	row = encoding.EncodeIntValue(row, 0, int64(pos))
+	if end > 0 {
+		// for offset
+		row = encoding.EncodeIntValue(row, 1, int64(start))
+		row = encoding.EncodeIntValue(row, 2, int64(end))
+	}
+	return
+}
+
+func encodeFieldTermAbstractKey(docID []byte, fieldId uint32) (key []byte) {
+	key = append(key, byte(KEY_TYPE_T))
+	key = encoding.EncodeBytesAscending(key, docID)
+	if fieldId > 0 {
+		key = encoding.EncodeUint32Ascending(key, fieldId)
+	}
+	return
+}
+
+func encodeFieldTermAbstract(docID []byte, fieldId uint32, terms [][]byte) (key []byte, row []byte, err error) {
+	if len(terms) == 0 {
+		err = errors.New("no terms")
+		return
+	}
+	key = encodeFieldTermAbstractKey(docID, fieldId)
+	for i, term := range terms {
+		row = encoding.EncodeBytesValue(row, uint32(i), term)
+	}
+	return
+}
+
+func decodeFieldTermAbstractKey(key []byte) (docID []byte, fieldId uint32, err error) {
+	if len(key) <= 1 || key[0] != byte(KEY_TYPE_T) {
+		err = errors.New("invalid field term abstract key")
+		return
+	}
+	key = key[1:]
+	key, docID, err = encoding.DecodeBytesAscending(key, nil)
+	if err != nil {
+		return
+	}
+	key, fieldId, err = encoding.DecodeUint32Ascending(key)
+	return
+}
+
+func decodeFieldTermAbstractValue(value []byte) ([][]byte, error) {
+	var terms [][]byte
+
+	for len(value) > 0 {
+		var term []byte
+		var err error
+		value, term, err = encoding.DecodeBytesValue(value)
+		if err != nil {
+			return nil, err
+		}
+		terms = append(terms, term)
+	}
+	return terms, nil
 }

@@ -27,12 +27,12 @@ func (t *Tokenizer) Tokenize(input []byte) analysis.TokenSet {
 		}
 		if t.filter.Filter(r) {
 			if token != nil {
+				pos++
 				token.End = i
 				token.Term = bytes.CloneBytes(input[token.Start: token.End])
 				token.Position = pos
 				sets = append(sets, token)
 				token = nil
-				pos++
 			}
 		} else {
 			if token == nil {
@@ -42,6 +42,7 @@ func (t *Tokenizer) Tokenize(input []byte) analysis.TokenSet {
 		i += size
 	}
 	if token != nil {
+		pos++
 		token.End = i
 		token.Term = bytes.CloneBytes(input[token.Start: token.End])
 		token.Position = pos
