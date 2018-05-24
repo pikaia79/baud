@@ -10,14 +10,10 @@ import (
 	"sync"
 )
 
-const (
-	PREFIX_SPACE = "schema space "
-)
-
 type PartitionPolicy struct {
 	Key      string
 	Function string
-	Number   uint32
+	Number   uint64
 }
 
 type Space struct {
@@ -62,7 +58,7 @@ func NewSpaceByMeta(metaSpace *metapb.Space) *Space {
 	}
 }
 
-func (s *Space) persistent(store Store) error {
+func (s *Space) persistent() error {
 	s.propertyLock.Lock()
 	defer s.propertyLock.Unlock()
 
@@ -72,41 +68,15 @@ func (s *Space) persistent(store Store) error {
 		log.Error("fail to marshal space[%v]. err:[%v]", copy, err)
 		return err
 	}
-	spaceKey := []byte(fmt.Sprintf("%s%d", PREFIX_SPACE, copy.ID))
-	if err := store.Put(spaceKey, spaceVal); err != nil {
-		log.Error("fail to put space[%v] into store. err:[%v]", copy, err)
-		return ErrLocalDbOpsFailed
-	}
-
+	// TODO 调用global etcd添加space, 接口由@杨洋提供
 	return nil
 }
 
-func (s *Space) batchPersistent(batch Batch) error {
+func (s *Space) erase() error {
 	s.propertyLock.Lock()
 	defer s.propertyLock.Unlock()
 
-	copy := deepcopy.Iface(s.Space).(*metapb.Space)
-	spaceVal, err := proto.Marshal(copy)
-	if err != nil {
-		log.Error("fail to marshal space[%v]. err:[%v]", copy, err)
-		return err
-	}
-	spaceKey := []byte(fmt.Sprintf("%s%d", PREFIX_SPACE, copy.ID))
-	batch.Put(spaceKey, spaceVal)
-
-	return nil
-}
-
-func (s *Space) erase(store Store) error {
-	s.propertyLock.Lock()
-	defer s.propertyLock.Unlock()
-
-	spaceKey := []byte(fmt.Sprintf("%s%d", PREFIX_SPACE, s.ID))
-	if err := store.Delete(spaceKey); err != nil {
-		log.Error("fail to delete space[%v] from store. err:[%v]", s.Space, err)
-		return ErrLocalDbOpsFailed
-	}
-
+	// TODO 调用global etcd删除space, 接口由@杨洋提供
 	return nil
 }
 
@@ -213,29 +183,26 @@ func (c *SpaceCache) DeleteSpace(space *Space) {
 	delete(c.name2Ids, oldSpace.Name)
 }
 
-func (c *SpaceCache) Recovery(store Store) ([]*Space, error) {
-	prefix := []byte(PREFIX_SPACE)
-	startKey, limitKey := util.BytesPrefix(prefix)
-
+func (c *SpaceCache) Recovery() ([]*Space, error) {
 	resultSpaces := make([]*Space, 0)
 
-	iterator := store.Scan(startKey, limitKey)
-	defer iterator.Release()
-	for iterator.Next() {
-		if iterator.Key() == nil {
-			log.Error("space store key is nil. never happened!!!")
-			continue
+	// TODO 从global etcd里获得一个DB的space list, 由@杨洋提供接口
+	topoSpaces := make([]metapb.Space, 0)
+	for _, topoSpace := range topoSpaces {
+		err := proto.Unmarshal([]byte{}, topoSpace)
+		if err != nil {
+			log.Error("proto.Unmarshal error, err:[%v]", err)
 		}
-
-		val := iterator.Value()
 		metaSpace := new(metapb.Space)
-		if err := proto.Unmarshal(val, metaSpace); err != nil {
-			log.Error("fail to unmarshal space from store. err[%v]", err)
-			return nil, ErrInternalError
-		}
+		metaSpace.ID = topoSpace.ID
+		metaSpace.Name = topoSpace.Name
+		metaSpace.DB = topoSpace.DB
+		metaSpace.Type = topoSpace.Type
+		metaSpace.DbName = topoSpace.DbName
+		metaSpace.KeyPolicy = topoSpace.KeyPolicy
+		metaSpace.Status = topoSpace.Status
 
 		resultSpaces = append(resultSpaces, NewSpaceByMeta(metaSpace))
 	}
-
 	return resultSpaces, nil
 }

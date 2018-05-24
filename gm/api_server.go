@@ -82,19 +82,18 @@ func (s *ApiServer) Close() {
 
 func (s *ApiServer) initAdminHandler() {
 	s.httpServer.Handle(netutil.POST, "/manage/db/create", s.handleDbCreate)
-	s.httpServer.Handle(netutil.GET, "/manage/db/delete", s.handleDbDelete)
-	s.httpServer.Handle(netutil.GET, "/manage/db/rename", s.handleDbRename)
+	s.httpServer.Handle(netutil.PUT, "/manage/db/delete", s.handleDbDelete)
+	s.httpServer.Handle(netutil.DELETE, "/manage/db/rename", s.handleDbRename)
 	s.httpServer.Handle(netutil.GET, "/manage/db/list", s.handleDbList)
 	s.httpServer.Handle(netutil.GET, "/manage/db/detail", s.handleDbDetail)
 
 	s.httpServer.Handle(netutil.POST, "/manage/space/create", s.handleSpaceCreate)
-	s.httpServer.Handle(netutil.GET, "/manage/space/delete", s.handleSpaceDelete)
-	s.httpServer.Handle(netutil.GET, "/manage/space/rename", s.handleSpaceRename)
+	s.httpServer.Handle(netutil.PUT, "/manage/space/delete", s.handleSpaceDelete)
+	s.httpServer.Handle(netutil.DELETE, "/manage/space/rename", s.handleSpaceRename)
 	s.httpServer.Handle(netutil.GET, "/manage/space/list", s.handleSpaceList)
 	s.httpServer.Handle(netutil.GET, "/manage/space/detail", s.handleSpaceDetail)
 
 	s.httpServer.Handle(netutil.GET, "/manage/partition/list", s.handlePartitionList)
-	s.httpServer.Handle(netutil.GET, "/manage/ps/list", s.handlePSList)
 }
 
 func (s *ApiServer) handleDbCreate(w http.ResponseWriter, r *http.Request, params netutil.UriParams) {
@@ -300,15 +299,6 @@ func (s *ApiServer) handlePartitionList(w http.ResponseWriter, r *http.Request, 
 
 	partitions := s.cluster.PartitionCache.GetAllPartitions()
 	sendReply(w, newHttpSucReply(partitions))
-}
-
-func (s *ApiServer) handlePSList(w http.ResponseWriter, r *http.Request, params netutil.UriParams) {
-	if err := s.checkLeader(w); err != nil {
-		return
-	}
-
-	allPs := s.cluster.PsCache.GetAllServers()
-	sendReply(w, newHttpSucReply(allPs))
 }
 
 type HttpReply struct {

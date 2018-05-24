@@ -9,7 +9,7 @@ import (
 )
 
 var (
-	GEN_STEP          uint32 = 10
+	GEN_STEP          uint32 = 100
 	AUTO_INCREMENT_ID        = fmt.Sprintf("$auto_increment_id")
 
 	idGeneratorSingle     IDGenerator
