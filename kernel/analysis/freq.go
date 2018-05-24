@@ -1,7 +1,7 @@
 package analysis
 
 type TermLocation struct {
-	Field          string
+	FieldId        uint32
 	Start          int
 	End            int
 	Position       int
@@ -19,10 +19,10 @@ func (tf *TokenFreq) Frequency() int {
 
 type TokenFrequencies map[string]*TokenFreq
 
-func (tfs TokenFrequencies) MergeAll(field string, tokenFreq TokenFrequencies) {
+func (tfs TokenFrequencies) MergeAll(fieldId uint32, tokenFreq TokenFrequencies) {
 	for term, tf := range tokenFreq {
 		for _, l := range tf.Locations {
-			l.Field = field
+			l.FieldId = fieldId
 		}
 		if existingTf, find := tfs[term]; find {
 			existingTf.Locations = append(existingTf.Locations, tf.Locations...)
@@ -38,7 +38,7 @@ func (tfs TokenFrequencies) MergeAll(field string, tokenFreq TokenFrequencies) {
 	}
 }
 
-func TokenFrequency(tokens []*Token, includeTermVectors bool) TokenFrequencies {
+func TokenFrequency(tokens TokenSet, includeTermVectors bool) TokenFrequencies {
 	rv := make(map[string]*TokenFreq, len(tokens))
 
 	if includeTermVectors {

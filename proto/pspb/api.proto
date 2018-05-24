@@ -141,6 +141,7 @@ enum ValueType {
     STRING  = 6;
     TIME    = 7;
     BLOB    = 8;
+    GEO     = 9;
 }
 
 // Controls how much information is stored in the postings lists

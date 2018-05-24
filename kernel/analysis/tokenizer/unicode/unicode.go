@@ -25,7 +25,7 @@ func (ut *UnicodeTokenizer) Tokenize(input []byte) analysis.TokenSet {
 		ut.zhTokneizer = chinese.NewZh()
 	}
 	segments := segment.NewSegmenter().TextSegment(input)
-	pos := 0
+	pos := 1
 	sets := make(analysis.TokenSet, 0, len(segments))
 	for _, s := range segments {
 		switch s.Type {
@@ -46,6 +46,7 @@ func (ut *UnicodeTokenizer) Tokenize(input []byte) analysis.TokenSet {
 				Position: pos,
 				Term: bytes.CloneBytes(s.Text),
 			})
+			pos++
 		}
 	}
 
