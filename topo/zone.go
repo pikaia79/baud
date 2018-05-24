@@ -17,7 +17,7 @@ func (s *TopoServer) GetAllZones(ctx context.Context) ([]*metapb.Zone, error) {
         return nil, nil
     }
 
-    zoneInfos := make([]*metapb.Zone, 0, len(dirs))
+    zoneMetas := make([]*metapb.Zone, 0, len(dirs))
     for _, dir := range dirs {
         contents, _, err := s.backend.Get(ctx, GlobalZone, path.Join(zonesPath, dir, ZoneInfoFile))
         if err != nil {
@@ -25,26 +25,50 @@ func (s *TopoServer) GetAllZones(ctx context.Context) ([]*metapb.Zone, error) {
             return nil, err
         }
 
-        zoneInfo := &metapb.Zone{}
-        if err := proto.Unmarshal(contents, zoneInfo); err != nil {
-            log.Error("Fail to unmarshal zone[%s] info. err[%v]", dir, err)
+        zoneMeta := &metapb.Zone{}
+        if err := proto.Unmarshal(contents, zoneMeta); err != nil {
+            log.Error("Fail to unmarshal meta info for zone[%s]. err[%v]", dir, err)
             return nil, err
         }
 
-        zoneInfos = append(zoneInfos, zoneInfo)
+        zoneMetas = append(zoneMetas, zoneMeta)
     }
 
-    return zoneInfos, nil
+    return zoneMetas, nil
 }
 
 func (s *TopoServer) GetZone(ctx context.Context, zoneName string) (*metapb.Zone, error) {
-    return nil, nil
+    contents, _, err := s.backend.Get(ctx, GlobalZone, path.Join(zonesPath, zoneName, ZoneInfoFile))
+    if err != nil {
+        return nil, err
+    }
+
+    zoneMeta := &metapb.Zone{}
+    if err := proto.Unmarshal(contents, zoneMeta); err != nil {
+        log.Error("Fail to unmarshal meta info for zone[%s]. err[%v]", zoneName, err)
+        return nil, err
+    }
+
+    return zoneMeta, nil
 }
+
 func (s *TopoServer) AddZone(ctx context.Context, zone *metapb.Zone) error {
+    contents, err := proto.Marshal(zone)
+    if err != nil {
+        log.Error("Fail to marshal zone[%v] info. err[%v]", zone, err)
+        return err
+    }
+
+    _, err = s.backend.Create(ctx, GlobalZone, path.Join(zonesPath, zone.Name, ZoneInfoFile), contents)
+    if err != nil {
+        return err
+    }
+
     return nil
 }
+
 func (s *TopoServer) DeleteZone(ctx context.Context, zoneName string) error {
-    return nil
+    return s.backend.Delete(ctx, GlobalZone, path.Join(zonesPath, zoneName, ZoneInfoFile), nil)
 }
 
 
