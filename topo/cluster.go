@@ -3,25 +3,29 @@ package topo
 import (
     "github.com/tiglabs/baudengine/proto/metapb"
     "github.com/tiglabs/baudengine/proto/masterpb"
+    "github.com/tiglabs/baudengine/util/log"
     "context"
     "errors"
+    "flag"
 )
 
 const (
     // Path components
-    cellsPath     = "cells"
+    zonesPath     = "zones"
     keyspacesPath = "keyspaces"
     shardsPath    = "shards"
     tabletsPath   = "tablets"
+
+    // Filenames for all object types.
+    ZoneInfoFile = "ZoneInfo"
 )
 
+
 var (
-    topoImplementation = "etcd3"
-
-    //globalAddr = "127.0.0.1:9301"
-
-    //zoneName   = []string{"myzone2", "myzone3"}
-    //zoneAddr   = []string{"127.0.0.1:9302", "127.0.0.1:9303"}
+    topoImplementation    = flag.String("topo_implementation", "etcd3", "the topology implementation to use")
+    topoGlobalServerAddrs = flag.String("topo_global_server_addrs", "", "topo global server addresses")
+    topoGlobalRootDir     = flag.String("topo_global_root_dir", "/",
+            "the path of the global topology data in the global topology server")
 )
 
 var (
@@ -59,7 +63,7 @@ var (
 )
 
 type Impl interface {
-    Backend
+   // Backend
 
     GetAllZones(ctx context.Context) ([]*metapb.Zone, error)
     GetZone(ctx context.Context, zoneName string) (*metapb.Zone, error)
@@ -102,20 +106,57 @@ type Impl interface {
     SetPartitionLeaderByZone(ctx context.Context, zoneName string,
             partitionId *metapb.PartitionID, leaderReplicaId metapb.ReplicaID) error
 
-    GetGMLeaderAsync(ctx context.Context) <-chan *masterpb.GMaster
-    GetGMLeaderSync(ctx context.Context) *masterpb.GMaster
-
-    GetZMLeaderAsync(ctx context.Context, zoneName string) <-chan *masterpb.ZMaster
-    GetZMLeaderSync(ctx context.Context, zoneName string) *masterpb.ZMaster
-
-    GenerateNewId(ctx context.Context)
+    GenerateNewId(ctx context.Context) (uint64, error)
 }
 
 type TopoServer struct {
-    Impl
+    backend Backend
 }
 
-func NewTopoServer() *TopoServer {
-    return nil
+func (s *TopoServer) Close() {
+    if s.backend != nil {
+       s.backend.Close()
+       s.backend = nil
+    }
+}
+
+// Factory is a factory method to create Impl objects.
+type Factory func(serverAddr, root string) (Backend, error)
+
+var (
+    factories = make(map[string]Factory)
+)
+
+func RegisterFactory(name string, factory Factory) {
+    if factories[name] != nil {
+        log.Error("Duplicate topo.Factory registration for %v", name)
+    }
+    factories[name] = factory
+}
+
+func OpenServer(implementation, globalServerAddrs, globalRootDir string) (*TopoServer, error) {
+    factory, ok := factories[implementation]
+    if !ok {
+        log.Error("invalid implementation[%s]", implementation)
+        return nil, ErrNoNode
+    }
+
+    backend, err := factory(globalServerAddrs, globalRootDir)
+    if err != nil {
+       log.Error("Fail to create etcd3 server. err[%v]", err)
+       return nil, err
+    }
+    return &TopoServer{
+        backend: backend,
+    }, nil
+}
+
+func Open() *TopoServer {
+    server, err := OpenServer(*topoImplementation, *topoGlobalServerAddrs, *topoGlobalRootDir)
+    if err != nil {
+        log.Fatal("Fail to create topo server with %s. err[%v]", *topoImplementation, err)
+    }
+
+    return server
 }
 

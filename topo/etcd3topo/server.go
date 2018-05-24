@@ -19,24 +19,19 @@ We follow these conventions within this package:
     Functions defined in this package can be assumed to have already converted
     errors as necessary.
 */
-package etcd2topo
+package etcd3topo
 
 import (
-	"path"
-	"strings"
 	"sync"
 
-	"github.com/coreos/etcd/clientv3"
-	"golang.org/x/net/context"
-
-	"github.com/youtube/vitess/go/vt/topo"
+	"github.com/tiglabs/baudengine/topo"
 )
 
 const (
 	// Path components
 	cellsPath     = "cells"
 	locksPath     = "locks"
-	electionsPath = "elections"
+	electionsPath = "masters"
 )
 
 // Server is the implementation of topo.Server for etcd.
@@ -70,33 +65,6 @@ func (s *Server) Close() {
 	s.global = nil
 }
 
-// GetKnownCells implements topo.Server.GetKnownCells.
-func (s *Server) GetKnownCells(ctx context.Context) ([]string, error) {
-	nodePath := path.Join(s.global.root, cellsPath) + "/"
-	resp, err := s.global.cli.Get(ctx, nodePath,
-		clientv3.WithPrefix(),
-		clientv3.WithSort(clientv3.SortByKey, clientv3.SortAscend),
-		clientv3.WithKeysOnly())
-	if err != nil {
-		return nil, convertError(err)
-	}
-
-	prefixLen := len(nodePath)
-	suffix := "/" + topo.CellInfoFile
-	suffixLen := len(suffix)
-
-	var result []string
-	for _, ev := range resp.Kvs {
-		p := string(ev.Key)
-		if strings.HasPrefix(p, nodePath) && strings.HasSuffix(p, suffix) {
-			p = p[prefixLen : len(p)-suffixLen]
-			result = append(result, p)
-		}
-	}
-
-	return result, nil
-}
-
 // NewServer returns a new etcdtopo.Server.
 func NewServer(serverAddr, root string) (*Server, error) {
 	global, err := newCellClient(serverAddr, root)
@@ -110,7 +78,7 @@ func NewServer(serverAddr, root string) (*Server, error) {
 }
 
 func init() {
-	//topo.RegisterFactory("etcd2", func(serverAddr, root string) (topo.Impl, error) {
-	//	return NewServer(serverAddr, root)
-	//})
+	topo.RegisterFactory("etcd3", func(serverAddr, root string) (topo.Backend, error) {
+		return NewServer(serverAddr, root)
+	})
 }

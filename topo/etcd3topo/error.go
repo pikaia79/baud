@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
-package etcd2topo
+package etcd3topo
 
 import (
 	"errors"
@@ -11,7 +11,7 @@ import (
 	"golang.org/x/net/context"
 	"google.golang.org/grpc/codes"
 
-	"github.com/youtube/vitess/go/vt/topo"
+	"github.com/tiglabs/baudengine/topo"
 )
 
 // Errors specific to this package.

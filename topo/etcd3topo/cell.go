@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
-package etcd2topo
+package etcd3topo
 
 import (
 	"fmt"
@@ -14,9 +14,8 @@ import (
 	"github.com/golang/protobuf/proto"
 	"golang.org/x/net/context"
 
-	"github.com/youtube/vitess/go/vt/topo"
-
-	topodatapb "github.com/youtube/vitess/go/vt/proto/topodata"
+	"github.com/tiglabs/baudengine/proto/metapb"
+	"github.com/tiglabs/baudengine/topo"
 )
 
 // cellClient wraps a Client for keeping track of cell-local clusters.
@@ -52,7 +51,7 @@ func (c *cellClient) close() {
 // It caches clients for previously requested cells.
 func (s *Server) clientForCell(ctx context.Context, cell string) (*cellClient, error) {
 	// Global cell is the easy case.
-	if cell == topo.GlobalCell {
+	if cell == topo.GlobalZone {
 		return s.global, nil
 	}
 
@@ -94,7 +93,7 @@ func (s *Server) clientForCell(ctx context.Context, cell string) (*cellClient, e
 // cell-local cluster, and the root directory. These lists are stored
 // in the global etcd cluster.
 func (s *Server) getCellAddrs(ctx context.Context, cell string) (string, string, error) {
-	nodePath := path.Join(s.global.root, cellsPath, cell, topo.CellInfoFile)
+	nodePath := path.Join(s.global.root, cellsPath, cell, topo.ZoneInfoFile)
 	resp, err := s.global.cli.Get(ctx, nodePath)
 	if err != nil {
 		return "", "", convertError(err)
@@ -102,13 +101,13 @@ func (s *Server) getCellAddrs(ctx context.Context, cell string) (string, string,
 	if len(resp.Kvs) != 1 {
 		return "", "", topo.ErrNoNode
 	}
-	ci := &topodatapb.CellInfo{}
+	ci := &metapb.Zone{}
 	if err := proto.Unmarshal(resp.Kvs[0].Value, ci); err != nil {
 		return "", "", fmt.Errorf("cannot unmarshal cell node %v: %v", nodePath, err)
 	}
-	if ci.ServerAddress == "" {
+	if ci.ServerAddrs == "" {
 		return "", "", fmt.Errorf("CellInfo.ServerAddress node %v is empty, expected list of addresses", nodePath)
 	}
 
-	return ci.ServerAddress, ci.Root, nil
+	return ci.ServerAddrs, ci.RootDir, nil
 }

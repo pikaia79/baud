@@ -9,7 +9,7 @@ import (
 const (
 	// GlobalCell is the name of the global cell.  It is special
 	// as it contains the global topology, and references the other cells.
-	GlobalCell = "global"
+	GlobalZone = "global"
 )
 
 // Backend defines the interface that must be implemented by topology
@@ -27,6 +27,8 @@ const (
 // all our current systems, and convert the higher levels to talk to
 // this API. This is a long-term project.
 type Backend interface {
+	Close()
+
 	//
 	// Directory support
 	//
@@ -143,7 +145,7 @@ type Backend interface {
 	// is the common usage. Id must be unique for each process
 	// calling this, for a given name. Calling this function does
 	// not make the current process a candidate for the election.
-	NewMasterParticipation(name, id string) (MasterParticipation, error)
+	NewMasterParticipation(cell, id string) (MasterParticipation, error)
 }
 
 // Version is an interface that describes a file version.

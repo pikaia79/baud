@@ -1,9 +1,9 @@
-package etcd2topo
+package etcd3topo
 
 import (
 	"fmt"
 
-	"github.com/youtube/vitess/go/vt/topo"
+	"github.com/tiglabs/baudengine/topo"
 )
 
 // EtcdVersion is etcd's idea of a version.

@@ -1,12 +1,11 @@
-package etcd2topo
+package etcd3topo
 
 import (
 	"path"
 
 	"github.com/coreos/etcd/clientv3"
 	"golang.org/x/net/context"
-
-	"github.com/youtube/vitess/go/vt/topo"
+	"github.com/tiglabs/baudengine/topo"
 )
 
 // Create is part of the topo.Backend interface.

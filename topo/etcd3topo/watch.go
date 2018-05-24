@@ -1,4 +1,4 @@
-package etcd2topo
+package etcd3topo
 
 import (
 	"fmt"
@@ -8,7 +8,7 @@ import (
 	"github.com/coreos/etcd/mvcc/mvccpb"
 	"golang.org/x/net/context"
 
-	"github.com/youtube/vitess/go/vt/topo"
+	"github.com/tiglabs/baudengine/topo"
 )
 
 // Watch is part of the topo.Backend interface

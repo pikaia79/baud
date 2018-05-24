@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
-package etcd2topo
+package etcd3topo
 
 import (
 	"flag"
@@ -96,9 +96,14 @@ func (s *Server) waitOnLastRev(ctx context.Context, nodePath string, revision in
 	return false, nil
 }
 
-func (s *Server) lock(ctx context.Context, nodePath string, contents string) (string, error) {
+func (s *Server) lock(ctx context.Context, cell, nodePath, contents string) (string, error) {
+	cellClient, err := s.clientForCell(ctx, cell)
+	if err != nil {
+		return "", err
+	}
+
 	// Get a lease, set its KeepAlive.
-	lease, err := s.global.cli.Grant(ctx, int64(*leaseTTL))
+	lease, err := cellClient.cli.Grant(ctx, int64(*leaseTTL))
 	if err != nil {
 		return "", convertError(err)
 	}
@@ -138,7 +143,7 @@ func (s *Server) lock(ctx context.Context, nodePath string, contents string) (st
 
 // unlock releases a lock acquired by lock() on the given directory.
 // The string returned by lock() should be passed as the actionPath.
-func (s *Server) unlock(ctx context.Context, dirPath, actionPath string) error {
+func (s *Server) unlock(ctx context.Context, cell, dirPath, actionPath string) error {
 	leaseIDStr := path.Base(actionPath)
 
 	// Sanity check.
@@ -152,8 +157,13 @@ func (s *Server) unlock(ctx context.Context, dirPath, actionPath string) error {
 	}
 	leaseID := clientv3.LeaseID(i)
 
+	cellClient, err := s.clientForCell(ctx, cell)
+	if err != nil {
+		return err
+	}
+
 	// Revoke the lease, will delete the node.
-	_, err = s.global.cli.Revoke(ctx, leaseID)
+	_, err = cellClient.cli.Revoke(ctx, leaseID)
 	if err != nil {
 		return convertError(err)
 	}
