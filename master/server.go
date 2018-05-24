@@ -8,7 +8,6 @@ import (
 type Master struct {
     config      *Config
     globalStore Store
-    leaderCh    chan *LeaderInfo
     wg          sync.WaitGroup
 
     cluster   *Cluster
@@ -75,10 +74,6 @@ func (ms *Master) Start(config *Config) error {
 }
 
 func (ms *Master) Shutdown() {
-    if ms.leaderCh != nil {
-        close(ms.leaderCh)
-        ms.leaderCh = nil
-    }
 	if ms.apiServer != nil {
 		ms.apiServer.Close()
 		ms.apiServer = nil
@@ -115,16 +110,13 @@ func (ms *Master) Shutdown() {
 }
 
 func (ms *Master) watchLeader() {
-    ms.leaderCh = make(chan *LeaderInfo, 4)
-    ms.globalStore.GetLeaderAsync(ms.leaderCh)
-
     ms.wg.Add(1)
     go func() {
         defer ms.wg.Done()
         
         for {
             select {
-            case leaderChanging, opened := <-ms.leaderCh:
+            case leaderChanging, opened := <-ms.globalStore.GetLeaderAsync():
                 if !opened {
                     log.Debug("closed leader watch channel")
                     return

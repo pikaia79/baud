@@ -28,6 +28,18 @@ service MasterRpc {
     rpc GetSpace(GetSpaceRequest)       returns (GetSpaceResponse) {}
 }
 
+message GMaster {
+    uint32      id         = 1;
+    string      ip         = 2;
+    uint32      rpc_port   = 3;
+}
+
+message ZMaster {
+    uint32      id         = 1;
+    string      ip         = 2;
+    uint32      rpc_port   = 3;
+}
+
 message Route {
     Partition       partition  = 1 [(gogoproto.nullable) = false, (gogoproto.embed) = true];
     repeated Node   nodes = 2;
