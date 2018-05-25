@@ -34,12 +34,13 @@ func (s *TopoServer) GetAllZones(ctx context.Context) ([]*ZoneTopo, error) {
             return nil, err
         }
 
-        zone := &ZoneTopo{version: version}
-        if err := proto.Unmarshal(contents, zone.Zone); err != nil {
+        zoneMeta := &metapb.Zone{}
+        if err := proto.Unmarshal(contents, zoneMeta); err != nil {
             log.Error("Fail to unmarshal meta data for zone[%s]. err[%v]", name, err)
             return nil, err
         }
 
+        zone := &ZoneTopo{version: version, Zone: zoneMeta}
         zones = append(zones, zone)
     }
 
@@ -56,11 +57,13 @@ func (s *TopoServer) GetZone(ctx context.Context, zoneName string) (*ZoneTopo, e
         return nil, err
     }
 
-    zone := &ZoneTopo{version: version}
-    if err := proto.Unmarshal(contents, zone.Zone); err != nil {
+    zoneMeta := &metapb.Zone{}
+    if err := proto.Unmarshal(contents, zoneMeta); err != nil {
         log.Error("Fail to unmarshal meta data for zone[%s]. err[%v]", zoneName, err)
         return nil, err
     }
+
+    zone := &ZoneTopo{version: version, Zone: zoneMeta}
 
     return zone, nil
 }
