@@ -92,11 +92,27 @@ func (s *TopoServer) UpdatePsByZone(ctx context.Context, zoneName string, ps *Ps
     if ctx == nil || len(zoneName) == 0 || ps == nil {
         return ErrNoNode
     }
+
+    nodePath := path.Join(partitionServersPath, fmt.Sprint(ps.ID), PartitionServerTopoFile)
+    contents, err := proto.Marshal(ps.Node)
+    if err != nil {
+        return err
+    }
+
+    newVersion, err := s.backend.Update(ctx, zoneName, nodePath, contents, ps.version)
+    if err != nil {
+        return ErrNoNode
+    }
+
+    ps.version = newVersion
     return nil
 }
+
 func (s *TopoServer) DeletePsByZone(ctx context.Context, zoneName string, ps *PsTopo) error {
     if ctx == nil || len(zoneName) == 0 || ps == nil {
         return ErrNoNode
     }
-    return nil
+
+    nodePath := path.Join(partitionServersPath, fmt.Sprint(ps.ID), PartitionServerTopoFile)
+    return s.backend.Delete(ctx, zoneName, nodePath, ps.version)
 }
