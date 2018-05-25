@@ -58,7 +58,6 @@ func (h *heartbeatWork) start() {
 				return
 
 			case <-heartbeatTimer.C:
-				log.Debug("timer trigger heartbeat to master, tickerInterval is %d", h.tickerInterval)
 				h.doHeartbeat()
 				h.update(heartbeatTimer)
 
@@ -74,7 +73,6 @@ func (h *heartbeatWork) start() {
 					break
 				}
 
-				log.Debug("triggerChan trigger heartbeat to master, tickerInterval is %d", h.tickerInterval)
 				h.doHeartbeat()
 				h.update(heartbeatTimer)
 			}
@@ -113,13 +111,13 @@ func (h *heartbeatWork) doHeartbeat() {
 		}
 		masterClient, err := h.server.masterClient.GetGrpcClient(masterAddr)
 		if err != nil {
-			return fmt.Errorf("get master heartbeat rpc client[%s] error: %v", masterAddr, err)
+			return fmt.Errorf("get master heartbeat rpc client[%s] error: %s", masterAddr, err)
 		}
 
 		stats, _ := h.server.systemMetric.Export()
 		req := &masterpb.PSHeartbeatRequest{
 			RequestHeader: metapb.RequestHeader{ReqId: uuid.FlakeUUID()},
-			NodeID:        h.server.nodeID,
+			NodeID:        h.server.NodeID,
 			Partitions:    make([]masterpb.PartitionInfo, 0),
 		}
 		h.server.partitions.Range(func(key, value interface{}) bool {
@@ -130,13 +128,13 @@ func (h *heartbeatWork) doHeartbeat() {
 		})
 		req.SysStats = *stats
 
-		log.Debug("heartbeat to master request is: %s", req.String())
+		log.Debug("heartbeat to master request is: %s", req)
 		goCtx, cancel := context.WithTimeout(h.server.ctx, heartbeatTimeout)
 		resp, err := masterClient.(masterpb.MasterRpcClient).PSHeartbeat(goCtx, req)
 		cancel()
 
 		if err != nil {
-			return fmt.Errorf("master heartbeat request[%s] failed error: %v", req.ReqId, err)
+			return fmt.Errorf("master heartbeat request[%s] failed error: %s", req.ReqId, err)
 		}
 
 		if resp.Code == metapb.RESP_CODE_OK {

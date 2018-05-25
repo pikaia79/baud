@@ -19,16 +19,16 @@ func (p *partition) getInternal(request *pspb.GetRequest, response *pspb.GetResp
 		response.Error = *err
 		if err.NotLeader != nil {
 			response.Code = metapb.PS_RESP_CODE_NOT_LEADER
-			response.Message = fmt.Sprintf("node[%d] of partition[%d] is not leader", p.server.nodeID, request.Partition)
+			response.Message = fmt.Sprintf("node[%d] of partition[%d] is not leader", p.server.NodeID, request.Partition)
 		} else if err.NoLeader != nil {
 			response.Code = metapb.PS_RESP_CODE_NO_LEADER
-			response.Message = fmt.Sprintf("node[%d] of partition[%d] has no leader", p.server.nodeID, request.Partition)
+			response.Message = fmt.Sprintf("node[%d] of partition[%d] has no leader", p.server.NodeID, request.Partition)
 		} else if err.PartitionNotFound != nil {
 			response.Code = metapb.PS_RESP_CODE_NO_PARTITION
-			response.Message = fmt.Sprintf("node[%d] of partition[%d] has closed", p.server.nodeID, request.Partition)
+			response.Message = fmt.Sprintf("node[%d] of partition[%d] has closed", p.server.NodeID, request.Partition)
 		}
 
-		log.Error("get document error:[%s],\n get request is:[%v]", response.Message, request)
+		log.Error("get document error:[%s],\n get request is:[%s]", response.Message, request)
 		return
 	}
 
@@ -61,7 +61,7 @@ func (p *partition) getInternal(request *pspb.GetRequest, response *pspb.GetResp
 			response.Code = metapb.RESP_CODE_SERVER_STOP
 			response.Message = "during request processing, the server is shut down"
 		}
-		log.Error("get document error:[%v],\n get request is:[%v]", err, request)
+		log.Error("get document error:[%s],\n get request is:[%s]", err, request)
 	} else if response.Found && len(fields) > 0 {
 		response.Fields = fields
 	}
@@ -69,6 +69,16 @@ func (p *partition) getInternal(request *pspb.GetRequest, response *pspb.GetResp
 }
 
 func (p *partition) bulkInternal(request *pspb.BulkRequest, response *pspb.BulkResponse) {
+	p.rwMutex.RLock()
+	pstatus := p.meta.Status
+	p.rwMutex.RUnlock()
+	if pstatus == metapb.PA_INVALID || pstatus == metapb.PA_NOTREAD {
+		response.Code = metapb.PS_RESP_CODE_NO_PARTITION
+		response.Message = fmt.Sprintf("node[%d] has not found partition[%d]", p.server.NodeID, request.Partition)
+		response.Error = metapb.Error{PartitionNotFound: &metapb.PartitionNotFound{request.Partition}}
+		return
+	}
+
 	var (
 		timeCtx = p.ctx
 		cancel  context.CancelFunc
@@ -88,7 +98,7 @@ func (p *partition) bulkInternal(request *pspb.BulkRequest, response *pspb.BulkR
 	raftCmd.WriteCommands = request.Requests
 	if data, e := raftCmd.Marshal(); e != nil {
 		err = e
-		log.Error("marshal raftCommand error:[%v],\n request is:[%v]", err, request)
+		log.Error("marshal raftCommand error:[%s],\n request is:[%s]", err, request)
 	} else {
 		future := p.server.raftServer.Submit(request.Partition, data)
 		respCh, errCh := future.AsyncResponse()
@@ -120,7 +130,7 @@ func (p *partition) fillBulkResponse(request *pspb.BulkRequest, response *pspb.B
 	switch err {
 	case raft.ErrRaftNotExists:
 		response.Code = metapb.PS_RESP_CODE_NO_PARTITION
-		response.Message = fmt.Sprintf("node[%d] has not found partition[%d]", p.server.nodeID, request.Partition)
+		response.Message = fmt.Sprintf("node[%d] has not found partition[%d]", p.server.NodeID, request.Partition)
 		response.Error = metapb.Error{PartitionNotFound: &metapb.PartitionNotFound{request.Partition}}
 
 	case raft.ErrStopped:
@@ -131,11 +141,11 @@ func (p *partition) fillBulkResponse(request *pspb.BulkRequest, response *pspb.B
 		p.rwMutex.RLock()
 		if p.leader == 0 {
 			response.Code = metapb.PS_RESP_CODE_NO_LEADER
-			response.Message = fmt.Sprintf("node[%d] of partition[%d] has no leader", p.server.nodeID, request.Partition)
+			response.Message = fmt.Sprintf("node[%d] of partition[%d] has no leader", p.server.NodeID, request.Partition)
 			response.Error = metapb.Error{NoLeader: &metapb.NoLeader{request.Partition}}
 		} else {
 			response.Code = metapb.PS_RESP_CODE_NOT_LEADER
-			response.Message = fmt.Sprintf("node[%d] of partition[%d] is not leader", p.server.nodeID, request.Partition)
+			response.Message = fmt.Sprintf("node[%d] of partition[%d] is not leader", p.server.NodeID, request.Partition)
 			response.Error = metapb.Error{NotLeader: &metapb.NotLeader{
 				PartitionID: request.Partition,
 				Leader:      metapb.NodeID(p.leader),
@@ -159,7 +169,7 @@ func (p *partition) fillBulkResponse(request *pspb.BulkRequest, response *pspb.B
 		}
 	}
 
-	log.Error("bulk write document error:[%s],\n bulk request is:[%v]", response.Message, request)
+	log.Error("bulk write document error:[%s],\n bulk request is:[%s]", response.Message, request)
 }
 
 func (p *partition) execWriteCommand(index uint64, cmds []pspb.BulkItemRequest) ([]pspb.BulkItemResponse, error) {
@@ -174,7 +184,7 @@ func (p *partition) execWriteCommand(index uint64, cmds []pspb.BulkItemRequest) 
 			if createResp, err := p.createInternal(cmd.Create, batch); err == nil {
 				resp[i].Create = createResp
 			} else {
-				log.Error("create document error:[%s],\n create request is:[%v]", err, cmd.Create)
+				log.Error("create document error:[%s],\n create request is:[%s]", err, cmd.Create)
 				resp[i].Failure = &pspb.Failure{Id: cmd.Create.Doc.Id, Cause: err.Error()}
 			}
 
@@ -182,7 +192,7 @@ func (p *partition) execWriteCommand(index uint64, cmds []pspb.BulkItemRequest) 
 			if updateResp, err := p.updateInternal(cmd.Update, batch); err == nil {
 				resp[i].Update = updateResp
 			} else {
-				log.Error("update document error:[%s],\n update request is:[%v]", err, cmd.Update)
+				log.Error("update document error:[%s],\n update request is:[%s]", err, cmd.Update)
 				resp[i].Failure = &pspb.Failure{Id: cmd.Update.Doc.Id, Cause: err.Error()}
 			}
 
@@ -190,7 +200,7 @@ func (p *partition) execWriteCommand(index uint64, cmds []pspb.BulkItemRequest) 
 			if delResp, err := p.deleteInternal(cmd.Delete, batch); err == nil {
 				resp[i].Delete = delResp
 			} else {
-				log.Error("delete document error:[%s],\n delete request is:[%v]", err, cmd.Delete)
+				log.Error("delete document error:[%s],\n delete request is:[%s]", err, cmd.Delete)
 				resp[i].Failure = &pspb.Failure{Id: cmd.Delete.Id, Cause: err.Error()}
 			}
 
@@ -203,7 +213,7 @@ func (p *partition) execWriteCommand(index uint64, cmds []pspb.BulkItemRequest) 
 	batch.SetApplyID(index)
 	if err := batch.Commit(); err != nil {
 		p.store.SetApplyID(index)
-		log.Error("could not commit batch,error is:[%v]", err)
+		log.Error("could not commit batch,error is:[%s]", err)
 		return nil, errors.New("could not commit batch")
 	}
 

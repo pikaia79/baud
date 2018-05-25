@@ -4,15 +4,14 @@ import (
 	"context"
 	"fmt"
 	"net"
-	"path"
 	"sort"
 	"sync"
 	"time"
 
+	"github.com/gogo/protobuf/proto"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/reflection"
 
-	"github.com/gogo/protobuf/proto"
 	"github.com/tiglabs/baudengine/proto/masterpb"
 	"github.com/tiglabs/baudengine/proto/metapb"
 	"github.com/tiglabs/baudengine/proto/pspb"
@@ -20,7 +19,6 @@ import (
 	"github.com/tiglabs/baudengine/util"
 	"github.com/tiglabs/baudengine/util/atomic"
 	"github.com/tiglabs/baudengine/util/build"
-	"github.com/tiglabs/baudengine/util/config"
 	"github.com/tiglabs/baudengine/util/log"
 	"github.com/tiglabs/baudengine/util/netutil"
 	"github.com/tiglabs/baudengine/util/routine"
@@ -28,8 +26,6 @@ import (
 	"github.com/tiglabs/baudengine/util/timeutil"
 	"github.com/tiglabs/baudengine/util/uuid"
 	"github.com/tiglabs/raft"
-	"github.com/tiglabs/raft/logger"
-	raftlog "github.com/tiglabs/raft/util/log"
 )
 
 const (
@@ -39,67 +35,58 @@ const (
 // Server partition server
 type Server struct {
 	Config
-	ip        string
-	nodeID    metapb.NodeID
-	ctx       context.Context
-	ctxCancel context.CancelFunc
+	meta *serverMeta
+
+	ip           string
+	masterLeader string
+	ctx          context.Context
+	ctxCancel    context.CancelFunc
 
 	nodeResolver *NodeResolver
 	raftConfig   *raft.Config
 	raftServer   *raft.RaftServer
-	apiServer    *grpc.Server
-	adminServer  *grpc.Server
-
-	systemMetric *metric.SystemMetric
 
 	connMgr         *rpc.ConnectionMgr
-	masterLeader    string
+	apiServer       *grpc.Server
+	adminServer     *grpc.Server
 	masterClient    *rpc.Client
 	masterHeartbeat *heartbeatWork
 
-	meta       *serverMeta
-	partitions sync.Map
-
-	stopping     atomic.AtomicBool
+	systemMetric *metric.SystemMetric
+	partitions   sync.Map
 	adminEventCh chan proto.Message
+
+	stopping atomic.AtomicBool
 }
 
 // NewServer create server instance
-func NewServer(conf *config.Config) *Server {
-	serverConf := loadConfig(conf)
-	// init log
-	log.InitFileLog(serverConf.LogDir, serverConf.LogModule, serverConf.LogLevel)
-	// init raft log
-	if raftLog, err := raftlog.NewLog(path.Join(serverConf.LogDir, "raft"), "raft", serverConf.LogLevel); err == nil {
-		logger.SetLogger(raftLog)
-	}
+func NewServer(conf *Config) *Server {
 	s := &Server{
-		Config:       *serverConf,
+		Config:       *conf,
 		ip:           netutil.GetPrivateIP().String(),
-		meta:         newServerMeta(serverConf.DataPath),
+		meta:         newServerMeta(conf.DataPath),
 		nodeResolver: NewNodeResolver(),
-		systemMetric: metric.NewSystemMetric(serverConf.DataPath, serverConf.DiskQuota),
+		systemMetric: metric.NewSystemMetric(conf.DataPath, conf.DiskQuota),
 		adminEventCh: make(chan proto.Message, 64),
 	}
 	s.ctx, s.ctxCancel = context.WithCancel(context.Background())
 
 	serverOpt := rpc.DefaultServerOption
-	serverOpt.ClusterID = serverConf.ClusterID
+	serverOpt.ClusterID = conf.ClusterID
 	s.apiServer = rpc.NewGrpcServer(&serverOpt)
 	s.adminServer = rpc.NewGrpcServer(&serverOpt)
 
 	connMgrOpt := rpc.DefaultManagerOption
 	s.connMgr = rpc.NewConnectionMgr(s.ctx, &connMgrOpt)
-
 	clientOpt := rpc.DefaultClientOption
 	clientOpt.Compression = true
-	clientOpt.ClusterID = serverConf.ClusterID
+	clientOpt.ClusterID = conf.ClusterID
 	clientOpt.ConnectMgr = s.connMgr
 	clientOpt.CreateFunc = func(cc *grpc.ClientConn) interface{} { return masterpb.NewMasterRpcClient(cc) }
 	s.masterClient = rpc.NewClient(1, &clientOpt)
+	s.masterHeartbeat = newHeartbeatWork(s)
 
 	return s
-
 }
 
 // Start start server
@@ -111,45 +98,40 @@ func (s *Server) doStart(init bool) error {
 	// load meta data
 	if init {
 		metaInfo := s.meta.getInfo()
-		s.nodeID = metaInfo.NodeID
-		log.Info("Server load meta from file is: %s", metaInfo.String())
+		log.Info("Server load meta from file is: %s", metaInfo)
+		if metaInfo.NodeID > 0 {
+			s.NodeID = metaInfo.NodeID
+		}
 		if metaInfo.ClusterID != s.ClusterID {
 			s.reset()
 		}
 	}
 
+	var initPartitions []metapb.Partition
 	// do register to master
-	registerResp, err := s.register()
-	if err != nil {
-		return err
-	}
-	s.meta.reset(&pspb.MetaInfo{ClusterID: s.ClusterID, NodeID: registerResp.NodeID})
-
-	if s.nodeID != registerResp.NodeID {
-		log.Info("Server get NodeID from register to master is: %d", registerResp.NodeID)
-		s.nodeID = registerResp.NodeID
-		if s.raftServer != nil {
-			s.raftServer.Stop()
-			s.raftServer = nil
+	if s.MasterServer != "" {
+		registerResp, err := s.register()
+		if err != nil {
+			return err
 		}
-	}
-	s.Config.PSConfig = registerResp.PSConfig
-	if err := s.Config.validate(); err != nil {
-		return err
-	}
-	log.Info("Server start with config is: %s", s.Config.String())
+		s.meta.reset(&pspb.MetaInfo{ClusterID: s.ClusterID, NodeID: registerResp.NodeID})
 
-	// clear old partition
-	if len(registerResp.Partitions) == 0 {
-		s.reset()
-	} else {
-		s.destroyExcludePartition(registerResp.Partitions)
+		log.Info("Server get register response from master is: %s", registerResp)
+
+		initPartitions = registerResp.Partitions
+		if s.NodeID != registerResp.NodeID {
+			s.NodeID = registerResp.NodeID
+			if s.raftServer != nil {
+				s.raftServer.Stop()
+				s.raftServer = nil
+			}
+		}
 	}
 
 	// create raft server
 	if s.raftServer == nil {
 		rc := raft.DefaultConfig()
-		rc.NodeID = uint64(s.nodeID)
+		rc.NodeID = uint64(s.NodeID)
 		rc.LeaseCheck = true
 		rc.HeartbeatAddr = fmt.Sprintf(":%d", s.RaftHeartbeatPort)
 		rc.ReplicateAddr = fmt.Sprintf(":%d", s.RaftReplicatePort)
@@ -157,8 +139,8 @@ func (s *Server) doStart(init bool) error {
 		if s.RaftReplicaConcurrency > 0 {
 			rc.MaxReplConcurrency = s.RaftReplicaConcurrency
 		}
-		if s.RaftSnapshotConcurrency > 0 {
-			rc.MaxSnapConcurrency = s.RaftSnapshotConcurrency
+		if s.RaftSnapConcurrency > 0 {
+			rc.MaxSnapConcurrency = s.RaftSnapConcurrency
 		}
 		if s.RaftHeartbeatInterval > 0 {
 			rc.TickInterval = time.Millisecond * time.Duration(s.RaftHeartbeatInterval)
@@ -169,53 +151,60 @@ func (s *Server) doStart(init bool) error {
 
 		rs, err := raft.NewRaftServer(rc)
 		if err != nil {
-			return fmt.Errorf("boot raft server failed, error: %v", err)
+			return fmt.Errorf("boot raft server failed, error: %s", err)
 		}
 		s.raftServer = rs
 		s.raftConfig = rc
 	}
 
+	// clear old partition
+	if len(initPartitions) == 0 {
+		s.reset()
+	} else {
+		s.destroyExcludePartition(initPartitions)
+	}
 	// create and recover partitions
-	s.recoverPartitions(registerResp.Partitions)
+	s.recoverPartitions(initPartitions)
 
 	// Start server
 	if init {
 		if ln, err := net.Listen("tcp", fmt.Sprintf(":%d", s.RPCPort)); err != nil {
-			return fmt.Errorf("Server failed to listen api port: %v", err)
+			return fmt.Errorf("Server failed to listen api port: %s", err)
 		} else {
 			pspb.RegisterApiGrpcServer(s.apiServer, s)
 			reflection.Register(s.apiServer)
 			go func() {
 				if err = s.apiServer.Serve(ln); err != nil {
-					log.Fatal("Server failed to start api grpc: %v", err)
+					log.Fatal("Server failed to start api grpc: %s", err)
 				}
 			}()
 			log.Info("Server api grpc listen on: %s", fmt.Sprintf(":%d", s.RPCPort))
 		}
 
 		if ln, err := net.Listen("tcp", fmt.Sprintf(":%d", s.AdminPort)); err != nil {
-			return fmt.Errorf("Server failed to listen admin port: %v", err)
+			return fmt.Errorf("Server failed to listen admin port: %s", err)
 		} else {
 			pspb.RegisterAdminGrpcServer(s.adminServer, s)
 			reflection.Register(s.adminServer)
 			go func() {
 				if err = s.adminServer.Serve(ln); err != nil {
-					log.Fatal("Server failed to start admin grpc: %v", err)
+					log.Fatal("Server failed to start admin grpc: %s", err)
 				}
 			}()
 			log.Info("Server admin grpc listen on: %s", fmt.Sprintf(":%d", s.AdminPort))
 		}
 
-		s.masterHeartbeat = newHeartbeatWork(s)
 		routine.RunWorkDaemon("ADMIN-EVENTHANDLER", s.adminEventHandler, s.ctx.Done())
 	}
 
 	// start heartbeat to master
 	s.stopping.Set(false)
-	s.masterHeartbeat.start()
-	s.masterHeartbeat.trigger()
-	log.Info("Baud server successful startup...")
+	if s.MasterServer != "" {
+		s.masterHeartbeat.start()
+		s.masterHeartbeat.trigger()
+	}
 
+	log.Info("Baud server successful startup...")
 	return nil
 }
 
@@ -271,7 +260,7 @@ func (s *Server) register() (*masterpb.PSRegisterResponse, error) {
 	buildInfo := build.GetInfo()
 	request := &masterpb.PSRegisterRequest{
 		RequestHeader: metapb.RequestHeader{ReqId: uuid.FlakeUUID()},
-		NodeID:        s.nodeID,
+		NodeID:        s.NodeID,
 		Ip:            s.ip,
 		RuntimeInfo: masterpb.RuntimeInfo{
 			AppVersion: buildInfo.AppVersion,
@@ -289,7 +278,7 @@ func (s *Server) register() (*masterpb.PSRegisterResponse, error) {
 		}
 		masterClient, err := s.masterClient.GetGrpcClient(masterAddr)
 		if err != nil {
-			return fmt.Errorf("get master register rpc client[%s] error: %v", masterAddr, err)
+			return fmt.Errorf("get master register rpc client[%s] error: %s", masterAddr, err)
 		}
 
 		goCtx, cancel := context.WithTimeout(s.ctx, registerTimeout)
@@ -297,7 +286,7 @@ func (s *Server) register() (*masterpb.PSRegisterResponse, error) {
 		cancel()
 
 		if err != nil {
-			return fmt.Errorf("master register requeset[%s] failed error: %v", request.ReqId, err)
+			return fmt.Errorf("master register requeset[%s] failed error: %s", request.ReqId, err)
 		}
 		if resp.Code != metapb.RESP_CODE_OK {
 			if resp.Error.NoLeader != nil {
@@ -305,7 +294,7 @@ func (s *Server) register() (*masterpb.PSRegisterResponse, error) {
 			} else if resp.Error.NotLeader != nil {
 				s.masterLeader = resp.Error.NotLeader.LeaderAddr
 			}
-			return fmt.Errorf("master register requeset[%s] ack code not ok, response is: %s", request.ReqId, resp.String())
+			return fmt.Errorf("master register requeset[%s] ack code not ok, response is: %s", request.ReqId, resp)
 		}
 
 		response = resp
@@ -361,6 +350,6 @@ func (s *Server) restart() {
 	// do start
 	s.closeAllRange()
 	if err := s.doStart(false); err != nil {
-		panic(fmt.Errorf("restart error: %v", err))
+		panic(fmt.Errorf("restart error: %s", err))
 	}
 }

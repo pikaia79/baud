@@ -39,15 +39,15 @@ type SystemMetric struct {
 	DiskUsed  uint64 `json:"disk_used,omitempty"`
 	DiskFree  uint64 `json:"disk_free,omitempty"`
 	// Net
+	NetIoInBytePerSec       uint64 `json:"net_io_in_flow_per_sec,omitempty"`
+	NetIoOutBytePerSec      uint64 `json:"net_io_out_flow_per_sec,omitempty"`
+	NetTCPConnections       uint32 `json:"net_tcp_connections,omitempty"`
+	NetTCPActiveOpensPerSec uint64 `json:"net_tcp_active_opens_per_sec,omitempty"`
 	netIoInBytes            uint64
 	netIoOutBytes           uint64
 	netIoInPackage          uint64
 	netIoOutPackage         uint64
-	NetIoInBytePerSec       uint64 `json:"net_io_in_flow_per_sec,omitempty"`
-	NetIoOutBytePerSec      uint64 `json:"net_io_out_flow_per_sec,omitempty"`
 	netTCPActiveOpens       uint64
-	NetTCPConnections       uint32 `json:"net_tcp_connections,omitempty"`
-	NetTCPActiveOpensPerSec uint64 `json:"net_tcp_active_opens_per_sec,omitempty"`
 }
 
 // NewSystemMetric create SystemMetric object
@@ -98,7 +98,7 @@ func (s *SystemMetric) cpuMetric() {
 	routine.RunWork("SystemMetric-CPU", func() error {
 		cpuLoads, err := cpu.Percent(time.Second, false)
 		if err != nil {
-			log.Error("SystemMetric get cpu info error: %v", err)
+			log.Error("SystemMetric get cpu info error: %s", err)
 			return err
 		}
 
@@ -118,7 +118,7 @@ func (s *SystemMetric) memMetric() {
 	routine.RunWork("SystemMetric-MEM", func() error {
 		memoryStat, err := mem.VirtualMemory()
 		if err != nil {
-			log.Error("SystemMetric get memory info error: %v", err)
+			log.Error("SystemMetric get memory info error: %s", err)
 			return err
 		}
 
@@ -131,7 +131,7 @@ func (s *SystemMetric) memMetric() {
 
 		swapStat, err := mem.SwapMemory()
 		if err != nil {
-			log.Error("SystemMetric get swap info error: %v", err)
+			log.Error("SystemMetric get swap info error: %s", err)
 			return err
 		}
 
@@ -148,7 +148,7 @@ func (s *SystemMetric) netMetric() {
 	routine.RunWork("SystemMetric-NET", func() error {
 		ioStat, err := net.IOCounters(false)
 		if err != nil {
-			log.Error("SystemMetric get net info error: %v", err)
+			log.Error("SystemMetric get net info error: %s", err)
 			return err
 		}
 		if len(ioStat) == 0 {
@@ -158,7 +158,7 @@ func (s *SystemMetric) netMetric() {
 
 		tcpProto, err := net.ProtoCounters([]string{"tcp"})
 		if err != nil {
-			log.Error("SystemMetric get net proto cpunter failed, err[%v]", err)
+			log.Error("SystemMetric get net proto cpunter error: %s", err)
 			return err
 		}
 
@@ -187,7 +187,7 @@ func (s *SystemMetric) diskMetric() {
 	routine.RunWork("SystemMetric-DISK", func() error {
 		diskStat, err := disk.Usage(s.diskPath)
 		if err != nil {
-			log.Error("SystemMetric get disk info error: %v", err)
+			log.Error("SystemMetric get disk info error: %s", err)
 			return err
 		}
 		s.DiskUsed = diskStat.Used

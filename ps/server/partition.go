@@ -54,7 +54,7 @@ func (p *partition) start() {
 		p.rwMutex.Lock()
 		p.meta.Status = metapb.PA_INVALID
 		p.rwMutex.Unlock()
-		log.Error("start partition[%d] create data and raft path error: %v", p.meta.ID, err)
+		log.Error("start partition[%d] create data and raft path error: %s", p.meta.ID, err)
 		return
 	}
 
@@ -68,7 +68,7 @@ func (p *partition) start() {
 		p.rwMutex.Lock()
 		p.meta.Status = metapb.PA_INVALID
 		p.rwMutex.Unlock()
-		log.Error("start partition[%d] open store engine error: %v", p.meta.ID, err)
+		log.Error("start partition[%d] open store engine error: %s", p.meta.ID, err)
 		return
 	}
 	p.store = index.NewIndexDriver(kvStore)
@@ -78,7 +78,7 @@ func (p *partition) start() {
 		p.meta.Status = metapb.PA_INVALID
 		p.rwMutex.Unlock()
 		p.store.Close()
-		log.Error("start partition[%d] get last apply index error: %v", p.meta.ID, err)
+		log.Error("start partition[%d] get last apply index error: %s", p.meta.ID, err)
 		return
 	}
 
@@ -89,7 +89,7 @@ func (p *partition) start() {
 		p.meta.Status = metapb.PA_INVALID
 		p.rwMutex.Unlock()
 		p.store.Close()
-		log.Error("start partition[%d] open raft store engine error: %v", p.meta.ID, err)
+		log.Error("start partition[%d] open raft store engine error: %s", p.meta.ID, err)
 		return
 	}
 
@@ -109,7 +109,7 @@ func (p *partition) start() {
 		p.meta.Status = metapb.PA_INVALID
 		p.rwMutex.Unlock()
 		p.store.Close()
-		log.Error("start partition[%d] create raft error: %v", p.meta.ID, err)
+		log.Error("start partition[%d] create raft error: %s", p.meta.ID, err)
 		return
 	}
 
@@ -140,7 +140,7 @@ func (p *partition) getPartitionInfo() *masterpb.PartitionInfo {
 	p.rwMutex.RLock()
 	info := new(masterpb.PartitionInfo)
 	info.ID = p.meta.ID
-	info.IsLeader = (p.leader == uint64(p.server.nodeID))
+	info.IsLeader = (p.leader == uint64(p.server.NodeID))
 	info.Status = p.meta.Status
 	info.Epoch = p.meta.Epoch
 	info.Statistics = p.statistics
@@ -151,7 +151,7 @@ func (p *partition) getPartitionInfo() *masterpb.PartitionInfo {
 		raftStatus := p.server.raftServer.Status(p.meta.ID)
 		info.RaftStatus = new(masterpb.RaftStatus)
 		for _, r := range replicas {
-			if r.NodeID == p.server.nodeID {
+			if r.NodeID == p.server.NodeID {
 				info.RaftStatus.Replica = r
 				info.RaftStatus.Term = raftStatus.Term
 				info.RaftStatus.Index = raftStatus.Index
@@ -192,7 +192,7 @@ func (p *partition) checkReadable(readLeader bool) (err *metapb.Error) {
 		err = &metapb.Error{NoLeader: &metapb.NoLeader{p.meta.ID}}
 		goto ret
 	}
-	if readLeader && p.leader != uint64(p.server.nodeID) {
+	if readLeader && p.leader != uint64(p.server.NodeID) {
 		err = &metapb.Error{NotLeader: &metapb.NotLeader{
 			PartitionID: p.meta.ID,
 			Leader:      metapb.NodeID(p.leader),

@@ -23,7 +23,7 @@ func (s *Server) Get(ctx context.Context, request *pspb.GetRequest) (*pspb.GetRe
 		response.Message = "the server is stopping, request is rejected"
 	} else if p, _ := s.partitions.Load(request.Partition); p == nil {
 		response.Code = metapb.PS_RESP_CODE_NO_PARTITION
-		response.Message = fmt.Sprintf("node[%d] has not found partition[%d]", s.nodeID, request.Partition)
+		response.Message = fmt.Sprintf("node[%d] has not found partition[%d]", s.NodeID, request.Partition)
 		response.Error = metapb.Error{PartitionNotFound: &metapb.PartitionNotFound{request.Partition}}
 	} else {
 		p.(*partition).getInternal(request, response)
@@ -46,7 +46,7 @@ func (s *Server) BulkWrite(ctx context.Context, request *pspb.BulkRequest) (*psp
 		response.Message = "the server is stopping, request is rejected"
 	} else if p, _ := s.partitions.Load(request.Partition); p == nil {
 		response.Code = metapb.PS_RESP_CODE_NO_PARTITION
-		response.Message = fmt.Sprintf("node[%d] has not found partition[%d]", s.nodeID, request.Partition)
+		response.Message = fmt.Sprintf("node[%d] has not found partition[%d]", s.NodeID, request.Partition)
 		response.Error = metapb.Error{PartitionNotFound: &metapb.PartitionNotFound{request.Partition}}
 	} else {
 		p.(*partition).bulkInternal(request, response)
