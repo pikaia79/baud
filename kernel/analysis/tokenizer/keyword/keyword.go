@@ -16,7 +16,7 @@ func New() *Tokenizer {
 }
 
 func (t *Tokenizer) Tokenize(input []byte) analysis.TokenSet {
-	return analysis.TokenSet{&analysis.Token{Start: 0, End: len(input), Term: input, Position: 0, Type: analysis.KeyWord}}
+	return analysis.TokenSet{&analysis.Token{Start: 0, End: len(input), Term: input, Position: 1, Type: analysis.KeyWord}}
 }
 
 func init() {

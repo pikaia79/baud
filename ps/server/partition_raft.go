@@ -96,7 +96,7 @@ func (p *partition) HandleLeaderChange(leader uint64) {
 			p.meta.Epoch.Version = term
 		}
 
-		if leader == uint64(p.server.nodeID) {
+		if leader == uint64(p.server.NodeID) {
 			p.meta.Status = metapb.PA_READWRITE
 			p.server.masterHeartbeat.trigger()
 		} else {
@@ -109,7 +109,7 @@ func (p *partition) HandleLeaderChange(leader uint64) {
 }
 
 func (p *partition) HandleFatalEvent(err *raft.FatalError) {
-	log.Error("partition[%d] occur fatal error: %v", p.meta.ID, err.Err)
+	log.Error("partition[%d] occur fatal error: %s", p.meta.ID, err.Err)
 	p.Close()
 	p.server.masterHeartbeat.trigger()
 }

@@ -82,19 +82,18 @@ func (s *ApiServer) Close() {
 
 func (s *ApiServer) initAdminHandler() {
 	s.httpServer.Handle(netutil.POST, "/manage/db/create", s.handleDbCreate)
-	s.httpServer.Handle(netutil.GET, "/manage/db/delete", s.handleDbDelete)
-	s.httpServer.Handle(netutil.GET, "/manage/db/rename", s.handleDbRename)
+	s.httpServer.Handle(netutil.PUT, "/manage/db/delete", s.handleDbDelete)
+	s.httpServer.Handle(netutil.DELETE, "/manage/db/rename", s.handleDbRename)
 	s.httpServer.Handle(netutil.GET, "/manage/db/list", s.handleDbList)
 	s.httpServer.Handle(netutil.GET, "/manage/db/detail", s.handleDbDetail)
 
 	s.httpServer.Handle(netutil.POST, "/manage/space/create", s.handleSpaceCreate)
-	s.httpServer.Handle(netutil.GET, "/manage/space/delete", s.handleSpaceDelete)
-	s.httpServer.Handle(netutil.GET, "/manage/space/rename", s.handleSpaceRename)
+	s.httpServer.Handle(netutil.PUT, "/manage/space/delete", s.handleSpaceDelete)
+	s.httpServer.Handle(netutil.DELETE, "/manage/space/rename", s.handleSpaceRename)
 	s.httpServer.Handle(netutil.GET, "/manage/space/list", s.handleSpaceList)
 	s.httpServer.Handle(netutil.GET, "/manage/space/detail", s.handleSpaceDetail)
 
 	s.httpServer.Handle(netutil.GET, "/manage/partition/list", s.handlePartitionList)
-	s.httpServer.Handle(netutil.GET, "/manage/ps/list", s.handlePSList)
 }
 
 func (s *ApiServer) handleDbCreate(w http.ResponseWriter, r *http.Request, params netutil.UriParams) {
@@ -195,7 +194,7 @@ func (s *ApiServer) handleSpaceCreate(w http.ResponseWriter, r *http.Request, pa
 	if err != nil {
 		return
 	}
-	partitionNum, err := checkMissingAndUint32Param(w, r, PARTITION_NUM)
+	partitionNum, err := checkMissingAndUint64Param(w, r, PARTITION_NUM)
 	if err != nil {
 		return
 	}
@@ -302,15 +301,6 @@ func (s *ApiServer) handlePartitionList(w http.ResponseWriter, r *http.Request, 
 	sendReply(w, newHttpSucReply(partitions))
 }
 
-func (s *ApiServer) handlePSList(w http.ResponseWriter, r *http.Request, params netutil.UriParams) {
-	if err := s.checkLeader(w); err != nil {
-		return
-	}
-
-	allPs := s.cluster.PsCache.GetAllServers()
-	sendReply(w, newHttpSucReply(allPs))
-}
-
 type HttpReply struct {
 	Code int32       `json:"code"`
 	Msg  string      `json:"msg"`
@@ -404,6 +394,30 @@ func checkMissingAndUint32Param(w http.ResponseWriter, r *http.Request, paramNam
 		return 0, ErrParamError
 	}
 	return uint32(paramValInt), nil
+}
+
+func checkMissingAndUint64Param(w http.ResponseWriter, r *http.Request, paramName string) (uint64, error) {
+	paramValStr, err := checkMissingParam(w, r, paramName)
+	if err != nil {
+		return 0, err
+	}
+
+	paramValInt, err := strconv.Atoi(paramValStr)
+	if err != nil {
+		reply := newHttpErrReply(ErrParamError)
+		newMsg := fmt.Sprintf("%s, unmatched type[%s]", reply.Msg, paramName)
+		reply.Msg = newMsg
+		sendReply(w, reply)
+		return 0, ErrParamError
+	}
+	if paramValInt > math.MaxUint64 {
+		reply := newHttpErrReply(ErrParamError)
+		newMsg := fmt.Sprintf("%s, value of [%s] exceed uint32 limit", reply.Msg, paramName)
+		reply.Msg = newMsg
+		sendReply(w, reply)
+		return 0, ErrParamError
+	}
+	return uint64(paramValInt), nil
 }
 
 func sendReply(w http.ResponseWriter, httpReply *HttpReply) {

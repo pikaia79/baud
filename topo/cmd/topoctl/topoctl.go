@@ -10,6 +10,7 @@ import (
 	"runtime"
 	"context"
 	"time"
+	"github.com/tiglabs/baudengine/proto/metapb"
 )
 
 var (
@@ -31,8 +32,28 @@ func main() {
 	server := topo.Open()
 	defer server.Close()
 
-	ctx, cancel := context.WithTimeout(context.Background(), 10 * time.Second)
-	server.GetAllZones(ctx)
+	ctx, cancel := context.WithTimeout(context.Background(), 30 * time.Second)
+
+	zoneMeta := &metapb.Zone{Name:"zone1", ServerAddrs:"127.0.0.1:9302", RootDir:"/zones/zone1"}
+	zone1, err := server.AddZone(ctx, zoneMeta)
+	if err != nil {
+		log.Error("addzone1 zone1 err[%v]", err)
+		return
+	}
+
+
+	zoneMetas, err := server.GetAllZones(ctx)
+	if err != nil {
+		log.Error("GetAllZones err[%v]", err)
+		return
+	}
+	log.Debug("zoneMetas=%v", zoneMetas)
+
+	if err := server.DeleteZone(ctx, zone1); err != nil {
+	    log.Error("")
+	    return
+    }
+
 	cancel()
 
 	log.Info("Goodbye, BaudEngine Topo control!")

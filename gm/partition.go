@@ -4,19 +4,19 @@ import (
 	"fmt"
 	"github.com/gogo/protobuf/proto"
 	"github.com/google/btree"
+	"github.com/jddb/jddb-k8s/pkg/apis/batch"
 	"github.com/tiglabs/baudengine/proto/masterpb"
 	"github.com/tiglabs/baudengine/proto/metapb"
-	"github.com/tiglabs/baudengine/util"
 	"github.com/tiglabs/baudengine/util/deepcopy"
 	"github.com/tiglabs/baudengine/util/log"
+	"strconv"
 	"sync"
 	"time"
 )
 
 const (
-	PREFIX_PARTITION   = "schema partition "
 	defaultBTreeDegree = 64
-	FIXED_REPLICA_NUM  = 1 // TODO: add config
+	FIXED_REPLICA_NUM  = 1
 )
 
 type Partition struct {
@@ -48,6 +48,7 @@ func NewPartition(dbId metapb.DBID, spaceId metapb.SpaceID, startSlot, endSlot m
 		Replicas:  make([]metapb.Replica, 0),
 		Status:    metapb.PA_READONLY,
 	}
+
 	return NewPartitionByMeta(metaPartition), nil
 }
 
@@ -57,7 +58,7 @@ func NewPartitionByMeta(metaPartition *metapb.Partition) *Partition {
 	}
 }
 
-func (p *Partition) batchPersistent(batch Batch) error {
+func (p *Partition) Persistent() error {
 	p.propertyLock.Lock()
 	defer p.propertyLock.Unlock()
 
@@ -65,21 +66,17 @@ func (p *Partition) batchPersistent(batch Batch) error {
 	if err != nil {
 		return err
 	}
-	batch.Put(key, val)
+
+	// TODO 调用global etcd 添加partition, 接口由@杨洋提供
 
 	return nil
 }
 
-func (p *Partition) erase(store Store) error {
+func (p *Partition) erase() error {
 	p.propertyLock.Lock()
 	defer p.propertyLock.Unlock()
 
-	key := []byte(fmt.Sprintf("%s%d", PREFIX_PARTITION, p.ID))
-	if err := store.Delete(key); err != nil {
-		log.Error("fail to delete partition[%v] from store. err:[%v]", p.Partition, err)
-		return ErrLocalDbOpsFailed
-	}
-
+	// TODO 调用global etcd删除partition, 接口由@杨洋提供
 	return nil
 }
 
@@ -267,9 +264,97 @@ func doMetaMarshal(p *metapb.Partition) ([]byte, []byte, error) {
 		log.Error("fail to marshal partition[%v]. err:[%v]", p, err)
 		return nil, nil, err
 	}
-	key := []byte(fmt.Sprintf("%s%d", PREFIX_PARTITION, p.ID))
+	key := []byte(strconv.Itoa(int(p.ID)))
 
 	return key, val, err
+}
+
+type PartitionCache struct {
+	lock       sync.RWMutex
+	partitions map[metapb.PartitionID]*Partition
+}
+
+func NewPartitionCache() *PartitionCache {
+	return &PartitionCache{
+		partitions: make(map[metapb.PartitionID]*Partition),
+	}
+}
+
+func (c *PartitionCache) FindPartitionById(partitionId metapb.PartitionID) *Partition {
+	c.lock.RLock()
+	defer c.lock.RUnlock()
+
+	p, ok := c.partitions[partitionId]
+	if !ok {
+		return nil
+	}
+
+	return p
+}
+
+func (c *PartitionCache) AddPartition(partition *Partition) {
+	c.lock.Lock()
+	defer c.lock.Unlock()
+
+	c.partitions[partition.ID] = partition
+}
+
+func (c *PartitionCache) GetAllPartitions() *[]Partition {
+	c.lock.RLock()
+	defer c.lock.RUnlock()
+
+	partitions := make([]Partition, 0, len(c.partitions))
+	for _, partition := range c.partitions {
+		log.Debug("api get all partition[%p] ", partition)
+		partitions = append(partitions, *partition)
+	}
+
+	return &partitions
+}
+
+func (c *PartitionCache) GetAllMetaPartitions() *[]metapb.Partition {
+	c.lock.RLock()
+	defer c.lock.RUnlock()
+
+	partitions := make([]metapb.Partition, 0, len(c.partitions))
+	for _, partition := range c.partitions {
+		partitions = append(partitions, *partition.Partition)
+	}
+
+	return &partitions
+}
+
+func (c *PartitionCache) Recovery() ([]*Partition, error) {
+
+	resultPartitions := make([]*Partition, 0)
+	// TODO 从global master获得partion list, 接口由@杨洋提供
+	topoPartitions := make([]metapb.Partition, 0)
+	for _, topoPartition := range topoPartitions {
+		err := proto.Unmarshal([]byte{}, topoPartition)
+		if err != nil {
+			log.Error("proto.Unmarshal error, err:[%v]", err)
+		}
+		metaPartition := new(metapb.Partition)
+		metaPartition.DB = topoPartition.DB
+		metaPartition.Status = topoPartition.Status
+		metaPartition.ID = topoPartition.ID
+		metaPartition.Space = topoPartition.Space
+		metaPartition.Epoch = topoPartition.Epoch
+		metaPartition.Replicas = topoPartition.Replicas
+		metaPartition.StartSlot = topoPartition.StartSlot
+		metaPartition.EndSlot = topoPartition.EndSlot
+
+		resultPartitions = append(resultPartitions, NewPartitionByMeta(metaPartition))
+	}
+
+	return resultPartitions, nil
+}
+
+func (c *PartitionCache) Clear() {
+	c.lock.Lock()
+	defer c.lock.Unlock()
+
+	c.partitions = make(map[metapb.PartitionID]*Partition)
 }
 
 type PartitionItem struct {
@@ -301,27 +386,27 @@ func NewPartitionTree() *PartitionTree {
 	}
 }
 
-func (t *PartitionTree) length() int {
-	return t.tree.Len()
+func (pt *PartitionTree) length() int {
+	return pt.tree.Len()
 }
 
 // update updates the tree with the region.
 // It finds and deletes all the overlapped regions first, and then
 // insert the region.
-func (t *PartitionTree) update(rng *Partition) {
-	item := &PartitionItem{partition: rng}
+func (pt *PartitionTree) update(partition *Partition) {
+	item := &PartitionItem{partition: partition}
 
-	result := t.find(rng)
+	result := pt.find(partition)
 	if result == nil {
 		result = item
 	}
 
 	var overlaps []*PartitionItem
 	var count int
-	t.tree.DescendLessOrEqual(result, func(i btree.Item) bool {
+	pt.tree.DescendLessOrEqual(result, func(i btree.Item) bool {
 		over := i.(*PartitionItem)
 		//if bytes.Compare(rng.EndSlot, over.region.StartKey) <= 0 {
-		if rng.EndSlot <= over.partition.StartSlot {
+		if partition.EndSlot <= over.partition.StartSlot {
 			return false
 		}
 		overlaps = append(overlaps, over)
@@ -330,49 +415,49 @@ func (t *PartitionTree) update(rng *Partition) {
 	})
 
 	if count > 2 {
-		log.Warn("=========many overlaps ranges %v, new range[%v]", overlaps, rng)
+		log.Warn("=========many overlaps ranges %v, new range[%v]", overlaps, partition)
 	}
-	for _, item := range overlaps {
-		t.tree.Delete(item)
+	for _, o := range overlaps {
+		pt.tree.Delete(o)
 	}
 
-	t.tree.ReplaceOrInsert(item)
+	pt.tree.ReplaceOrInsert(item)
 }
 
 // remove removes a region if the region is in the tree.
 // It will do nothing if it cannot find the region or the found region
 // is not the same with the region.
-func (t *PartitionTree) remove(rng *Partition) {
-	result := t.find(rng)
-	if result == nil || result.partition.ID != rng.ID {
+func (pt *PartitionTree) remove(partition *Partition) {
+	result := pt.find(partition)
+	if result == nil || result.partition.ID != partition.ID {
 		return
 	}
 
-	t.tree.Delete(result)
+	pt.tree.Delete(result)
 }
 
 // search returns a region that contains the key.
-func (t *PartitionTree) search(slot metapb.SlotID) *Partition {
+func (pt *PartitionTree) search(slot metapb.SlotID) *Partition {
 	rng := &Partition{
 		Partition: &metapb.Partition{
 			StartSlot: slot,
 		},
 	}
-	log.Debug("################### len=%v", t.tree.Len())
-	result := t.find(rng)
+	log.Debug("################### len=%v", pt.tree.Len())
+	result := pt.find(rng)
 	if result == nil {
 		return nil
 	}
 	return result.partition
 }
 
-func (t *PartitionTree) multipleSearch(slot metapb.SlotID, num int) []*Partition {
+func (pt *PartitionTree) multipleSearch(slot metapb.SlotID, num int) []*Partition {
 	rng := &Partition{
 		Partition: &metapb.Partition{
 			StartSlot: slot,
 		},
 	}
-	results := t.ascendScan(rng, num)
+	results := pt.ascendScan(rng, num)
 	var ranges = make([]*Partition, 0, num)
 	var endSlot metapb.SlotID
 	var isFound = false
@@ -392,30 +477,30 @@ func (t *PartitionTree) multipleSearch(slot metapb.SlotID, num int) []*Partition
 }
 
 // This is a helper function to find an item.
-func (t *PartitionTree) find(rng *Partition) *PartitionItem {
-	item := &PartitionItem{partition: rng}
+func (pt *PartitionTree) find(partition *Partition) *PartitionItem {
+	item := &PartitionItem{partition: partition}
 
 	var result *PartitionItem
-	t.tree.AscendGreaterOrEqual(item, func(i btree.Item) bool {
+	pt.tree.AscendGreaterOrEqual(item, func(i btree.Item) bool {
 		result = i.(*PartitionItem)
 		return false
 	})
 
-	log.Debug("####range find: result=%v, startkey=%v", result, rng.StartSlot)
+	log.Debug("####range find: result=%v, startkey=%v", result, partition.StartSlot)
 
 	if result != nil {
-		log.Debug("####range find: result range =%v, startkey=%v", result.partition, rng.StartSlot)
+		log.Debug("####range find: result range =%v, startkey=%v", result.partition, partition.StartSlot)
 	}
 
-	if result == nil || !result.Contains(rng.StartSlot) {
+	if result == nil || !result.Contains(partition.StartSlot) {
 		return nil
 	}
 
 	return result
 }
 
-func (t *PartitionTree) ascendScan(rng *Partition, num int) []*PartitionItem {
-	result := t.find(rng)
+func (pt *PartitionTree) ascendScan(partition *Partition, num int) []*PartitionItem {
+	result := pt.find(partition)
 	if result == nil {
 		return nil
 	}
@@ -424,7 +509,7 @@ func (t *PartitionTree) ascendScan(rng *Partition, num int) []*PartitionItem {
 	//var firstItem *rangeItem
 	results = make([]*PartitionItem, 0, num)
 	count := 0
-	t.tree.DescendLessOrEqual(result, func(i btree.Item) bool {
+	pt.tree.DescendLessOrEqual(result, func(i btree.Item) bool {
 		results = append(results, i.(*PartitionItem))
 		count++
 		if count == num {
