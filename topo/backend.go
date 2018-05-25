@@ -146,6 +146,58 @@ type Backend interface {
 	// calling this, for a given name. Calling this function does
 	// not make the current process a candidate for the election.
 	NewMasterParticipation(cell, id string) (MasterParticipation, error)
+
+	// create transaction
+	NewTransaction(ctx context.Context, cell string) (Transaction, error)
+}
+
+type TxnOpType int32
+
+const (
+	OPTYPE_CREATE    = 1
+	OPTYPE_DELETE    = 2
+	OPTYPE_UPDATE    = 3
+	OPTYPE_ERROR     = 4
+)
+
+type TxnOpResult interface {
+	getOpType() TxnOpType
+}
+
+type TxnCreateOpResult struct {
+	Typ     TxnOpType
+	Version Version
+}
+
+func (op *TxnCreateOpResult) getOpType() TxnOpType {
+	return op.Typ
+}
+
+func (op *TxnCreateOpResult) getVersion() Version {
+	return op.Version
+}
+
+type TxnErrorOpResult struct {
+	Typ TxnOpType
+	Err error
+}
+
+func (op *TxnErrorOpResult) getOpType() TxnOpType {
+	return op.Typ
+}
+
+func (op *TxnErrorOpResult) getErr() error {
+	return op.Err
+}
+
+type Transaction interface {
+	Create(filePath string, contents []byte)
+
+	Delete(filePath string, version Version)
+
+	// Update(filePath string, contents []byte, version Version)
+
+	Commit() ([]TxnOpResult, error)
 }
 
 // Version is an interface that describes a file version.
