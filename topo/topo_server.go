@@ -85,7 +85,7 @@ type Impl interface {
 
     GetAllSpaces(ctx context.Context) ([]*SpaceTopo, error)
     GetSpace(ctx context.Context, dbId metapb.DBID, spaceId metapb.SpaceID) (*SpaceTopo, error)
-    AddSpace(ctx context.Context, dbId metapb.DBID, space *metapb.Space, partitions []*metapb.Partition) (*SpaceTopo,
+    AddSpace(ctx context.Context, space *metapb.Space, partitions []*metapb.Partition) (*SpaceTopo,
             []*PartitionTopo, error)
     UpdateSpace(ctx context.Context, space *SpaceTopo) error
     DeleteSpace(ctx context.Context, space *SpaceTopo) error
