@@ -194,7 +194,7 @@ func (s *ApiServer) handleSpaceCreate(w http.ResponseWriter, r *http.Request, pa
 	if err != nil {
 		return
 	}
-	partitionNum, err := checkMissingAndUint32Param(w, r, PARTITION_NUM)
+	partitionNum, err := checkMissingAndUint64Param(w, r, PARTITION_NUM)
 	if err != nil {
 		return
 	}
@@ -394,6 +394,30 @@ func checkMissingAndUint32Param(w http.ResponseWriter, r *http.Request, paramNam
 		return 0, ErrParamError
 	}
 	return uint32(paramValInt), nil
+}
+
+func checkMissingAndUint64Param(w http.ResponseWriter, r *http.Request, paramName string) (uint64, error) {
+	paramValStr, err := checkMissingParam(w, r, paramName)
+	if err != nil {
+		return 0, err
+	}
+
+	paramValInt, err := strconv.Atoi(paramValStr)
+	if err != nil {
+		reply := newHttpErrReply(ErrParamError)
+		newMsg := fmt.Sprintf("%s, unmatched type[%s]", reply.Msg, paramName)
+		reply.Msg = newMsg
+		sendReply(w, reply)
+		return 0, ErrParamError
+	}
+	if paramValInt > math.MaxUint64 {
+		reply := newHttpErrReply(ErrParamError)
+		newMsg := fmt.Sprintf("%s, value of [%s] exceed uint32 limit", reply.Msg, paramName)
+		reply.Msg = newMsg
+		sendReply(w, reply)
+		return 0, ErrParamError
+	}
+	return uint64(paramValInt), nil
 }
 
 func sendReply(w http.ResponseWriter, httpReply *HttpReply) {

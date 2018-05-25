@@ -259,17 +259,10 @@ func (c *Cluster) CreateSpace(dbName, spaceName string, policy *PartitionPolicy)
 		partitions = append(partitions, partition)
 	}
 
-	// update memory and send event
 	db.SpaceCache.AddSpace(space)
 	for _, partition := range partitions {
 		space.putPartition(partition)
-
-		//if err := PushProcessorEvent(NewPartitionCreateEvent(partition)); err != nil {
-		//	log.Error("fail to push event for creating partition[%v].", partition)
-		//}
 	}
-
-	// waiting to continues to create partition in ps by the background worker
 
 	return space, nil
 }
@@ -294,7 +287,7 @@ func (c *Cluster) RenameSpace(dbName, srcSpaceName, destSpaceName string) error 
 
 	db.SpaceCache.DeleteSpace(srcSpace)
 	srcSpace.rename(destSpaceName)
-	if err := srcSpace.persistent(c.store); err != nil {
+	if err := srcSpace.persistent(); err != nil {
 		return err
 	}
 	db.SpaceCache.AddSpace(srcSpace)

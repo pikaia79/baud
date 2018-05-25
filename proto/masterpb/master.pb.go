@@ -19,6 +19,14 @@
 		GetRouteResponse
 		PSRegisterRequest
 		PSRegisterResponse
+		CreatePartitionRequest
+		CreatePartitionResponse
+		DeletePartitionRequest
+		DeletePartitionResponse
+		ChangeReplicaRequest
+		ChangeReplicaResponse
+		ChangeLeaderRequest
+		ChangeLeaderResponse
 		PSConfig
 		PSHeartbeatRequest
 		PSHeartbeatResponse
@@ -59,6 +67,27 @@ var _ = math.Inf
 // A compilation error at this line likely means your copy of the
 // proto package needs to be updated.
 const _ = proto.ProtoPackageIsVersion2 // please upgrade the proto package
+
+type ReplicaChangeType int32
+
+const (
+	ReplicaChangeType_Add    ReplicaChangeType = 0
+	ReplicaChangeType_Remove ReplicaChangeType = 1
+)
+
+var ReplicaChangeType_name = map[int32]string{
+	0: "Add",
+	1: "Remove",
+}
+var ReplicaChangeType_value = map[string]int32{
+	"Add":    0,
+	"Remove": 1,
+}
+
+func (x ReplicaChangeType) String() string {
+	return proto.EnumName(ReplicaChangeType_name, int32(x))
+}
+func (ReplicaChangeType) EnumDescriptor() ([]byte, []int) { return fileDescriptorMaster, []int{0} }
 
 type GMaster struct {
 	Id      uint32 `protobuf:"varint,1,opt,name=id,proto3" json:"id,omitempty"`
@@ -169,6 +198,76 @@ func (m *PSRegisterResponse) Reset()                    { *m = PSRegisterRespons
 func (*PSRegisterResponse) ProtoMessage()               {}
 func (*PSRegisterResponse) Descriptor() ([]byte, []int) { return fileDescriptorMaster, []int{10} }
 
+type CreatePartitionRequest struct {
+	meta.RequestHeader `protobuf:"bytes,1,opt,name=header,embedded=header" json:"header"`
+	Partition          meta.Partition `protobuf:"bytes,2,opt,name=partition" json:"partition"`
+}
+
+func (m *CreatePartitionRequest) Reset()                    { *m = CreatePartitionRequest{} }
+func (*CreatePartitionRequest) ProtoMessage()               {}
+func (*CreatePartitionRequest) Descriptor() ([]byte, []int) { return fileDescriptorMaster, []int{11} }
+
+type CreatePartitionResponse struct {
+	meta.ResponseHeader `protobuf:"bytes,1,opt,name=header,embedded=header" json:"header"`
+}
+
+func (m *CreatePartitionResponse) Reset()                    { *m = CreatePartitionResponse{} }
+func (*CreatePartitionResponse) ProtoMessage()               {}
+func (*CreatePartitionResponse) Descriptor() ([]byte, []int) { return fileDescriptorMaster, []int{12} }
+
+type DeletePartitionRequest struct {
+	meta.RequestHeader `protobuf:"bytes,1,opt,name=header,embedded=header" json:"header"`
+	ID                 github_com_tiglabs_baudengine_proto_metapb.PartitionID `protobuf:"varint,2,opt,name=id,proto3,casttype=github.com/tiglabs/baudengine/proto/metapb.PartitionID" json:"id,omitempty"`
+}
+
+func (m *DeletePartitionRequest) Reset()                    { *m = DeletePartitionRequest{} }
+func (*DeletePartitionRequest) ProtoMessage()               {}
+func (*DeletePartitionRequest) Descriptor() ([]byte, []int) { return fileDescriptorMaster, []int{13} }
+
+type DeletePartitionResponse struct {
+	meta.ResponseHeader `protobuf:"bytes,1,opt,name=header,embedded=header" json:"header"`
+}
+
+func (m *DeletePartitionResponse) Reset()                    { *m = DeletePartitionResponse{} }
+func (*DeletePartitionResponse) ProtoMessage()               {}
+func (*DeletePartitionResponse) Descriptor() ([]byte, []int) { return fileDescriptorMaster, []int{14} }
+
+type ChangeReplicaRequest struct {
+	meta.RequestHeader `protobuf:"bytes,1,opt,name=header,embedded=header" json:"header"`
+	Type               ReplicaChangeType                                      `protobuf:"varint,2,opt,name=type,proto3,enum=ReplicaChangeType" json:"type,omitempty"`
+	PartitionID        github_com_tiglabs_baudengine_proto_metapb.PartitionID `protobuf:"varint,3,opt,name=partition_id,json=partitionId,proto3,casttype=github.com/tiglabs/baudengine/proto/metapb.PartitionID" json:"partition_id,omitempty"`
+	Replica            meta.Replica                                           `protobuf:"bytes,4,opt,name=replica" json:"replica"`
+}
+
+func (m *ChangeReplicaRequest) Reset()                    { *m = ChangeReplicaRequest{} }
+func (*ChangeReplicaRequest) ProtoMessage()               {}
+func (*ChangeReplicaRequest) Descriptor() ([]byte, []int) { return fileDescriptorMaster, []int{15} }
+
+type ChangeReplicaResponse struct {
+	meta.ResponseHeader `protobuf:"bytes,1,opt,name=header,embedded=header" json:"header"`
+}
+
+func (m *ChangeReplicaResponse) Reset()                    { *m = ChangeReplicaResponse{} }
+func (*ChangeReplicaResponse) ProtoMessage()               {}
+func (*ChangeReplicaResponse) Descriptor() ([]byte, []int) { return fileDescriptorMaster, []int{16} }
+
+type ChangeLeaderRequest struct {
+	meta.RequestHeader `protobuf:"bytes,1,opt,name=header,embedded=header" json:"header"`
+	PartitionID        github_com_tiglabs_baudengine_proto_metapb.PartitionID `protobuf:"varint,2,opt,name=partition_id,json=partitionId,proto3,casttype=github.com/tiglabs/baudengine/proto/metapb.PartitionID" json:"partition_id,omitempty"`
+}
+
+func (m *ChangeLeaderRequest) Reset()                    { *m = ChangeLeaderRequest{} }
+func (*ChangeLeaderRequest) ProtoMessage()               {}
+func (*ChangeLeaderRequest) Descriptor() ([]byte, []int) { return fileDescriptorMaster, []int{17} }
+
+type ChangeLeaderResponse struct {
+	meta.ResponseHeader `protobuf:"bytes,1,opt,name=header,embedded=header" json:"header"`
+}
+
+func (m *ChangeLeaderResponse) Reset()                    { *m = ChangeLeaderResponse{} }
+func (*ChangeLeaderResponse) ProtoMessage()               {}
+func (*ChangeLeaderResponse) Descriptor() ([]byte, []int) { return fileDescriptorMaster, []int{18} }
+
 type PSConfig struct {
 	RPCPort                 int    `protobuf:"varint,1,opt,name=rpc_port,json=rpcPort,proto3,casttype=int" json:"rpc_port,omitempty"`
 	AdminPort               int    `protobuf:"varint,2,opt,name=admin_port,json=adminPort,proto3,casttype=int" json:"admin_port,omitempty"`
@@ -183,7 +282,7 @@ type PSConfig struct {
 
 func (m *PSConfig) Reset()                    { *m = PSConfig{} }
 func (*PSConfig) ProtoMessage()               {}
-func (*PSConfig) Descriptor() ([]byte, []int) { return fileDescriptorMaster, []int{11} }
+func (*PSConfig) Descriptor() ([]byte, []int) { return fileDescriptorMaster, []int{19} }
 
 type PSHeartbeatRequest struct {
 	meta.RequestHeader `protobuf:"bytes,1,opt,name=header,embedded=header" json:"header"`
@@ -194,7 +293,7 @@ type PSHeartbeatRequest struct {
 
 func (m *PSHeartbeatRequest) Reset()                    { *m = PSHeartbeatRequest{} }
 func (*PSHeartbeatRequest) ProtoMessage()               {}
-func (*PSHeartbeatRequest) Descriptor() ([]byte, []int) { return fileDescriptorMaster, []int{12} }
+func (*PSHeartbeatRequest) Descriptor() ([]byte, []int) { return fileDescriptorMaster, []int{20} }
 
 type PSHeartbeatResponse struct {
 	meta.ResponseHeader `protobuf:"bytes,1,opt,name=header,embedded=header" json:"header"`
@@ -202,7 +301,7 @@ type PSHeartbeatResponse struct {
 
 func (m *PSHeartbeatResponse) Reset()                    { *m = PSHeartbeatResponse{} }
 func (*PSHeartbeatResponse) ProtoMessage()               {}
-func (*PSHeartbeatResponse) Descriptor() ([]byte, []int) { return fileDescriptorMaster, []int{13} }
+func (*PSHeartbeatResponse) Descriptor() ([]byte, []int) { return fileDescriptorMaster, []int{21} }
 
 type PartitionInfo struct {
 	ID         github_com_tiglabs_baudengine_proto_metapb.PartitionID `protobuf:"varint,1,opt,name=id,proto3,casttype=github.com/tiglabs/baudengine/proto/metapb.PartitionID" json:"id,omitempty"`
@@ -215,7 +314,7 @@ type PartitionInfo struct {
 
 func (m *PartitionInfo) Reset()                    { *m = PartitionInfo{} }
 func (*PartitionInfo) ProtoMessage()               {}
-func (*PartitionInfo) Descriptor() ([]byte, []int) { return fileDescriptorMaster, []int{14} }
+func (*PartitionInfo) Descriptor() ([]byte, []int) { return fileDescriptorMaster, []int{22} }
 
 type RuntimeInfo struct {
 	AppVersion string `protobuf:"bytes,1,opt,name=app_version,json=appVersion,proto3" json:"app_version,omitempty"`
@@ -226,7 +325,7 @@ type RuntimeInfo struct {
 
 func (m *RuntimeInfo) Reset()                    { *m = RuntimeInfo{} }
 func (*RuntimeInfo) ProtoMessage()               {}
-func (*RuntimeInfo) Descriptor() ([]byte, []int) { return fileDescriptorMaster, []int{15} }
+func (*RuntimeInfo) Descriptor() ([]byte, []int) { return fileDescriptorMaster, []int{23} }
 
 type RaftStatus struct {
 	meta.Replica `protobuf:"bytes,1,opt,name=replica,embedded=replica" json:"replica"`
@@ -239,7 +338,7 @@ type RaftStatus struct {
 
 func (m *RaftStatus) Reset()                    { *m = RaftStatus{} }
 func (*RaftStatus) ProtoMessage()               {}
-func (*RaftStatus) Descriptor() ([]byte, []int) { return fileDescriptorMaster, []int{16} }
+func (*RaftStatus) Descriptor() ([]byte, []int) { return fileDescriptorMaster, []int{24} }
 
 type RaftFollowerStatus struct {
 	meta.Replica `protobuf:"bytes,1,opt,name=replica,embedded=replica" json:"replica"`
@@ -252,7 +351,7 @@ type RaftFollowerStatus struct {
 
 func (m *RaftFollowerStatus) Reset()                    { *m = RaftFollowerStatus{} }
 func (*RaftFollowerStatus) ProtoMessage()               {}
-func (*RaftFollowerStatus) Descriptor() ([]byte, []int) { return fileDescriptorMaster, []int{17} }
+func (*RaftFollowerStatus) Descriptor() ([]byte, []int) { return fileDescriptorMaster, []int{25} }
 
 type NodeSysStats struct {
 	// Memory
@@ -289,7 +388,7 @@ type NodeSysStats struct {
 
 func (m *NodeSysStats) Reset()                    { *m = NodeSysStats{} }
 func (*NodeSysStats) ProtoMessage()               {}
-func (*NodeSysStats) Descriptor() ([]byte, []int) { return fileDescriptorMaster, []int{18} }
+func (*NodeSysStats) Descriptor() ([]byte, []int) { return fileDescriptorMaster, []int{26} }
 
 type PartitionStats struct {
 	Size_                  uint64 `protobuf:"varint,1,opt,name=size,proto3" json:"size,omitempty"`
@@ -302,7 +401,7 @@ type PartitionStats struct {
 
 func (m *PartitionStats) Reset()                    { *m = PartitionStats{} }
 func (*PartitionStats) ProtoMessage()               {}
-func (*PartitionStats) Descriptor() ([]byte, []int) { return fileDescriptorMaster, []int{19} }
+func (*PartitionStats) Descriptor() ([]byte, []int) { return fileDescriptorMaster, []int{27} }
 
 func init() {
 	proto.RegisterType((*GMaster)(nil), "GMaster")
@@ -316,6 +415,14 @@ func init() {
 	proto.RegisterType((*GetRouteResponse)(nil), "GetRouteResponse")
 	proto.RegisterType((*PSRegisterRequest)(nil), "PSRegisterRequest")
 	proto.RegisterType((*PSRegisterResponse)(nil), "PSRegisterResponse")
+	proto.RegisterType((*CreatePartitionRequest)(nil), "CreatePartitionRequest")
+	proto.RegisterType((*CreatePartitionResponse)(nil), "CreatePartitionResponse")
+	proto.RegisterType((*DeletePartitionRequest)(nil), "DeletePartitionRequest")
+	proto.RegisterType((*DeletePartitionResponse)(nil), "DeletePartitionResponse")
+	proto.RegisterType((*ChangeReplicaRequest)(nil), "ChangeReplicaRequest")
+	proto.RegisterType((*ChangeReplicaResponse)(nil), "ChangeReplicaResponse")
+	proto.RegisterType((*ChangeLeaderRequest)(nil), "ChangeLeaderRequest")
+	proto.RegisterType((*ChangeLeaderResponse)(nil), "ChangeLeaderResponse")
 	proto.RegisterType((*PSConfig)(nil), "PSConfig")
 	proto.RegisterType((*PSHeartbeatRequest)(nil), "PSHeartbeatRequest")
 	proto.RegisterType((*PSHeartbeatResponse)(nil), "PSHeartbeatResponse")
@@ -325,6 +432,7 @@ func init() {
 	proto.RegisterType((*RaftFollowerStatus)(nil), "RaftFollowerStatus")
 	proto.RegisterType((*NodeSysStats)(nil), "NodeSysStats")
 	proto.RegisterType((*PartitionStats)(nil), "PartitionStats")
+	proto.RegisterEnum("ReplicaChangeType", ReplicaChangeType_name, ReplicaChangeType_value)
 }
 func (this *GMaster) Equal(that interface{}) bool {
 	if that == nil {
@@ -665,6 +773,216 @@ func (this *PSRegisterResponse) Equal(that interface{}) bool {
 		if !this.Partitions[i].Equal(&that1.Partitions[i]) {
 			return false
 		}
+	}
+	return true
+}
+func (this *CreatePartitionRequest) Equal(that interface{}) bool {
+	if that == nil {
+		return this == nil
+	}
+
+	that1, ok := that.(*CreatePartitionRequest)
+	if !ok {
+		that2, ok := that.(CreatePartitionRequest)
+		if ok {
+			that1 = &that2
+		} else {
+			return false
+		}
+	}
+	if that1 == nil {
+		return this == nil
+	} else if this == nil {
+		return false
+	}
+	if !this.RequestHeader.Equal(&that1.RequestHeader) {
+		return false
+	}
+	if !this.Partition.Equal(&that1.Partition) {
+		return false
+	}
+	return true
+}
+func (this *CreatePartitionResponse) Equal(that interface{}) bool {
+	if that == nil {
+		return this == nil
+	}
+
+	that1, ok := that.(*CreatePartitionResponse)
+	if !ok {
+		that2, ok := that.(CreatePartitionResponse)
+		if ok {
+			that1 = &that2
+		} else {
+			return false
+		}
+	}
+	if that1 == nil {
+		return this == nil
+	} else if this == nil {
+		return false
+	}
+	if !this.ResponseHeader.Equal(&that1.ResponseHeader) {
+		return false
+	}
+	return true
+}
+func (this *DeletePartitionRequest) Equal(that interface{}) bool {
+	if that == nil {
+		return this == nil
+	}
+
+	that1, ok := that.(*DeletePartitionRequest)
+	if !ok {
+		that2, ok := that.(DeletePartitionRequest)
+		if ok {
+			that1 = &that2
+		} else {
+			return false
+		}
+	}
+	if that1 == nil {
+		return this == nil
+	} else if this == nil {
+		return false
+	}
+	if !this.RequestHeader.Equal(&that1.RequestHeader) {
+		return false
+	}
+	if this.ID != that1.ID {
+		return false
+	}
+	return true
+}
+func (this *DeletePartitionResponse) Equal(that interface{}) bool {
+	if that == nil {
+		return this == nil
+	}
+
+	that1, ok := that.(*DeletePartitionResponse)
+	if !ok {
+		that2, ok := that.(DeletePartitionResponse)
+		if ok {
+			that1 = &that2
+		} else {
+			return false
+		}
+	}
+	if that1 == nil {
+		return this == nil
+	} else if this == nil {
+		return false
+	}
+	if !this.ResponseHeader.Equal(&that1.ResponseHeader) {
+		return false
+	}
+	return true
+}
+func (this *ChangeReplicaRequest) Equal(that interface{}) bool {
+	if that == nil {
+		return this == nil
+	}
+
+	that1, ok := that.(*ChangeReplicaRequest)
+	if !ok {
+		that2, ok := that.(ChangeReplicaRequest)
+		if ok {
+			that1 = &that2
+		} else {
+			return false
+		}
+	}
+	if that1 == nil {
+		return this == nil
+	} else if this == nil {
+		return false
+	}
+	if !this.RequestHeader.Equal(&that1.RequestHeader) {
+		return false
+	}
+	if this.Type != that1.Type {
+		return false
+	}
+	if this.PartitionID != that1.PartitionID {
+		return false
+	}
+	if !this.Replica.Equal(&that1.Replica) {
+		return false
+	}
+	return true
+}
+func (this *ChangeReplicaResponse) Equal(that interface{}) bool {
+	if that == nil {
+		return this == nil
+	}
+
+	that1, ok := that.(*ChangeReplicaResponse)
+	if !ok {
+		that2, ok := that.(ChangeReplicaResponse)
+		if ok {
+			that1 = &that2
+		} else {
+			return false
+		}
+	}
+	if that1 == nil {
+		return this == nil
+	} else if this == nil {
+		return false
+	}
+	if !this.ResponseHeader.Equal(&that1.ResponseHeader) {
+		return false
+	}
+	return true
+}
+func (this *ChangeLeaderRequest) Equal(that interface{}) bool {
+	if that == nil {
+		return this == nil
+	}
+
+	that1, ok := that.(*ChangeLeaderRequest)
+	if !ok {
+		that2, ok := that.(ChangeLeaderRequest)
+		if ok {
+			that1 = &that2
+		} else {
+			return false
+		}
+	}
+	if that1 == nil {
+		return this == nil
+	} else if this == nil {
+		return false
+	}
+	if !this.RequestHeader.Equal(&that1.RequestHeader) {
+		return false
+	}
+	if this.PartitionID != that1.PartitionID {
+		return false
+	}
+	return true
+}
+func (this *ChangeLeaderResponse) Equal(that interface{}) bool {
+	if that == nil {
+		return this == nil
+	}
+
+	that1, ok := that.(*ChangeLeaderResponse)
+	if !ok {
+		that2, ok := that.(ChangeLeaderResponse)
+		if ok {
+			that1 = &that2
+		} else {
+			return false
+		}
+	}
+	if that1 == nil {
+		return this == nil
+	} else if this == nil {
+		return false
+	}
+	if !this.ResponseHeader.Equal(&that1.ResponseHeader) {
+		return false
 	}
 	return true
 }
@@ -1061,6 +1379,10 @@ type MasterRpcClient interface {
 	PSHeartbeat(ctx context.Context, in *PSHeartbeatRequest, opts ...grpc.CallOption) (*PSHeartbeatResponse, error)
 	GetDB(ctx context.Context, in *GetDBRequest, opts ...grpc.CallOption) (*GetDBResponse, error)
 	GetSpace(ctx context.Context, in *GetSpaceRequest, opts ...grpc.CallOption) (*GetSpaceResponse, error)
+	CreatePartition(ctx context.Context, in *CreatePartitionRequest, opts ...grpc.CallOption) (*CreatePartitionResponse, error)
+	DeletePartition(ctx context.Context, in *DeletePartitionRequest, opts ...grpc.CallOption) (*DeletePartitionResponse, error)
+	ChangeReplica(ctx context.Context, in *ChangeReplicaRequest, opts ...grpc.CallOption) (*ChangeReplicaResponse, error)
+	ChangeLeader(ctx context.Context, in *ChangeLeaderRequest, opts ...grpc.CallOption) (*ChangeLeaderResponse, error)
 }
 
 type masterRpcClient struct {
@@ -1116,6 +1438,42 @@ func (c *masterRpcClient) GetSpace(ctx context.Context, in *GetSpaceRequest, opt
 	return out, nil
 }
 
+func (c *masterRpcClient) CreatePartition(ctx context.Context, in *CreatePartitionRequest, opts ...grpc.CallOption) (*CreatePartitionResponse, error) {
+	out := new(CreatePartitionResponse)
+	err := grpc.Invoke(ctx, "/MasterRpc/CreatePartition", in, out, c.cc, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *masterRpcClient) DeletePartition(ctx context.Context, in *DeletePartitionRequest, opts ...grpc.CallOption) (*DeletePartitionResponse, error) {
+	out := new(DeletePartitionResponse)
+	err := grpc.Invoke(ctx, "/MasterRpc/DeletePartition", in, out, c.cc, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *masterRpcClient) ChangeReplica(ctx context.Context, in *ChangeReplicaRequest, opts ...grpc.CallOption) (*ChangeReplicaResponse, error) {
+	out := new(ChangeReplicaResponse)
+	err := grpc.Invoke(ctx, "/MasterRpc/ChangeReplica", in, out, c.cc, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *masterRpcClient) ChangeLeader(ctx context.Context, in *ChangeLeaderRequest, opts ...grpc.CallOption) (*ChangeLeaderResponse, error) {
+	out := new(ChangeLeaderResponse)
+	err := grpc.Invoke(ctx, "/MasterRpc/ChangeLeader", in, out, c.cc, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // Server API for MasterRpc service
 
 type MasterRpcServer interface {
@@ -1124,6 +1482,10 @@ type MasterRpcServer interface {
 	PSHeartbeat(context.Context, *PSHeartbeatRequest) (*PSHeartbeatResponse, error)
 	GetDB(context.Context, *GetDBRequest) (*GetDBResponse, error)
 	GetSpace(context.Context, *GetSpaceRequest) (*GetSpaceResponse, error)
+	CreatePartition(context.Context, *CreatePartitionRequest) (*CreatePartitionResponse, error)
+	DeletePartition(context.Context, *DeletePartitionRequest) (*DeletePartitionResponse, error)
+	ChangeReplica(context.Context, *ChangeReplicaRequest) (*ChangeReplicaResponse, error)
+	ChangeLeader(context.Context, *ChangeLeaderRequest) (*ChangeLeaderResponse, error)
 }
 
 func RegisterMasterRpcServer(s *grpc.Server, srv MasterRpcServer) {
@@ -1220,6 +1582,78 @@ func _MasterRpc_GetSpace_Handler(srv interface{}, ctx context.Context, dec func(
 	return interceptor(ctx, in, info, handler)
 }
 
+func _MasterRpc_CreatePartition_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(CreatePartitionRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(MasterRpcServer).CreatePartition(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/MasterRpc/CreatePartition",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(MasterRpcServer).CreatePartition(ctx, req.(*CreatePartitionRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _MasterRpc_DeletePartition_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(DeletePartitionRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(MasterRpcServer).DeletePartition(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/MasterRpc/DeletePartition",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(MasterRpcServer).DeletePartition(ctx, req.(*DeletePartitionRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _MasterRpc_ChangeReplica_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ChangeReplicaRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(MasterRpcServer).ChangeReplica(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/MasterRpc/ChangeReplica",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(MasterRpcServer).ChangeReplica(ctx, req.(*ChangeReplicaRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _MasterRpc_ChangeLeader_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ChangeLeaderRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(MasterRpcServer).ChangeLeader(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/MasterRpc/ChangeLeader",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(MasterRpcServer).ChangeLeader(ctx, req.(*ChangeLeaderRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 var _MasterRpc_serviceDesc = grpc.ServiceDesc{
 	ServiceName: "MasterRpc",
 	HandlerType: (*MasterRpcServer)(nil),
@@ -1243,6 +1677,22 @@ var _MasterRpc_serviceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "GetSpace",
 			Handler:    _MasterRpc_GetSpace_Handler,
+		},
+		{
+			MethodName: "CreatePartition",
+			Handler:    _MasterRpc_CreatePartition_Handler,
+		},
+		{
+			MethodName: "DeletePartition",
+			Handler:    _MasterRpc_DeletePartition_Handler,
+		},
+		{
+			MethodName: "ChangeReplica",
+			Handler:    _MasterRpc_ChangeReplica_Handler,
+		},
+		{
+			MethodName: "ChangeLeader",
+			Handler:    _MasterRpc_ChangeLeader_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},
@@ -1672,6 +2122,250 @@ func (m *PSRegisterResponse) MarshalTo(dAtA []byte) (int, error) {
 	return i, nil
 }
 
+func (m *CreatePartitionRequest) Marshal() (dAtA []byte, err error) {
+	size := m.Size()
+	dAtA = make([]byte, size)
+	n, err := m.MarshalTo(dAtA)
+	if err != nil {
+		return nil, err
+	}
+	return dAtA[:n], nil
+}
+
+func (m *CreatePartitionRequest) MarshalTo(dAtA []byte) (int, error) {
+	var i int
+	_ = i
+	var l int
+	_ = l
+	dAtA[i] = 0xa
+	i++
+	i = encodeVarintMaster(dAtA, i, uint64(m.RequestHeader.Size()))
+	n14, err := m.RequestHeader.MarshalTo(dAtA[i:])
+	if err != nil {
+		return 0, err
+	}
+	i += n14
+	dAtA[i] = 0x12
+	i++
+	i = encodeVarintMaster(dAtA, i, uint64(m.Partition.Size()))
+	n15, err := m.Partition.MarshalTo(dAtA[i:])
+	if err != nil {
+		return 0, err
+	}
+	i += n15
+	return i, nil
+}
+
+func (m *CreatePartitionResponse) Marshal() (dAtA []byte, err error) {
+	size := m.Size()
+	dAtA = make([]byte, size)
+	n, err := m.MarshalTo(dAtA)
+	if err != nil {
+		return nil, err
+	}
+	return dAtA[:n], nil
+}
+
+func (m *CreatePartitionResponse) MarshalTo(dAtA []byte) (int, error) {
+	var i int
+	_ = i
+	var l int
+	_ = l
+	dAtA[i] = 0xa
+	i++
+	i = encodeVarintMaster(dAtA, i, uint64(m.ResponseHeader.Size()))
+	n16, err := m.ResponseHeader.MarshalTo(dAtA[i:])
+	if err != nil {
+		return 0, err
+	}
+	i += n16
+	return i, nil
+}
+
+func (m *DeletePartitionRequest) Marshal() (dAtA []byte, err error) {
+	size := m.Size()
+	dAtA = make([]byte, size)
+	n, err := m.MarshalTo(dAtA)
+	if err != nil {
+		return nil, err
+	}
+	return dAtA[:n], nil
+}
+
+func (m *DeletePartitionRequest) MarshalTo(dAtA []byte) (int, error) {
+	var i int
+	_ = i
+	var l int
+	_ = l
+	dAtA[i] = 0xa
+	i++
+	i = encodeVarintMaster(dAtA, i, uint64(m.RequestHeader.Size()))
+	n17, err := m.RequestHeader.MarshalTo(dAtA[i:])
+	if err != nil {
+		return 0, err
+	}
+	i += n17
+	if m.ID != 0 {
+		dAtA[i] = 0x10
+		i++
+		i = encodeVarintMaster(dAtA, i, uint64(m.ID))
+	}
+	return i, nil
+}
+
+func (m *DeletePartitionResponse) Marshal() (dAtA []byte, err error) {
+	size := m.Size()
+	dAtA = make([]byte, size)
+	n, err := m.MarshalTo(dAtA)
+	if err != nil {
+		return nil, err
+	}
+	return dAtA[:n], nil
+}
+
+func (m *DeletePartitionResponse) MarshalTo(dAtA []byte) (int, error) {
+	var i int
+	_ = i
+	var l int
+	_ = l
+	dAtA[i] = 0xa
+	i++
+	i = encodeVarintMaster(dAtA, i, uint64(m.ResponseHeader.Size()))
+	n18, err := m.ResponseHeader.MarshalTo(dAtA[i:])
+	if err != nil {
+		return 0, err
+	}
+	i += n18
+	return i, nil
+}
+
+func (m *ChangeReplicaRequest) Marshal() (dAtA []byte, err error) {
+	size := m.Size()
+	dAtA = make([]byte, size)
+	n, err := m.MarshalTo(dAtA)
+	if err != nil {
+		return nil, err
+	}
+	return dAtA[:n], nil
+}
+
+func (m *ChangeReplicaRequest) MarshalTo(dAtA []byte) (int, error) {
+	var i int
+	_ = i
+	var l int
+	_ = l
+	dAtA[i] = 0xa
+	i++
+	i = encodeVarintMaster(dAtA, i, uint64(m.RequestHeader.Size()))
+	n19, err := m.RequestHeader.MarshalTo(dAtA[i:])
+	if err != nil {
+		return 0, err
+	}
+	i += n19
+	if m.Type != 0 {
+		dAtA[i] = 0x10
+		i++
+		i = encodeVarintMaster(dAtA, i, uint64(m.Type))
+	}
+	if m.PartitionID != 0 {
+		dAtA[i] = 0x18
+		i++
+		i = encodeVarintMaster(dAtA, i, uint64(m.PartitionID))
+	}
+	dAtA[i] = 0x22
+	i++
+	i = encodeVarintMaster(dAtA, i, uint64(m.Replica.Size()))
+	n20, err := m.Replica.MarshalTo(dAtA[i:])
+	if err != nil {
+		return 0, err
+	}
+	i += n20
+	return i, nil
+}
+
+func (m *ChangeReplicaResponse) Marshal() (dAtA []byte, err error) {
+	size := m.Size()
+	dAtA = make([]byte, size)
+	n, err := m.MarshalTo(dAtA)
+	if err != nil {
+		return nil, err
+	}
+	return dAtA[:n], nil
+}
+
+func (m *ChangeReplicaResponse) MarshalTo(dAtA []byte) (int, error) {
+	var i int
+	_ = i
+	var l int
+	_ = l
+	dAtA[i] = 0xa
+	i++
+	i = encodeVarintMaster(dAtA, i, uint64(m.ResponseHeader.Size()))
+	n21, err := m.ResponseHeader.MarshalTo(dAtA[i:])
+	if err != nil {
+		return 0, err
+	}
+	i += n21
+	return i, nil
+}
+
+func (m *ChangeLeaderRequest) Marshal() (dAtA []byte, err error) {
+	size := m.Size()
+	dAtA = make([]byte, size)
+	n, err := m.MarshalTo(dAtA)
+	if err != nil {
+		return nil, err
+	}
+	return dAtA[:n], nil
+}
+
+func (m *ChangeLeaderRequest) MarshalTo(dAtA []byte) (int, error) {
+	var i int
+	_ = i
+	var l int
+	_ = l
+	dAtA[i] = 0xa
+	i++
+	i = encodeVarintMaster(dAtA, i, uint64(m.RequestHeader.Size()))
+	n22, err := m.RequestHeader.MarshalTo(dAtA[i:])
+	if err != nil {
+		return 0, err
+	}
+	i += n22
+	if m.PartitionID != 0 {
+		dAtA[i] = 0x10
+		i++
+		i = encodeVarintMaster(dAtA, i, uint64(m.PartitionID))
+	}
+	return i, nil
+}
+
+func (m *ChangeLeaderResponse) Marshal() (dAtA []byte, err error) {
+	size := m.Size()
+	dAtA = make([]byte, size)
+	n, err := m.MarshalTo(dAtA)
+	if err != nil {
+		return nil, err
+	}
+	return dAtA[:n], nil
+}
+
+func (m *ChangeLeaderResponse) MarshalTo(dAtA []byte) (int, error) {
+	var i int
+	_ = i
+	var l int
+	_ = l
+	dAtA[i] = 0xa
+	i++
+	i = encodeVarintMaster(dAtA, i, uint64(m.ResponseHeader.Size()))
+	n23, err := m.ResponseHeader.MarshalTo(dAtA[i:])
+	if err != nil {
+		return 0, err
+	}
+	i += n23
+	return i, nil
+}
+
 func (m *PSConfig) Marshal() (dAtA []byte, err error) {
 	size := m.Size()
 	dAtA = make([]byte, size)
@@ -1753,11 +2447,11 @@ func (m *PSHeartbeatRequest) MarshalTo(dAtA []byte) (int, error) {
 	dAtA[i] = 0xa
 	i++
 	i = encodeVarintMaster(dAtA, i, uint64(m.RequestHeader.Size()))
-	n14, err := m.RequestHeader.MarshalTo(dAtA[i:])
+	n24, err := m.RequestHeader.MarshalTo(dAtA[i:])
 	if err != nil {
 		return 0, err
 	}
-	i += n14
+	i += n24
 	if m.NodeID != 0 {
 		dAtA[i] = 0x10
 		i++
@@ -1778,11 +2472,11 @@ func (m *PSHeartbeatRequest) MarshalTo(dAtA []byte) (int, error) {
 	dAtA[i] = 0x22
 	i++
 	i = encodeVarintMaster(dAtA, i, uint64(m.SysStats.Size()))
-	n15, err := m.SysStats.MarshalTo(dAtA[i:])
+	n25, err := m.SysStats.MarshalTo(dAtA[i:])
 	if err != nil {
 		return 0, err
 	}
-	i += n15
+	i += n25
 	return i, nil
 }
 
@@ -1804,11 +2498,11 @@ func (m *PSHeartbeatResponse) MarshalTo(dAtA []byte) (int, error) {
 	dAtA[i] = 0xa
 	i++
 	i = encodeVarintMaster(dAtA, i, uint64(m.ResponseHeader.Size()))
-	n16, err := m.ResponseHeader.MarshalTo(dAtA[i:])
+	n26, err := m.ResponseHeader.MarshalTo(dAtA[i:])
 	if err != nil {
 		return 0, err
 	}
-	i += n16
+	i += n26
 	return i, nil
 }
 
@@ -1850,28 +2544,28 @@ func (m *PartitionInfo) MarshalTo(dAtA []byte) (int, error) {
 	dAtA[i] = 0x22
 	i++
 	i = encodeVarintMaster(dAtA, i, uint64(m.Epoch.Size()))
-	n17, err := m.Epoch.MarshalTo(dAtA[i:])
+	n27, err := m.Epoch.MarshalTo(dAtA[i:])
 	if err != nil {
 		return 0, err
 	}
-	i += n17
+	i += n27
 	dAtA[i] = 0x2a
 	i++
 	i = encodeVarintMaster(dAtA, i, uint64(m.Statistics.Size()))
-	n18, err := m.Statistics.MarshalTo(dAtA[i:])
+	n28, err := m.Statistics.MarshalTo(dAtA[i:])
 	if err != nil {
 		return 0, err
 	}
-	i += n18
+	i += n28
 	if m.RaftStatus != nil {
 		dAtA[i] = 0x32
 		i++
 		i = encodeVarintMaster(dAtA, i, uint64(m.RaftStatus.Size()))
-		n19, err := m.RaftStatus.MarshalTo(dAtA[i:])
+		n29, err := m.RaftStatus.MarshalTo(dAtA[i:])
 		if err != nil {
 			return 0, err
 		}
-		i += n19
+		i += n29
 	}
 	return i, nil
 }
@@ -1936,11 +2630,11 @@ func (m *RaftStatus) MarshalTo(dAtA []byte) (int, error) {
 	dAtA[i] = 0xa
 	i++
 	i = encodeVarintMaster(dAtA, i, uint64(m.Replica.Size()))
-	n20, err := m.Replica.MarshalTo(dAtA[i:])
+	n30, err := m.Replica.MarshalTo(dAtA[i:])
 	if err != nil {
 		return 0, err
 	}
-	i += n20
+	i += n30
 	if m.Term != 0 {
 		dAtA[i] = 0x10
 		i++
@@ -1994,11 +2688,11 @@ func (m *RaftFollowerStatus) MarshalTo(dAtA []byte) (int, error) {
 	dAtA[i] = 0xa
 	i++
 	i = encodeVarintMaster(dAtA, i, uint64(m.Replica.Size()))
-	n21, err := m.Replica.MarshalTo(dAtA[i:])
+	n31, err := m.Replica.MarshalTo(dAtA[i:])
 	if err != nil {
 		return 0, err
 	}
-	i += n21
+	i += n31
 	if m.Match != 0 {
 		dAtA[i] = 0x10
 		i++
@@ -2345,6 +3039,86 @@ func NewPopulatedPSRegisterResponse(r randyMaster, easy bool) *PSRegisterRespons
 	return this
 }
 
+func NewPopulatedCreatePartitionRequest(r randyMaster, easy bool) *CreatePartitionRequest {
+	this := &CreatePartitionRequest{}
+	v19 := meta.NewPopulatedRequestHeader(r, easy)
+	this.RequestHeader = *v19
+	v20 := meta.NewPopulatedPartition(r, easy)
+	this.Partition = *v20
+	if !easy && r.Intn(10) != 0 {
+	}
+	return this
+}
+
+func NewPopulatedCreatePartitionResponse(r randyMaster, easy bool) *CreatePartitionResponse {
+	this := &CreatePartitionResponse{}
+	v21 := meta.NewPopulatedResponseHeader(r, easy)
+	this.ResponseHeader = *v21
+	if !easy && r.Intn(10) != 0 {
+	}
+	return this
+}
+
+func NewPopulatedDeletePartitionRequest(r randyMaster, easy bool) *DeletePartitionRequest {
+	this := &DeletePartitionRequest{}
+	v22 := meta.NewPopulatedRequestHeader(r, easy)
+	this.RequestHeader = *v22
+	this.ID = github_com_tiglabs_baudengine_proto_metapb.PartitionID(r.Uint32())
+	if !easy && r.Intn(10) != 0 {
+	}
+	return this
+}
+
+func NewPopulatedDeletePartitionResponse(r randyMaster, easy bool) *DeletePartitionResponse {
+	this := &DeletePartitionResponse{}
+	v23 := meta.NewPopulatedResponseHeader(r, easy)
+	this.ResponseHeader = *v23
+	if !easy && r.Intn(10) != 0 {
+	}
+	return this
+}
+
+func NewPopulatedChangeReplicaRequest(r randyMaster, easy bool) *ChangeReplicaRequest {
+	this := &ChangeReplicaRequest{}
+	v24 := meta.NewPopulatedRequestHeader(r, easy)
+	this.RequestHeader = *v24
+	this.Type = ReplicaChangeType([]int32{0, 1}[r.Intn(2)])
+	this.PartitionID = github_com_tiglabs_baudengine_proto_metapb.PartitionID(r.Uint32())
+	v25 := meta.NewPopulatedReplica(r, easy)
+	this.Replica = *v25
+	if !easy && r.Intn(10) != 0 {
+	}
+	return this
+}
+
+func NewPopulatedChangeReplicaResponse(r randyMaster, easy bool) *ChangeReplicaResponse {
+	this := &ChangeReplicaResponse{}
+	v26 := meta.NewPopulatedResponseHeader(r, easy)
+	this.ResponseHeader = *v26
+	if !easy && r.Intn(10) != 0 {
+	}
+	return this
+}
+
+func NewPopulatedChangeLeaderRequest(r randyMaster, easy bool) *ChangeLeaderRequest {
+	this := &ChangeLeaderRequest{}
+	v27 := meta.NewPopulatedRequestHeader(r, easy)
+	this.RequestHeader = *v27
+	this.PartitionID = github_com_tiglabs_baudengine_proto_metapb.PartitionID(r.Uint32())
+	if !easy && r.Intn(10) != 0 {
+	}
+	return this
+}
+
+func NewPopulatedChangeLeaderResponse(r randyMaster, easy bool) *ChangeLeaderResponse {
+	this := &ChangeLeaderResponse{}
+	v28 := meta.NewPopulatedResponseHeader(r, easy)
+	this.ResponseHeader = *v28
+	if !easy && r.Intn(10) != 0 {
+	}
+	return this
+}
+
 func NewPopulatedPSConfig(r randyMaster, easy bool) *PSConfig {
 	this := &PSConfig{}
 	this.RPCPort = int(r.Uint32())
@@ -2363,19 +3137,19 @@ func NewPopulatedPSConfig(r randyMaster, easy bool) *PSConfig {
 
 func NewPopulatedPSHeartbeatRequest(r randyMaster, easy bool) *PSHeartbeatRequest {
 	this := &PSHeartbeatRequest{}
-	v19 := meta.NewPopulatedRequestHeader(r, easy)
-	this.RequestHeader = *v19
+	v29 := meta.NewPopulatedRequestHeader(r, easy)
+	this.RequestHeader = *v29
 	this.NodeID = github_com_tiglabs_baudengine_proto_metapb.NodeID(r.Uint32())
 	if r.Intn(10) != 0 {
-		v20 := r.Intn(5)
-		this.Partitions = make([]PartitionInfo, v20)
-		for i := 0; i < v20; i++ {
-			v21 := NewPopulatedPartitionInfo(r, easy)
-			this.Partitions[i] = *v21
+		v30 := r.Intn(5)
+		this.Partitions = make([]PartitionInfo, v30)
+		for i := 0; i < v30; i++ {
+			v31 := NewPopulatedPartitionInfo(r, easy)
+			this.Partitions[i] = *v31
 		}
 	}
-	v22 := NewPopulatedNodeSysStats(r, easy)
-	this.SysStats = *v22
+	v32 := NewPopulatedNodeSysStats(r, easy)
+	this.SysStats = *v32
 	if !easy && r.Intn(10) != 0 {
 	}
 	return this
@@ -2383,8 +3157,8 @@ func NewPopulatedPSHeartbeatRequest(r randyMaster, easy bool) *PSHeartbeatReques
 
 func NewPopulatedPSHeartbeatResponse(r randyMaster, easy bool) *PSHeartbeatResponse {
 	this := &PSHeartbeatResponse{}
-	v23 := meta.NewPopulatedResponseHeader(r, easy)
-	this.ResponseHeader = *v23
+	v33 := meta.NewPopulatedResponseHeader(r, easy)
+	this.ResponseHeader = *v33
 	if !easy && r.Intn(10) != 0 {
 	}
 	return this
@@ -2395,10 +3169,10 @@ func NewPopulatedPartitionInfo(r randyMaster, easy bool) *PartitionInfo {
 	this.ID = github_com_tiglabs_baudengine_proto_metapb.PartitionID(r.Uint32())
 	this.IsLeader = bool(bool(r.Intn(2) == 0))
 	this.Status = meta.PartitionStatus([]int32{0, 1, 2, 3, 4}[r.Intn(5)])
-	v24 := meta.NewPopulatedPartitionEpoch(r, easy)
-	this.Epoch = *v24
-	v25 := NewPopulatedPartitionStats(r, easy)
-	this.Statistics = *v25
+	v34 := meta.NewPopulatedPartitionEpoch(r, easy)
+	this.Epoch = *v34
+	v35 := NewPopulatedPartitionStats(r, easy)
+	this.Statistics = *v35
 	if r.Intn(10) != 0 {
 		this.RaftStatus = NewPopulatedRaftStatus(r, easy)
 	}
@@ -2420,18 +3194,18 @@ func NewPopulatedRuntimeInfo(r randyMaster, easy bool) *RuntimeInfo {
 
 func NewPopulatedRaftStatus(r randyMaster, easy bool) *RaftStatus {
 	this := &RaftStatus{}
-	v26 := meta.NewPopulatedReplica(r, easy)
-	this.Replica = *v26
+	v36 := meta.NewPopulatedReplica(r, easy)
+	this.Replica = *v36
 	this.Term = uint64(uint64(r.Uint32()))
 	this.Index = uint64(uint64(r.Uint32()))
 	this.Commit = uint64(uint64(r.Uint32()))
 	this.Applied = uint64(uint64(r.Uint32()))
 	if r.Intn(10) != 0 {
-		v27 := r.Intn(5)
-		this.Followers = make([]RaftFollowerStatus, v27)
-		for i := 0; i < v27; i++ {
-			v28 := NewPopulatedRaftFollowerStatus(r, easy)
-			this.Followers[i] = *v28
+		v37 := r.Intn(5)
+		this.Followers = make([]RaftFollowerStatus, v37)
+		for i := 0; i < v37; i++ {
+			v38 := NewPopulatedRaftFollowerStatus(r, easy)
+			this.Followers[i] = *v38
 		}
 	}
 	if !easy && r.Intn(10) != 0 {
@@ -2441,8 +3215,8 @@ func NewPopulatedRaftStatus(r randyMaster, easy bool) *RaftStatus {
 
 func NewPopulatedRaftFollowerStatus(r randyMaster, easy bool) *RaftFollowerStatus {
 	this := &RaftFollowerStatus{}
-	v29 := meta.NewPopulatedReplica(r, easy)
-	this.Replica = *v29
+	v39 := meta.NewPopulatedReplica(r, easy)
+	this.Replica = *v39
 	this.Match = uint64(uint64(r.Uint32()))
 	this.Commit = uint64(uint64(r.Uint32()))
 	this.Next = uint64(uint64(r.Uint32()))
@@ -2512,9 +3286,9 @@ func randUTF8RuneMaster(r randyMaster) rune {
 	return rune(ru + 61)
 }
 func randStringMaster(r randyMaster) string {
-	v30 := r.Intn(100)
-	tmps := make([]rune, v30)
-	for i := 0; i < v30; i++ {
+	v40 := r.Intn(100)
+	tmps := make([]rune, v40)
+	for i := 0; i < v40; i++ {
 		tmps[i] = randUTF8RuneMaster(r)
 	}
 	return string(tmps)
@@ -2536,11 +3310,11 @@ func randFieldMaster(dAtA []byte, r randyMaster, fieldNumber int, wire int) []by
 	switch wire {
 	case 0:
 		dAtA = encodeVarintPopulateMaster(dAtA, uint64(key))
-		v31 := r.Int63()
+		v41 := r.Int63()
 		if r.Intn(2) == 0 {
-			v31 *= -1
+			v41 *= -1
 		}
-		dAtA = encodeVarintPopulateMaster(dAtA, uint64(v31))
+		dAtA = encodeVarintPopulateMaster(dAtA, uint64(v41))
 	case 1:
 		dAtA = encodeVarintPopulateMaster(dAtA, uint64(key))
 		dAtA = append(dAtA, byte(r.Intn(256)), byte(r.Intn(256)), byte(r.Intn(256)), byte(r.Intn(256)), byte(r.Intn(256)), byte(r.Intn(256)), byte(r.Intn(256)), byte(r.Intn(256)))
@@ -2725,6 +3499,86 @@ func (m *PSRegisterResponse) Size() (n int) {
 			n += 1 + l + sovMaster(uint64(l))
 		}
 	}
+	return n
+}
+
+func (m *CreatePartitionRequest) Size() (n int) {
+	var l int
+	_ = l
+	l = m.RequestHeader.Size()
+	n += 1 + l + sovMaster(uint64(l))
+	l = m.Partition.Size()
+	n += 1 + l + sovMaster(uint64(l))
+	return n
+}
+
+func (m *CreatePartitionResponse) Size() (n int) {
+	var l int
+	_ = l
+	l = m.ResponseHeader.Size()
+	n += 1 + l + sovMaster(uint64(l))
+	return n
+}
+
+func (m *DeletePartitionRequest) Size() (n int) {
+	var l int
+	_ = l
+	l = m.RequestHeader.Size()
+	n += 1 + l + sovMaster(uint64(l))
+	if m.ID != 0 {
+		n += 1 + sovMaster(uint64(m.ID))
+	}
+	return n
+}
+
+func (m *DeletePartitionResponse) Size() (n int) {
+	var l int
+	_ = l
+	l = m.ResponseHeader.Size()
+	n += 1 + l + sovMaster(uint64(l))
+	return n
+}
+
+func (m *ChangeReplicaRequest) Size() (n int) {
+	var l int
+	_ = l
+	l = m.RequestHeader.Size()
+	n += 1 + l + sovMaster(uint64(l))
+	if m.Type != 0 {
+		n += 1 + sovMaster(uint64(m.Type))
+	}
+	if m.PartitionID != 0 {
+		n += 1 + sovMaster(uint64(m.PartitionID))
+	}
+	l = m.Replica.Size()
+	n += 1 + l + sovMaster(uint64(l))
+	return n
+}
+
+func (m *ChangeReplicaResponse) Size() (n int) {
+	var l int
+	_ = l
+	l = m.ResponseHeader.Size()
+	n += 1 + l + sovMaster(uint64(l))
+	return n
+}
+
+func (m *ChangeLeaderRequest) Size() (n int) {
+	var l int
+	_ = l
+	l = m.RequestHeader.Size()
+	n += 1 + l + sovMaster(uint64(l))
+	if m.PartitionID != 0 {
+		n += 1 + sovMaster(uint64(m.PartitionID))
+	}
+	return n
+}
+
+func (m *ChangeLeaderResponse) Size() (n int) {
+	var l int
+	_ = l
+	l = m.ResponseHeader.Size()
+	n += 1 + l + sovMaster(uint64(l))
 	return n
 }
 
@@ -3104,6 +3958,92 @@ func (this *PSRegisterResponse) String() string {
 		`NodeID:` + fmt.Sprintf("%v", this.NodeID) + `,`,
 		`PSConfig:` + strings.Replace(strings.Replace(this.PSConfig.String(), "PSConfig", "PSConfig", 1), `&`, ``, 1) + `,`,
 		`Partitions:` + strings.Replace(strings.Replace(fmt.Sprintf("%v", this.Partitions), "Partition", "meta.Partition", 1), `&`, ``, 1) + `,`,
+		`}`,
+	}, "")
+	return s
+}
+func (this *CreatePartitionRequest) String() string {
+	if this == nil {
+		return "nil"
+	}
+	s := strings.Join([]string{`&CreatePartitionRequest{`,
+		`RequestHeader:` + strings.Replace(strings.Replace(this.RequestHeader.String(), "RequestHeader", "meta.RequestHeader", 1), `&`, ``, 1) + `,`,
+		`Partition:` + strings.Replace(strings.Replace(this.Partition.String(), "Partition", "meta.Partition", 1), `&`, ``, 1) + `,`,
+		`}`,
+	}, "")
+	return s
+}
+func (this *CreatePartitionResponse) String() string {
+	if this == nil {
+		return "nil"
+	}
+	s := strings.Join([]string{`&CreatePartitionResponse{`,
+		`ResponseHeader:` + strings.Replace(strings.Replace(this.ResponseHeader.String(), "ResponseHeader", "meta.ResponseHeader", 1), `&`, ``, 1) + `,`,
+		`}`,
+	}, "")
+	return s
+}
+func (this *DeletePartitionRequest) String() string {
+	if this == nil {
+		return "nil"
+	}
+	s := strings.Join([]string{`&DeletePartitionRequest{`,
+		`RequestHeader:` + strings.Replace(strings.Replace(this.RequestHeader.String(), "RequestHeader", "meta.RequestHeader", 1), `&`, ``, 1) + `,`,
+		`ID:` + fmt.Sprintf("%v", this.ID) + `,`,
+		`}`,
+	}, "")
+	return s
+}
+func (this *DeletePartitionResponse) String() string {
+	if this == nil {
+		return "nil"
+	}
+	s := strings.Join([]string{`&DeletePartitionResponse{`,
+		`ResponseHeader:` + strings.Replace(strings.Replace(this.ResponseHeader.String(), "ResponseHeader", "meta.ResponseHeader", 1), `&`, ``, 1) + `,`,
+		`}`,
+	}, "")
+	return s
+}
+func (this *ChangeReplicaRequest) String() string {
+	if this == nil {
+		return "nil"
+	}
+	s := strings.Join([]string{`&ChangeReplicaRequest{`,
+		`RequestHeader:` + strings.Replace(strings.Replace(this.RequestHeader.String(), "RequestHeader", "meta.RequestHeader", 1), `&`, ``, 1) + `,`,
+		`Type:` + fmt.Sprintf("%v", this.Type) + `,`,
+		`PartitionID:` + fmt.Sprintf("%v", this.PartitionID) + `,`,
+		`Replica:` + strings.Replace(strings.Replace(this.Replica.String(), "Replica", "meta.Replica", 1), `&`, ``, 1) + `,`,
+		`}`,
+	}, "")
+	return s
+}
+func (this *ChangeReplicaResponse) String() string {
+	if this == nil {
+		return "nil"
+	}
+	s := strings.Join([]string{`&ChangeReplicaResponse{`,
+		`ResponseHeader:` + strings.Replace(strings.Replace(this.ResponseHeader.String(), "ResponseHeader", "meta.ResponseHeader", 1), `&`, ``, 1) + `,`,
+		`}`,
+	}, "")
+	return s
+}
+func (this *ChangeLeaderRequest) String() string {
+	if this == nil {
+		return "nil"
+	}
+	s := strings.Join([]string{`&ChangeLeaderRequest{`,
+		`RequestHeader:` + strings.Replace(strings.Replace(this.RequestHeader.String(), "RequestHeader", "meta.RequestHeader", 1), `&`, ``, 1) + `,`,
+		`PartitionID:` + fmt.Sprintf("%v", this.PartitionID) + `,`,
+		`}`,
+	}, "")
+	return s
+}
+func (this *ChangeLeaderResponse) String() string {
+	if this == nil {
+		return "nil"
+	}
+	s := strings.Join([]string{`&ChangeLeaderResponse{`,
+		`ResponseHeader:` + strings.Replace(strings.Replace(this.ResponseHeader.String(), "ResponseHeader", "meta.ResponseHeader", 1), `&`, ``, 1) + `,`,
 		`}`,
 	}, "")
 	return s
@@ -4619,6 +5559,782 @@ func (m *PSRegisterResponse) Unmarshal(dAtA []byte) error {
 			}
 			m.Partitions = append(m.Partitions, meta.Partition{})
 			if err := m.Partitions[len(m.Partitions)-1].Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		default:
+			iNdEx = preIndex
+			skippy, err := skipMaster(dAtA[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if skippy < 0 {
+				return ErrInvalidLengthMaster
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			iNdEx += skippy
+		}
+	}
+
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
+}
+func (m *CreatePartitionRequest) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
+	iNdEx := 0
+	for iNdEx < l {
+		preIndex := iNdEx
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowMaster
+			}
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := dAtA[iNdEx]
+			iNdEx++
+			wire |= (uint64(b) & 0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: CreatePartitionRequest: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: CreatePartitionRequest: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
+		switch fieldNum {
+		case 1:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field RequestHeader", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMaster
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				msglen |= (int(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthMaster
+			}
+			postIndex := iNdEx + msglen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			if err := m.RequestHeader.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		case 2:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Partition", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMaster
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				msglen |= (int(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthMaster
+			}
+			postIndex := iNdEx + msglen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			if err := m.Partition.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		default:
+			iNdEx = preIndex
+			skippy, err := skipMaster(dAtA[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if skippy < 0 {
+				return ErrInvalidLengthMaster
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			iNdEx += skippy
+		}
+	}
+
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
+}
+func (m *CreatePartitionResponse) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
+	iNdEx := 0
+	for iNdEx < l {
+		preIndex := iNdEx
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowMaster
+			}
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := dAtA[iNdEx]
+			iNdEx++
+			wire |= (uint64(b) & 0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: CreatePartitionResponse: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: CreatePartitionResponse: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
+		switch fieldNum {
+		case 1:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field ResponseHeader", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMaster
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				msglen |= (int(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthMaster
+			}
+			postIndex := iNdEx + msglen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			if err := m.ResponseHeader.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		default:
+			iNdEx = preIndex
+			skippy, err := skipMaster(dAtA[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if skippy < 0 {
+				return ErrInvalidLengthMaster
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			iNdEx += skippy
+		}
+	}
+
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
+}
+func (m *DeletePartitionRequest) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
+	iNdEx := 0
+	for iNdEx < l {
+		preIndex := iNdEx
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowMaster
+			}
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := dAtA[iNdEx]
+			iNdEx++
+			wire |= (uint64(b) & 0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: DeletePartitionRequest: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: DeletePartitionRequest: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
+		switch fieldNum {
+		case 1:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field RequestHeader", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMaster
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				msglen |= (int(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthMaster
+			}
+			postIndex := iNdEx + msglen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			if err := m.RequestHeader.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		case 2:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field ID", wireType)
+			}
+			m.ID = 0
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMaster
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				m.ID |= (github_com_tiglabs_baudengine_proto_metapb.PartitionID(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+		default:
+			iNdEx = preIndex
+			skippy, err := skipMaster(dAtA[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if skippy < 0 {
+				return ErrInvalidLengthMaster
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			iNdEx += skippy
+		}
+	}
+
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
+}
+func (m *DeletePartitionResponse) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
+	iNdEx := 0
+	for iNdEx < l {
+		preIndex := iNdEx
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowMaster
+			}
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := dAtA[iNdEx]
+			iNdEx++
+			wire |= (uint64(b) & 0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: DeletePartitionResponse: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: DeletePartitionResponse: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
+		switch fieldNum {
+		case 1:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field ResponseHeader", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMaster
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				msglen |= (int(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthMaster
+			}
+			postIndex := iNdEx + msglen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			if err := m.ResponseHeader.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		default:
+			iNdEx = preIndex
+			skippy, err := skipMaster(dAtA[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if skippy < 0 {
+				return ErrInvalidLengthMaster
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			iNdEx += skippy
+		}
+	}
+
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
+}
+func (m *ChangeReplicaRequest) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
+	iNdEx := 0
+	for iNdEx < l {
+		preIndex := iNdEx
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowMaster
+			}
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := dAtA[iNdEx]
+			iNdEx++
+			wire |= (uint64(b) & 0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: ChangeReplicaRequest: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: ChangeReplicaRequest: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
+		switch fieldNum {
+		case 1:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field RequestHeader", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMaster
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				msglen |= (int(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthMaster
+			}
+			postIndex := iNdEx + msglen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			if err := m.RequestHeader.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		case 2:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Type", wireType)
+			}
+			m.Type = 0
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMaster
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				m.Type |= (ReplicaChangeType(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+		case 3:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field PartitionID", wireType)
+			}
+			m.PartitionID = 0
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMaster
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				m.PartitionID |= (github_com_tiglabs_baudengine_proto_metapb.PartitionID(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+		case 4:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Replica", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMaster
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				msglen |= (int(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthMaster
+			}
+			postIndex := iNdEx + msglen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			if err := m.Replica.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		default:
+			iNdEx = preIndex
+			skippy, err := skipMaster(dAtA[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if skippy < 0 {
+				return ErrInvalidLengthMaster
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			iNdEx += skippy
+		}
+	}
+
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
+}
+func (m *ChangeReplicaResponse) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
+	iNdEx := 0
+	for iNdEx < l {
+		preIndex := iNdEx
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowMaster
+			}
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := dAtA[iNdEx]
+			iNdEx++
+			wire |= (uint64(b) & 0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: ChangeReplicaResponse: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: ChangeReplicaResponse: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
+		switch fieldNum {
+		case 1:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field ResponseHeader", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMaster
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				msglen |= (int(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthMaster
+			}
+			postIndex := iNdEx + msglen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			if err := m.ResponseHeader.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		default:
+			iNdEx = preIndex
+			skippy, err := skipMaster(dAtA[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if skippy < 0 {
+				return ErrInvalidLengthMaster
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			iNdEx += skippy
+		}
+	}
+
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
+}
+func (m *ChangeLeaderRequest) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
+	iNdEx := 0
+	for iNdEx < l {
+		preIndex := iNdEx
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowMaster
+			}
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := dAtA[iNdEx]
+			iNdEx++
+			wire |= (uint64(b) & 0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: ChangeLeaderRequest: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: ChangeLeaderRequest: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
+		switch fieldNum {
+		case 1:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field RequestHeader", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMaster
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				msglen |= (int(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthMaster
+			}
+			postIndex := iNdEx + msglen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			if err := m.RequestHeader.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		case 2:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field PartitionID", wireType)
+			}
+			m.PartitionID = 0
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMaster
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				m.PartitionID |= (github_com_tiglabs_baudengine_proto_metapb.PartitionID(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+		default:
+			iNdEx = preIndex
+			skippy, err := skipMaster(dAtA[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if skippy < 0 {
+				return ErrInvalidLengthMaster
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			iNdEx += skippy
+		}
+	}
+
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
+}
+func (m *ChangeLeaderResponse) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
+	iNdEx := 0
+	for iNdEx < l {
+		preIndex := iNdEx
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowMaster
+			}
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := dAtA[iNdEx]
+			iNdEx++
+			wire |= (uint64(b) & 0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: ChangeLeaderResponse: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: ChangeLeaderResponse: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
+		switch fieldNum {
+		case 1:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field ResponseHeader", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMaster
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				msglen |= (int(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthMaster
+			}
+			postIndex := iNdEx + msglen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			if err := m.ResponseHeader.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
 				return err
 			}
 			iNdEx = postIndex
@@ -6480,120 +8196,137 @@ var (
 func init() { proto.RegisterFile("master.proto", fileDescriptorMaster) }
 
 var fileDescriptorMaster = []byte{
-	// 1837 bytes of a gzipped FileDescriptorProto
-	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0xcc, 0x58, 0x4d, 0x8c, 0x23, 0x47,
-	0x15, 0x76, 0xfb, 0x6f, 0xec, 0xe7, 0xb1, 0x67, 0xa6, 0x76, 0x33, 0xe3, 0x9d, 0x05, 0x7b, 0x68,
-	0xa1, 0xc4, 0x90, 0xa4, 0x67, 0xd7, 0x21, 0x59, 0x82, 0x14, 0x25, 0xf1, 0x98, 0xec, 0x5a, 0xca,
-	0xee, 0x9a, 0xf6, 0x86, 0x88, 0x48, 0xa8, 0xd5, 0xee, 0xae, 0xf1, 0xb4, 0xd6, 0xee, 0x6a, 0xba,
-	0xca, 0xbb, 0x19, 0x4e, 0xdc, 0xe0, 0xc8, 0x91, 0x13, 0x67, 0xae, 0x70, 0x8a, 0x90, 0x90, 0x38,
-	0xee, 0x8d, 0x1c, 0x39, 0x59, 0x19, 0x73, 0xe2, 0x80, 0xc4, 0x11, 0xed, 0x01, 0x50, 0xbd, 0xaa,
-	0x76, 0xb7, 0x67, 0x83, 0xc4, 0x18, 0x21, 0xe5, 0xe4, 0xae, 0xf7, 0xbe, 0xf7, 0x5b, 0xef, 0xbd,
-	0xaa, 0x32, 0x6c, 0xcf, 0x5c, 0x2e, 0x68, 0x6c, 0x45, 0x31, 0x13, 0xec, 0xf0, 0xf5, 0x49, 0x20,
-	0xce, 0xe6, 0x63, 0xcb, 0x63, 0xb3, 0xe3, 0x09, 0x9b, 0xb0, 0x63, 0x24, 0x8f, 0xe7, 0xa7, 0xb8,
-	0xc2, 0x05, 0x7e, 0x69, 0xf8, 0x9b, 0x19, 0xb8, 0x08, 0x26, 0x53, 0x77, 0xcc, 0x8f, 0xc7, 0xee,
-	0xdc, 0xa7, 0xe1, 0x24, 0x08, 0xa9, 0x12, 0x3e, 0x9e, 0x51, 0xe1, 0x46, 0x63, 0xfc, 0x51, 0x62,
-	0x66, 0x1f, 0xb6, 0xee, 0xde, 0x47, 0xb3, 0xa4, 0x01, 0xf9, 0xc0, 0x6f, 0x1a, 0x47, 0x46, 0xa7,
-	0x6e, 0xe7, 0x03, 0x1f, 0xd7, 0x51, 0x33, 0x7f, 0x64, 0x74, 0xaa, 0x76, 0x3e, 0x88, 0xc8, 0x0d,
-	0xa8, 0xc4, 0x91, 0xe7, 0x44, 0x2c, 0x16, 0xcd, 0x02, 0xa2, 0xb6, 0xe2, 0xc8, 0x1b, 0xb2, 0x58,
-	0x48, 0x2d, 0x9f, 0xfc, 0xef, 0x5a, 0x7e, 0x6b, 0x40, 0xc9, 0x66, 0x73, 0x41, 0x49, 0x17, 0xaa,
-	0x91, 0x1b, 0x8b, 0x40, 0x04, 0x2c, 0x44, 0x5d, 0xb5, 0x2e, 0x58, 0xc3, 0x84, 0xd2, 0xab, 0x3c,
-	0x5b, 0xb4, 0x73, 0x9f, 0x2f, 0xda, 0x86, 0x9d, 0xc2, 0xc8, 0x4d, 0x28, 0x85, 0xcc, 0xa7, 0xbc,
-	0x99, 0x3f, 0x2a, 0x74, 0x6a, 0xdd, 0x92, 0xf5, 0x80, 0xf9, 0xd4, 0x56, 0x34, 0xf2, 0x31, 0x94,
-	0xa7, 0xd4, 0xf5, 0x69, 0xac, 0x6c, 0xf6, 0xde, 0x5d, 0x2e, 0xda, 0xe5, 0x0f, 0x91, 0xf2, 0x7c,
-	0xd1, 0xbe, 0xfd, 0xdf, 0xe7, 0x0e, 0xb5, 0x0e, 0xfa, 0xb6, 0x56, 0x67, 0xfe, 0x08, 0xb6, 0xef,
-	0x52, 0xd1, 0xef, 0xd9, 0xf4, 0x27, 0x73, 0xca, 0x05, 0xb9, 0x05, 0xe5, 0x33, 0x65, 0x48, 0xb9,
-	0xdd, 0xb0, 0x34, 0xe7, 0x1e, 0x52, 0x33, 0xae, 0x6b, 0x1c, 0x39, 0x80, 0xad, 0x7e, 0xcf, 0x09,
-	0xdd, 0x19, 0xd5, 0x59, 0x2a, 0xf7, 0x7b, 0x0f, 0xdc, 0x19, 0x35, 0x7f, 0x0c, 0x75, 0xad, 0x9a,
-	0x47, 0x2c, 0xe4, 0x94, 0xdc, 0xbe, 0xa4, 0x7b, 0xc7, 0x4a, 0x58, 0xff, 0x51, 0xf9, 0x0d, 0xc8,
-	0xfb, 0x63, 0xd4, 0x5b, 0xeb, 0x16, 0xac, 0x7e, 0xaf, 0x57, 0x94, 0x10, 0x3b, 0xef, 0x8f, 0xcd,
-	0xdf, 0x19, 0xb0, 0x73, 0x97, 0x8a, 0x51, 0xe4, 0x7a, 0x74, 0x73, 0xef, 0x1f, 0x40, 0xc9, 0x1f,
-	0x3b, 0x81, 0x8f, 0x36, 0xea, 0xbd, 0xb7, 0x97, 0x8b, 0x76, 0x7e, 0xd0, 0x7f, 0xbe, 0x68, 0x1f,
-	0x5f, 0x21, 0xa7, 0xfd, 0xde, 0xa0, 0x6f, 0x17, 0xfd, 0xf1, 0xc0, 0x27, 0x5f, 0x07, 0x40, 0x8f,
-	0x54, 0x42, 0x0a, 0x98, 0x90, 0x2a, 0x52, 0x30, 0x27, 0x01, 0xec, 0xa6, 0x3e, 0x6f, 0x9e, 0x16,
-	0x13, 0x4a, 0x5c, 0xea, 0xd0, 0x99, 0x29, 0x5b, 0xa8, 0x51, 0x27, 0x47, 0xb1, 0xcc, 0xcf, 0xf2,
-	0x98, 0x1f, 0x2c, 0xc8, 0xcd, 0xf3, 0x33, 0x58, 0x6d, 0x80, 0x4e, 0x4e, 0xbf, 0xb7, 0x49, 0x72,
-	0xf2, 0xfe, 0x98, 0x7c, 0x94, 0x38, 0x9d, 0x96, 0x70, 0x09, 0xfd, 0x7e, 0xbe, 0x68, 0x77, 0xaf,
-	0xa0, 0x10, 0x65, 0x06, 0x7d, 0x1d, 0x27, 0xf9, 0x01, 0x14, 0xf9, 0x94, 0x89, 0x66, 0x11, 0xb5,
-	0xbe, 0xb3, 0x5c, 0xb4, 0x8b, 0xa3, 0x29, 0x13, 0x57, 0x6c, 0x0b, 0x29, 0x22, 0x37, 0x51, 0xaa,
-	0x32, 0x1f, 0xe3, 0x2e, 0xe9, 0xcc, 0x6d, 0xbe, 0x4b, 0xdf, 0x84, 0x72, 0x2c, 0x75, 0x24, 0x2d,
-	0x5d, 0xb6, 0x50, 0xa5, 0xde, 0x26, 0xcd, 0x33, 0xff, 0x6a, 0xc0, 0xde, 0x70, 0x64, 0xd3, 0x49,
-	0x20, 0xe7, 0xcf, 0xe6, 0x3b, 0xf5, 0x31, 0x94, 0x43, 0xec, 0x6d, 0xbd, 0x5b, 0x38, 0x22, 0x54,
-	0xb7, 0x6f, 0x38, 0x22, 0x94, 0x3a, 0x3d, 0x01, 0x0b, 0xab, 0x09, 0xf8, 0x36, 0x6c, 0xc7, 0xf3,
-	0x50, 0x04, 0x33, 0xea, 0x04, 0xe1, 0x29, 0xc3, 0xc4, 0xd7, 0xba, 0xdb, 0x96, 0xad, 0x88, 0x83,
-	0xf0, 0x94, 0x65, 0xdc, 0xab, 0xc5, 0x29, 0xd9, 0xfc, 0x97, 0x01, 0x24, 0x1b, 0xeb, 0xe6, 0xb9,
-	0xfd, 0xbf, 0x45, 0xfb, 0x2a, 0x94, 0x3d, 0x16, 0x9e, 0x06, 0x13, 0x8c, 0xb8, 0xd6, 0xad, 0x5a,
-	0xc3, 0xd1, 0x09, 0x12, 0xb2, 0x5e, 0x28, 0x08, 0xb9, 0x05, 0xb0, 0x1a, 0xe0, 0xbc, 0x59, 0xc4,
-	0x5d, 0xce, 0x0e, 0x7a, 0xb5, 0xd3, 0x19, 0x8c, 0xf9, 0xcf, 0x02, 0x54, 0x12, 0x85, 0xe4, 0xf5,
-	0xcc, 0x59, 0x82, 0x27, 0x4e, 0x8f, 0x2c, 0x17, 0xed, 0x2d, 0x7b, 0x78, 0x22, 0xcf, 0x93, 0xe7,
-	0x8b, 0x76, 0x21, 0x08, 0xc5, 0xea, 0x7c, 0x21, 0x2f, 0x03, 0xb8, 0xfe, 0x2c, 0x08, 0x95, 0x80,
-	0x8a, 0x7b, 0x2b, 0x41, 0x55, 0x91, 0x85, 0xb8, 0xb7, 0x80, 0x9c, 0x51, 0x37, 0x16, 0x63, 0xea,
-	0x0a, 0x27, 0x08, 0x05, 0x8d, 0x9f, 0xb8, 0x53, 0xdd, 0x75, 0x2b, 0xfc, 0xde, 0x0a, 0x32, 0xd0,
-	0x08, 0x72, 0x07, 0xae, 0xc5, 0xee, 0xa9, 0x70, 0x52, 0x61, 0x34, 0x54, 0xbc, 0x24, 0x28, 0x31,
-	0xf7, 0x12, 0x08, 0x1a, 0x4c, 0x04, 0x63, 0x1a, 0x4d, 0x03, 0xcf, 0x15, 0x54, 0x09, 0x96, 0xbe,
-	0x44, 0xd0, 0x4e, 0x20, 0x28, 0xf8, 0x2e, 0x1c, 0x5c, 0xb2, 0xb8, 0x72, 0xb7, 0xbc, 0x2e, 0xfc,
-	0xd2, 0x9a, 0xd5, 0x95, 0xcb, 0x1d, 0xd8, 0xd5, 0x96, 0x85, 0x1b, 0x84, 0xce, 0x94, 0x4d, 0x78,
-	0x73, 0xeb, 0xc8, 0xe8, 0x14, 0xed, 0x86, 0xb2, 0x26, 0xc9, 0x1f, 0xb2, 0x09, 0x27, 0xef, 0x43,
-	0x33, 0xeb, 0xa3, 0xe3, 0xb1, 0xd0, 0x9b, 0xc7, 0x31, 0x0d, 0xbd, 0xf3, 0x66, 0x65, 0xdd, 0xd6,
-	0x7e, 0xc6, 0xd1, 0x93, 0x14, 0x46, 0x4e, 0xe0, 0x06, 0xaa, 0xe0, 0xa1, 0x1b, 0xf1, 0x33, 0x26,
-	0xd6, 0x74, 0x54, 0xd7, 0x75, 0x60, 0x5c, 0x23, 0x0d, 0xcc, 0x28, 0x31, 0x7f, 0x9e, 0x97, 0x2d,
-	0xb0, 0x8a, 0xe4, 0x2b, 0xd8, 0xef, 0xdf, 0x59, 0x2b, 0xea, 0x02, 0x16, 0x75, 0x23, 0x2d, 0x6a,
-	0xec, 0xef, 0x17, 0x0a, 0x9b, 0xdc, 0x82, 0x2a, 0x3f, 0xe7, 0x0e, 0x17, 0xae, 0xe0, 0x7a, 0x24,
-	0xd4, 0x51, 0xf3, 0xe8, 0x9c, 0x8f, 0x24, 0x51, 0xcb, 0x54, 0xb8, 0x5e, 0x9b, 0xf7, 0xe0, 0xda,
-	0x5a, 0x22, 0x36, 0x1e, 0x06, 0xe6, 0xef, 0xf3, 0x50, 0x5f, 0xf3, 0x8f, 0x0c, 0xd3, 0x5b, 0x5c,
-	0xef, 0xbd, 0xd5, 0x99, 0xfe, 0xd6, 0x15, 0x92, 0x92, 0xea, 0xeb, 0xe3, 0x3d, 0xf0, 0x26, 0x54,
-	0x03, 0xee, 0xe8, 0x4b, 0x98, 0xcc, 0x78, 0xc5, 0xae, 0x04, 0x5c, 0x5d, 0xc1, 0x48, 0x07, 0xca,
-	0x32, 0xf0, 0x39, 0xc7, 0x2e, 0x6b, 0x74, 0x77, 0x53, 0xf1, 0x11, 0xd2, 0x6d, 0xcd, 0x27, 0xaf,
-	0x42, 0x89, 0x46, 0xcc, 0x3b, 0xd3, 0x29, 0xda, 0x49, 0x81, 0xdf, 0x97, 0xe4, 0xe4, 0x08, 0x47,
-	0x0c, 0x79, 0x13, 0x40, 0x8a, 0x05, 0x5c, 0x04, 0x1e, 0xc7, 0x76, 0x5a, 0x93, 0xc8, 0xa6, 0x35,
-	0x03, 0x24, 0xaf, 0x41, 0x4d, 0xd5, 0xa9, 0x72, 0xa9, 0x8c, 0x72, 0x35, 0xcb, 0x96, 0x15, 0xa9,
-	0xbc, 0x81, 0x78, 0xf5, 0x6d, 0xfe, 0xc2, 0x80, 0x5a, 0x66, 0x74, 0x93, 0x36, 0xd4, 0xdc, 0x28,
-	0x72, 0x9e, 0xd0, 0x98, 0x27, 0xb7, 0xd7, 0xaa, 0x0d, 0x6e, 0x14, 0xfd, 0x50, 0x51, 0xe4, 0x15,
-	0x87, 0x0b, 0x37, 0x16, 0x8e, 0x14, 0xd1, 0x77, 0xbe, 0x2a, 0x52, 0x1e, 0x05, 0x33, 0x2a, 0xd9,
-	0x13, 0xb6, 0x12, 0xd7, 0x37, 0xa0, 0x09, 0x4b, 0xa4, 0x0f, 0xa1, 0x12, 0x4d, 0x5d, 0x71, 0xca,
-	0xe2, 0x19, 0xe6, 0xa0, 0x6a, 0xaf, 0xd6, 0xe6, 0x9f, 0x0c, 0x80, 0xd4, 0x4b, 0xf2, 0x1a, 0x6c,
-	0xe9, 0x6e, 0xd5, 0xa5, 0x50, 0xb1, 0x74, 0x57, 0x66, 0x6a, 0x20, 0x81, 0x10, 0x02, 0x45, 0x41,
-	0xe3, 0x19, 0x3a, 0x54, 0xb4, 0xf1, 0x9b, 0x5c, 0x87, 0x52, 0x10, 0xfa, 0xf4, 0x53, 0x74, 0xa3,
-	0x68, 0xab, 0x05, 0xd9, 0x97, 0x23, 0x7e, 0x36, 0x0b, 0xd4, 0x68, 0x2b, 0xda, 0x7a, 0x45, 0x9a,
-	0xb0, 0xe5, 0x46, 0xd1, 0x34, 0xa0, 0x3e, 0xe6, 0xba, 0x68, 0x27, 0x4b, 0x72, 0x07, 0xaa, 0xa7,
-	0x6c, 0x3a, 0x65, 0x4f, 0x69, 0x2c, 0xf3, 0x29, 0x3b, 0xe2, 0x1a, 0xe6, 0xf3, 0x03, 0x4d, 0x55,
-	0x1e, 0xeb, 0xbd, 0x48, 0xb1, 0xe6, 0x1f, 0x0c, 0x20, 0x2f, 0xe2, 0xae, 0x18, 0xd9, 0x75, 0x28,
-	0xcd, 0x5c, 0xe1, 0x9d, 0xe9, 0xd0, 0xd4, 0x22, 0x13, 0x45, 0x61, 0x2d, 0x0a, 0x02, 0xc5, 0x90,
-	0x7e, 0x9a, 0xc4, 0x86, 0xdf, 0xe4, 0x1b, 0xb0, 0xed, 0xb3, 0xa7, 0xa1, 0xc3, 0xa9, 0xc7, 0x42,
-	0x9f, 0xeb, 0xf0, 0x6a, 0x92, 0x36, 0x52, 0x24, 0x69, 0x44, 0xd6, 0x0b, 0xc5, 0x72, 0xa9, 0xda,
-	0x6a, 0x61, 0xfe, 0xba, 0x04, 0xdb, 0xd9, 0x26, 0x96, 0x9a, 0x66, 0x74, 0xc6, 0xe2, 0x73, 0x47,
-	0x30, 0xe1, 0x4e, 0xd1, 0xfd, 0xa2, 0x5d, 0x53, 0xb4, 0x47, 0x92, 0x44, 0x5e, 0x86, 0x1d, 0x0d,
-	0x99, 0x73, 0xea, 0x3b, 0x31, 0xe7, 0xda, 0xf1, 0xba, 0x22, 0x7f, 0xc4, 0xa9, 0x6f, 0x73, 0x2e,
-	0x0b, 0x2d, 0x83, 0xd3, 0x51, 0x40, 0x8a, 0xc9, 0x00, 0x4e, 0x63, 0x4a, 0x75, 0x40, 0x1a, 0xf0,
-	0x41, 0x4c, 0x29, 0xf9, 0x36, 0xec, 0xf1, 0xa7, 0x6e, 0xe4, 0xac, 0x79, 0x54, 0x46, 0xd8, 0x8e,
-	0x64, 0xdc, 0xcf, 0x78, 0xd5, 0x81, 0xdd, 0x2c, 0x16, 0x4d, 0xea, 0x93, 0x22, 0x85, 0xa2, 0xd9,
-	0x4b, 0x48, 0xb4, 0x5d, 0xb9, 0x8c, 0x44, 0xfb, 0x26, 0xd4, 0xbd, 0x68, 0xee, 0x44, 0x31, 0xf3,
-	0x9c, 0x58, 0xe6, 0x0e, 0x8e, 0x8c, 0x8e, 0x61, 0xd7, 0xbc, 0x68, 0x3e, 0x8c, 0x99, 0x67, 0xbb,
-	0x82, 0xca, 0xb9, 0x21, 0x31, 0x1e, 0x9b, 0x87, 0xa2, 0x59, 0xc3, 0x07, 0x63, 0xc5, 0x8b, 0xe6,
-	0x27, 0x72, 0x2d, 0x7b, 0xc5, 0x0f, 0xf8, 0x63, 0xed, 0xf9, 0x0e, 0x1a, 0xa9, 0x4a, 0x8a, 0xf2,
-	0xf9, 0x26, 0xe0, 0x42, 0x39, 0xbb, 0x8b, 0xdc, 0x8a, 0x24, 0xa0, 0x9b, 0x09, 0x13, 0xfd, 0xdb,
-	0x4b, 0x99, 0xe8, 0xd9, 0x6d, 0xd8, 0x0f, 0xa9, 0x70, 0x02, 0xe6, 0x04, 0xa1, 0x33, 0x3e, 0x97,
-	0x27, 0x32, 0x8d, 0xe5, 0xf6, 0x37, 0x5f, 0x42, 0xe4, 0x5e, 0x48, 0xc5, 0x80, 0x0d, 0xc2, 0xde,
-	0xb9, 0xa0, 0x43, 0x1a, 0x8f, 0xa8, 0x47, 0xde, 0x80, 0x03, 0x2d, 0xc2, 0xe6, 0x62, 0x5d, 0x66,
-	0x1f, 0x65, 0x08, 0xca, 0x3c, 0x9c, 0x8b, 0x8c, 0x90, 0x05, 0xd7, 0xa4, 0x90, 0xf0, 0x22, 0x79,
-	0x18, 0x86, 0xd4, 0x53, 0x87, 0xc6, 0x01, 0xc6, 0x29, 0x8d, 0x3c, 0xf2, 0xa2, 0x93, 0x94, 0x41,
-	0xde, 0x81, 0xaf, 0x25, 0x78, 0xd7, 0x13, 0xc1, 0x13, 0xea, 0xb0, 0x88, 0x86, 0x7c, 0x65, 0xa9,
-	0x89, 0x96, 0x0e, 0x94, 0xe0, 0xfb, 0x88, 0x78, 0x28, 0x01, 0xda, 0xdc, 0x2e, 0x14, 0x58, 0xc4,
-	0x9b, 0x37, 0x10, 0x25, 0x3f, 0xcd, 0xbf, 0x19, 0xd0, 0x58, 0x1f, 0x88, 0xb2, 0x01, 0x78, 0xf0,
-	0x53, 0xaa, 0x4b, 0x13, 0xbf, 0x13, 0xc1, 0xfc, 0x4a, 0x90, 0xbc, 0x02, 0xbb, 0x32, 0x46, 0x2e,
-	0x13, 0x94, 0x58, 0x57, 0x25, 0x58, 0x47, 0xfa, 0x20, 0xd4, 0x36, 0xbf, 0x05, 0x7b, 0x0a, 0x28,
-	0xd3, 0x92, 0x20, 0x55, 0x2d, 0x36, 0x90, 0xf1, 0x70, 0x2e, 0x34, 0xf4, 0xbb, 0xd0, 0xc4, 0x9d,
-	0x74, 0x64, 0x2b, 0xba, 0xa1, 0xcf, 0xb1, 0x34, 0x28, 0xe7, 0xab, 0x89, 0xb2, 0x8f, 0xfc, 0x13,
-	0xcd, 0x1e, 0x26, 0x5c, 0xf2, 0x0a, 0xec, 0x3c, 0xa6, 0xe7, 0xf8, 0xa0, 0x71, 0x66, 0x01, 0xe7,
-	0x94, 0xeb, 0x3a, 0x6e, 0x24, 0xe4, 0xfb, 0x48, 0xed, 0xfe, 0x32, 0x0f, 0x55, 0xf5, 0x4f, 0x85,
-	0x1d, 0x79, 0xe4, 0x36, 0x54, 0x92, 0x87, 0x0a, 0xd9, 0xb5, 0x2e, 0xbd, 0xf6, 0x0e, 0xf7, 0xac,
-	0xcb, 0xaf, 0x18, 0x33, 0x47, 0xee, 0x00, 0xa4, 0x37, 0x70, 0x42, 0xac, 0x17, 0x9e, 0x1e, 0x87,
-	0xd7, 0xac, 0x17, 0xaf, 0xe8, 0x66, 0x8e, 0x7c, 0x0f, 0x6a, 0x99, 0xe3, 0x9a, 0x48, 0xd4, 0xe5,
-	0x5b, 0xcc, 0xe1, 0x75, 0xeb, 0x4b, 0x4e, 0x74, 0x33, 0x47, 0x3a, 0x50, 0xc2, 0xbf, 0x02, 0x48,
-	0xdd, 0xca, 0xfe, 0xdb, 0x70, 0xd8, 0xb0, 0xd6, 0xfe, 0x21, 0x30, 0x73, 0x3a, 0x22, 0x7c, 0xe2,
-	0xa9, 0x88, 0xb2, 0xef, 0x7b, 0x15, 0xd1, 0xda, 0xeb, 0xd9, 0xcc, 0xf5, 0xde, 0x7b, 0x76, 0xd1,
-	0xca, 0xfd, 0xf9, 0xa2, 0x95, 0xfb, 0xe2, 0xa2, 0x95, 0xfb, 0xfb, 0x45, 0x2b, 0xf7, 0x8f, 0x8b,
-	0x96, 0xf1, 0xb3, 0x65, 0xcb, 0xf8, 0xcd, 0xb2, 0x65, 0x7c, 0xb6, 0x6c, 0xe5, 0xfe, 0xb8, 0x6c,
-	0xe5, 0x9e, 0x2d, 0x5b, 0xc6, 0xe7, 0xcb, 0x96, 0xf1, 0xc5, 0xb2, 0x65, 0xfc, 0xea, 0x2f, 0xad,
-	0xdc, 0x3d, 0xe3, 0x93, 0x8a, 0xfa, 0xbb, 0x2a, 0x1a, 0x8f, 0xcb, 0x78, 0xf2, 0xbf, 0xf1, 0xef,
-	0x00, 0x00, 0x00, 0xff, 0xff, 0x82, 0xe1, 0x60, 0x38, 0xc1, 0x12, 0x00, 0x00,
+	// 2098 bytes of a gzipped FileDescriptorProto
+	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0xcc, 0x58, 0xcd, 0x8f, 0x1b, 0x49,
+	0x15, 0x77, 0xfb, 0x6b, 0xec, 0xe7, 0xf9, 0xac, 0x49, 0x66, 0x9c, 0x09, 0xd8, 0xa1, 0x85, 0xb2,
+	0x66, 0x3f, 0x3a, 0xc9, 0x2c, 0xbb, 0x61, 0x91, 0xa2, 0x4d, 0x3c, 0x26, 0x89, 0x51, 0x3e, 0x86,
+	0x76, 0x96, 0x15, 0x2b, 0xa1, 0x56, 0xbb, 0xbb, 0xc6, 0xd3, 0x8a, 0xdd, 0xd5, 0x74, 0x95, 0x93,
+	0x9d, 0x3d, 0x71, 0x63, 0xff, 0x04, 0x0e, 0x08, 0x89, 0x1b, 0x57, 0x90, 0x90, 0x56, 0x48, 0x48,
+	0x1c, 0x73, 0x63, 0x8f, 0x9c, 0xac, 0x8d, 0x39, 0x71, 0x40, 0xe2, 0x88, 0x72, 0x00, 0x54, 0xaf,
+	0xaa, 0xdb, 0x6d, 0xcf, 0x44, 0x22, 0xde, 0x5d, 0x89, 0x53, 0x77, 0xbd, 0xfa, 0xbd, 0xcf, 0xaa,
+	0x7a, 0xaf, 0x5e, 0xc1, 0xea, 0xc8, 0xe5, 0x82, 0xc6, 0x56, 0x14, 0x33, 0xc1, 0xf6, 0xde, 0x1a,
+	0x04, 0xe2, 0x78, 0xdc, 0xb7, 0x3c, 0x36, 0xba, 0x32, 0x60, 0x03, 0x76, 0x05, 0xc9, 0xfd, 0xf1,
+	0x11, 0x8e, 0x70, 0x80, 0x7f, 0x1a, 0xfe, 0x4e, 0x06, 0x2e, 0x82, 0xc1, 0xd0, 0xed, 0xf3, 0x2b,
+	0x7d, 0x77, 0xec, 0xd3, 0x70, 0x10, 0x84, 0x54, 0x31, 0x5f, 0x19, 0x51, 0xe1, 0x46, 0x7d, 0xfc,
+	0x28, 0x36, 0xb3, 0x03, 0x2b, 0x77, 0xee, 0xa3, 0x5a, 0xb2, 0x0e, 0xf9, 0xc0, 0xaf, 0x1b, 0x97,
+	0x8c, 0xd6, 0x9a, 0x9d, 0x0f, 0x7c, 0x1c, 0x47, 0xf5, 0xfc, 0x25, 0xa3, 0x55, 0xb5, 0xf3, 0x41,
+	0x44, 0x2e, 0x40, 0x25, 0x8e, 0x3c, 0x27, 0x62, 0xb1, 0xa8, 0x17, 0x10, 0xb5, 0x12, 0x47, 0xde,
+	0x21, 0x8b, 0x85, 0x94, 0xf2, 0xd1, 0x97, 0x97, 0xf2, 0x3b, 0x03, 0x4a, 0x36, 0x1b, 0x0b, 0x4a,
+	0xf6, 0xa1, 0x1a, 0xb9, 0xb1, 0x08, 0x44, 0xc0, 0x42, 0x94, 0x55, 0xdb, 0x07, 0xeb, 0x30, 0xa1,
+	0xb4, 0x2b, 0xcf, 0x26, 0xcd, 0xdc, 0xe7, 0x93, 0xa6, 0x61, 0xcf, 0x60, 0xe4, 0x22, 0x94, 0x42,
+	0xe6, 0x53, 0x5e, 0xcf, 0x5f, 0x2a, 0xb4, 0x6a, 0xfb, 0x25, 0xeb, 0x01, 0xf3, 0xa9, 0xad, 0x68,
+	0xe4, 0x43, 0x28, 0x0f, 0xa9, 0xeb, 0xd3, 0x58, 0xe9, 0x6c, 0xbf, 0x3f, 0x9d, 0x34, 0xcb, 0xf7,
+	0x90, 0xf2, 0x62, 0xd2, 0xbc, 0xf6, 0xbf, 0xc7, 0x0e, 0xa5, 0x76, 0x3b, 0xb6, 0x16, 0x67, 0xfe,
+	0x04, 0x56, 0xef, 0x50, 0xd1, 0x69, 0xdb, 0xf4, 0x67, 0x63, 0xca, 0x05, 0xb9, 0x0a, 0xe5, 0x63,
+	0xa5, 0x48, 0x99, 0xbd, 0x6e, 0xe9, 0x99, 0xbb, 0x48, 0xcd, 0x98, 0xae, 0x71, 0x64, 0x17, 0x56,
+	0x3a, 0x6d, 0x27, 0x74, 0x47, 0x54, 0x47, 0xa9, 0xdc, 0x69, 0x3f, 0x70, 0x47, 0xd4, 0xfc, 0x29,
+	0xac, 0x69, 0xd1, 0x3c, 0x62, 0x21, 0xa7, 0xe4, 0xda, 0x82, 0xec, 0x0d, 0x2b, 0x99, 0x7a, 0xa9,
+	0xf0, 0x0b, 0x90, 0xf7, 0xfb, 0x28, 0xb7, 0xb6, 0x5f, 0xb0, 0x3a, 0xed, 0x76, 0x51, 0x42, 0xec,
+	0xbc, 0xdf, 0x37, 0x7f, 0x6f, 0xc0, 0xc6, 0x1d, 0x2a, 0x7a, 0x91, 0xeb, 0xd1, 0xe5, 0xad, 0x7f,
+	0x00, 0x25, 0xbf, 0xef, 0x04, 0x3e, 0xea, 0x58, 0x6b, 0xbf, 0x37, 0x9d, 0x34, 0xf3, 0xdd, 0xce,
+	0x8b, 0x49, 0xf3, 0xca, 0x2b, 0xc4, 0xb4, 0xd3, 0xee, 0x76, 0xec, 0xa2, 0xdf, 0xef, 0xfa, 0xe4,
+	0x9b, 0x00, 0x68, 0x91, 0x0a, 0x48, 0x01, 0x03, 0x52, 0x45, 0x0a, 0xc6, 0x24, 0x80, 0xcd, 0x99,
+	0xcd, 0xcb, 0x87, 0xc5, 0x84, 0x12, 0x97, 0x32, 0x74, 0x64, 0xca, 0x16, 0x4a, 0xd4, 0xc1, 0x51,
+	0x53, 0xe6, 0x67, 0x79, 0x8c, 0x0f, 0x6e, 0xc8, 0xe5, 0xe3, 0xd3, 0x4d, 0x17, 0x40, 0x07, 0xa7,
+	0xd3, 0x5e, 0x26, 0x38, 0x79, 0xbf, 0x4f, 0x3e, 0x48, 0x8c, 0x9e, 0x6d, 0xe1, 0x12, 0xda, 0xfd,
+	0x62, 0xd2, 0xdc, 0x7f, 0x05, 0x81, 0xc8, 0xd3, 0xed, 0x68, 0x3f, 0xc9, 0x8f, 0xa0, 0xc8, 0x87,
+	0x4c, 0xd4, 0x8b, 0x28, 0xf5, 0xc6, 0x74, 0xd2, 0x2c, 0xf6, 0x86, 0x4c, 0xbc, 0xe2, 0xb1, 0x90,
+	0x2c, 0x72, 0x11, 0xa5, 0x28, 0xf3, 0x31, 0xae, 0x92, 0x8e, 0xdc, 0xf2, 0xab, 0xf4, 0x6d, 0x28,
+	0xc7, 0x52, 0x46, 0x72, 0xa4, 0xcb, 0x16, 0x8a, 0xd4, 0xcb, 0xa4, 0xe7, 0xcc, 0xbf, 0x1b, 0xb0,
+	0x75, 0xd8, 0xb3, 0xe9, 0x20, 0x90, 0xf9, 0x67, 0xf9, 0x95, 0xfa, 0x10, 0xca, 0x21, 0x9e, 0x6d,
+	0xbd, 0x5a, 0x98, 0x22, 0xd4, 0x69, 0x5f, 0x32, 0x45, 0x28, 0x71, 0x3a, 0x03, 0x16, 0xd2, 0x0c,
+	0xf8, 0x1e, 0xac, 0xc6, 0xe3, 0x50, 0x04, 0x23, 0xea, 0x04, 0xe1, 0x11, 0xc3, 0xc0, 0xd7, 0xf6,
+	0x57, 0x2d, 0x5b, 0x11, 0xbb, 0xe1, 0x11, 0xcb, 0x98, 0x57, 0x8b, 0x67, 0x64, 0xf3, 0x3f, 0x06,
+	0x90, 0xac, 0xaf, 0xcb, 0xc7, 0xf6, 0x6b, 0xf3, 0xf6, 0x0d, 0x28, 0x7b, 0x2c, 0x3c, 0x0a, 0x06,
+	0xe8, 0x71, 0x6d, 0xbf, 0x6a, 0x1d, 0xf6, 0x0e, 0x90, 0x90, 0xb5, 0x42, 0x41, 0xc8, 0x55, 0x80,
+	0x34, 0x81, 0xf3, 0x7a, 0x11, 0x57, 0x39, 0x9b, 0xe8, 0xd5, 0x4a, 0x67, 0x30, 0xe6, 0x27, 0xb0,
+	0x73, 0x10, 0x53, 0x57, 0xd0, 0x14, 0xb4, 0xfc, 0x8a, 0x5b, 0xd9, 0x2a, 0x93, 0x3f, 0x55, 0x65,
+	0x94, 0xf2, 0x19, 0xc4, 0xbc, 0x07, 0xbb, 0xa7, 0x74, 0x2f, 0xbd, 0x02, 0xe6, 0xaf, 0x0c, 0xd8,
+	0xe9, 0xd0, 0x21, 0xfd, 0x4a, 0x5c, 0x39, 0xc4, 0xaa, 0xab, 0x96, 0xf2, 0x66, 0x9a, 0x83, 0xdf,
+	0x7d, 0x85, 0x65, 0x4c, 0x8d, 0x90, 0xd9, 0x26, 0xf0, 0xa5, 0xb3, 0xa7, 0xac, 0x5b, 0xde, 0xd9,
+	0x4f, 0xf3, 0x70, 0xee, 0xe0, 0xd8, 0x0d, 0x07, 0xd4, 0xa6, 0xd1, 0x30, 0xf0, 0xdc, 0xe5, 0x5d,
+	0xbd, 0x0c, 0x45, 0x71, 0x12, 0xa9, 0xd4, 0xbd, 0xbe, 0x4f, 0x2c, 0x2d, 0x50, 0x49, 0x7f, 0x74,
+	0x12, 0x51, 0x1b, 0xe7, 0xc9, 0x10, 0x56, 0xd3, 0xa5, 0x93, 0x05, 0x4a, 0x65, 0xcd, 0xee, 0x74,
+	0xd2, 0xac, 0x65, 0x7c, 0xfd, 0x12, 0x51, 0xaa, 0xa5, 0xe2, 0xbb, 0x3e, 0x69, 0xc1, 0x4a, 0xac,
+	0x0c, 0xd1, 0xe7, 0xb9, 0x92, 0x18, 0xa6, 0xf7, 0x51, 0x32, 0x6d, 0xfe, 0x10, 0xce, 0x2f, 0x44,
+	0x62, 0xf9, 0xb0, 0xfe, 0xc1, 0x80, 0x6d, 0x25, 0x4c, 0xdd, 0x65, 0x96, 0x8f, 0xea, 0x62, 0xb4,
+	0xf2, 0x5f, 0x67, 0xb4, 0xcc, 0x6e, 0xb2, 0x1b, 0x12, 0xb3, 0x97, 0x0f, 0xc1, 0xbf, 0x0b, 0x50,
+	0x49, 0x32, 0x0c, 0x79, 0x2b, 0x73, 0xb9, 0xc4, 0x2b, 0x68, 0x9b, 0x4c, 0x27, 0xcd, 0x15, 0xfb,
+	0xf0, 0x40, 0x5e, 0x30, 0x5f, 0x4c, 0x9a, 0x85, 0x20, 0x14, 0xe9, 0x85, 0x93, 0x5c, 0x06, 0x70,
+	0xfd, 0x51, 0x10, 0x2a, 0x06, 0xe5, 0xf2, 0x4a, 0x82, 0xaa, 0xe2, 0x14, 0xe2, 0xde, 0x05, 0x72,
+	0x4c, 0xdd, 0x58, 0xf4, 0xa9, 0x2b, 0x9c, 0x20, 0x14, 0x34, 0x7e, 0xe2, 0x0e, 0xf5, 0x86, 0x4a,
+	0xf1, 0x5b, 0x29, 0xa4, 0xab, 0x11, 0xe4, 0x3a, 0x6c, 0xc7, 0xee, 0x91, 0x70, 0x66, 0xcc, 0xa8,
+	0xa8, 0xb8, 0xc0, 0x28, 0x31, 0x77, 0x13, 0x08, 0x2a, 0x4c, 0x18, 0xf5, 0x9e, 0x11, 0x54, 0x31,
+	0x96, 0xce, 0x60, 0xb4, 0x13, 0x08, 0x32, 0xbe, 0x0f, 0xbb, 0x0b, 0x1a, 0x53, 0x73, 0xcb, 0xf3,
+	0xcc, 0xe7, 0xe7, 0xb4, 0xa6, 0x26, 0xb7, 0x60, 0x53, 0x6b, 0x16, 0x6e, 0x10, 0x3a, 0x43, 0x36,
+	0xe0, 0xf5, 0x95, 0x4b, 0x46, 0xab, 0x68, 0xaf, 0x2b, 0x6d, 0x92, 0x7c, 0x8f, 0x0d, 0x38, 0xb9,
+	0x05, 0xf5, 0xac, 0x8d, 0x8e, 0xc7, 0x42, 0x6f, 0x1c, 0xc7, 0x34, 0xf4, 0x4e, 0xea, 0x95, 0x79,
+	0x5d, 0x3b, 0x19, 0x43, 0x0f, 0x66, 0x30, 0x72, 0x00, 0x17, 0x50, 0x04, 0x0f, 0xdd, 0x88, 0x1f,
+	0x33, 0x31, 0x27, 0xa3, 0x3a, 0x2f, 0x03, 0xfd, 0xea, 0x69, 0x60, 0x46, 0x88, 0xf9, 0x8b, 0xbc,
+	0xac, 0x89, 0xa9, 0x27, 0xff, 0x87, 0x17, 0x80, 0xef, 0xce, 0x55, 0xb9, 0x02, 0x56, 0xb9, 0xf5,
+	0xcc, 0xe1, 0x90, 0x05, 0xff, 0x54, 0xa5, 0x23, 0x57, 0xa1, 0xca, 0x4f, 0xb8, 0xc3, 0x85, 0x2b,
+	0xb8, 0xce, 0x29, 0x6b, 0x28, 0xb9, 0x77, 0xc2, 0x7b, 0x92, 0xa8, 0x79, 0x2a, 0x5c, 0x8f, 0xcd,
+	0xbb, 0xb0, 0x3d, 0x17, 0x88, 0xe5, 0x0f, 0xd5, 0x1f, 0xf3, 0xb0, 0x36, 0x67, 0x9f, 0x2e, 0x30,
+	0xc6, 0x57, 0x57, 0x60, 0xc8, 0x45, 0xa8, 0x06, 0xdc, 0xd1, 0x5d, 0x99, 0x8c, 0x78, 0xc5, 0xae,
+	0x04, 0x5c, 0x25, 0x04, 0xd2, 0x82, 0xb2, 0x74, 0x7c, 0xcc, 0xf1, 0x94, 0xad, 0xef, 0x6f, 0xce,
+	0xd8, 0x7b, 0x48, 0xb7, 0xf5, 0x3c, 0x79, 0x03, 0x4a, 0x34, 0x62, 0xde, 0xb1, 0x0e, 0xd1, 0xc6,
+	0x0c, 0xf8, 0x03, 0x49, 0x4e, 0xee, 0xf4, 0x88, 0x21, 0xef, 0x00, 0x48, 0xb6, 0x80, 0x8b, 0xc0,
+	0xe3, 0x78, 0x9c, 0xe6, 0x38, 0xb2, 0x61, 0xcd, 0x00, 0xc9, 0x9b, 0x50, 0x53, 0xfb, 0x54, 0x99,
+	0x54, 0x46, 0xbe, 0x9a, 0x65, 0xcb, 0x1d, 0xa9, 0xac, 0x81, 0x38, 0xfd, 0x37, 0x3f, 0x35, 0xa0,
+	0x96, 0xb9, 0xcb, 0x91, 0x26, 0xd4, 0xdc, 0x28, 0x72, 0x9e, 0xd0, 0x98, 0x27, 0xed, 0x6c, 0xd5,
+	0x06, 0x37, 0x8a, 0x7e, 0xac, 0x28, 0xb2, 0xe7, 0xe1, 0xc2, 0x8d, 0x85, 0x23, 0x59, 0x74, 0x13,
+	0x58, 0x45, 0xca, 0xa3, 0x60, 0x44, 0xe5, 0xf4, 0x80, 0xa5, 0xec, 0xba, 0x25, 0x1a, 0xb0, 0x84,
+	0x7b, 0x0f, 0x2a, 0xd1, 0xd0, 0x15, 0x47, 0x2c, 0x1e, 0x61, 0x0c, 0xaa, 0x76, 0x3a, 0x36, 0xff,
+	0x62, 0x00, 0xcc, 0xac, 0x24, 0x6f, 0xce, 0x8a, 0x94, 0xb1, 0x50, 0xa4, 0x66, 0x7b, 0x20, 0x81,
+	0x10, 0x02, 0x45, 0x41, 0xe3, 0x11, 0x1a, 0x54, 0xb4, 0xf1, 0x9f, 0x9c, 0x83, 0x52, 0x10, 0xfa,
+	0xf4, 0x63, 0x34, 0xa3, 0x68, 0xab, 0x01, 0xd9, 0x91, 0x77, 0xbe, 0xd1, 0x28, 0x50, 0xa9, 0xad,
+	0x68, 0xeb, 0x11, 0xa9, 0xc3, 0x8a, 0x1b, 0x45, 0xc3, 0x80, 0xfa, 0x18, 0xeb, 0xa2, 0x9d, 0x0c,
+	0xc9, 0x75, 0xa8, 0x1e, 0xb1, 0xe1, 0x90, 0x3d, 0xa5, 0xb1, 0x8c, 0xa7, 0x3c, 0x11, 0xdb, 0x18,
+	0xcf, 0xdb, 0x9a, 0xaa, 0x2c, 0x4e, 0xee, 0x60, 0x29, 0xd6, 0xfc, 0x93, 0x01, 0xe4, 0x34, 0xee,
+	0x15, 0x3d, 0x3b, 0x07, 0xa5, 0x91, 0x2b, 0xbc, 0x63, 0xed, 0x9a, 0x1a, 0x64, 0xbc, 0x28, 0xcc,
+	0x79, 0x41, 0xa0, 0x18, 0xd2, 0x8f, 0x13, 0xdf, 0xf0, 0x9f, 0x7c, 0x0b, 0x56, 0x7d, 0xf6, 0x34,
+	0x74, 0x38, 0xf5, 0x58, 0xe8, 0x73, 0xed, 0x5e, 0x4d, 0xd2, 0x7a, 0x8a, 0x24, 0x95, 0xc8, 0xfd,
+	0x42, 0x71, 0xbb, 0x54, 0x6d, 0x35, 0x30, 0x7f, 0x5d, 0x82, 0xd5, 0xec, 0x21, 0x96, 0x92, 0x46,
+	0x74, 0xc4, 0xe2, 0x13, 0x47, 0x30, 0xe1, 0x0e, 0xd1, 0xfc, 0xa2, 0x5d, 0x53, 0xb4, 0x47, 0x92,
+	0x44, 0x2e, 0xc3, 0x86, 0x86, 0x8c, 0x39, 0xf5, 0x9d, 0x98, 0x73, 0x6d, 0xf8, 0x9a, 0x22, 0x7f,
+	0xc0, 0xa9, 0x6f, 0x73, 0x2e, 0x37, 0x5a, 0x06, 0xa7, 0xbd, 0x80, 0x19, 0x26, 0x03, 0x38, 0x8a,
+	0x29, 0xd5, 0x0e, 0x69, 0xc0, 0xed, 0x98, 0x52, 0xf2, 0x3a, 0x6c, 0xf1, 0xa7, 0x6e, 0xe4, 0xcc,
+	0x59, 0x54, 0x46, 0xd8, 0x86, 0x9c, 0xb8, 0x9f, 0xb1, 0xaa, 0x05, 0x9b, 0x59, 0x2c, 0xaa, 0xd4,
+	0x95, 0x62, 0x06, 0x45, 0xb5, 0x0b, 0x48, 0xd4, 0x5d, 0x59, 0x44, 0xa2, 0x7e, 0x13, 0xd6, 0xbc,
+	0x68, 0xec, 0x44, 0x31, 0xf3, 0x9c, 0x58, 0xc6, 0x0e, 0x2e, 0x19, 0x2d, 0xc3, 0xae, 0x79, 0xd1,
+	0xf8, 0x30, 0x66, 0x9e, 0xed, 0x0a, 0x2a, 0xf3, 0x86, 0xc4, 0x78, 0x6c, 0x1c, 0x8a, 0x7a, 0x0d,
+	0x5f, 0x90, 0x2a, 0x5e, 0x34, 0x3e, 0x90, 0x63, 0x79, 0x56, 0xfc, 0x80, 0x3f, 0xd6, 0x96, 0x6f,
+	0xa0, 0x92, 0xaa, 0xa4, 0x28, 0x9b, 0x2f, 0x02, 0x0e, 0x94, 0xb1, 0x9b, 0x38, 0x5b, 0x91, 0x04,
+	0x34, 0x33, 0x99, 0x44, 0xfb, 0xb6, 0x66, 0x93, 0x68, 0xd9, 0x35, 0xd8, 0x09, 0xa9, 0x70, 0x02,
+	0xe6, 0x04, 0xa1, 0xd3, 0x3f, 0x91, 0x15, 0x99, 0xc6, 0x72, 0xf9, 0xeb, 0xe7, 0x11, 0xb9, 0x15,
+	0x52, 0xd1, 0x65, 0xdd, 0xb0, 0x7d, 0x22, 0xe8, 0x21, 0x8d, 0x7b, 0xd4, 0x23, 0x6f, 0xc3, 0xae,
+	0x66, 0x61, 0x63, 0x31, 0xcf, 0xb3, 0x83, 0x3c, 0x04, 0x79, 0x1e, 0x8e, 0x45, 0x86, 0xc9, 0x82,
+	0x6d, 0xc9, 0x24, 0xbc, 0x48, 0x16, 0xc3, 0x90, 0x7a, 0xaa, 0x68, 0xec, 0xa2, 0x9f, 0x52, 0xc9,
+	0x23, 0x2f, 0x3a, 0x98, 0x4d, 0x90, 0x1b, 0xf0, 0x8d, 0x04, 0xef, 0x7a, 0x22, 0x78, 0x42, 0x1d,
+	0x16, 0xd1, 0x90, 0xa7, 0x9a, 0xea, 0xa8, 0x69, 0x57, 0x31, 0xde, 0x42, 0xc4, 0x43, 0x09, 0xd0,
+	0xea, 0x36, 0xa1, 0xc0, 0x22, 0x5e, 0xbf, 0x80, 0x28, 0xf9, 0x6b, 0xfe, 0xc3, 0x80, 0xf5, 0xf9,
+	0x84, 0x28, 0x0f, 0x00, 0x0f, 0x3e, 0xa1, 0x7a, 0x6b, 0xe2, 0x7f, 0xc2, 0x98, 0x4f, 0x19, 0xc9,
+	0x6b, 0xb0, 0x29, 0x7d, 0xe4, 0x32, 0x40, 0x89, 0x76, 0xb5, 0x05, 0xd7, 0x90, 0xde, 0x0d, 0xb5,
+	0xce, 0xef, 0xc0, 0x96, 0x02, 0xca, 0xb0, 0x24, 0x48, 0xb5, 0x17, 0xd7, 0x71, 0xe2, 0xe1, 0x58,
+	0x68, 0xe8, 0xf7, 0xa0, 0x8e, 0x2b, 0xe9, 0xc8, 0xa3, 0xe8, 0x86, 0x3e, 0xc7, 0xad, 0x41, 0x39,
+	0x4f, 0x33, 0xca, 0x0e, 0xce, 0x1f, 0xe8, 0xe9, 0xc3, 0x64, 0x96, 0xbc, 0x06, 0x1b, 0x8f, 0xe9,
+	0x09, 0xbe, 0x70, 0x38, 0xa3, 0x80, 0x73, 0xca, 0xf5, 0x3e, 0x5e, 0x4f, 0xc8, 0xf7, 0x91, 0xfa,
+	0x7a, 0x0b, 0xb6, 0x4e, 0x75, 0x10, 0x64, 0x05, 0x0a, 0xb7, 0x7c, 0x7f, 0x33, 0x47, 0x00, 0xca,
+	0x36, 0x1d, 0xb1, 0x27, 0x74, 0xd3, 0xd8, 0xff, 0x4d, 0x11, 0xaa, 0xea, 0x91, 0xd3, 0x8e, 0x3c,
+	0x72, 0x0d, 0x2a, 0xc9, 0x1b, 0x07, 0xd9, 0xb4, 0x16, 0x1e, 0x8a, 0xf6, 0xb6, 0xac, 0xc5, 0x07,
+	0x10, 0x33, 0x47, 0xae, 0x03, 0xcc, 0x9a, 0x77, 0x42, 0xac, 0x53, 0xaf, 0x16, 0x7b, 0xdb, 0xd6,
+	0xe9, 0xee, 0xde, 0xcc, 0x91, 0xef, 0x43, 0x2d, 0x53, 0xd8, 0x89, 0x44, 0x2d, 0xde, 0x77, 0xf6,
+	0xce, 0x59, 0x67, 0xd4, 0x7e, 0x33, 0x47, 0x5a, 0x50, 0xc2, 0x57, 0x44, 0xb2, 0x66, 0x65, 0x1f,
+	0x2a, 0xf7, 0xd6, 0xad, 0xb9, 0xc7, 0x45, 0x33, 0xa7, 0x3d, 0xc2, 0xd7, 0x21, 0xe5, 0x51, 0xf6,
+	0x69, 0x50, 0x79, 0x34, 0xf7, 0xf0, 0x66, 0xe6, 0xc8, 0x6d, 0xd8, 0x58, 0xe8, 0x88, 0xc9, 0xae,
+	0x75, 0x76, 0x7f, 0xbe, 0x57, 0xb7, 0x5e, 0xd2, 0x3c, 0x2b, 0x39, 0x0b, 0xcd, 0x26, 0xd9, 0xb5,
+	0xce, 0x6e, 0x8e, 0xf7, 0xea, 0xd6, 0x4b, 0xfa, 0x52, 0x33, 0x47, 0x6e, 0xc2, 0xda, 0x5c, 0x6f,
+	0x45, 0xce, 0x5b, 0x67, 0x75, 0x9d, 0x7b, 0x3b, 0xd6, 0x99, 0x2d, 0x98, 0x99, 0x23, 0x37, 0x60,
+	0x35, 0xdb, 0x99, 0x90, 0x73, 0xd6, 0x19, 0xfd, 0xd5, 0xde, 0x79, 0xeb, 0xac, 0xf6, 0xc5, 0xcc,
+	0xb5, 0x6f, 0x3e, 0x7b, 0xde, 0xc8, 0xfd, 0xf5, 0x79, 0x23, 0xf7, 0xc5, 0xf3, 0x46, 0xee, 0x9f,
+	0xcf, 0x1b, 0xb9, 0x7f, 0x3d, 0x6f, 0x18, 0x3f, 0x9f, 0x36, 0x8c, 0xdf, 0x4e, 0x1b, 0xc6, 0x67,
+	0xd3, 0x46, 0xee, 0xcf, 0xd3, 0x46, 0xee, 0xd9, 0xb4, 0x61, 0x7c, 0x3e, 0x6d, 0x18, 0x5f, 0x4c,
+	0x1b, 0xc6, 0x2f, 0xff, 0xd6, 0xc8, 0xdd, 0x35, 0x3e, 0xaa, 0xa8, 0xa7, 0xff, 0xa8, 0xdf, 0x2f,
+	0xe3, 0xa5, 0xe9, 0xed, 0xff, 0x06, 0x00, 0x00, 0xff, 0xff, 0x03, 0x6e, 0x18, 0x89, 0x0d, 0x18,
+	0x00, 0x00,
 }

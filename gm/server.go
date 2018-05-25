@@ -47,9 +47,8 @@ func (gm *GM) Start(config *Config) error {
 		return err
 	}
 
-	gm.zoneMasterRpcClient = GetZoneMasterRpcClientSingle(config)
-
 	gm.idGenerator = GetIdGeneratorSingle()
+	gm.zoneMasterRpcClient = GetZoneMasterRpcClientSingle(config)
 	gm.processorManager = GetPMSingle(gm.cluster)
 
 	gm.workerManager = NewWorkerManager(gm.cluster)
