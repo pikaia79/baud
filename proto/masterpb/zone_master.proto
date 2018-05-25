@@ -1,0 +1,220 @@
+syntax = "proto3";
+
+import "github.com/gogo/protobuf/gogoproto/gogo.proto";
+
+import "github.com/tiglabs/baudengine/proto/metapb/meta.proto";
+
+option go_package = "zonemasterpb";
+
+option optimize_for = SPEED;
+option (gogoproto.marshaler_all) = true;
+option (gogoproto.sizer_all) = true;
+option (gogoproto.unmarshaler_all) = true;
+option (gogoproto.gostring_all) = false;
+option (gogoproto.equal_all) = true;
+option (gogoproto.verbose_equal_all) = false;
+option (gogoproto.goproto_stringer_all) = false;
+option (gogoproto.stringer_all) =  true;
+option (gogoproto.populate_all) = true;
+option (gogoproto.testgen_all) = false;
+option (gogoproto.benchgen_all) = false;
+option (gogoproto.goproto_getters_all) = false;
+
+service ZoneMasterRpc {
+    rpc CreatePartition(CreatePartitionRequest) returns (CreatePartitionResponse) {}
+    rpc DeletePartition(DeletePartitionRequest) returns (DeletePartitionResponse) {}
+    rpc ChangeReplica(ChangeReplicaRequest) returns (ChangeReplicaResponse) {}
+    rpc GetRoute(GetRouteRequest)       returns (GetRouteResponse) {}
+    rpc PSRegister(PSRegisterRequest)   returns (PSRegisterResponse) {}
+    rpc PSHeartbeat(PSHeartbeatRequest) returns (PSHeartbeatResponse) {}
+    rpc GetDB(GetDBRequest)             returns (GetDBResponse) {}
+    rpc GetSpace(GetSpaceRequest)       returns (GetSpaceResponse) {}
+}
+
+message CreatePartitionRequest {
+    RequestHeader   header    = 1 [(gogoproto.nullable) = false, (gogoproto.embed) = true];
+    Partition       partition = 2 [(gogoproto.nullable) = false];
+}
+
+message CreatePartitionResponse {
+    ResponseHeader  header    = 1 [(gogoproto.nullable) = false, (gogoproto.embed) = true];
+    Replica         replica   = 2 [(gogoproto.nullable) = false];
+}
+
+message DeletePartitionRequest {
+    RequestHeader   header      = 1 [(gogoproto.nullable) = false, (gogoproto.embed) = true];
+    uint32          partitionID = 2 [(gogoproto.customname) = "PartitionID", (gogoproto.casttype) = "github.com/tiglabs/baudengine/proto/metapb.PartitionID"];
+    uint32          nodeId      = 3 [(gogoproto.customname) = "NodeID", (gogoproto.casttype) = "github.com/tiglabs/baudengine/proto/metapb.NodeID"];
+}
+
+message DeletePartitionResponse {
+    ResponseHeader  header    = 1 [(gogoproto.nullable) = false, (gogoproto.embed) = true];
+}
+
+message ChangeReplicaRequest {
+    RequestHeader     header        = 1 [(gogoproto.nullable) = false, (gogoproto.embed) = true];
+    ReplicaChangeType type          = 2;
+    uint32            partition_id  = 3 [(gogoproto.customname) = "PartitionID", (gogoproto.casttype) = "github.com/tiglabs/baudengine/proto/metapb.PartitionID"];
+    Replica           replica       = 4 [(gogoproto.nullable) = false];
+}
+
+message ChangeReplicaResponse {
+    ResponseHeader  header    = 1 [(gogoproto.nullable) = false, (gogoproto.embed) = true];
+}
+
+message Route {
+    Partition       partition  = 1 [(gogoproto.nullable) = false, (gogoproto.embed) = true];
+    repeated Node   nodes = 2;
+    uint32          leader = 3 [(gogoproto.customname) = "Leader", (gogoproto.casttype) = "github.com/tiglabs/baudengine/proto/metapb.NodeID"];
+}
+
+message GetDBRequest {
+    RequestHeader header = 1 [(gogoproto.nullable) = false, (gogoproto.embed) = true];
+    string        DB_name = 2;
+}
+
+message GetDBResponse {
+    ResponseHeader header = 1 [(gogoproto.nullable) = false, (gogoproto.embed) = true];
+    DB             db    = 2 [(gogoproto.nullable) = false];
+}
+
+message GetSpaceRequest {
+    RequestHeader header = 1 [(gogoproto.nullable) = false, (gogoproto.embed) = true];
+    uint32        db_id   = 2 [(gogoproto.customname) = "ID", (gogoproto.casttype) = "github.com/tiglabs/baudengine/proto/metapb.DBID"];
+    string        Space_name = 3;
+}
+
+message GetSpaceResponse {
+    ResponseHeader header = 1 [(gogoproto.nullable) = false, (gogoproto.embed) = true];
+    Space             space    = 2 [(gogoproto.nullable) = false];
+}
+
+message GetRouteRequest {
+    RequestHeader header = 1 [(gogoproto.nullable) = false, (gogoproto.embed) = true];
+    uint32        db  = 2 [(gogoproto.customname) = "DB", (gogoproto.casttype) = "github.com/tiglabs/baudengine/proto/metapb.DBID"];
+    uint32        space  = 3 [(gogoproto.customname) = "Space", (gogoproto.casttype) = "github.com/tiglabs/baudengine/proto/metapb.SpaceID"];
+    uint32        slot   = 4 [(gogoproto.customname) = "Slot", (gogoproto.casttype) = "github.com/tiglabs/baudengine/proto/metapb.SlotID"];
+}
+
+message GetRouteResponse {
+    ResponseHeader header = 1 [(gogoproto.nullable) = false, (gogoproto.embed) = true];
+    repeated Route routes = 2 [(gogoproto.nullable) = false];
+}
+
+message PSRegisterRequest {
+    RequestHeader header       = 1 [(gogoproto.nullable) = false, (gogoproto.embed) = true];
+    uint32        nodeID       = 2 [(gogoproto.customname) = "NodeID", (gogoproto.casttype) = "github.com/tiglabs/baudengine/proto/metapb.NodeID"];
+    string        ip           = 3;
+    RuntimeInfo   runtime_info = 4 [(gogoproto.nullable) = false, (gogoproto.embed) = true];
+}
+
+message PSRegisterResponse {
+    ResponseHeader     header     = 1 [(gogoproto.nullable) = false, (gogoproto.embed) = true];
+    uint32             nodeID     = 2 [(gogoproto.customname) = "NodeID", (gogoproto.casttype) = "github.com/tiglabs/baudengine/proto/metapb.NodeID"];
+    PSConfig           config     = 3 [(gogoproto.nullable) = false, (gogoproto.embed) = true];
+    repeated Partition partitions = 4 [(gogoproto.nullable) = false];
+}
+
+message PSConfig {
+    uint32 rpc_port                  = 1 [(gogoproto.customname) = "RPCPort", (gogoproto.casttype) = "int"];
+    uint32 admin_port                = 2 [(gogoproto.casttype) = "int"];
+    uint32 heartbeat_interval        = 3 [(gogoproto.casttype) = "int"];
+    uint32 raft_heartbeat_port       = 4 [(gogoproto.casttype) = "int"];
+    uint32 raft_replicate_port       = 5 [(gogoproto.casttype) = "int"];
+    uint32 raft_heartbeat_interval   = 6 [(gogoproto.casttype) = "int"];
+    uint64 raft_retain_logs          = 7;
+    uint32 raft_replica_concurrency  = 8 [(gogoproto.casttype) = "int"];
+    uint32 raft_snapshot_concurrency = 9 [(gogoproto.casttype) = "int"];
+}
+
+message PSHeartbeatRequest {
+    RequestHeader          header     = 1 [(gogoproto.nullable) = false, (gogoproto.embed) = true];
+    uint32                 nodeID     = 2 [(gogoproto.customname) = "NodeID", (gogoproto.casttype) = "github.com/tiglabs/baudengine/proto/metapb.NodeID"];
+    repeated PartitionInfo partitions = 3 [(gogoproto.nullable) = false];
+    NodeSysStats           sys_stats  = 4 [(gogoproto.nullable) = false];
+}
+
+message PSHeartbeatResponse {
+    ResponseHeader     header     = 1 [(gogoproto.nullable) = false, (gogoproto.embed) = true];
+}
+
+message PartitionInfo {
+    uint32           id          = 1 [(gogoproto.customname) = "ID", (gogoproto.casttype) = "github.com/tiglabs/baudengine/proto/metapb.PartitionID"];
+    bool             is_leader   = 2;
+    PartitionStatus  status      = 3;
+    PartitionEpoch   epoch       = 4 [(gogoproto.nullable) = false];
+    PartitionStats   statistics  = 5 [(gogoproto.nullable) = false];
+    RaftStatus       raft_status = 6;
+}
+
+message RuntimeInfo {
+    string app_version = 1;
+    string start_time  = 2;
+    string go_version  = 3;
+    string platform    = 4;
+}
+
+message RaftStatus {
+    Replica replica                       = 1 [(gogoproto.nullable) = false, (gogoproto.embed) = true];
+    uint64 term                           = 2;
+    uint64 index                          = 3;
+    uint64 commit                         = 4;
+    uint64 applied                        = 5;
+    repeated RaftFollowerStatus followers = 6 [(gogoproto.nullable) = false];
+}
+
+message RaftFollowerStatus {
+    Replica replica     = 1 [(gogoproto.nullable) = false, (gogoproto.embed) = true];
+    uint64 match        = 2;
+    uint64 commit       = 3;
+    uint64 next         = 4;
+    uint64 down_seconds = 5;
+    string state        = 6;
+}
+
+message NodeSysStats {
+    // Memory
+    uint64 memory_total                      = 1;
+    uint64 memory_used_rss                   = 2;
+    uint64 memory_used                       = 3;
+    uint64 memory_free                       = 4;
+    //double memory_used_percent               = 5;
+    uint64 swap_memory_total                 = 6;
+    uint64 swap_memory_used                  = 7;
+    uint64 swap_memory_free                  = 8;
+    //double swap_memory_used_percent          = 9;
+    // CPU
+    double cpu_proc_rate                     = 10;
+    uint32 cpu_count                         = 11;
+    //double load1                             = 12;
+    //double load5                             = 13;
+    //double load15                            = 14;
+    // Disk
+    uint64 disk_total                        = 15;
+    uint64 disk_used                         = 16;
+    uint64 disk_free                         = 17;
+    //double disk_proc_rate                    = 18;
+    //uint64 disk_read_byte_per_sec            = 19;
+    //uint64 disk_write_byte_per_sec           = 20;
+    // Net
+    uint64 net_io_in_byte_per_sec            = 21;
+    uint64 net_io_out_byte_per_sec           = 22;
+    uint32 net_tcp_connections               = 23;
+    uint64 net_tcp_active_opens_per_sec      = 24;
+    // server
+    uint64 ops                               = 25;
+}
+
+message PartitionStats {
+    uint64 size                = 1;
+    uint64 ops                 = 2;
+    uint64 bytes_in_per_sec    = 3;
+    uint64 bytes_out_per_sec   = 4;
+    uint64 total_commands_processed = 5;
+    uint64 keyspace_misses     = 6;
+}
+
+enum ReplicaChangeType {
+    Add     = 0;
+    Remove  = 1;
+}
