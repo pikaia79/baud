@@ -45,10 +45,14 @@ func main() {
 	zoneMetas, err := server.GetAllZones(ctx)
 	if err != nil {
 		log.Error("GetAllZones err[%v]", err)
+		return
 	}
 	log.Debug("zoneMetas=%v", zoneMetas)
 
-	server.DeleteZone(ctx, zone1)
+	if err := server.DeleteZone(ctx, zone1); err != nil {
+	    log.Error("")
+	    return
+    }
 
 	cancel()
 
