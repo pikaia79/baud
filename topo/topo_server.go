@@ -10,7 +10,7 @@ import (
 
 const (
     // Path components
-    zonesPath            = "zones"
+    ZonesPath            = "zones"
     dbsPath              = "dbs"
     spacesPath           = "spaces"
     partitionsPath       = "partitions"
@@ -96,7 +96,7 @@ type Impl interface {
     DeletePartition(ctx context.Context, partition *PartitionTopo) error
 
     GetAllPsByZone(ctx context.Context, zoneName string) ([]*PsTopo, error)
-    GetPsByZone(ctx context.Context, zoneName string, nodeId metapb.NodeID) (*PsTopo, error)
+    GetPsByZone(ctx context.Context, zoneName string, psId metapb.NodeID) (*PsTopo, error)
     AddPsByZone(ctx context.Context, zoneName string, node *metapb.Node) (*PsTopo, error)
     UpdatePsByZone(ctx context.Context, zoneName string, ps *PsTopo) error
     DeletePsByZone(ctx context.Context, zoneName string, ps *PsTopo) error
@@ -106,7 +106,7 @@ type Impl interface {
     GetPartitionInfoByZone(ctx context.Context, zoneName string, partitionId metapb.PartitionID) (*PartitionInfoTopo, error)
 
     // PsRegister
-    GetPartitionsOnPsByZone(ctx context.Context, zoneName string, nodeId metapb.NodeID) ([]*PartitionTopo, error)
+    GetPartitionsOnPsByZone(ctx context.Context, zoneName string, psId metapb.NodeID) ([]*PartitionTopo, error)
 
     // PsHeartbeat
     SetPartitionInfoByZone(ctx context.Context, zoneName string, partition *PartitionInfoTopo) error
