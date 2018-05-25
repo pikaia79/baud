@@ -190,21 +190,17 @@ type PartitionProcessor struct {
 	cancelFunc context.CancelFunc
 	wg         sync.WaitGroup
 
-	eventCh        chan *ProcessorEvent
-	cluster        *Cluster
-	serverSelector Selector
-	jdos           DCOS
+	eventCh chan *ProcessorEvent
+	cluster *Cluster
 }
 
 func NewPartitionProcessor(ctx context.Context, cancel context.CancelFunc, cluster *Cluster) *PartitionProcessor {
 
 	p := &PartitionProcessor{
-		ctx:            ctx,
-		cancelFunc:     cancel,
-		eventCh:        make(chan *ProcessorEvent, PARTITION_CHANNEL_LIMIT),
-		cluster:        cluster,
-		serverSelector: NewIdleSelector(),
-		jdos:           new(JDOS),
+		ctx:        ctx,
+		cancelFunc: cancel,
+		eventCh:    make(chan *ProcessorEvent, PARTITION_CHANNEL_LIMIT),
+		cluster:    cluster,
 	}
 
 	return p

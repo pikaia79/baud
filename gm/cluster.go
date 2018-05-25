@@ -1,7 +1,6 @@
 package gm
 
 import (
-	"github.com/jddb/jddb-k8s/pkg/apis/batch"
 	"github.com/tiglabs/baudengine/proto/metapb"
 	"github.com/tiglabs/baudengine/util"
 	"github.com/tiglabs/baudengine/util/log"
@@ -14,8 +13,11 @@ type Cluster struct {
 
 	DbCache        *DBCache
 	PartitionCache *PartitionCache
+	ZoneCache      *ZoneCache
 
-	ZoneCache *ZoneCache
+	isGMLeader            bool
+	currentGMLeaderNodeID uint64
+	currentGMLeaderAddr   string
 
 	clusterLock sync.RWMutex
 }
@@ -30,6 +32,7 @@ func NewCluster(config *Config) *Cluster {
 }
 
 func (c *Cluster) Start() error {
+
 	if err := c.registorGlobalEtcd(); err != nil {
 		log.Error("fail to registor global etcd. err:[%v]", err)
 		return err
@@ -174,6 +177,28 @@ func (c *Cluster) clearAllCache() {
 	// SpaceCache in DbCache
 	c.PartitionCache.Clear()
 	c.ZoneCache.Clear()
+}
+
+func (c *Cluster) CreateZone(zoneName, zoneEtcdAddr, zoneMasterAddr string) (*Zone, error) {
+	c.clusterLock.Lock()
+	defer c.clusterLock.Unlock()
+
+	db := c.ZoneCache.FindZoneByName(zoneName)
+	if db != nil {
+		return nil, ErrDupDb
+	}
+
+	zone, err := NewZone(zoneName, zoneEtcdAddr, zoneMasterAddr)
+	if err != nil {
+		return nil, err
+	}
+
+	if err := zone.persistent(); err != nil {
+		return nil, err
+	}
+	c.ZoneCache.AddZone(zone)
+
+	return zone, nil
 }
 
 func (c *Cluster) CreateDb(dbName string) (*DB, error) {

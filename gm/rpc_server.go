@@ -393,7 +393,6 @@ func pickReplicaToDelete(info *masterpb.PartitionInfo) *metapb.Replica {
 		replicaToDelete = &follower.Replica
 		break
 	}
-	if replicaToDelete != nil {
 		return replicaToDelete
 	}
 

@@ -18,15 +18,18 @@ const (
 	DEFAULT_CLOSE_TIMEOUT = 5 * time.Second
 
 	// definition for http url parameter name
-	DB_NAME         = "db_name"
-	SRC_DB_NAME     = "src_db_name"
-	DEST_DB_NAME    = "dest_db_name"
-	SPACE_NAME      = "space_name"
-	SRC_SPACE_NAME  = "src_space_name"
-	DEST_SPACE_NAME = "dest_space_name"
-	PARTITION_KEY   = "partition_key"
-	PARTITION_FUNC  = "partition_func"
-	PARTITION_NUM   = "partition_num"
+	ZONE_NAME        = "zone_name"
+	ZONE_ETCD_ADDR   = "zone_etcd_addr"
+	ZONE_MASTER_ADDR = "zone_master_addr"
+	DB_NAME          = "db_name"
+	SRC_DB_NAME      = "src_db_name"
+	DEST_DB_NAME     = "dest_db_name"
+	SPACE_NAME       = "space_name"
+	SRC_SPACE_NAME   = "src_space_name"
+	DEST_SPACE_NAME  = "dest_space_name"
+	PARTITION_KEY    = "partition_key"
+	PARTITION_FUNC   = "partition_func"
+	PARTITION_NUM    = "partition_num"
 )
 
 type ApiServer struct {
@@ -81,19 +84,110 @@ func (s *ApiServer) Close() {
 }
 
 func (s *ApiServer) initAdminHandler() {
+	s.httpServer.Handle(netutil.POST, "/manage/zone/create", s.handleZoneCreate)
+	s.httpServer.Handle(netutil.DELETE, "/manage/zone/delete", s.handleZoneDelete)
+	s.httpServer.Handle(netutil.PUT, "/manage/zone/update", s.handleZoneRename)
+	s.httpServer.Handle(netutil.GET, "/manage/zone/list", s.handleZoneList)
+	s.httpServer.Handle(netutil.GET, "/manage/zone/detail", s.handleZoneDetail)
+
 	s.httpServer.Handle(netutil.POST, "/manage/db/create", s.handleDbCreate)
-	s.httpServer.Handle(netutil.PUT, "/manage/db/delete", s.handleDbDelete)
-	s.httpServer.Handle(netutil.DELETE, "/manage/db/rename", s.handleDbRename)
+	s.httpServer.Handle(netutil.DELETE, "/manage/db/delete", s.handleDbDelete)
+	s.httpServer.Handle(netutil.PUT, "/manage/db/rename", s.handleDbRename)
 	s.httpServer.Handle(netutil.GET, "/manage/db/list", s.handleDbList)
 	s.httpServer.Handle(netutil.GET, "/manage/db/detail", s.handleDbDetail)
 
 	s.httpServer.Handle(netutil.POST, "/manage/space/create", s.handleSpaceCreate)
-	s.httpServer.Handle(netutil.PUT, "/manage/space/delete", s.handleSpaceDelete)
-	s.httpServer.Handle(netutil.DELETE, "/manage/space/rename", s.handleSpaceRename)
+	s.httpServer.Handle(netutil.DELETE, "/manage/space/delete", s.handleSpaceDelete)
+	s.httpServer.Handle(netutil.PUT, "/manage/space/rename", s.handleSpaceRename)
 	s.httpServer.Handle(netutil.GET, "/manage/space/list", s.handleSpaceList)
 	s.httpServer.Handle(netutil.GET, "/manage/space/detail", s.handleSpaceDetail)
 
+	s.httpServer.Handle(netutil.POST, "/manage/partition/create", s.handlePartitionCreate)
+	s.httpServer.Handle(netutil.DELETE, "/manage/partition/delete", s.handlePartitionDelete)
 	s.httpServer.Handle(netutil.GET, "/manage/partition/list", s.handlePartitionList)
+	s.httpServer.Handle(netutil.GET, "/manage/partition/detail", s.handlePartitionDetail)
+
+	s.httpServer.Handle(netutil.GET, "/manage/partition/zonelist", s.handlePartitionZoneList)
+}
+
+func (s *ApiServer) handleZoneCreate(w http.ResponseWriter, r *http.Request, params netutil.UriParams) {
+	zoneName, err := checkMissingParam(w, r, ZONE_NAME)
+	if err != nil {
+		return
+	}
+	zoneEtcdAddr, err := checkMissingParam(w, r, ZONE_ETCD_ADDR)
+	if err != nil {
+		return
+	}
+	zoneMasterAddr, err := checkMissingParam(w, r, ZONE_MASTER_ADDR)
+	if err != nil {
+		return
+	}
+
+	zone, err := s.cluster.CreateZone(zoneName, zoneEtcdAddr, zoneMasterAddr)
+	if err != nil {
+		sendReply(w, newHttpErrReply(err))
+		return
+	}
+
+	sendReply(w, newHttpSucReply(zone))
+}
+
+func (s *ApiServer) handleZoneDelete(w http.ResponseWriter, r *http.Request, params netutil.UriParams) {
+	if err := s.checkLeader(w); err != nil {
+		return
+	}
+}
+
+func (s *ApiServer) handleZoneRename(w http.ResponseWriter, r *http.Request, params netutil.UriParams) {
+	if err := s.checkLeader(w); err != nil {
+		return
+	}
+
+	srcDbName, err := checkMissingParam(w, r, SRC_DB_NAME)
+	if err != nil {
+		return
+	}
+	destDbName, err := checkMissingParam(w, r, DEST_DB_NAME)
+	if err != nil {
+		return
+	}
+
+	if err := s.cluster.RenameDb(srcDbName, destDbName); err != nil {
+		sendReply(w, newHttpErrReply(err))
+		return
+	}
+
+	sendReply(w, newHttpSucReply(""))
+}
+
+func (s *ApiServer) handleZoneList(w http.ResponseWriter, r *http.Request, params netutil.UriParams) {
+	if err := s.checkLeader(w); err != nil {
+		return
+	}
+
+	dbs := s.cluster.DbCache.GetAllDBs()
+
+	sendReply(w, newHttpSucReply(dbs))
+}
+
+func (s *ApiServer) handleZoneDetail(w http.ResponseWriter, r *http.Request, params netutil.UriParams) {
+	if err := s.checkLeader(w); err != nil {
+		return
+	}
+
+	dbName, err := checkMissingParam(w, r, DB_NAME)
+	if err != nil {
+		return
+	}
+
+	db := s.cluster.DbCache.FindDbByName(dbName)
+	if db == nil {
+		sendReply(w, newHttpErrReply(ErrDbNotExists))
+		return
+	}
+
+	sendReply(w, newHttpSucReply(db))
 }
 
 func (s *ApiServer) handleDbCreate(w http.ResponseWriter, r *http.Request, params netutil.UriParams) {
@@ -332,32 +426,6 @@ func newHttpErrReply(err error) *HttpReply {
 			Msg:  ErrInternalError.Error(),
 		}
 	}
-}
-
-func (s *ApiServer) checkLeader(w http.ResponseWriter) error {
-	leaderInfo := s.cluster.store.GetLeaderSync()
-
-	if leaderInfo == nil {
-		sendReply(w, newHttpErrReply(ErrNoMSLeader))
-		return ErrNoMSLeader
-	}
-
-	if !leaderInfo.becomeLeader {
-		if leaderInfo.newLeaderId == 0 {
-			sendReply(w, newHttpErrReply(ErrNoMSLeader))
-			return ErrNoMSLeader
-		} else {
-			log.Debug("current master leader is [%v]", leaderInfo.newLeaderId)
-			reply := newHttpErrReply(ErrNotMSLeader)
-			newMsg := fmt.Sprintf("%s, current leader[%d][%s]", reply.Msg, leaderInfo.newLeaderId,
-				leaderInfo.newLeaderAddr)
-			reply.Msg = newMsg
-			sendReply(w, reply)
-			return ErrNotMSLeader
-		}
-	}
-
-	return nil
 }
 
 func checkMissingParam(w http.ResponseWriter, r *http.Request, paramName string) (string, error) {

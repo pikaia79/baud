@@ -22,9 +22,11 @@ type Zone struct {
 	propertyLock sync.RWMutex
 }
 
-func NewZone(zoneName string) (*Zone, error) {
+func NewZone(zoneName, zoneEtcdAddr, zoneMasterAddr string) (*Zone, error) {
 	metaZone := &metapb.Zone{
 		Name: zoneName,
+		// etcdAddr: zoneEtcdAddr,
+		// zoneMasterAddr: zoneMasterAddr
 	}
 	return NewZoneByMeta(metaZone), nil
 }
@@ -38,18 +40,7 @@ func NewZoneByMeta(metaZone *metapb.Zone) *Zone {
 func (zone *Zone) persistent() error {
 	zone.propertyLock.Lock()
 	defer zone.propertyLock.Unlock()
-
-	dbVal, err := proto.Marshal(db.DB)
-	if err != nil {
-		log.Error("fail to marshal db[%v]. err:[%v]", db.DB, err)
-		return err
-	}
-
-	dbKey := []byte(fmt.Sprintf("%s%d", PREFIX_DB, db.ID))
-	if err := store.Put(dbKey, dbVal); err != nil {
-		log.Error("fail to put db[%v] into store. err:[%v]", db.DB, err)
-		return ErrLocalDbOpsFailed
-	}
+	topo.AddZone(zone.Zone)
 
 	return nil
 }
