@@ -2,7 +2,6 @@ package topo
 
 import (
     "github.com/tiglabs/baudengine/proto/metapb"
-    "github.com/tiglabs/baudengine/proto/masterpb"
     "github.com/tiglabs/baudengine/util/log"
     "context"
     "errors"
@@ -11,15 +10,24 @@ import (
 
 const (
     // Path components
-    zonesPath     = "zones"
-    keyspacesPath = "keyspaces"
-    shardsPath    = "shards"
-    tabletsPath   = "tablets"
+    zonesPath            = "zones"
+    dbsPath              = "dbs"
+    spacesPath           = "spaces"
+    partitionsPath       = "partitions"
+    partitionServersPath = "servers"
+    replicaGroupPath     = "group"
+    tasksPath            = "tasks"
 
     // Filenames for all object types.
-    ZoneInfoFile = "ZoneInfo"
+    ZoneTopoFile            = "zone_info"
+    DBTopoFile              = "db_info"
+    SpaceTopoFile           = "space_info"
+    PartitionServerTopoFile = "ps_info"
+    ReplicaTopoFile         = "replica_info"
+    PartitionTopoFile       = "partition_info"
+    PartitionInfoTopoFile   = "partitioninfo_info"
+    TaskTopoFile            = "task_info"
 )
-
 
 var (
     topoImplementation    = flag.String("topo_implementation", "etcd3", "the topology implementation to use")
@@ -63,48 +71,49 @@ var (
 )
 
 type Impl interface {
-   // Backend
 
-    GetAllZones(ctx context.Context) ([]*metapb.Zone, error)
-    GetZone(ctx context.Context, zoneName string) (*metapb.Zone, error)
-    AddZone(ctx context.Context, zone *metapb.Zone) error
-    DeleteZone(ctx context.Context, zoneName string) error
+    GetAllZones(ctx context.Context) ([]*ZoneTopo, error)
+    GetZone(ctx context.Context, zoneName string) (*ZoneTopo, error)
+    AddZone(ctx context.Context, zone *metapb.Zone) (*ZoneTopo, error)
+    DeleteZone(ctx context.Context, zone *ZoneTopo) error
 
-    GetAllDBs(ctx context.Context) ([]*metapb.DB, error)
-    GetDB(ctx context.Context, dbId metapb.DBID) (*metapb.DB, error)
-    AddDB(ctx context.Context, db *metapb.DB) error
-    UpdateDB(ctx context.Context, db *metapb.DB) error
-    DeleteDB(ctx context.Context, dbId metapb.DBID) error
+    GetAllDBs(ctx context.Context) ([]*DBTopo, error)
+    GetDB(ctx context.Context, dbId metapb.DBID) (*DBTopo, error)
+    AddDB(ctx context.Context, db *metapb.DB) (*DBTopo, error)
+    UpdateDB(ctx context.Context, db *DBTopo) error
+    DeleteDB(ctx context.Context, db *DBTopo) error
 
-    GetAllSpaces(ctx context.Context) ([]*metapb.Space, error)
-    GetSpace(ctx context.Context, spaceId metapb.SpaceID) (*metapb.Space, error)
-    AddSpace(ctx context.Context, space *metapb.Space, partitions []*metapb.Partition) error
-    UpdateSpace(ctx context.Context, space *metapb.Space) error
-    DeleteSpace(ctx context.Context, spaceId metapb.SpaceID) error
+    GetAllSpaces(ctx context.Context) ([]*SpaceTopo, error)
+    GetSpace(ctx context.Context, dbId metapb.DBID, spaceId metapb.SpaceID) (*SpaceTopo, error)
+    AddSpace(ctx context.Context, dbId metapb.DBID, space *metapb.Space, partitions []*metapb.Partition) (*SpaceTopo,
+            []*PartitionTopo, error)
+    UpdateSpace(ctx context.Context, space *SpaceTopo) error
+    DeleteSpace(ctx context.Context, space *SpaceTopo) error
 
-    GetAllPartition(ctx context.Context) ([]*metapb.Partition, error)
-    GetPartition(ctx context.Context, partitionId metapb.PartitionID) (*metapb.Partition, error)
-    UpdatePartition(ctx context.Context, partition *metapb.Partition) error
-    DeletePartition(ctx context.Context, partitionId metapb.PartitionID) error
+    GetAllPartition(ctx context.Context) ([]*PartitionTopo, error)
+    GetPartition(ctx context.Context, partitionId metapb.PartitionID) (*PartitionTopo, error)
+    UpdatePartition(ctx context.Context, partition *PartitionTopo) error
+    DeletePartition(ctx context.Context, partition *PartitionTopo) error
 
-    GetAllPsByZone(ctx context.Context, zoneName string) ([]*metapb.Node, error)
-    GetPsByZone(ctx context.Context, zoneName string, nodeId metapb.NodeID) (*metapb.Node, error)
-    AddPsByZone(ctx context.Context, zoneName string, node *metapb.Node) error
-    UpdatePsByZone(ctx context.Context, zoneName string, ps *metapb.Node) error
-    DeletePsByZone(ctx context.Context, zoneName string, nodeId metapb.NodeID) error
+    GetAllPsByZone(ctx context.Context, zoneName string) ([]*PsTopo, error)
+    GetPsByZone(ctx context.Context, zoneName string, nodeId metapb.NodeID) (*PsTopo, error)
+    AddPsByZone(ctx context.Context, zoneName string, node *metapb.Node) (*PsTopo, error)
+    UpdatePsByZone(ctx context.Context, zoneName string, ps *PsTopo) error
+    DeletePsByZone(ctx context.Context, zoneName string, ps *PsTopo) error
 
     // GetZoneForPartition(ctx context.Context, partitionId metapb.PartitionID) ([]*metapb.Zone, error)
     // GetRoute
-    GetPartitionInfoByZone(ctx context.Context, zoneName string,
-            partitionId *metapb.PartitionID) (*masterpb.PartitionInfo, error)
+    GetPartitionInfoByZone(ctx context.Context, zoneName string, partitionId metapb.PartitionID) (*PartitionInfoTopo, error)
 
     // PsRegister
-    GetPartitionsOnPsByZone(ctx context.Context, zoneName string, nodeId metapb.NodeID) ([]*metapb.Partition, error)
+    GetPartitionsOnPsByZone(ctx context.Context, zoneName string, nodeId metapb.NodeID) ([]*PartitionTopo, error)
 
     // PsHeartbeat
-    SetPartitionInfoByZone(ctx context.Context, zoneName string, partition *masterpb.PartitionInfo) error
+    SetPartitionInfoByZone(ctx context.Context, zoneName string, partition *PartitionInfoTopo) error
     SetPartitionLeaderByZone(ctx context.Context, zoneName string,
             partitionId *metapb.PartitionID, leaderReplicaId metapb.ReplicaID) error
+
+    NewMasterParticipation(zone, id string) (MasterParticipation, error)
 
     GenerateNewId(ctx context.Context) (uint64, error)
 }
