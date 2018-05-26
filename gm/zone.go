@@ -1,16 +1,16 @@
 package gm
 
 import (
-	"fmt"
 	"github.com/gogo/protobuf/proto"
 	"github.com/tiglabs/baudengine/proto/metapb"
-	"github.com/tiglabs/baudengine/util"
+	"github.com/tiglabs/baudengine/topo"
 	"github.com/tiglabs/baudengine/util/log"
 	"sync"
+	"golang.org/x/net/context"
 )
 
 type Zone struct {
-	*metapb.Zone
+	*topo.ZoneTopo
 
 	// name
 	// type "global/local"
@@ -28,31 +28,44 @@ func NewZone(zoneName, zoneEtcdAddr, zoneMasterAddr string) (*Zone, error) {
 		// etcdAddr: zoneEtcdAddr,
 		// zoneMasterAddr: zoneMasterAddr
 	}
-	return NewZoneByMeta(metaZone), nil
+	topoZone := &topo.ZoneTopo{
+		Zone: metaZone,
+
+	}
+	return NewZoneByTopo(topoZone), nil
 }
 
-func NewZoneByMeta(metaZone *metapb.Zone) *Zone {
+func NewZoneByTopo(topoZone *topo.ZoneTopo) *Zone {
 	return &Zone{
-		Zone: metaZone,
+		ZoneTopo: topoZone,
 	}
 }
 
-func (zone *Zone) persistent() error {
+func (zone *Zone) add() error {
 	zone.propertyLock.Lock()
 	defer zone.propertyLock.Unlock()
-	topo.AddZone(zone.Zone)
+	ctx := context.Background()
+
+	zoneTopo, err:= topoServer.AddZone(ctx, zone.ZoneTopo.Zone)
+	if err != nil {
+		log.Error("topoServer AddZone error, err: [%v]", err)
+		return err
+	}
+	zone.ZoneTopo = zoneTopo
 
 	return nil
 }
 
 func (zone *Zone) erase() error {
-	db.propertyLock.Lock()
-	defer db.propertyLock.Unlock()
+	zone.propertyLock.Lock()
+	defer zone.propertyLock.Unlock()
 
-	dbKey := []byte(fmt.Sprintf("%s%d", PREFIX_DB, db.DB.ID))
-	if err := store.Delete(dbKey); err != nil {
-		log.Error("fail to delete db[%v] from store. err:[%v]", db.DB, err)
-		return ErrLocalDbOpsFailed
+	ctx := context.Background()
+
+	err := topoServer.DeleteZone(ctx, zone.ZoneTopo)
+	if err != nil {
+		log.Error("topoServer DeleteZone error, err: [%v]", err)
+		return err
 	}
 
 	return nil

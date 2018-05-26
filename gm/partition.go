@@ -4,9 +4,9 @@ import (
 	"fmt"
 	"github.com/gogo/protobuf/proto"
 	"github.com/google/btree"
-	"github.com/jddb/jddb-k8s/pkg/apis/batch"
 	"github.com/tiglabs/baudengine/proto/masterpb"
 	"github.com/tiglabs/baudengine/proto/metapb"
+	"github.com/tiglabs/baudengine/topo"
 	"github.com/tiglabs/baudengine/util/deepcopy"
 	"github.com/tiglabs/baudengine/util/log"
 	"strconv"
@@ -20,8 +20,10 @@ const (
 )
 
 type Partition struct {
-	*metapb.Partition // !!! Do not directly operate the Replicas，must be firstly take the propertyLock
+	*topo.PartitionTopo // !!! Do not directly operate the Replicas，must be firstly take the propertyLock
 
+
+    Zones    map[string]*topo.ZoneTopo
 	Leader *metapb.Replica `json:"leader"`
 
 	// TODO: temporary policy, finally using global task to replace it
@@ -39,7 +41,7 @@ func NewPartition(dbId metapb.DBID, spaceId metapb.SpaceID, startSlot, endSlot m
 		return nil, ErrGenIdFailed
 	}
 
-	metaPartition := &metapb.Partition{
+	partitionMeta := &metapb.Partition{
 		ID:        metapb.PartitionID(partId),
 		DB:        dbId,
 		Space:     spaceId,
@@ -49,27 +51,17 @@ func NewPartition(dbId metapb.DBID, spaceId metapb.SpaceID, startSlot, endSlot m
 		Status:    metapb.PA_READONLY,
 	}
 
-	return NewPartitionByMeta(metaPartition), nil
+	partitionTopo := &topo.PartitionTopo{
+		Partition: partitionMeta,
+	}
+
+	return NewPartitionByTopo(partitionTopo), nil
 }
 
-func NewPartitionByMeta(metaPartition *metapb.Partition) *Partition {
+func NewPartitionByTopo(partitionTopo *topo.PartitionTopo) *Partition {
 	return &Partition{
-		Partition: metaPartition,
+		PartitionTopo: partitionTopo,
 	}
-}
-
-func (p *Partition) Persistent() error {
-	p.propertyLock.Lock()
-	defer p.propertyLock.Unlock()
-
-	key, val, err := doMetaMarshal(p.Partition)
-	if err != nil {
-		return err
-	}
-
-	// TODO 调用global etcd 添加partition, 接口由@杨洋提供
-
-	return nil
 }
 
 func (p *Partition) erase() error {
@@ -257,18 +249,6 @@ func (p *Partition) takeChangeMemberTask() bool {
 	return false
 }
 
-// internal use, need to write lock external
-func doMetaMarshal(p *metapb.Partition) ([]byte, []byte, error) {
-	val, err := proto.Marshal(p)
-	if err != nil {
-		log.Error("fail to marshal partition[%v]. err:[%v]", p, err)
-		return nil, nil, err
-	}
-	key := []byte(strconv.Itoa(int(p.ID)))
-
-	return key, val, err
-}
-
 type PartitionCache struct {
 	lock       sync.RWMutex
 	partitions map[metapb.PartitionID]*Partition
@@ -299,17 +279,17 @@ func (c *PartitionCache) AddPartition(partition *Partition) {
 	c.partitions[partition.ID] = partition
 }
 
-func (c *PartitionCache) GetAllPartitions() *[]Partition {
+func (c *PartitionCache) GetAllPartitions() []*Partition {
 	c.lock.RLock()
 	defer c.lock.RUnlock()
 
-	partitions := make([]Partition, 0, len(c.partitions))
+	partitions := make([]*Partition, 0, len(c.partitions))
 	for _, partition := range c.partitions {
 		log.Debug("api get all partition[%p] ", partition)
-		partitions = append(partitions, *partition)
+		partitions = append(partitions, partition)
 	}
 
-	return &partitions
+	return partitions
 }
 
 func (c *PartitionCache) GetAllMetaPartitions() *[]metapb.Partition {

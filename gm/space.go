@@ -4,10 +4,12 @@ import (
 	"fmt"
 	"github.com/gogo/protobuf/proto"
 	"github.com/tiglabs/baudengine/proto/metapb"
+	"github.com/tiglabs/baudengine/topo"
 	"github.com/tiglabs/baudengine/util"
 	"github.com/tiglabs/baudengine/util/deepcopy"
 	"github.com/tiglabs/baudengine/util/log"
 	"sync"
+	"golang.org/x/net/context"
 )
 
 type PartitionPolicy struct {
@@ -17,7 +19,8 @@ type PartitionPolicy struct {
 }
 
 type Space struct {
-	*metapb.Space
+	*topo.SpaceTopo
+	partitionsTopo []*topo.PartitionTopo
 	searchTree   *PartitionTree `json:"-"`
 	propertyLock sync.RWMutex   `json:"-"`
 }
@@ -37,7 +40,7 @@ func NewSpace(dbId metapb.DBID, dbName, spaceName string, policy *PartitionPolic
 		return nil, ErrGenIdFailed
 	}
 
-	metaSpace := &metapb.Space{
+	spaceMeta := &metapb.Space{
 		Name:   spaceName,
 		ID:     metapb.SpaceID(spaceId),
 		DB:     dbId,
@@ -48,27 +51,54 @@ func NewSpace(dbId metapb.DBID, dbName, spaceName string, policy *PartitionPolic
 			KeyFunc:  policy.Function,
 		},
 	}
-	return NewSpaceByMeta(metaSpace), nil
+
+	spaceTopo := &topo.SpaceTopo{
+		Space: spaceMeta,
+	}
+
+	return NewSpaceByTopo(spaceTopo), nil
 }
 
-func NewSpaceByMeta(metaSpace *metapb.Space) *Space {
+func NewSpaceByTopo(spaceTopo *topo.SpaceTopo) *Space {
 	return &Space{
-		Space:      metaSpace,
+		SpaceTopo:      spaceTopo,
 		searchTree: NewPartitionTree(),
 	}
 }
 
-func (s *Space) persistent() error {
+func (s *Space) add(partitions []*Partition) error {
 	s.propertyLock.Lock()
 	defer s.propertyLock.Unlock()
 
-	copy := deepcopy.Iface(s.Space).(*metapb.Space)
-	spaceVal, err := proto.Marshal(copy)
+	ctx := context.Background()
+	partitionsMeta := make([]*metapb.Partition, 0)
+	for _, partition := range partitions {
+		partitionsMeta = append(partitionsMeta, partition.PartitionTopo.Partition)
+	}
+
+	spaceTopo, partitionsTopo, err := topoServer.AddSpace(ctx, s.DB, s.SpaceTopo.Space, partitionsMeta)
 	if err != nil {
-		log.Error("fail to marshal space[%v]. err:[%v]", copy, err)
+		log.Error("topoServer AddSpace error, err: [%v]", err)
 		return err
 	}
-	// TODO 调用global etcd添加space, 接口由@杨洋提供
+	s.SpaceTopo = spaceTopo
+	s.partitionsTopo = partitionsTopo
+
+	return nil
+}
+
+func (s *Space) update() error {
+	s.propertyLock.Lock()
+	defer s.propertyLock.Unlock()
+
+	ctx := context.Background()
+
+	err := topoServer.UpdateSpace(ctx, s.SpaceTopo)
+	if err != nil {
+		log.Error("topoServer UpdateSpace error, err: [%v]", err)
+		return err
+	}
+
 	return nil
 }
 
@@ -76,7 +106,13 @@ func (s *Space) erase() error {
 	s.propertyLock.Lock()
 	defer s.propertyLock.Unlock()
 
-	// TODO 调用global etcd删除space, 接口由@杨洋提供
+	ctx := context.Background()
+
+	err := topoServer.DeleteSpace(ctx, s.SpaceTopo)
+	if err != nil {
+		log.Error("topoServer DeleteSpace error, err: [%v]", err)
+		return err
+	}
 	return nil
 }
 

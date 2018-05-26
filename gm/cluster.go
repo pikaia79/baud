@@ -37,6 +37,10 @@ func (c *Cluster) Start() error {
 		log.Error("fail to registor global etcd. err:[%v]", err)
 		return err
 	}
+	if err := c.recoveryZoneCache(); err != nil {
+		log.Error("fail to recovery ZoneCache. err:[%v]", err)
+		return err
+	}
 	// recovery memory meta data
 	if err := c.recoveryDBCache(); err != nil {
 		log.Error("fail to recovery DbCache. err[%v]", err)
@@ -50,12 +54,8 @@ func (c *Cluster) Start() error {
 		log.Error("fail to recovery PartitionCache. err[%v]", err)
 		return err
 	}
-	if err := c.recoveryZoneCache(); err != nil {
-		log.Error("fail to recovery ZoneCache. err:[%v]", err)
-		return err
-	}
-	log.Info("finish to recovery whole cluster")
 
+	log.Info("finish to recovery whole cluster")
 	log.Info("Cluster has started")
 	return nil
 }
@@ -67,6 +67,22 @@ func (c *Cluster) Close() {
 
 func (c *Cluster) registorGlobalEtcd() error {
 	//TODO ***** 启动时gm把自己注册到glocal etcd, 调用@杨洋提供的接口
+
+	return nil
+}
+
+func (c *Cluster) recoveryZoneCache() error {
+	c.clusterLock.Lock()
+	defer c.clusterLock.Unlock()
+
+	zones, err := c.ZoneCache.Recovery()
+	if err != nil {
+		return err
+	}
+
+	for _, zone := range zones {
+		c.ZoneCache.AddZone(zone)
+	}
 
 	return nil
 }
@@ -153,29 +169,13 @@ func (c *Cluster) recoveryPartitionCache() error {
 	return nil
 }
 
-func (c *Cluster) recoveryZoneCache() error {
-	c.clusterLock.Lock()
-	defer c.clusterLock.Unlock()
-
-	zones, err := c.ZoneCache.Recovery()
-	if err != nil {
-		return err
-	}
-
-	for _, zone := range zones {
-		c.ZoneCache.AddZone(zone)
-	}
-
-	return nil
-}
-
 func (c *Cluster) clearAllCache() {
 	c.clusterLock.Lock()
 	defer c.clusterLock.Unlock()
 
-	c.DbCache.Clear()
-	// SpaceCache in DbCache
 	c.PartitionCache.Clear()
+	// SpaceCache in DbCache
+	c.DbCache.Clear()
 	c.ZoneCache.Clear()
 }
 
@@ -183,9 +183,9 @@ func (c *Cluster) CreateZone(zoneName, zoneEtcdAddr, zoneMasterAddr string) (*Zo
 	c.clusterLock.Lock()
 	defer c.clusterLock.Unlock()
 
-	db := c.ZoneCache.FindZoneByName(zoneName)
-	if db != nil {
-		return nil, ErrDupDb
+	zone := c.ZoneCache.FindZoneByName(zoneName)
+	if zone != nil {
+		return nil, ErrDupZone
 	}
 
 	zone, err := NewZone(zoneName, zoneEtcdAddr, zoneMasterAddr)
@@ -193,12 +193,29 @@ func (c *Cluster) CreateZone(zoneName, zoneEtcdAddr, zoneMasterAddr string) (*Zo
 		return nil, err
 	}
 
-	if err := zone.persistent(); err != nil {
+	if err := zone.add(); err != nil {
 		return nil, err
 	}
 	c.ZoneCache.AddZone(zone)
 
 	return zone, nil
+}
+
+func (c *Cluster) DeleteZone(zoneName string) error {
+	c.clusterLock.Lock()
+	defer c.clusterLock.Unlock()
+
+	zone := c.ZoneCache.FindZoneByName(zoneName)
+	if zone == nil {
+		return ErrZoneNotExists
+	}
+
+	if err := zone.erase(); err != nil {
+		return err
+	}
+	c.ZoneCache.DeleteZone(zone)
+
+	return nil
 }
 
 func (c *Cluster) CreateDb(dbName string) (*DB, error) {
@@ -215,7 +232,7 @@ func (c *Cluster) CreateDb(dbName string) (*DB, error) {
 		return nil, err
 	}
 
-	if err := db.persistent(); err != nil {
+	if err := db.add(); err != nil {
 		return nil, err
 	}
 	c.DbCache.AddDb(db)
@@ -238,10 +255,27 @@ func (c *Cluster) RenameDb(srcDbName, destDbName string) error {
 
 	c.DbCache.DeleteDb(srcDb)
 	srcDb.rename(destDbName)
-	if err := srcDb.persistent(); err != nil {
+	if err := srcDb.update(); err != nil {
 		return err
 	}
 	c.DbCache.AddDb(srcDb)
+
+	return nil
+}
+
+func (c *Cluster) DeleteDb(dbName string) error {
+	c.clusterLock.Lock()
+	defer c.clusterLock.Unlock()
+
+	db := c.DbCache.FindDbByName(dbName)
+	if db == nil {
+		return ErrDbNotExists
+	}
+
+	if err := db.erase(); err != nil {
+		return err
+	}
+	c.DbCache.DeleteDb(db)
 
 	return nil
 }
@@ -262,9 +296,6 @@ func (c *Cluster) CreateSpace(dbName, spaceName string, policy *PartitionPolicy)
 	if err != nil {
 		return nil, err
 	}
-	if err := space.persistent(); err != nil {
-		return nil, err
-	}
 
 	slots := util.SlotSplit(0, math.MaxUint32, policy.Number+1)
 	if slots == nil {
@@ -277,16 +308,17 @@ func (c *Cluster) CreateSpace(dbName, spaceName string, policy *PartitionPolicy)
 		if err != nil {
 			return nil, err
 		}
-
-		if err := partition.Persistent(); err != nil {
-			return nil, err
-		}
 		partitions = append(partitions, partition)
+	}
+
+	if err := space.add(partitions); err != nil {
+		return nil, err
 	}
 
 	db.SpaceCache.AddSpace(space)
 	for _, partition := range partitions {
 		space.putPartition(partition)
+		c.PartitionCache.AddPartition(partition)
 	}
 
 	return space, nil
@@ -312,10 +344,31 @@ func (c *Cluster) RenameSpace(dbName, srcSpaceName, destSpaceName string) error 
 
 	db.SpaceCache.DeleteSpace(srcSpace)
 	srcSpace.rename(destSpaceName)
-	if err := srcSpace.persistent(); err != nil {
+	if err := srcSpace.update(); err != nil {
 		return err
 	}
 	db.SpaceCache.AddSpace(srcSpace)
+
+	return nil
+}
+
+func (c *Cluster) DeleteSpace(dbName, spaceName string) error {
+	c.clusterLock.Lock()
+	defer c.clusterLock.Unlock()
+
+	db := c.DbCache.FindDbByName(dbName)
+	if db == nil {
+		return ErrDbNotExists
+	}
+	space := db.SpaceCache.FindSpaceByName(spaceName)
+	if space == nil {
+		return ErrSpaceNotExists
+	}
+
+	if err := space.erase(); err != nil {
+		return err
+	}
+	db.SpaceCache.DeleteSpace(space)
 
 	return nil
 }

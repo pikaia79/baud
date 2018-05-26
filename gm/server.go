@@ -1,14 +1,13 @@
 package gm
 
 import (
-	"github.com/jddb/jddb-k8s/third_party/golang/go/doc/testdata"
-	topoServer "github.com/tiglabs/baudengine/topo"
+	"github.com/tiglabs/baudengine/topo"
 	"github.com/tiglabs/baudengine/util/log"
 	"sync"
 )
 
 var (
-	topo *topoServer.TopoServer
+	topoServer *topo.TopoServer
 )
 
 type GM struct {
@@ -31,7 +30,7 @@ func NewServer() *GM {
 
 func (gm *GM) Start(config *Config) error {
 	gm.config = config
-	topo = topoServer.Open()
+	topoServer = topo.Open()
 
 	gm.cluster = NewCluster(config)
 	if err := gm.cluster.Start(); err != nil {
@@ -100,9 +99,9 @@ func (gm *GM) Shutdown() {
 		gm.cluster.Close()
 		gm.cluster = nil
 	}
-	if topo != nil {
-		topo.Close()
-		topo = nil
+	if topoServer != nil {
+		topoServer.Close()
+		topoServer = nil
 	}
 	gm.wg.Wait()
 }
