@@ -1,11 +1,8 @@
 package gm
 
 import (
-	"fmt"
-	"github.com/gogo/protobuf/proto"
 	"github.com/tiglabs/baudengine/proto/metapb"
 	"github.com/tiglabs/baudengine/topo"
-	"github.com/tiglabs/baudengine/util"
 	"github.com/tiglabs/baudengine/util/log"
 	"sync"
 	"golang.org/x/net/context"
@@ -166,18 +163,22 @@ func (c *DBCache) GetAllDBs() []*DB {
 func (c *DBCache) Recovery() ([]*DB, error) {
 
 	resultDBs := make([]*DB, 0)
-	// TODO 从global etcd里获得所有DB list, 由@杨洋提供接口
-	topoDBs := make([]*metapb.DB, 0)
-	for _, topoDB := range topoDBs {
-		err := proto.Unmarshal([]byte{}, topoDB)
-		if err != nil {
-			log.Error("proto.Unmarshal error, err:[%v]", err)
-		}
-		metaDb := new(metapb.DB)
-		metaDb.Name = topoDB.Name
-		metaDb.ID = topoDB.ID
-		resultDBs = append(resultDBs, NewDBByMeta(metaDb))
+
+	ctx := context.Background()
+	dbsTopo, err := topoServer.GetAllDBs(ctx)
+	if err != nil {
+		log.Error("topoServer GetAllDBs error, err: [%v]", err)
+		return nil, err
 	}
+	if dbsTopo != nil {
+		for _, dbTopo := range dbsTopo {
+			db := &DB{
+				DBTopo: dbTopo,
+			}
+			resultDBs = append(resultDBs, db)
+		}
+	}
+
 	return resultDBs, nil
 }
 

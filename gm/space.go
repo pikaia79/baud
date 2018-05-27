@@ -1,12 +1,8 @@
 package gm
 
 import (
-	"fmt"
-	"github.com/gogo/protobuf/proto"
 	"github.com/tiglabs/baudengine/proto/metapb"
 	"github.com/tiglabs/baudengine/topo"
-	"github.com/tiglabs/baudengine/util"
-	"github.com/tiglabs/baudengine/util/deepcopy"
 	"github.com/tiglabs/baudengine/util/log"
 	"sync"
 	"golang.org/x/net/context"
@@ -108,6 +104,7 @@ func (s *Space) erase() error {
 
 	ctx := context.Background()
 
+	// TODO partition是否在删除space时一起删除???
 	err := topoServer.DeleteSpace(ctx, s.SpaceTopo)
 	if err != nil {
 		log.Error("topoServer DeleteSpace error, err: [%v]", err)
@@ -132,8 +129,10 @@ func (s *Space) putPartition(partition *Partition) {
 
 func (s *Space) AscendScanPartition(pivotSlot metapb.SlotID, batchNum int) []*Partition {
 	searchPivot := &Partition{
-		Partition: &metapb.Partition{
-			StartSlot: pivotSlot,
+		PartitionTopo: &topo.PartitionTopo{
+			Partition: &metapb.Partition{
+				StartSlot: pivotSlot,
+			},
 		},
 	}
 	items := s.searchTree.ascendScan(searchPivot, batchNum)
@@ -147,6 +146,8 @@ func (s *Space) AscendScanPartition(pivotSlot metapb.SlotID, batchNum int) []*Pa
 	}
 	return result
 }
+
+// SpaceCache
 
 type SpaceCache struct {
 	lock     sync.RWMutex
@@ -216,29 +217,26 @@ func (c *SpaceCache) DeleteSpace(space *Space) {
 	if !ok {
 		return
 	}
+	delete(c.spaces, space.ID)
 	delete(c.name2Ids, oldSpace.Name)
 }
 
 func (c *SpaceCache) Recovery() ([]*Space, error) {
 	resultSpaces := make([]*Space, 0)
-
-	// TODO 从global etcd里获得一个DB的space list, 由@杨洋提供接口
-	topoSpaces := make([]metapb.Space, 0)
-	for _, topoSpace := range topoSpaces {
-		err := proto.Unmarshal([]byte{}, topoSpace)
-		if err != nil {
-			log.Error("proto.Unmarshal error, err:[%v]", err)
-		}
-		metaSpace := new(metapb.Space)
-		metaSpace.ID = topoSpace.ID
-		metaSpace.Name = topoSpace.Name
-		metaSpace.DB = topoSpace.DB
-		metaSpace.Type = topoSpace.Type
-		metaSpace.DbName = topoSpace.DbName
-		metaSpace.KeyPolicy = topoSpace.KeyPolicy
-		metaSpace.Status = topoSpace.Status
-
-		resultSpaces = append(resultSpaces, NewSpaceByMeta(metaSpace))
+	ctx := context.Background()
+	spacesTopo, err := topoServer.GetAllSpaces(ctx)
+	if err != nil {
+		log.Error("topoServer GetAllSpaces error, err: [%v]", err)
+		return nil, err
 	}
+	if spacesTopo != nil {
+		for _, spaceTopo := range spacesTopo{
+			space := &Space {
+				SpaceTopo: spaceTopo,
+			}
+			resultSpaces = append(resultSpaces, space)
+		}
+	}
+
 	return resultSpaces, nil
 }

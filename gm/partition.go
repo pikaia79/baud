@@ -1,17 +1,13 @@
 package gm
 
 import (
-	"fmt"
 	"github.com/gogo/protobuf/proto"
 	"github.com/google/btree"
-	"github.com/tiglabs/baudengine/proto/masterpb"
 	"github.com/tiglabs/baudengine/proto/metapb"
 	"github.com/tiglabs/baudengine/topo"
-	"github.com/tiglabs/baudengine/util/deepcopy"
 	"github.com/tiglabs/baudengine/util/log"
-	"strconv"
 	"sync"
-	"time"
+	"golang.org/x/net/context"
 )
 
 const (
@@ -20,17 +16,10 @@ const (
 )
 
 type Partition struct {
-	*topo.PartitionTopo // !!! Do not directly operate the Replicas，must be firstly take the propertyLock
-
+	*topo.PartitionTopo
 
     Zones    map[string]*topo.ZoneTopo
-	Leader *metapb.Replica `json:"leader"`
 
-	// TODO: temporary policy, finally using global task to replace it
-	taskFlag    bool
-	taskTimeout time.Time
-
-	LastHeartbeat time.Time `json:"last_heartbeat"`
 	propertyLock  sync.RWMutex
 }
 
@@ -64,135 +53,6 @@ func NewPartitionByTopo(partitionTopo *topo.PartitionTopo) *Partition {
 	}
 }
 
-func (p *Partition) erase() error {
-	p.propertyLock.Lock()
-	defer p.propertyLock.Unlock()
-
-	// TODO 调用global etcd删除partition, 接口由@杨洋提供
-	return nil
-}
-
-func (p *Partition) deleteReplica(store Store, metaReplicas ...*metapb.Replica) error {
-	p.propertyLock.Lock()
-	defer p.propertyLock.Unlock()
-
-	copy := deepcopy.Iface(p.Partition).(*metapb.Partition)
-	for i := len(copy.Replicas) - 1; i >= 0; i-- {
-		for _, metaReplica := range metaReplicas {
-			if copy.Replicas[i].ID == metaReplica.ID {
-				copy.Replicas = append(copy.Replicas[:i], copy.Replicas[i+1:]...)
-			}
-		}
-	}
-
-	key, val, err := doMetaMarshal(copy)
-	if err != nil {
-		return err
-	}
-	if err := store.Put(key, val); err != nil {
-		return err
-	}
-
-	p.Partition = copy
-	return nil
-}
-
-func (p *Partition) addReplica(store Store, metaReplicas ...*metapb.Replica) error {
-	p.propertyLock.Lock()
-	defer p.propertyLock.Unlock()
-
-	copy := deepcopy.Iface(p.Partition).(*metapb.Partition)
-	for _, r := range metaReplicas {
-		copy.Replicas = append(copy.Replicas, *r)
-	}
-
-	key, val, err := doMetaMarshal(copy)
-	if err != nil {
-		return err
-	}
-	if err := store.Put(key, val); err != nil {
-		return err
-	}
-
-	p.Partition = copy
-
-	return nil
-}
-
-// updating policy :
-// 1. update the leader and replicas group when confVer of partitionInfo is greater than confVer of cluster partition
-//    or current cluster partition have no leader
-// 2. update only the leader when confVer of partitionInfo is equals to confVer of cluster partition,
-//    and the leader of partitionInfo is exists in replica group of current cluster partition
-func (p *Partition) UpdateReplicaGroupByCond(store Store, info *masterpb.PartitionInfo,
-	leaderReplica *metapb.Replica) (verExpired, updateOk bool) {
-	p.propertyLock.Lock()
-	defer p.propertyLock.Unlock()
-
-	if info.Epoch.ConfVersion < p.Epoch.ConfVersion ||
-		(info.Epoch.ConfVersion == p.Epoch.ConfVersion && p.Leader != nil) {
-		return true, false
-	}
-
-	copy := deepcopy.Iface(p.Partition).(*metapb.Partition)
-	copy.Epoch = info.Epoch
-	copy.Status = info.Status
-
-	copy.Replicas = make([]metapb.Replica, 0, len(info.RaftStatus.Followers)+1)
-	copy.Replicas = append(copy.Replicas, info.RaftStatus.Replica)
-	for _, follower := range info.RaftStatus.Followers {
-		replica := &follower.Replica
-		copy.Replicas = append(copy.Replicas, *replica)
-	}
-	key, val, err := doMetaMarshal(copy)
-	if err != nil {
-		return false, false
-	}
-	if err := store.Put(key, val); err != nil {
-		return false, false
-	}
-
-	p.Partition = copy
-
-	p.taskFlag = false
-	p.taskTimeout = time.Time{}
-
-	p.LastHeartbeat = time.Now()
-	p.Leader = leaderReplica
-
-	return false, true
-}
-
-func (p *Partition) ValidateAndUpdateLeaderByCond(info *masterpb.PartitionInfo,
-	leaderReplica *metapb.Replica) (verExpired, illegal, updateOk bool) {
-	p.propertyLock.Lock()
-	defer p.propertyLock.Unlock()
-
-	if info.Epoch.ConfVersion != p.Epoch.ConfVersion {
-		return true, false, false
-	}
-
-	if p.Leader == nil {
-		return false, false, false
-	}
-
-	var leaderExists bool
-	for _, replica := range p.Replicas {
-		if replica.ID == leaderReplica.ID {
-			leaderExists = true
-			break
-		}
-	}
-	if !leaderExists {
-		return false, true, false
-	}
-
-	p.LastHeartbeat = time.Now()
-	p.Leader = leaderReplica
-
-	return false, false, true
-}
-
 func (p *Partition) countReplicas() int {
 	p.propertyLock.RLock()
 	defer p.propertyLock.RUnlock()
@@ -216,11 +76,9 @@ func (p *Partition) pickLeaderNodeId() metapb.NodeID {
 	p.propertyLock.RLock()
 	defer p.propertyLock.RUnlock()
 
-	if p.Leader != nil {
-		return p.Leader.NodeID
-	} else {
-		return 0
-	}
+	// TODO 得到一个partition的replica leader
+	// TODO 需要watch所有zone的etcd后,才能分析出来
+
 }
 
 func (p *Partition) findReplicaById(replicaId metapb.ReplicaID) *metapb.Replica {
@@ -240,14 +98,12 @@ func (p *Partition) takeChangeMemberTask() bool {
 	p.propertyLock.Lock()
 	defer p.propertyLock.Unlock()
 
-	if p.taskFlag == false || time.Now().Sub(p.taskTimeout) >= 30*time.Second {
-		p.taskFlag = true
-		p.taskTimeout = time.Now()
-		return true
-	}
+	// TODO 得到一个partition的任务标识， 接口由@杨洋提供
 
 	return false
 }
+
+// PartitionCache
 
 type PartitionCache struct {
 	lock       sync.RWMutex
@@ -279,6 +135,13 @@ func (c *PartitionCache) AddPartition(partition *Partition) {
 	c.partitions[partition.ID] = partition
 }
 
+func (c *PartitionCache) DeletePartition(partitionID metapb.PartitionID) {
+	c.lock.Lock()
+	defer c.lock.Unlock()
+
+	delete(c.partitions, partitionID)
+}
+
 func (c *PartitionCache) GetAllPartitions() []*Partition {
 	c.lock.RLock()
 	defer c.lock.RUnlock()
@@ -292,39 +155,35 @@ func (c *PartitionCache) GetAllPartitions() []*Partition {
 	return partitions
 }
 
-func (c *PartitionCache) GetAllMetaPartitions() *[]metapb.Partition {
+func (c *PartitionCache) GetAllMetaPartitions() []*metapb.Partition {
 	c.lock.RLock()
 	defer c.lock.RUnlock()
 
-	partitions := make([]metapb.Partition, 0, len(c.partitions))
+	partitionsMeta := make([]*metapb.Partition, 0, len(c.partitions))
 	for _, partition := range c.partitions {
-		partitions = append(partitions, *partition.Partition)
+		partitionsMeta = append(partitionsMeta, partition.PartitionTopo.Partition)
 	}
 
-	return &partitions
+	return partitionsMeta
 }
 
 func (c *PartitionCache) Recovery() ([]*Partition, error) {
 
 	resultPartitions := make([]*Partition, 0)
-	// TODO 从global master获得partion list, 接口由@杨洋提供
-	topoPartitions := make([]metapb.Partition, 0)
-	for _, topoPartition := range topoPartitions {
-		err := proto.Unmarshal([]byte{}, topoPartition)
-		if err != nil {
-			log.Error("proto.Unmarshal error, err:[%v]", err)
-		}
-		metaPartition := new(metapb.Partition)
-		metaPartition.DB = topoPartition.DB
-		metaPartition.Status = topoPartition.Status
-		metaPartition.ID = topoPartition.ID
-		metaPartition.Space = topoPartition.Space
-		metaPartition.Epoch = topoPartition.Epoch
-		metaPartition.Replicas = topoPartition.Replicas
-		metaPartition.StartSlot = topoPartition.StartSlot
-		metaPartition.EndSlot = topoPartition.EndSlot
 
-		resultPartitions = append(resultPartitions, NewPartitionByMeta(metaPartition))
+	ctx := context.Background()
+	partitionsTopo, err := topoServer.GetAllPartitions(ctx)
+	if err != nil {
+		log.Error("topoServer GetAllPartitions error, err: [%v]", err)
+		return nil, err
+	}
+	if partitionsTopo != nil {
+		for _, partitionTopo := range partitionsTopo {
+			partition := &Partition{
+				PartitionTopo: partitionTopo,
+			}
+			resultPartitions = append(resultPartitions, partition)
+		}
 	}
 
 	return resultPartitions, nil
@@ -336,6 +195,8 @@ func (c *PartitionCache) Clear() {
 
 	c.partitions = make(map[metapb.PartitionID]*Partition)
 }
+
+// PartitionItem
 
 type PartitionItem struct {
 	partition *Partition

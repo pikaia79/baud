@@ -369,6 +369,9 @@ func (c *Cluster) DeleteSpace(dbName, spaceName string) error {
 		return err
 	}
 	db.SpaceCache.DeleteSpace(space)
+	for _, partitionTopo := range space.partitionsTopo {
+		c.PartitionCache.DeletePartition(partitionTopo.Partition.ID)
+	}
 
 	return nil
 }

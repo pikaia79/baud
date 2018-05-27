@@ -1,7 +1,6 @@
 package gm
 
 import (
-	"github.com/gogo/protobuf/proto"
 	"github.com/tiglabs/baudengine/proto/metapb"
 	"github.com/tiglabs/baudengine/topo"
 	"github.com/tiglabs/baudengine/util/log"
@@ -123,22 +122,21 @@ func (c *ZoneCache) GetAllZones() []*Zone {
 func (c *ZoneCache) Recovery() ([]*Zone, error) {
 
 	resultZones := make([]*Zone, 0)
-
-	// TODO 调用global etcd获得zone list, 接口由@杨洋提供
-	topoZones := make([]*metapb.Zone, 0)
-	for _, topoZone := range topoZones {
-		err := proto.Unmarshal([]byte{}, topoZone)
-		if err != nil {
-			log.Error("proto.Unmarshal error, err:[%v]", err)
-		}
-		metaZone := new(metapb.Zone)
-		metaZone.Name = topoZone.Name
-		metaZone.ServerAddrs = topoZone.ServerAddrs
-		metaZone.RootDir = topoZone.RootDir
-		// TODO global etcd, zone etcd, global addr, zone addr
-
-		resultZones = append(resultZones, NewZoneByMeta(metaZone))
+	ctx := context.Background()
+	zonesTopo, err := topoServer.GetAllZones(ctx)
+	if err != nil {
+		log.Error("topoServer GetAllZones error, err: [%v]", err)
+		return nil, err
 	}
+	if zonesTopo != nil {
+		for _, zoneTopo := range zonesTopo {
+			zone := &Zone{
+				ZoneTopo: zoneTopo,
+			}
+			resultZones = append(resultZones, zone)
+		}
+	}
+
 	return resultZones, nil
 }
 
