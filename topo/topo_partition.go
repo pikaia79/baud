@@ -20,7 +20,7 @@ type PartitionInfoTopo struct {
     *masterpb.PartitionInfo
 }
 
-func (s *TopoServer) GetAllPartition(ctx context.Context) ([]*PartitionTopo, error) {
+func (s *TopoServer) GetAllPartitions(ctx context.Context) ([]*PartitionTopo, error) {
     if ctx == nil {
         return nil, ErrNoNode
     }
@@ -104,3 +104,116 @@ func (s *TopoServer) DeletePartition(ctx context.Context, partition *PartitionTo
     return s.backend.Delete(ctx, GlobalZone, path.Join(partitionsPath, fmt.Sprint(partition.ID), PartitionTopoFile),
             partition.version)
 }
+
+func (s *TopoServer) GetPartitionInfoByZone(ctx context.Context, zoneName string,
+            partitionId metapb.PartitionID) (*masterpb.PartitionInfo, error) {
+    if ctx == nil || len(zoneName) == 0 {
+        return nil, ErrNoNode
+    }
+
+    nodePath := path.Join(partitionsPath, fmt.Sprint(partitionId), partitionGroupTopoFile)
+    contents, _, err := s.backend.Get(ctx, zoneName, nodePath)
+    if err != nil {
+        return nil, err
+    }
+
+    psInfoMeta := &masterpb.PartitionInfo{}
+    if err := proto.Unmarshal(contents, psInfoMeta); err != nil {
+        log.Error("Fail to unmarshal meta data for partitionInfo. partitionId[%d]. err[%v]", partitionId, err)
+        return nil, err
+    }
+
+    return psInfoMeta, nil
+}
+
+func (s *TopoServer) SetPartitionInfoByZone(ctx context.Context, zoneName string,
+        partitionInfo *masterpb.PartitionInfo) error {
+    if ctx == nil || len(zoneName) == 0 || partitionInfo == nil {
+        return ErrNoNode
+    }
+
+    contents, err := proto.Marshal(partitionInfo)
+    if err != nil {
+        log.Error("Fail to marshal meta data for partitionInfo[%v]. err[%v]", partitionInfo, err)
+        return err
+    }
+
+    nodePath := path.Join(partitionsPath, fmt.Sprint(partitionInfo.ID), partitionGroupTopoFile)
+    if _, err := s.backend.Update(ctx, zoneName, nodePath, contents, nil); err != nil {
+        return err
+    }
+
+    return nil
+}
+
+//func (s *TopoServer) SetPartitionLeaderByZone(ctx context.Context, zoneName string,
+//    partitionId *metapb.PartitionID, leaderReplicaId metapb.ReplicaID) error {
+//    return nil
+//}
+
+func (s *TopoServer) GetPartitionsOnPsByZone(ctx context.Context, zoneName string,
+    psId metapb.NodeID) ([]*PartitionTopo, error) {
+    if ctx == nil || len(zoneName) == 0 {
+        return nil, ErrNoNode
+    }
+
+    parentPath := path.Join(partitionServersPath, fmt.Sprint(psId), partitionsPath)
+    dirs, err := s.backend.ListDir(ctx, zoneName, parentPath)
+    if err != nil {
+        return nil, err
+    }
+    if dirs == nil || len(dirs) == 0 {
+        return nil, nil
+    }
+
+    partitions := make([]*PartitionTopo, 0, len(dirs))
+    for _, id := range dirs {
+        childPath := path.Join(parentPath, id, PartitionTopoFile)
+        contents, version, err := s.backend.Get(ctx, zoneName, childPath)
+        if err != nil {
+            return nil, err
+        }
+
+        partitionMeta := &metapb.Partition{}
+        if err := proto.Unmarshal(contents, partitionMeta); err != nil {
+            log.Error("Fail to unmarshal meta info for partition[%s]. err[%v]", id, err)
+            return nil, err
+        }
+
+        partitions = append(partitions, &PartitionTopo{version:version, Partition: partitionMeta})
+    }
+
+    return partitions, nil
+}
+
+func (s *TopoServer) SetPartitionsOnPSByZone(ctx context.Context, zoneName string, psId metapb.NodeID,
+    partitions []*metapb.Partition) error {
+    if ctx == nil || len(zoneName) == 0 || len(partitions) == 0 {
+        return ErrNoNode
+    }
+
+    parentPath := path.Join(partitionServersPath, fmt.Sprint(psId), partitionsPath)
+    txn, err := s.backend.NewTransaction(ctx, zoneName)
+    if err != nil {
+        return err
+    }
+
+    txn.Delete(parentPath, nil)
+    for _, partition := range partitions {
+        contents, err := proto.Marshal(partition)
+        if err != nil {
+            return err
+        }
+
+        nodePath := path.Join(parentPath, fmt.Sprint(partition.ID), PartitionTopoFile)
+        txn.Create(nodePath, contents)
+    }
+    if _, err := txn.Commit(); err != nil {
+        return err
+    }
+
+    return nil
+}
+
+
+
