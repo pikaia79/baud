@@ -1,8 +1,13 @@
 package gm
 
 import (
+	"github.com/tiglabs/baudengine/topo"
 	"github.com/tiglabs/baudengine/util/log"
 	"sync"
+)
+
+var (
+	topoServer *topo.TopoServer
 )
 
 type GM struct {
@@ -25,6 +30,7 @@ func NewServer() *GM {
 
 func (gm *GM) Start(config *Config) error {
 	gm.config = config
+	topoServer = topo.Open()
 
 	gm.cluster = NewCluster(config)
 	if err := gm.cluster.Start(); err != nil {
@@ -47,9 +53,9 @@ func (gm *GM) Start(config *Config) error {
 		return err
 	}
 
-	gm.zoneMasterRpcClient = GetZoneMasterRpcClientSingle(config)
-
 	gm.idGenerator = GetIdGeneratorSingle()
+	gm.zoneMasterRpcClient = GetZoneMasterRpcClientSingle(config)
+	// processorManager start() when init
 	gm.processorManager = GetPMSingle(gm.cluster)
 
 	gm.workerManager = NewWorkerManager(gm.cluster)
@@ -93,25 +99,30 @@ func (gm *GM) Shutdown() {
 		gm.cluster.Close()
 		gm.cluster = nil
 	}
+	if topoServer != nil {
+		topoServer.Close()
+		topoServer = nil
+	}
 	gm.wg.Wait()
 }
 
 func (gm *GM) watchLeader() {
-	gm.leaderCh = make(chan *LeaderInfo, 4)
 
 	gm.wg.Add(1)
 	go func() {
 		defer gm.wg.Done()
 
+		//TODO 调用global etcd进行gm leader选举, 接口由@杨洋提供
+
 		for {
 			select {
-			case leaderChanging, opened := <-gm.leaderCh:
-				if !opened {
-					log.Debug("closed leader watch channel")
-					return
-				}
 
-				if !leaderChanging.becomeLeader {
+			case "":
+
+				if "leader2follower" == "" {
+					gm.cluster.isGMLeader = false
+					gm.cluster.currentGMLeaderNodeID = 0
+					gm.cluster.currentGMLeaderAddr = ""
 					if gm.workerManager != nil {
 						gm.workerManager.Shutdown()
 						gm.workerManager = nil
@@ -124,14 +135,7 @@ func (gm *GM) watchLeader() {
 						gm.idGenerator.Close()
 						gm.idGenerator = nil
 					}
-
 				} else {
-					gm.cluster.Close()
-					if err := gm.cluster.Start(); err != nil {
-						log.Error("fail to restart cluster. err:[%v]", err)
-						break
-					}
-
 					if gm.idGenerator == nil {
 						gm.idGenerator = GetIdGeneratorSingle()
 					}
@@ -145,6 +149,9 @@ func (gm *GM) watchLeader() {
 							break
 						}
 					}
+					gm.cluster.isGMLeader = true
+					gm.cluster.currentGMLeaderNodeID = 0
+					gm.cluster.currentGMLeaderAddr = ""
 				}
 			}
 		}

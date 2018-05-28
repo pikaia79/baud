@@ -16,7 +16,7 @@ import (
 
 // CreatePartition admin grpc service for create partition
 func (s *Server) CreatePartition(ctx context.Context, request *pspb.CreatePartitionRequest) (*pspb.CreatePartitionResponse, error) {
-	log.Debug("CreatePartition recive request:\n %s", request)
+	log.Debug("CreatePartition recive request: %s", request)
 
 	response := &pspb.CreatePartitionResponse{
 		ResponseHeader: metapb.ResponseHeader{
@@ -37,7 +37,7 @@ func (s *Server) CreatePartition(ctx context.Context, request *pspb.CreatePartit
 
 // DeletePartition admin grpc service for delete partition
 func (s *Server) DeletePartition(ctx context.Context, request *pspb.DeletePartitionRequest) (*pspb.DeletePartitionResponse, error) {
-	log.Debug("DeletePartition recive request:\n %s", request)
+	log.Debug("DeletePartition recive request: %s", request)
 
 	response := &pspb.DeletePartitionResponse{
 		ResponseHeader: metapb.ResponseHeader{
@@ -58,7 +58,7 @@ func (s *Server) DeletePartition(ctx context.Context, request *pspb.DeletePartit
 
 // ChangeReplica admin grpc service for change replica of partition
 func (s *Server) ChangeReplica(ctx context.Context, request *pspb.ChangeReplicaRequest) (*pspb.ChangeReplicaResponse, error) {
-	log.Debug("ChangeReplica recive request:\n %s", request)
+	log.Debug("ChangeReplica recive request: %s", request)
 
 	response := &pspb.ChangeReplicaResponse{
 		ResponseHeader: metapb.ResponseHeader{
@@ -74,12 +74,12 @@ func (s *Server) ChangeReplica(ctx context.Context, request *pspb.ChangeReplicaR
 	}
 	if _, ok := s.partitions.Load(request.PartitionID); !ok {
 		response.Code = metapb.PS_RESP_CODE_NO_PARTITION
-		response.Message = fmt.Sprintf("node[%d] has not found partition[%d]", s.nodeID, request.PartitionID)
+		response.Message = fmt.Sprintf("node[%d] has not found partition[%d]", s.NodeID, request.PartitionID)
 		return response, nil
 	}
 	if !s.raftServer.IsLeader(request.PartitionID) {
 		response.Code = metapb.PS_RESP_CODE_NOT_LEADER
-		response.Message = fmt.Sprintf("node[%d] is not leader of partition[%d]", s.nodeID, request.PartitionID)
+		response.Message = fmt.Sprintf("node[%d] is not leader of partition[%d]", s.NodeID, request.PartitionID)
 		return response, nil
 	}
 
@@ -113,7 +113,7 @@ func (s *Server) ChangeLeader(ctx context.Context, request *pspb.ChangeLeaderReq
 	}
 	if _, ok := s.partitions.Load(request.PartitionID); !ok {
 		response.Code = metapb.PS_RESP_CODE_NO_PARTITION
-		response.Message = fmt.Sprintf("node[%d] has not found partition[%d]", s.nodeID, request.PartitionID)
+		response.Message = fmt.Sprintf("node[%d] has not found partition[%d]", s.NodeID, request.PartitionID)
 		return response, nil
 	}
 

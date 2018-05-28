@@ -24,14 +24,19 @@ var (
 // newUniqueEphemeralKV creates a new file in the provided directory.
 // It is linked to the Lease.
 // Errors returned are converted to topo errors.
-func (s *Server) newUniqueEphemeralKV(ctx context.Context, leaseID clientv3.LeaseID, nodePath string, contents string) (string, int64, error) {
+func (s *Server) newUniqueEphemeralKV(ctx context.Context, cell string, leaseID clientv3.LeaseID, nodePath string, contents string) (string, int64, error) {
+	c, err := s.clientForCell(ctx, cell)
+	if err != nil {
+		return "", 0, err
+	}
+
 	// Use the lease ID as the file name, so it's guaranteed unique.
 	newKey := fmt.Sprintf("%v/%v", nodePath, leaseID)
 
 	// Only create a new file if it doesn't exist already
 	// (version = 0), to avoid two processes using the
 	// same file name. Since we use the lease ID, this should never happen.
-	txnresp, err := s.global.cli.Txn(ctx).
+	txnresp, err := c.cli.Txn(ctx).
 		If(clientv3.Compare(clientv3.Version(newKey), "=", 0)).
 		Then(clientv3.OpPut(newKey, contents, clientv3.WithLease(leaseID))).
 		Commit()
@@ -42,7 +47,7 @@ func (s *Server) newUniqueEphemeralKV(ctx context.Context, leaseID clientv3.Leas
 			// succeeded or not. In any case, let's try to
 			// delete the node, so we don't leave an orphan
 			// node behind for *leaseTTL time.
-			s.global.cli.Delete(context.Background(), newKey)
+			c.cli.Delete(context.Background(), newKey)
 		}
 		return "", 0, convertError(err)
 	}
@@ -57,10 +62,15 @@ func (s *Server) newUniqueEphemeralKV(ctx context.Context, leaseID clientv3.Leas
 // waitOnLastRev waits on all revisions of the files in the provided
 // directory that have revisions smaller than the provided revision.
 // It returns true only if there is no more other older files.
-func (s *Server) waitOnLastRev(ctx context.Context, nodePath string, revision int64) (bool, error) {
+func (s *Server) waitOnLastRev(ctx context.Context, cell, nodePath string, revision int64) (bool, error) {
+	c, err := s.clientForCell(ctx, cell)
+	if err != nil {
+		return false, err
+	}
+
 	// Get the keys that are blocking us, if any.
 	opts := append(clientv3.WithLastRev(), clientv3.WithMaxModRev(revision-1))
-	lastKey, err := s.global.cli.Get(ctx, nodePath+"/", opts...)
+	lastKey, err := c.cli.Get(ctx, nodePath+"/", opts...)
 	if err != nil {
 		return false, convertError(err)
 	}
@@ -74,7 +84,7 @@ func (s *Server) waitOnLastRev(ctx context.Context, nodePath string, revision in
 	key := string(lastKey.Kvs[0].Key)
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
-	wc := s.global.cli.Watch(ctx, key, clientv3.WithRev(revision))
+	wc := c.cli.Watch(ctx, key, clientv3.WithRev(revision))
 	if wc == nil {
 		return false, fmt.Errorf("Watch failed")
 	}
@@ -97,17 +107,17 @@ func (s *Server) waitOnLastRev(ctx context.Context, nodePath string, revision in
 }
 
 func (s *Server) lock(ctx context.Context, cell, nodePath, contents string) (string, error) {
-	cellClient, err := s.clientForCell(ctx, cell)
+	c, err := s.clientForCell(ctx, cell)
 	if err != nil {
 		return "", err
 	}
 
 	// Get a lease, set its KeepAlive.
-	lease, err := cellClient.cli.Grant(ctx, int64(*leaseTTL))
+	lease, err := c.cli.Grant(ctx, int64(*leaseTTL))
 	if err != nil {
 		return "", convertError(err)
 	}
-	leaseKA, err := s.global.cli.KeepAlive(ctx, lease.ID)
+	leaseKA, err := c.cli.KeepAlive(ctx, lease.ID)
 	if err != nil {
 		return "", convertError(err)
 	}
@@ -117,7 +127,7 @@ func (s *Server) lock(ctx context.Context, cell, nodePath, contents string) (str
 	}()
 
 	// Create an ephemeral node in the locks directory.
-	_, revision, err := s.newUniqueEphemeralKV(ctx, lease.ID, nodePath, contents)
+	_, revision, err := s.newUniqueEphemeralKV(ctx, cell, lease.ID, nodePath, contents)
 	if err != nil {
 		return "", err
 	}
@@ -125,11 +135,11 @@ func (s *Server) lock(ctx context.Context, cell, nodePath, contents string) (str
 
 	// Wait until all older nodes in the locks directory are gone.
 	for {
-		done, err := s.waitOnLastRev(ctx, nodePath, revision)
+		done, err := s.waitOnLastRev(ctx, cell, nodePath, revision)
 		if err != nil {
 			// We had an error waiting on the last node.
 			// Revoke our lease, this will delete the file.
-			if _, rerr := s.global.cli.Revoke(context.Background(), lease.ID); rerr != nil {
+			if _, rerr := c.cli.Revoke(context.Background(), lease.ID); rerr != nil {
 				log.Warningf("Revoke(%d) failed, may have left %v behind: %v", lease.ID, key, rerr)
 			}
 			return "", err
@@ -157,13 +167,13 @@ func (s *Server) unlock(ctx context.Context, cell, dirPath, actionPath string) e
 	}
 	leaseID := clientv3.LeaseID(i)
 
-	cellClient, err := s.clientForCell(ctx, cell)
+	c, err := s.clientForCell(ctx, cell)
 	if err != nil {
 		return err
 	}
 
 	// Revoke the lease, will delete the node.
-	_, err = cellClient.cli.Revoke(ctx, leaseID)
+	_, err = c.cli.Revoke(ctx, leaseID)
 	if err != nil {
 		return convertError(err)
 	}

@@ -1,27 +1,22 @@
 package gm
 
 import (
-	"fmt"
-	"github.com/gogo/protobuf/proto"
 	"github.com/tiglabs/baudengine/proto/metapb"
-	"github.com/tiglabs/baudengine/util"
-	"github.com/tiglabs/baudengine/util/deepcopy"
+	"github.com/tiglabs/baudengine/topo"
 	"github.com/tiglabs/baudengine/util/log"
 	"sync"
-)
-
-const (
-	PREFIX_SPACE = "schema space "
+	"golang.org/x/net/context"
 )
 
 type PartitionPolicy struct {
 	Key      string
 	Function string
-	Number   uint32
+	Number   uint64
 }
 
 type Space struct {
-	*metapb.Space
+	*topo.SpaceTopo
+	partitionsTopo []*topo.PartitionTopo
 	searchTree   *PartitionTree `json:"-"`
 	propertyLock sync.RWMutex   `json:"-"`
 }
@@ -41,7 +36,7 @@ func NewSpace(dbId metapb.DBID, dbName, spaceName string, policy *PartitionPolic
 		return nil, ErrGenIdFailed
 	}
 
-	metaSpace := &metapb.Space{
+	spaceMeta := &metapb.Space{
 		Name:   spaceName,
 		ID:     metapb.SpaceID(spaceId),
 		DB:     dbId,
@@ -52,61 +47,69 @@ func NewSpace(dbId metapb.DBID, dbName, spaceName string, policy *PartitionPolic
 			KeyFunc:  policy.Function,
 		},
 	}
-	return NewSpaceByMeta(metaSpace), nil
+
+	spaceTopo := &topo.SpaceTopo{
+		Space: spaceMeta,
+	}
+
+	return NewSpaceByTopo(spaceTopo), nil
 }
 
-func NewSpaceByMeta(metaSpace *metapb.Space) *Space {
+func NewSpaceByTopo(spaceTopo *topo.SpaceTopo) *Space {
 	return &Space{
-		Space:      metaSpace,
+		SpaceTopo:      spaceTopo,
 		searchTree: NewPartitionTree(),
 	}
 }
 
-func (s *Space) persistent(store Store) error {
+func (s *Space) add(partitions []*Partition) error {
 	s.propertyLock.Lock()
 	defer s.propertyLock.Unlock()
 
-	copy := deepcopy.Iface(s.Space).(*metapb.Space)
-	spaceVal, err := proto.Marshal(copy)
+	ctx := context.Background()
+	partitionsMeta := make([]*metapb.Partition, 0)
+	for _, partition := range partitions {
+		partitionsMeta = append(partitionsMeta, partition.PartitionTopo.Partition)
+	}
+
+	spaceTopo, partitionsTopo, err := topoServer.AddSpace(ctx, s.DB, s.SpaceTopo.Space, partitionsMeta)
 	if err != nil {
-		log.Error("fail to marshal space[%v]. err:[%v]", copy, err)
+		log.Error("topoServer AddSpace error, err: [%v]", err)
 		return err
 	}
-	spaceKey := []byte(fmt.Sprintf("%s%d", PREFIX_SPACE, copy.ID))
-	if err := store.Put(spaceKey, spaceVal); err != nil {
-		log.Error("fail to put space[%v] into store. err:[%v]", copy, err)
-		return ErrLocalDbOpsFailed
+	s.SpaceTopo = spaceTopo
+	s.partitionsTopo = partitionsTopo
+
+	return nil
+}
+
+func (s *Space) update() error {
+	s.propertyLock.Lock()
+	defer s.propertyLock.Unlock()
+
+	ctx := context.Background()
+
+	err := topoServer.UpdateSpace(ctx, s.SpaceTopo)
+	if err != nil {
+		log.Error("topoServer UpdateSpace error, err: [%v]", err)
+		return err
 	}
 
 	return nil
 }
 
-func (s *Space) batchPersistent(batch Batch) error {
+func (s *Space) erase() error {
 	s.propertyLock.Lock()
 	defer s.propertyLock.Unlock()
 
-	copy := deepcopy.Iface(s.Space).(*metapb.Space)
-	spaceVal, err := proto.Marshal(copy)
+	ctx := context.Background()
+
+	// TODO partition是否在删除space时一起删除???
+	err := topoServer.DeleteSpace(ctx, s.SpaceTopo)
 	if err != nil {
-		log.Error("fail to marshal space[%v]. err:[%v]", copy, err)
+		log.Error("topoServer DeleteSpace error, err: [%v]", err)
 		return err
 	}
-	spaceKey := []byte(fmt.Sprintf("%s%d", PREFIX_SPACE, copy.ID))
-	batch.Put(spaceKey, spaceVal)
-
-	return nil
-}
-
-func (s *Space) erase(store Store) error {
-	s.propertyLock.Lock()
-	defer s.propertyLock.Unlock()
-
-	spaceKey := []byte(fmt.Sprintf("%s%d", PREFIX_SPACE, s.ID))
-	if err := store.Delete(spaceKey); err != nil {
-		log.Error("fail to delete space[%v] from store. err:[%v]", s.Space, err)
-		return ErrLocalDbOpsFailed
-	}
-
 	return nil
 }
 
@@ -126,8 +129,10 @@ func (s *Space) putPartition(partition *Partition) {
 
 func (s *Space) AscendScanPartition(pivotSlot metapb.SlotID, batchNum int) []*Partition {
 	searchPivot := &Partition{
-		Partition: &metapb.Partition{
-			StartSlot: pivotSlot,
+		PartitionTopo: &topo.PartitionTopo{
+			Partition: &metapb.Partition{
+				StartSlot: pivotSlot,
+			},
 		},
 	}
 	items := s.searchTree.ascendScan(searchPivot, batchNum)
@@ -141,6 +146,8 @@ func (s *Space) AscendScanPartition(pivotSlot metapb.SlotID, batchNum int) []*Pa
 	}
 	return result
 }
+
+// SpaceCache
 
 type SpaceCache struct {
 	lock     sync.RWMutex
@@ -210,31 +217,25 @@ func (c *SpaceCache) DeleteSpace(space *Space) {
 	if !ok {
 		return
 	}
+	delete(c.spaces, space.ID)
 	delete(c.name2Ids, oldSpace.Name)
 }
 
-func (c *SpaceCache) Recovery(store Store) ([]*Space, error) {
-	prefix := []byte(PREFIX_SPACE)
-	startKey, limitKey := util.BytesPrefix(prefix)
-
+func (c *SpaceCache) Recovery() ([]*Space, error) {
 	resultSpaces := make([]*Space, 0)
-
-	iterator := store.Scan(startKey, limitKey)
-	defer iterator.Release()
-	for iterator.Next() {
-		if iterator.Key() == nil {
-			log.Error("space store key is nil. never happened!!!")
-			continue
+	ctx := context.Background()
+	spacesTopo, err := topoServer.GetAllSpaces(ctx)
+	if err != nil {
+		log.Error("topoServer GetAllSpaces error, err: [%v]", err)
+		return nil, err
+	}
+	if spacesTopo != nil {
+		for _, spaceTopo := range spacesTopo{
+			space := &Space {
+				SpaceTopo: spaceTopo,
+			}
+			resultSpaces = append(resultSpaces, space)
 		}
-
-		val := iterator.Value()
-		metaSpace := new(metapb.Space)
-		if err := proto.Unmarshal(val, metaSpace); err != nil {
-			log.Error("fail to unmarshal space from store. err[%v]", err)
-			return nil, ErrInternalError
-		}
-
-		resultSpaces = append(resultSpaces, NewSpaceByMeta(metaSpace))
 	}
 
 	return resultSpaces, nil

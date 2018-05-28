@@ -1,6 +1,7 @@
 package gm
 
 import (
+	"github.com/fzzy/radix/redis/resp"
 	"github.com/tiglabs/baudengine/proto/masterpb"
 	"github.com/tiglabs/baudengine/proto/metapb"
 	"github.com/tiglabs/baudengine/util"
@@ -392,8 +393,7 @@ func pickReplicaToDelete(info *masterpb.PartitionInfo) *metapb.Replica {
 
 		replicaToDelete = &follower.Replica
 		break
-	}
-	if replicaToDelete != nil {
+
 		return replicaToDelete
 	}
 

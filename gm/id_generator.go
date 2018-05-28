@@ -9,7 +9,7 @@ import (
 )
 
 var (
-	GEN_STEP          uint32 = 10
+	GEN_STEP          uint32 = 100
 	AUTO_INCREMENT_ID        = fmt.Sprintf("$auto_increment_id")
 
 	idGeneratorSingle     IDGenerator
@@ -34,11 +34,7 @@ func GetIdGeneratorSingle() IDGenerator {
 	defer idGeneratorSingleLock.Unlock()
 
 	if atomic.LoadUint32(&idGeneratorSingleDone) == 0 {
-		if store == nil {
-			log.Error("store should not be nil at first time when create IdGenerator single")
-			return nil
-		}
-		idGeneratorSingle = NewIDGenerator([]byte(AUTO_INCREMENT_ID), GEN_STEP, store)
+		idGeneratorSingle = NewIDGenerator([]byte(AUTO_INCREMENT_ID), GEN_STEP)
 		atomic.StoreUint32(&idGeneratorSingleDone, 1)
 
 		log.Info("IdGenerator single has started")
@@ -54,14 +50,10 @@ type StoreIdGenerator struct {
 
 	key  []byte
 	step uint32
-
-	// TODO: put operation of this store transfer new end value yielded through raft message,
-	// may be slow GenID()
-	store Store
 }
 
-func NewIDGenerator(key []byte, step uint32, store Store) *StoreIdGenerator {
-	return &StoreIdGenerator{key: key, step: step, store: store}
+func NewIDGenerator(key []byte, step uint32) *StoreIdGenerator {
+	return &StoreIdGenerator{key: key, step: step}
 }
 
 func (id *StoreIdGenerator) GenID() (uint32, error) {
@@ -108,6 +100,7 @@ func (id *StoreIdGenerator) Close() {
 }
 
 func (id *StoreIdGenerator) get(key []byte) ([]byte, error) {
+	// TODO: 调用global etcd, 得到自增ID, 接口由@杨洋提供
 	value, err := id.store.Get(key)
 	if err != nil {
 		return nil, err
@@ -116,6 +109,7 @@ func (id *StoreIdGenerator) get(key []byte) ([]byte, error) {
 }
 
 func (id *StoreIdGenerator) put(key, value []byte) error {
+	// TODO: 调用global etcd, 更新自增ID, 接口由@杨洋提供
 	return id.store.Put(key, value)
 }
 

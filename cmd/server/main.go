@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"os"
+	"path"
 
 	"gopkg.in/urfave/cli.v2"
 
@@ -10,6 +11,8 @@ import (
 	"github.com/tiglabs/baudengine/util/config"
 	"github.com/tiglabs/baudengine/util/log"
 	"github.com/tiglabs/baudengine/util/server"
+	"github.com/tiglabs/raft/logger"
+	raftlog "github.com/tiglabs/raft/util/log"
 )
 
 const (
@@ -31,9 +34,23 @@ var (
 			server.SetGoFlagVals(cmdCtx)
 
 			conf := config.LoadConfigFile(cmdCtx.String(flagConfig))
-			s := ps.NewServer(conf)
+			serverConf := ps.LoadConfig(conf)
+			if err := serverConf.Validate(); err != nil {
+				fmt.Printf("Baud partition server start error: %s", err)
+				return err
+			}
+			fmt.Printf("Server start with config is: %s", serverConf)
+
+			// init log
+			log.InitFileLog(serverConf.LogDir, serverConf.LogModule, serverConf.LogLevel)
+			// init raft log
+			if raftLog, err := raftlog.NewLog(path.Join(serverConf.LogDir, "raft"), "raft", serverConf.LogLevel); err == nil {
+				logger.SetLogger(raftLog)
+			}
+
+			s := ps.NewServer(serverConf)
 			if err := s.Start(); err != nil {
-				fmt.Printf("Baud partition server start error: %v", err)
+				fmt.Printf("Baud partition server start error: %s", err)
 				return err
 			}
 
@@ -60,7 +77,7 @@ func main() {
 	// Needed to avoid "logging before flag.Parse" error with glog.
 	server.SupressGlogWarnings()
 	if err := app.Run(os.Args); err != nil {
-		log.Error("Run server error.", "Error", err)
+		fmt.Printf("Run baud server error: %s", err)
 		os.Exit(-1)
 	}
 }

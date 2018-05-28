@@ -16,10 +16,13 @@ var (
 	ErrNotMSLeader   = errors.New("the master node is not a leader")
 	ErrNoMSLeader    = errors.New("the master cluster have no a leader")
 
+	ErrZoneNotExists        = errors.New("zone not exists")
+	ErrDupZone              = errors.New("duplicated zone")
 	ErrDupDb              = errors.New("duplicated database")
 	ErrDbNotExists        = errors.New("db not exists")
 	ErrDupSpace           = errors.New("duplicated space")
 	ErrSpaceNotExists     = errors.New("space not exists")
+	ErrPartitionNotExists     = errors.New("partition not exists")
 	ErrPSNotExists        = errors.New("partition server is not exists")
 	ErrGenIdFailed        = errors.New("generate id is failed")
 	ErrLocalDbOpsFailed   = errors.New("local storage db operation error")
