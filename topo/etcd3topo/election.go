@@ -49,7 +49,17 @@ type etcdMasterParticipation struct {
 
 // WaitForMastership is part of the topo.MasterParticipation interface.
 func (mp *etcdMasterParticipation) WaitForMastership() (context.Context, error) {
-	electionPath := mp.buildElectionPath()
+	var rootDir string
+	if mp.cell == topo.GlobalZone {
+		rootDir = mp.s.global.root
+	} else {
+		var e error
+		if _, rootDir, e = mp.s.getCellAddrs(context.Background(), mp.cell); e != nil {
+			return nil, topo.ErrZoneNotExists
+		}
+	}
+
+	electionPath := path.Join(rootDir, electionsPath, mp.cell)
 	lockPath := ""
 
 	// We use a cancelable context here. If stop is closed,
@@ -111,19 +121,19 @@ func (mp *etcdMasterParticipation) GetCurrentMasterID(ctx context.Context) (stri
 	return string(resp.Kvs[0].Value), nil
 }
 
-func (mp *etcdMasterParticipation) buildElectionPath() string {
-	var electionPath string
-	if mp.cell == topo.GlobalZone {
-		electionPath = path.Join(mp.s.global.root, electionsPath, mp.cell)
-	} else {
-		client, ok := mp.s.cells[mp.cell]
-		if ok {
-			electionPath = path.Join(client.root, electionsPath, mp.cell)
-		} else {
-			log.Error("cell[%s] not found", mp.cell)
-			electionPath = ""
-		}
-	}
-
-	return electionPath
-}
+//func (mp *etcdMasterParticipation) buildElectionPath() string {
+//	var electionPath string
+//	if mp.cell == topo.GlobalZone {
+//		electionPath = path.Join(mp.s.global.root, electionsPath, mp.cell)
+//	} else {
+//		client, ok := mp.s.cells[mp.cell]
+//		if ok {
+//			electionPath = path.Join(client.root, electionsPath, mp.cell)
+//		} else {
+//			log.Error("cell[%s] not found", mp.cell)
+//			electionPath = ""
+//		}
+//	}
+//
+//	return electionPath
+//}

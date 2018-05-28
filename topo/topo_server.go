@@ -69,6 +69,8 @@ var (
     // ErrNoUpdateNeeded can be returned by an 'UpdateFields' method
     // to skip any update.
     ErrNoUpdateNeeded = errors.New("no update needed")
+
+    ErrZoneNotExists = errors.New("zone not exists")
 )
 
 type Impl interface {
