@@ -34,12 +34,13 @@ func (s *TopoServer) GetAllDBs(ctx context.Context) ([]*DBTopo, error) {
             return nil, err
         }
 
-        db := &DBTopo{version: version}
-        if err := proto.Unmarshal(contents, db.DB); err != nil {
+        dbMeta := &metapb.DB{}
+        if err := proto.Unmarshal(contents, dbMeta); err != nil {
             log.Error("Fail to unmarshal meta data for db[%d]. err[%v]", dbId, err)
             return nil, err
         }
 
+        db := &DBTopo{version: version, DB: dbMeta}
         dbs = append(dbs, db)
     }
 
@@ -56,11 +57,13 @@ func (s *TopoServer) GetDB(ctx context.Context, dbId metapb.DBID) (*DBTopo, erro
         return nil, err
     }
 
-    db := &DBTopo{version: version}
-    if err := proto.Unmarshal(contents, db.DB); err != nil {
+    dbMeta := &metapb.DB{}
+    if err := proto.Unmarshal(contents, dbMeta); err != nil {
         log.Error("Fail to unmarshal meta data for db[%d]. err[%v]", dbId, err)
         return nil, err
     }
+
+    db := &DBTopo{version: version, DB: dbMeta}
 
     return db, nil
 }

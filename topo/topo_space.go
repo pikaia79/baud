@@ -29,16 +29,18 @@ func (s *TopoServer) GetAllSpaces(ctx context.Context) ([]*SpaceTopo, error) {
 
     spaceTopos := make([]*SpaceTopo, 0)
     for _, dbAndSpaceId := range dbAndSpaceIds {
-        spaceTopo := &SpaceTopo{}
         contents, version, err := s.backend.Get(ctx, GlobalZone, path.Join(spacesPath, dbAndSpaceId, SpaceTopoFile))
         if err != nil {
             return nil, err
         }
-        if err := proto.Unmarshal(contents, spaceTopo.Space); err != nil {
+
+        spaceMeta := &metapb.Space{}
+        if err := proto.Unmarshal(contents, spaceMeta); err != nil {
+            log.Error("Fail to unmarshal meta data for db-space[%d]", dbAndSpaceId)
             return nil, err
         }
 
-        spaceTopo.version = version
+        spaceTopo := &SpaceTopo{version: version, Space: spaceMeta}
         spaceTopos = append(spaceTopos, spaceTopo)
     }
 
@@ -50,24 +52,25 @@ func (s *TopoServer) GetSpace(ctx context.Context, dbId metapb.DBID, spaceId met
         return nil, ErrNoNode
     }
 
-    spaceTopo := &SpaceTopo{}
     nodePath := path.Join(spacesPath, fmt.Sprintf("%d-%d", dbId, spaceId), SpaceTopoFile)
-
     contents, version, err := s.backend.Get(ctx, GlobalZone, nodePath)
     if err != nil {
         return nil, err
     }
-    if err := proto.Unmarshal(contents, spaceTopo.Space); err != nil {
+
+    spaceMeta := &metapb.Space{}
+    if err := proto.Unmarshal(contents, spaceMeta); err != nil {
+        log.Error("Fail to unmarshal meta data for space[%d]", spaceId)
         return nil, err
     }
 
-    spaceTopo.version = version
+    spaceTopo := &SpaceTopo{version: version, Space: spaceMeta}
 
     return spaceTopo, nil
 }
 
-func (s *TopoServer) AddSpace(ctx context.Context, dbId metapb.DBID, space *metapb.Space,
-        partitions []*metapb.Partition) (*SpaceTopo, []*PartitionTopo, error) {
+func (s *TopoServer) AddSpace(ctx context.Context, space *metapb.Space,
+            partitions []*metapb.Partition) (*SpaceTopo, []*PartitionTopo, error) {
     if ctx == nil || space == nil || partitions == nil || len(partitions) == 0 {
         return nil, nil, ErrNoNode
     }
@@ -83,7 +86,7 @@ func (s *TopoServer) AddSpace(ctx context.Context, dbId metapb.DBID, space *meta
         log.Error("Fail to marshal meta data for space[%v]. err[%v]", space, err)
         return nil, nil, err
     }
-    txn.Create(path.Join(spacesPath, fmt.Sprintf("%d-%d", dbId, space.ID), SpaceTopoFile), contents)
+    txn.Create(path.Join(spacesPath, fmt.Sprintf("%d-%d", space.DB, space.ID), SpaceTopoFile), contents)
 
     for _, partition := range partitions {
         contents, err := proto.Marshal(partition)
@@ -104,8 +107,8 @@ func (s *TopoServer) AddSpace(ctx context.Context, dbId metapb.DBID, space *meta
 
     spaceTopo := &SpaceTopo{version: opResults[0].(*TxnCreateOpResult).Version, Space: space}
     partitionTopos := make([]*PartitionTopo, 0)
-    for i := 1; i <= len(partitions); i++ {
-        partitionTopo := &PartitionTopo{version:opResults[i].(*TxnCreateOpResult).Version, Partition: partitions[i]}
+    for i := 0; i < len(partitions); i++ {
+        partitionTopo := &PartitionTopo{version:opResults[i + 1].(*TxnCreateOpResult).Version, Partition: partitions[i]}
         partitionTopos = append(partitionTopos, partitionTopo)
     }
 
@@ -113,9 +116,31 @@ func (s *TopoServer) AddSpace(ctx context.Context, dbId metapb.DBID, space *meta
 }
 
 func (s *TopoServer) UpdateSpace(ctx context.Context, space *SpaceTopo) error {
+    if ctx == nil || space == nil {
+        return ErrNoNode
+    }
+
+    nodePath := path.Join(spacesPath, fmt.Sprintf("%d-%d", space.DB, space.ID), SpaceTopoFile)
+
+    contents, err := proto.Marshal(space.Space)
+    if err != nil {
+        return err
+    }
+
+    newVersion, err := s.backend.Update(ctx, GlobalZone, nodePath, contents, space.version)
+    if err != nil {
+        return ErrNoNode
+    }
+
+    space.version = newVersion
     return nil
 }
 
 func (s *TopoServer) DeleteSpace(ctx context.Context, space *SpaceTopo) error {
-    return nil
+    if ctx == nil || space == nil {
+        return ErrNoNode
+    }
+
+    nodePath := path.Join(spacesPath, fmt.Sprintf("%d-%d", space.DB, space.ID), SpaceTopoFile)
+    return s.backend.Delete(ctx, GlobalZone, nodePath, space.version)
 }

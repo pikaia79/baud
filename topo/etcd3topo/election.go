@@ -89,10 +89,15 @@ func (mp *etcdMasterParticipation) Stop() {
 
 // GetCurrentMasterID is part of the topo.MasterParticipation interface
 func (mp *etcdMasterParticipation) GetCurrentMasterID(ctx context.Context) (string, error) {
-	electionPath := mp.buildElectionPath()
+	c, err := mp.s.clientForCell(ctx, mp.cell)
+	if err != nil {
+		return "", err
+	}
+
+	electionPath := path.Join(c.root, electionsPath, mp.cell)
 
 	// Get the keys in the directory, older first.
-	resp, err := mp.s.global.cli.Get(ctx, electionPath+"/",
+	resp, err := c.cli.Get(ctx, electionPath+"/",
 		clientv3.WithPrefix(),
 		clientv3.WithSort(clientv3.SortByModRevision, clientv3.SortAscend),
 		clientv3.WithLimit(1))
@@ -113,7 +118,7 @@ func (mp *etcdMasterParticipation) buildElectionPath() string {
 	} else {
 		client, ok := mp.s.cells[mp.cell]
 		if ok {
-			electionPath = path.Join(client.root, electionPath, mp.cell)
+			electionPath = path.Join(client.root, electionsPath, mp.cell)
 		} else {
 			log.Error("cell[%s] not found", mp.cell)
 			electionPath = ""

@@ -18,7 +18,7 @@ func (s *TopoServer) GetAllZones(ctx context.Context) ([]*ZoneTopo, error) {
         return nil, ErrNoNode
     }
 
-    names, err := s.backend.ListDir(ctx, GlobalZone, zonesPath)
+    names, err := s.backend.ListDir(ctx, GlobalZone, ZonesPath)
     if err != nil {
        return nil, err
     }
@@ -28,18 +28,19 @@ func (s *TopoServer) GetAllZones(ctx context.Context) ([]*ZoneTopo, error) {
 
     zones := make([]*ZoneTopo, 0, len(names))
     for _, name := range names {
-        contents, version, err := s.backend.Get(ctx, GlobalZone, path.Join(zonesPath, name, ZoneTopoFile))
+        contents, version, err := s.backend.Get(ctx, GlobalZone, path.Join(ZonesPath, name, ZoneTopoFile))
         if err != nil {
             log.Error("Fail to get zone[%s] info from dir. err[%v]", name, err)
             return nil, err
         }
 
-        zone := &ZoneTopo{version: version}
-        if err := proto.Unmarshal(contents, zone.Zone); err != nil {
+        zoneMeta := &metapb.Zone{}
+        if err := proto.Unmarshal(contents, zoneMeta); err != nil {
             log.Error("Fail to unmarshal meta data for zone[%s]. err[%v]", name, err)
             return nil, err
         }
 
+        zone := &ZoneTopo{version: version, Zone: zoneMeta}
         zones = append(zones, zone)
     }
 
@@ -51,16 +52,18 @@ func (s *TopoServer) GetZone(ctx context.Context, zoneName string) (*ZoneTopo, e
         return nil, ErrNoNode
     }
 
-    contents, version, err := s.backend.Get(ctx, GlobalZone, path.Join(zonesPath, zoneName, ZoneTopoFile))
+    contents, version, err := s.backend.Get(ctx, GlobalZone, path.Join(ZonesPath, zoneName, ZoneTopoFile))
     if err != nil {
         return nil, err
     }
 
-    zone := &ZoneTopo{version: version}
-    if err := proto.Unmarshal(contents, zone.Zone); err != nil {
+    zoneMeta := &metapb.Zone{}
+    if err := proto.Unmarshal(contents, zoneMeta); err != nil {
         log.Error("Fail to unmarshal meta data for zone[%s]. err[%v]", zoneName, err)
         return nil, err
     }
+
+    zone := &ZoneTopo{version: version, Zone: zoneMeta}
 
     return zone, nil
 }
@@ -76,7 +79,7 @@ func (s *TopoServer) AddZone(ctx context.Context, zone *metapb.Zone) (*ZoneTopo,
         return nil, err
     }
 
-    version, err := s.backend.Create(ctx, GlobalZone, path.Join(zonesPath, zone.Name, ZoneTopoFile), contents)
+    version, err := s.backend.Create(ctx, GlobalZone, path.Join(ZonesPath, zone.Name, ZoneTopoFile), contents)
     if err != nil {
         return nil, err
     }
@@ -88,7 +91,7 @@ func (s *TopoServer) DeleteZone(ctx context.Context, zone *ZoneTopo) error {
     if ctx == nil || zone == nil {
         return ErrNoNode
     }
-    return s.backend.Delete(ctx, GlobalZone, path.Join(zonesPath, zone.Name, ZoneTopoFile), zone.version)
+    return s.backend.Delete(ctx, GlobalZone, path.Join(ZonesPath, zone.Name, ZoneTopoFile), zone.version)
 }
 
 

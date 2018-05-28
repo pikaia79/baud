@@ -29,7 +29,7 @@ import (
 
 const (
 	// Path components
-	cellsPath     = "cells"
+	//cellsPath     = "cells"
 	locksPath     = "locks"
 	electionsPath = "masters"
 )

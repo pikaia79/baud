@@ -93,7 +93,7 @@ func (s *Server) clientForCell(ctx context.Context, cell string) (*cellClient, e
 // cell-local cluster, and the root directory. These lists are stored
 // in the global etcd cluster.
 func (s *Server) getCellAddrs(ctx context.Context, cell string) (string, string, error) {
-	nodePath := path.Join(s.global.root, cellsPath, cell, topo.ZoneTopoFile)
+	nodePath := path.Join(s.global.root, topo.ZonesPath, cell, topo.ZoneTopoFile)
 	resp, err := s.global.cli.Get(ctx, nodePath)
 	if err != nil {
 		return "", "", convertError(err)
