@@ -24,6 +24,12 @@ message Zone {
     string root_dir     = 3;
 }
 
+message Task {
+    string id          = 1;
+    string type        = 2;
+    string contents    = 3;
+}
+
 message DB {
     uint32 id   = 1 [(gogoproto.customname) = "ID", (gogoproto.casttype) = "DBID"];
     string name = 2;

@@ -7,6 +7,7 @@ import (
     "errors"
     "flag"
     "github.com/tiglabs/baudengine/proto/masterpb"
+    "time"
 )
 
 const (
@@ -101,6 +102,9 @@ type Impl interface {
     UpdatePsByZone(ctx context.Context, zoneName string, ps *PsTopo) error
     DeletePsByZone(ctx context.Context, zoneName string, ps *PsTopo) error
 
+    SetZonesForPartition(ctx context.Context, partitionId metapb.PartitionID, zones []string) error
+    GetZonesForPartition(ctx context.Context, partitionId metapb.PartitionID) ([]string, error)
+
     GetPartitionInfoByZone(ctx context.Context, zoneName string,
             partitionId metapb.PartitionID) (*masterpb.PartitionInfo, error)
     SetPartitionInfoByZone(ctx context.Context, zoneName string, partitionInfo *masterpb.PartitionInfo) error
@@ -111,6 +115,9 @@ type Impl interface {
     GetPartitionsOnPsByZone(ctx context.Context, zoneName string, psId metapb.NodeID) ([]*PartitionTopo, error)
     SetPartitionsOnPSByZone(ctx context.Context, zoneName string, psId metapb.NodeID,
             partitions []*metapb.Partition) error
+
+    SetTask(ctx context.Context, task metapb.Task, timeout time.Duration) error
+    GetTask(ctx context.Context, taskName string, taskId string) (*metapb.Task, error)
 
     NewMasterParticipation(zone, id string) (MasterParticipation, error)
 
