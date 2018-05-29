@@ -28,6 +28,7 @@ const (
     PartitionTopoFile       = "partition_info"
     partitionGroupTopoFile  = "partition_group_info"
     TaskTopoFile            = "task_info"
+    IdGeneratorTopoFile     = "idgen"
 )
 
 var (
@@ -123,7 +124,7 @@ type Impl interface {
 
     NewMasterParticipation(zone, id string) (MasterParticipation, error)
 
-    GenerateNewId(ctx context.Context) (uint64, error)
+    GenerateNewId(ctx context.Context, step uint64) (start, end uint64, err error)
 }
 
 type TopoServer struct {

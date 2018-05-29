@@ -8,6 +8,7 @@ import (
     "path"
     "fmt"
     "github.com/tiglabs/baudengine/util/log"
+    "strings"
 )
 
 type PartitionTopo struct {
@@ -214,6 +215,36 @@ func (s *TopoServer) SetPartitionsOnPSByZone(ctx context.Context, zoneName strin
 
     return nil
 }
+
+func (s *TopoServer) SetZonesForPartition(ctx context.Context, partitionId metapb.PartitionID, zones []string) error {
+    if ctx == nil || len(zones) == 0 {
+        return ErrNoNode
+    }
+
+    nodePath := path.Join(partitionsPath, fmt.Sprint(partitionId), ZonesPath)
+    contents := []byte(strings.Join(zones, "|"))
+    _, err := s.backend.Update(ctx, GlobalZone, nodePath, contents, nil)
+    if err != nil {
+        return err
+    }
+
+    return nil
+}
+
+func (s *TopoServer) GetZonesForPartition(ctx context.Context, partitionId metapb.PartitionID) ([]string, error) {
+    if ctx == nil {
+        return nil, ErrNoNode
+    }
+
+    nodePath := path.Join(partitionsPath, fmt.Sprint(partitionId), ZonesPath)
+    contents, _, err := s.backend.Get(ctx, GlobalZone, nodePath)
+    if err != nil {
+        return nil, err
+    }
+
+    return strings.Split(string(contents), "|"), nil
+}
+
 
 
 

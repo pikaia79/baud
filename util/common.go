@@ -83,3 +83,16 @@ func Uint32ToBytes(v uint32) []byte {
     return b
 }
 
+func BytesToUint64(b []byte) (uint64) {
+    if len(b) != 8 {
+        return 0
+    }
+
+    return binary.BigEndian.Uint64(b)
+}
+
+func Uint64ToBytes(v uint64) []byte {
+    b := make([]byte, 8)
+    binary.BigEndian.PutUint64(b, v)
+    return b
+}
