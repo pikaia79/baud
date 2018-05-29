@@ -1,5 +1,5 @@
 package kernel
 
-type Result struct {
+type SearchResult struct {
 	//TODO
 }
