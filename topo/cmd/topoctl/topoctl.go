@@ -11,6 +11,7 @@ import (
 	"context"
 	"time"
     "runtime/debug"
+	"sync"
 )
 
 var (
@@ -40,6 +41,7 @@ func main() {
 	defer server.Close()
 
 	ctx, cancel := context.WithTimeout(context.Background(), 30 * time.Second)
+    defer cancel()
 
 	//zoneMeta := &metapb.Zone{Name:"zone1", ServerAddrs:"127.0.0.1:9302", RootDir:"/zones/zone1"}
 	//_, err := server.AddZone(ctx, zoneMeta)
@@ -115,31 +117,169 @@ func main() {
     //    return
     //}
     //
+
     //psMeta := &metapb.Node{ID:201, Ip:"127.0.0.9"}
     //psTopo, err := server.AddPsByZone(ctx, "zone1", psMeta)
     //if err != nil {
-    //    log.Error("AddPsByZone err[%v]", psTopo)
-    //    return
+    //   log.Error("AddPsByZone err[%v]", psTopo)
+    //   return
     //}
     //log.Debug("psTopo=[%v]", psTopo)
+    //
+    //psTopo2, err := server.GetPsByZone(ctx, "zone1", 201)
+    //if err != nil {
+    //	log.Error("GetPsByZone err[%v]")
+    //	return
+    //}
+    //log.Debug("psTopo2=%v", psTopo2)
+    //
+    //psTopo2.AdminAddr = "127.0.0.23"
+    //if err := server.UpdatePsByZone(ctx, "zone1", psTopo2); err != nil {
+    //    log.Error("UpdatePsByZone err[%v]", err)
+    //    return
+    //}
+    //log.Debug("changed psTopo2=%v", psTopo2)
+    //
+    //psTopos, err := server.GetAllPsByZone(ctx, "zone1")
+    //if err != nil {
+    //	log.Error("GetAllPsByZone err[%v]", err)
+    //	return
+    //}
+    //log.Debug("psTopos=%v", psTopos)
+    //
+    //if err := server.DeletePsByZone(ctx, "zone1", psTopo2); err != nil {
+    //    log.Error("DeletePsByZone err[%v]", err)
+    //    return
+    //}
 
-    psTopo2, err := server.GetPsByZone(ctx, "zone1", 201)
+    //mp1, err := server.NewMasterParticipation(topo.GlobalZone, "191")
+    //if err != nil {
+    //    log.Error("new master participation. err[%v]", err)
+    //    return
+    //}
+    //mp2, err := server.NewMasterParticipation(topo.GlobalZone, "192")
+    //if err != nil {
+    //    log.Error("new master participation. err[%v]", err)
+    //    return
+    //}
+    //var wg sync.WaitGroup
+    //wg.Add(1)
+    //go func() {
+    //    defer wg.Done()
+    //    defer func() {
+    //        if e := recover(); e != nil {
+    //            log.Error("recover [%v]\n[%s]", e, debug.Stack())
+    //        }
+    //
+    //    }()
+    //    _, err := mp1.WaitForMastership()
+    //    if err != nil {
+    //        log.Error("%v", err)
+    //    }
+    //    log.Info("mp1 get master")
+    //
+    //}()
+    //wg.Add(1)
+    //go func() {
+    //    defer wg.Done()
+    //    defer func() {
+    //        if e := recover(); e != nil {
+    //            log.Error("recover [%v]\n[%s]", e, debug.Stack())
+    //        }
+    //
+    //    }()
+    //    _, err := mp2.WaitForMastership()
+    //    if err != nil {
+    //        log.Error("%v", err)
+    //    }
+    //    log.Info("mp2 get master")
+    //
+    //}()
+    //time.Sleep(time.Second)
+    //masterId1, err := mp1.GetCurrentMasterID(ctx)
+    //if err != nil {
+    //    return
+    //}
+    //log.Debug("mp1 master id =%s", masterId1)
+    //masterId2, err := mp2.GetCurrentMasterID(ctx)
+    //if err != nil {
+    //    return
+    //}
+    //log.Debug("mp2 master id =%s", masterId2)
+    //wg.Wait()
+
+    mp3, err := server.NewMasterParticipation("zone1", "193")
     if err != nil {
-    	log.Error("GetPsByZone err[%v]")
-    	return
-	}
-	log.Debug("psTopo2=%v", psTopo2)
+       log.Error("new master participation. err[%v]", err)
+       return
+    }
+    var wg sync.WaitGroup
+    wg.Add(1)
+    go func() {
+       defer wg.Done()
+       defer func() {
+           if e := recover(); e != nil {
+               log.Error("recover [%v]\n[%s]", e, debug.Stack())
+           }
 
-    psTopos, err := server.GetAllPsByZone(ctx, "zone1")
+       }()
+       _, err := mp3.WaitForMastership()
+       if err != nil {
+           log.Error("%v", err)
+       }
+       log.Info("mp3 get master")
+
+    }()
+    time.Sleep(time.Second)
+    masterId3, err := mp3.GetCurrentMasterID(ctx)
     if err != nil {
-    	log.Error("GetAllPsByZone err[%v]", err)
-    	return
-	}
-	log.Debug("psTopos=%v", psTopos)
+      return
+    }
+    log.Debug("mp3 master id =%s", masterId3)
+    wg.Wait()
+
+    //var wg sync.WaitGroup
+    //for i := 0; i < 100; i++ {
+    //    wg.Add(1)
+    //    go func() {
+    //        defer wg.Done()
+    //        for i := 0; i < 10; i++ {
+    //            start, end, err := server.GenerateNewId(ctx, 10)
+    //            if err != nil {
+    //                log.Error("GenerateNewId err[%v]", err)
+    //                return
+    //            }
+    //            log.Debug("start=%d, end=%d", start, end)
+    //        }
+    //    }()
+    //}
+    //wg.Wait()
+
+    //err := server.SetZonesForPartition(ctx, 120, []string{"zone1", "zone2", "zone3"})
+    //if err != nil {
+    	//log.Error("SetZonesForPartition err[%v]", err)
+    	//return
+	//}
+	//zones, err := server.GetZonesForPartition(ctx, 120)
+	//if err != nil {
+	//	log.Error("GetZonesForPartition err[%v]", err)
+	//	return
+	//}
+	//log.Debug("zones=%v", zones)
+	//err = server.SetZonesForPartition(ctx, 120, []string{"zone2", "zone4"})
+	//if err != nil {
+	//	log.Error("SetZonesForPartition err[%v]", err)
+	//	return
+	//}
+	//zones, err = server.GetZonesForPartition(ctx, 120)
+	//if err != nil {
+	//	log.Error("GetZonesForPartition err[%v]", err)
+	//	return
+	//}
+	//log.Debug("updateddated zones=%v", zones)
 
 
-	cancel()
-	time.Sleep(5 * time.Second)
+	time.Sleep(10 * time.Second)
 	log.Info("Goodbye, BaudEngine Topo control!")
 }
 //

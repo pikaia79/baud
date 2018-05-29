@@ -4,6 +4,7 @@ package topo
 
 import (
 	"golang.org/x/net/context"
+	"time"
 )
 
 const (
@@ -48,6 +49,9 @@ type Backend interface {
 	// Returns ErrNodeExists if the file exists.
 	// filePath is a path relative to the root directory of the cell.
 	Create(ctx context.Context, cell, filePath string, contents []byte) (Version, error)
+
+	CreateUniqueEphemeral(ctx context.Context, cell string, filePath string, contents []byte,
+			timeout time.Duration) (Version, error)
 
 	// Update updates the file with the provided filename with the
 	// new content.

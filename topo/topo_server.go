@@ -18,6 +18,7 @@ const (
     partitionsPath       = "partitions"
     partitionServersPath = "servers"
     tasksPath            = "tasks"
+    membersPath          = "members"
 
     // Filenames for all object types.
     ZoneTopoFile            = "zone_info"
@@ -28,6 +29,7 @@ const (
     PartitionTopoFile       = "partition_info"
     partitionGroupTopoFile  = "partition_group_info"
     TaskTopoFile            = "task_info"
+    IdGeneratorTopoFile     = "idgen"
 )
 
 var (
@@ -69,6 +71,8 @@ var (
     // ErrNoUpdateNeeded can be returned by an 'UpdateFields' method
     // to skip any update.
     ErrNoUpdateNeeded = errors.New("no update needed")
+
+    ErrZoneNotExists = errors.New("zone not exists")
 )
 
 type Impl interface {
@@ -105,6 +109,9 @@ type Impl interface {
     SetZonesForPartition(ctx context.Context, partitionId metapb.PartitionID, zones []string) error
     GetZonesForPartition(ctx context.Context, partitionId metapb.PartitionID) ([]string, error)
 
+    SetTask(ctx context.Context, zoneName string, task *metapb.Task, timeout time.Duration) error
+    GetTask(ctx context.Context, zoneName string, taskType string, taskId string) (*metapb.Task, error)
+
     GetPartitionInfoByZone(ctx context.Context, zoneName string,
             partitionId metapb.PartitionID) (*masterpb.PartitionInfo, error)
     SetPartitionInfoByZone(ctx context.Context, zoneName string, partitionInfo *masterpb.PartitionInfo) error
@@ -116,12 +123,9 @@ type Impl interface {
     SetPartitionsOnPSByZone(ctx context.Context, zoneName string, psId metapb.NodeID,
             partitions []*metapb.Partition) error
 
-    SetTask(ctx context.Context, task metapb.Task, timeout time.Duration) error
-    GetTask(ctx context.Context, taskName string, taskId string) (*metapb.Task, error)
-
     NewMasterParticipation(zone, id string) (MasterParticipation, error)
 
-    GenerateNewId(ctx context.Context) (uint64, error)
+    GenerateNewId(ctx context.Context, step uint64) (start, end uint64, err error)
 }
 
 type TopoServer struct {
