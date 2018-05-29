@@ -11,6 +11,7 @@ import (
 	"context"
 	"time"
     "runtime/debug"
+	"sync"
 )
 
 var (
@@ -207,35 +208,35 @@ func main() {
     //log.Debug("mp2 master id =%s", masterId2)
     //wg.Wait()
 
-    //mp3, err := server.NewMasterParticipation("zone1", "193")
-    //if err != nil {
-    //    log.Error("new master participation. err[%v]", err)
-    //    return
-    //}
-    //var wg sync.WaitGroup
-    //wg.Add(1)
-    //go func() {
-    //    defer wg.Done()
-    //    defer func() {
-    //        if e := recover(); e != nil {
-    //            log.Error("recover [%v]\n[%s]", e, debug.Stack())
-    //        }
-    //
-    //    }()
-    //    _, err := mp3.WaitForMastership()
-    //    if err != nil {
-    //        log.Error("%v", err)
-    //    }
-    //    log.Info("mp3 get master")
-    //
-    //}()
-    //time.Sleep(time.Second)
-    //masterId3, err := mp3.GetCurrentMasterID(ctx)
-    //if err != nil {
-    //   return
-    //}
-    //log.Debug("mp3 master id =%s", masterId3)
-    //wg.Wait()
+    mp3, err := server.NewMasterParticipation("zone1", "193")
+    if err != nil {
+       log.Error("new master participation. err[%v]", err)
+       return
+    }
+    var wg sync.WaitGroup
+    wg.Add(1)
+    go func() {
+       defer wg.Done()
+       defer func() {
+           if e := recover(); e != nil {
+               log.Error("recover [%v]\n[%s]", e, debug.Stack())
+           }
+
+       }()
+       _, err := mp3.WaitForMastership()
+       if err != nil {
+           log.Error("%v", err)
+       }
+       log.Info("mp3 get master")
+
+    }()
+    time.Sleep(time.Second)
+    masterId3, err := mp3.GetCurrentMasterID(ctx)
+    if err != nil {
+      return
+    }
+    log.Debug("mp3 master id =%s", masterId3)
+    wg.Wait()
 
     //var wg sync.WaitGroup
     //for i := 0; i < 100; i++ {
@@ -254,28 +255,28 @@ func main() {
     //}
     //wg.Wait()
 
-    err := server.SetZonesForPartition(ctx, 120, []string{"zone1", "zone2", "zone3"})
-    if err != nil {
-    	log.Error("SetZonesForPartition err[%v]", err)
-    	return
-	}
-	zones, err := server.GetZonesForPartition(ctx, 120)
-	if err != nil {
-		log.Error("GetZonesForPartition err[%v]", err)
-		return
-	}
-	log.Debug("zones=%v", zones)
-	err = server.SetZonesForPartition(ctx, 120, []string{"zone2", "zone4"})
-	if err != nil {
-		log.Error("SetZonesForPartition err[%v]", err)
-		return
-	}
-	zones, err = server.GetZonesForPartition(ctx, 120)
-	if err != nil {
-		log.Error("GetZonesForPartition err[%v]", err)
-		return
-	}
-	log.Debug("updateddated zones=%v", zones)
+    //err := server.SetZonesForPartition(ctx, 120, []string{"zone1", "zone2", "zone3"})
+    //if err != nil {
+    	//log.Error("SetZonesForPartition err[%v]", err)
+    	//return
+	//}
+	//zones, err := server.GetZonesForPartition(ctx, 120)
+	//if err != nil {
+	//	log.Error("GetZonesForPartition err[%v]", err)
+	//	return
+	//}
+	//log.Debug("zones=%v", zones)
+	//err = server.SetZonesForPartition(ctx, 120, []string{"zone2", "zone4"})
+	//if err != nil {
+	//	log.Error("SetZonesForPartition err[%v]", err)
+	//	return
+	//}
+	//zones, err = server.GetZonesForPartition(ctx, 120)
+	//if err != nil {
+	//	log.Error("GetZonesForPartition err[%v]", err)
+	//	return
+	//}
+	//log.Debug("updateddated zones=%v", zones)
 
 
 	time.Sleep(10 * time.Second)
