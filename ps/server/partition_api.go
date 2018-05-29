@@ -220,7 +220,7 @@ func (p *partition) execWriteCommand(index uint64, cmds []pspb.BulkItemRequest) 
 	return resp, nil
 }
 
-func (p *partition) createInternal(request *pspb.CreateRequest, batch kernel.Batch) (*pspb.CreateResponse, error) {
+func (p *partition) createInternal(request *pspb.CreateRequest, batch engine.Batch) (*pspb.CreateResponse, error) {
 	if err := batch.AddDocument(p.ctx, &request.Doc); err != nil {
 		return nil, err
 	}
@@ -228,7 +228,7 @@ func (p *partition) createInternal(request *pspb.CreateRequest, batch kernel.Bat
 	return &pspb.CreateResponse{Id: request.Doc.Id, Result: pspb.WriteResult_CREATED}, nil
 }
 
-func (p *partition) updateInternal(request *pspb.UpdateRequest, batch kernel.Batch) (*pspb.UpdateResponse, error) {
+func (p *partition) updateInternal(request *pspb.UpdateRequest, batch engine.Batch) (*pspb.UpdateResponse, error) {
 	found, err := batch.UpdateDocument(p.ctx, &request.Doc, request.Upsert)
 	if err != nil {
 		return nil, err
@@ -243,7 +243,7 @@ func (p *partition) updateInternal(request *pspb.UpdateRequest, batch kernel.Bat
 	return &pspb.UpdateResponse{Id: request.Doc.Id, Result: result}, nil
 }
 
-func (p *partition) deleteInternal(request *pspb.DeleteRequest, batch kernel.Batch) (*pspb.DeleteResponse, error) {
+func (p *partition) deleteInternal(request *pspb.DeleteRequest, batch engine.Batch) (*pspb.DeleteResponse, error) {
 	n, err := batch.DeleteDocument(p.ctx, request.Id)
 	if err != nil {
 		return nil, err

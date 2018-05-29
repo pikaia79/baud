@@ -8,7 +8,7 @@ import (
 	"github.com/tiglabs/baudengine/kernel"
 )
 
-var _ kernel.Snapshot = &Snapshot{}
+var _ engine.Snapshot = &Snapshot{}
 
 type Snapshot struct {
 	snap     kvstore.Snapshot
@@ -26,7 +26,7 @@ func (ds *Snapshot)GetApplyID() (uint64, error) {
 }
 
 // filter raft log key
-func (ds *Snapshot)NewIterator() kernel.Iterator {
+func (ds *Snapshot)NewIterator() engine.Iterator {
 	iter := ds.snap.RangeIterator(nil, nil)
 	return &Iterator{iter: iter, filters: []Filter{&RaftFilter{}}}
 }

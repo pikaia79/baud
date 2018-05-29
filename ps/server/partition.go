@@ -26,7 +26,7 @@ type partition struct {
 	ctxCancel context.CancelFunc
 
 	server    *Server
-	store     kernel.Engine
+	store     engine.Engine
 	closeOnce sync.Once
 
 	rwMutex    sync.RWMutex
