@@ -4,9 +4,19 @@ import (
 	"context"
 	"io"
 
-	"github.com/tiglabs/baudengine/proto/metapb"
-	"github.com/tiglabs/baudengine/proto/pspb"
 )
+
+type DOC_ID []byte
+
+func (d DOC_ID) ToString() string {
+	return string(d)
+}
+
+func (d DOC_ID) ToBytes() []byte {
+	return []byte(d)
+}
+
+type DOCUMENT map[string]interface{}
 
 // Snapshot is an interface for read-only snapshot in an engine.
 type Snapshot interface {
@@ -20,23 +30,24 @@ type Iterator interface {
 	io.Closer
 	Next()
 	Valid() bool
-	Key() metapb.Key
-	Value() metapb.Value
+	Key() []byte
+	Value() []byte
 }
 
 // Reader is the read interface to an engine's data.
 type Reader interface {
 	io.Closer
 	GetApplyID() (uint64, error)
-	GetDocument(ctx context.Context, docID metapb.Key, fields []uint32) (map[uint32]pspb.FieldValue, bool)
+	GetDocument(ctx context.Context, docID DOC_ID) (DOCUMENT, bool)
+	Search(ctx context.Context, req *SearchRequest)(*SearchResult, error)
 }
 
 // Writer is the write interface to an engine's data.
 type Writer interface {
 	SetApplyID(uint64) error
-	AddDocument(ctx context.Context, doc *pspb.Document) error
-	UpdateDocument(ctx context.Context, doc *pspb.Document, upsert bool) (found bool, err error)
-	DeleteDocument(ctx context.Context, docID metapb.Key) (int, error)
+	AddDocument(ctx context.Context, docID DOC_ID, doc interface{}) error
+	UpdateDocument(ctx context.Context, docID DOC_ID, doc interface{}, upsert bool) (found bool, err error)
+	DeleteDocument(ctx context.Context, docID DOC_ID) (int, error)
 }
 
 // ReadWriter is the read/write interface to an engine's data.
