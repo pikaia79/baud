@@ -104,11 +104,13 @@ message CreatePartitionRequest {
 
 message CreatePartitionResponse {
     ResponseHeader  header    = 1 [(gogoproto.nullable) = false, (gogoproto.embed) = true];
+    Replica         replica   = 2 [(gogoproto.nullable) = false];
 }
 
 message DeletePartitionRequest {
-    RequestHeader   header    = 1 [(gogoproto.nullable) = false, (gogoproto.embed) = true];
-    uint32          id        = 2 [(gogoproto.customname) = "ID", (gogoproto.casttype) = "github.com/tiglabs/baudengine/proto/metapb.PartitionID"];
+    RequestHeader   header      = 1 [(gogoproto.nullable) = false, (gogoproto.embed) = true];
+    uint32          partitionID = 2 [(gogoproto.customname) = "PartitionID", (gogoproto.casttype) = "github.com/tiglabs/baudengine/proto/metapb.PartitionID"];
+    uint32          nodeId      = 3 [(gogoproto.customname) = "NodeID", (gogoproto.casttype) = "github.com/tiglabs/baudengine/proto/metapb.NodeID"];
 }
 
 message DeletePartitionResponse {
