@@ -26,11 +26,11 @@ import (
 
 	"github.com/tiglabs/baudengine/util/log"
 
-	"github.com/tiglabs/baudengine/mygate/mysql/sqltypes"
 	"github.com/tiglabs/baudengine/mygate/mysql/errors"
+	"github.com/tiglabs/baudengine/mygate/mysql/sqltypes"
 
-	querypb "github.com/tiglabs/baudengine/proto/mysqlpb"
 	codepb "github.com/tiglabs/baudengine/proto/mysqlpb"
+	querypb "github.com/tiglabs/baudengine/proto/mysqlpb"
 )
 
 // Instructions for creating new types: If a type

@@ -24,8 +24,8 @@ import (
 	"strings"
 	"unicode"
 
-	"github.com/tiglabs/baudengine/mygate/mysql/sqltypes"
 	"github.com/tiglabs/baudengine/mygate/mysql/errors"
+	"github.com/tiglabs/baudengine/mygate/mysql/sqltypes"
 
 	codepb "github.com/tiglabs/baudengine/proto/mysqlpb"
 )
