@@ -1,4 +1,4 @@
-package kernel
+package engine
 
 type SearchRequest struct {
 	//TODO

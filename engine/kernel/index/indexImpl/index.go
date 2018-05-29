@@ -10,7 +10,7 @@ import (
 
 var RAFT_APPLY_ID []byte = []byte("Raft_apply_id")
 
-var _ kernel.Engine = &IndexDriver{}
+var _ engine.Engine = &IndexDriver{}
 
 type IndexDriver struct {
 	store        kvstore.KVStore
@@ -23,7 +23,7 @@ func NewIndexDriver(store kvstore.KVStore) *IndexDriver {
 	}
 }
 
-func (id *IndexDriver) NewSnapshot() (kernel.Snapshot, error) {
+func (id *IndexDriver) NewSnapshot() (engine.Snapshot, error) {
 	snap, err := id.store.GetSnapshot()
 	if err != nil {
 		return nil, err
@@ -32,7 +32,7 @@ func (id *IndexDriver) NewSnapshot() (kernel.Snapshot, error) {
 }
 
 // TODO clear store kv paris before apply snapshot
-func (id *IndexDriver) ApplySnapshot(ctx context.Context, iter kernel.Iterator) error {
+func (id *IndexDriver) ApplySnapshot(ctx context.Context, iter engine.Iterator) error {
 	var batch kvstore.KVBatch
 	count := 0
 	for iter.Valid() {
@@ -62,7 +62,7 @@ func (id *IndexDriver) ApplySnapshot(ctx context.Context, iter kernel.Iterator) 
 }
 
 
-func (id *IndexDriver) NewWriteBatch() kernel.Batch {
+func (id *IndexDriver) NewWriteBatch() engine.Batch {
 	return NewBatch(id.store)
 }
 

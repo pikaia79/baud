@@ -1,4 +1,4 @@
-package kernel
+package engine
 
 //the index stats
 type Stats struct {

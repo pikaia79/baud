@@ -42,7 +42,7 @@ type Batch struct {
 	store   kvstore.KVStore
 }
 
-var _ kernel.Batch = &Batch{}
+var _ engine.Batch = &Batch{}
 
 func NewBatch(store kvstore.KVStore) *Batch {
 	return &Batch{store: store, batch: store.NewKVBatch()}

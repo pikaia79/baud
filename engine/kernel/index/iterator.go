@@ -6,7 +6,7 @@ import (
 	"github.com/blevesearch/bleve/index/store"
 )
 
-var _ kernel.Iterator = &Iterator{}
+var _ engine.Iterator = &Iterator{}
 
 type Filter interface {
 	// return true for filter key
