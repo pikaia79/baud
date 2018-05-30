@@ -6,7 +6,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/tiglabs/baudengine/kernel"
+	"github.com/tiglabs/baudengine/engine"
 	"github.com/tiglabs/baudengine/kernel/index"
 	"github.com/tiglabs/baudengine/kernel/store/kvstore/badgerdb"
 	"github.com/tiglabs/baudengine/proto/masterpb"
@@ -181,24 +181,24 @@ func (p *partition) getPartitionInfo() *masterpb.PartitionInfo {
 	return info
 }
 
-func (p *partition) checkReadable(readLeader bool) (err *metapb.Error) {
+func (p *partition) checkReadable(readLeader bool) (err error) {
 	p.rwMutex.RLock()
 
 	if p.meta.Status == metapb.PA_INVALID || p.meta.Status == metapb.PA_NOTREAD {
-		err = &metapb.Error{PartitionNotFound: &metapb.PartitionNotFound{p.meta.ID}}
+		err = &metapb.PartitionNotFound{p.meta.ID}
 		goto ret
 	}
 	if p.leader == 0 {
-		err = &metapb.Error{NoLeader: &metapb.NoLeader{p.meta.ID}}
+		err = &metapb.NoLeader{p.meta.ID}
 		goto ret
 	}
 	if readLeader && p.leader != uint64(p.server.NodeID) {
-		err = &metapb.Error{NotLeader: &metapb.NotLeader{
+		err = &metapb.NotLeader{
 			PartitionID: p.meta.ID,
 			Leader:      metapb.NodeID(p.leader),
 			LeaderAddr:  p.leaderAddr,
 			Epoch:       p.meta.Epoch,
-		}}
+		}
 		goto ret
 	}
 

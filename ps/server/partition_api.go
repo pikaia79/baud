@@ -3,47 +3,35 @@ package server
 import (
 	"context"
 	"errors"
-	"fmt"
 	"time"
 
-	"github.com/tiglabs/baudengine/kernel"
+	"github.com/tiglabs/baudengine/engine"
 	"github.com/tiglabs/baudengine/proto/metapb"
 	"github.com/tiglabs/baudengine/proto/pspb"
 	"github.com/tiglabs/baudengine/proto/pspb/raftpb"
+	"github.com/tiglabs/baudengine/util/json"
 	"github.com/tiglabs/baudengine/util/log"
 	"github.com/tiglabs/raft"
 )
 
-func (p *partition) getInternal(request *pspb.GetRequest, response *pspb.GetResponse) {
-	if err := p.checkReadable(true); err != nil {
-		response.Error = *err
-		if err.NotLeader != nil {
-			response.Code = metapb.PS_RESP_CODE_NOT_LEADER
-			response.Message = fmt.Sprintf("node[%d] of partition[%d] is not leader", p.server.NodeID, request.Partition)
-		} else if err.NoLeader != nil {
-			response.Code = metapb.PS_RESP_CODE_NO_LEADER
-			response.Message = fmt.Sprintf("node[%d] of partition[%d] has no leader", p.server.NodeID, request.Partition)
-		} else if err.PartitionNotFound != nil {
-			response.Code = metapb.PS_RESP_CODE_NO_PARTITION
-			response.Message = fmt.Sprintf("node[%d] of partition[%d] has closed", p.server.NodeID, request.Partition)
-		}
+var timeoutErr = new(metapb.TimeoutError)
 
-		log.Error("get document error:[%s],\n get request is:[%s]", response.Message, request)
+func (p *partition) getInternal(docID engine.DOC_ID, timeout string) (doc engine.DOCUMENT, found bool, err error) {
+	if err = p.checkReadable(true); err != nil {
+		log.Error("get document error: [%s]", err)
 		return
 	}
 
 	var (
-		err     error
-		fields  map[uint32]pspb.FieldValue
-		cancel  context.CancelFunc
 		timeCtx = p.ctx
+		cancel  context.CancelFunc
 	)
-	if request.Timeout != "" {
-		if timeout, err := time.ParseDuration(request.Timeout); err == nil {
+	if timeout != "" {
+		if timeout, err := time.ParseDuration(timeout); err == nil {
 			timeCtx, cancel = context.WithTimeout(timeCtx, timeout)
 		}
 	}
-	fields, response.Found = p.store.GetDocument(timeCtx, request.Id, request.Fields)
+	doc, found = p.store.GetDocument(timeCtx, docID)
 	select {
 	case <-timeCtx.Done():
 		err = timeCtx.Err()
@@ -55,27 +43,22 @@ func (p *partition) getInternal(request *pspb.GetRequest, response *pspb.GetResp
 
 	if err != nil {
 		if err == context.DeadlineExceeded {
-			response.Code = metapb.RESP_CODE_TIMEOUT
-			response.Message = "request timeout"
+			err = timeoutErr
 		} else {
-			response.Code = metapb.RESP_CODE_SERVER_STOP
-			response.Message = "during request processing, the server is shut down"
+			err = &metapb.ServerError{Cause: "during request processing, the server is shut down"}
 		}
-		log.Error("get document error:[%s],\n get request is:[%s]", err, request)
-	} else if response.Found && len(fields) > 0 {
-		response.Fields = fields
+		log.Error("get document error: [%s]", err)
 	}
+
 	return
 }
 
-func (p *partition) bulkInternal(request *pspb.BulkRequest, response *pspb.BulkResponse) {
+func (p *partition) bulkInternal(requests []pspb.RequestUnion, timeout string) (responses []pspb.ResponseUnion, err error) {
 	p.rwMutex.RLock()
 	pstatus := p.meta.Status
 	p.rwMutex.RUnlock()
 	if pstatus == metapb.PA_INVALID || pstatus == metapb.PA_NOTREAD {
-		response.Code = metapb.PS_RESP_CODE_NO_PARTITION
-		response.Message = fmt.Sprintf("node[%d] has not found partition[%d]", p.server.NodeID, request.Partition)
-		response.Error = metapb.Error{PartitionNotFound: &metapb.PartitionNotFound{request.Partition}}
+		err = &metapb.PartitionNotFound{p.meta.ID}
 		return
 	}
 
@@ -83,24 +66,23 @@ func (p *partition) bulkInternal(request *pspb.BulkRequest, response *pspb.BulkR
 		timeCtx = p.ctx
 		cancel  context.CancelFunc
 
-		err    error
 		done   bool
 		result interface{}
 	)
-	if request.Timeout != "" {
-		if timeout, e := time.ParseDuration(request.Timeout); e == nil {
+	if timeout != "" {
+		if timeout, e := time.ParseDuration(timeout); e == nil {
 			timeCtx, cancel = context.WithTimeout(timeCtx, timeout)
 		}
 	}
 
 	raftCmd := raftpb.CreateRaftCommand()
 	raftCmd.Type = raftpb.CmdType_WRITE
-	raftCmd.WriteCommands = request.Requests
+	raftCmd.WriteCommands = requests
 	if data, e := raftCmd.Marshal(); e != nil {
 		err = e
-		log.Error("marshal raftCommand error:[%s],\n request is:[%s]", err, request)
+		log.Error("marshal raftCommand error: [%s]", err)
 	} else {
-		future := p.server.raftServer.Submit(request.Partition, data)
+		future := p.server.raftServer.Submit(p.meta.ID, data)
 		respCh, errCh := future.AsyncResponse()
 		raftCmd.Close()
 
@@ -118,63 +100,52 @@ func (p *partition) bulkInternal(request *pspb.BulkRequest, response *pspb.BulkR
 	if cancel != nil {
 		cancel()
 	}
-	p.fillBulkResponse(request, response, result, err, done)
+	return p.fillBulkResponse(requests, result, err, done)
 }
 
-func (p *partition) fillBulkResponse(request *pspb.BulkRequest, response *pspb.BulkResponse, result interface{}, err error, done bool) {
+func (p *partition) fillBulkResponse(requests []pspb.RequestUnion, result interface{}, err error, done bool) ([]pspb.ResponseUnion, error) {
 	if err == nil {
-		response.Responses = result.([]pspb.BulkItemResponse)
-		return
+		return result.([]pspb.ResponseUnion), nil
 	}
 
 	switch err {
 	case raft.ErrRaftNotExists:
-		response.Code = metapb.PS_RESP_CODE_NO_PARTITION
-		response.Message = fmt.Sprintf("node[%d] has not found partition[%d]", p.server.NodeID, request.Partition)
-		response.Error = metapb.Error{PartitionNotFound: &metapb.PartitionNotFound{request.Partition}}
+		err = &metapb.PartitionNotFound{p.meta.ID}
 
 	case raft.ErrStopped:
-		response.Code = metapb.RESP_CODE_SERVER_STOP
-		response.Message = "the server is stopping, request is rejected"
+		err = &metapb.ServerError{"the server is stopping, request is rejected"}
 
 	case raft.ErrNotLeader:
 		p.rwMutex.RLock()
 		if p.leader == 0 {
-			response.Code = metapb.PS_RESP_CODE_NO_LEADER
-			response.Message = fmt.Sprintf("node[%d] of partition[%d] has no leader", p.server.NodeID, request.Partition)
-			response.Error = metapb.Error{NoLeader: &metapb.NoLeader{request.Partition}}
+			err = &metapb.NoLeader{p.meta.ID}
 		} else {
-			response.Code = metapb.PS_RESP_CODE_NOT_LEADER
-			response.Message = fmt.Sprintf("node[%d] of partition[%d] is not leader", p.server.NodeID, request.Partition)
-			response.Error = metapb.Error{NotLeader: &metapb.NotLeader{
-				PartitionID: request.Partition,
+			err = &metapb.NotLeader{
+				PartitionID: p.meta.ID,
 				Leader:      metapb.NodeID(p.leader),
 				LeaderAddr:  p.leaderAddr,
 				Epoch:       p.meta.Epoch,
-			}}
+			}
 		}
 		p.rwMutex.RUnlock()
 
 	case context.DeadlineExceeded:
-		response.Code = metapb.RESP_CODE_TIMEOUT
-		response.Message = "request timeout"
+		err = timeoutErr
 
 	default:
 		if done {
-			response.Code = metapb.RESP_CODE_SERVER_STOP
-			response.Message = "the server is shut down, request has proposed but not apply"
-		} else {
-			response.Code = metapb.RESP_CODE_SERVER_ERROR
-			response.Message = err.Error()
+			err = &metapb.ServerError{"the server is shut down, request has proposed but not apply"}
 		}
 	}
 
-	log.Error("bulk write document error:[%s],\n bulk request is:[%s]", response.Message, request)
+	log.Error("bulk write document error: [%s]", err)
+
+	return nil, err
 }
 
-func (p *partition) execWriteCommand(index uint64, cmds []pspb.BulkItemRequest) ([]pspb.BulkItemResponse, error) {
+func (p *partition) execWriteCommand(index uint64, cmds []pspb.RequestUnion) ([]pspb.ResponseUnion, error) {
 	batch := p.store.NewWriteBatch()
-	resp := make([]pspb.BulkItemResponse, len(cmds))
+	resp := make([]pspb.ResponseUnion, len(cmds))
 
 	for i, cmd := range cmds {
 		resp[i].OpType = cmd.OpType
@@ -185,7 +156,7 @@ func (p *partition) execWriteCommand(index uint64, cmds []pspb.BulkItemRequest) 
 				resp[i].Create = createResp
 			} else {
 				log.Error("create document error:[%s],\n create request is:[%s]", err, cmd.Create)
-				resp[i].Failure = &pspb.Failure{Id: cmd.Create.Doc.Id, Cause: err.Error()}
+				resp[i].Failure = &pspb.Failure{ID: cmd.Create.ID, Cause: err.Error()}
 			}
 
 		case pspb.OpType_UPDATE:
@@ -193,7 +164,7 @@ func (p *partition) execWriteCommand(index uint64, cmds []pspb.BulkItemRequest) 
 				resp[i].Update = updateResp
 			} else {
 				log.Error("update document error:[%s],\n update request is:[%s]", err, cmd.Update)
-				resp[i].Failure = &pspb.Failure{Id: cmd.Update.Doc.Id, Cause: err.Error()}
+				resp[i].Failure = &pspb.Failure{ID: cmd.Update.ID, Cause: err.Error()}
 			}
 
 		case pspb.OpType_DELETE:
@@ -201,7 +172,7 @@ func (p *partition) execWriteCommand(index uint64, cmds []pspb.BulkItemRequest) 
 				resp[i].Delete = delResp
 			} else {
 				log.Error("delete document error:[%s],\n delete request is:[%s]", err, cmd.Delete)
-				resp[i].Failure = &pspb.Failure{Id: cmd.Delete.Id, Cause: err.Error()}
+				resp[i].Failure = &pspb.Failure{ID: cmd.Delete.ID, Cause: err.Error()}
 			}
 
 		default:
@@ -221,15 +192,25 @@ func (p *partition) execWriteCommand(index uint64, cmds []pspb.BulkItemRequest) 
 }
 
 func (p *partition) createInternal(request *pspb.CreateRequest, batch engine.Batch) (*pspb.CreateResponse, error) {
-	if err := batch.AddDocument(p.ctx, &request.Doc); err != nil {
+	var data interface{}
+	if err := json.Unmarshal(request.Data, &data); err != nil {
 		return nil, err
 	}
 
-	return &pspb.CreateResponse{Id: request.Doc.Id, Result: pspb.WriteResult_CREATED}, nil
+	if err := batch.AddDocument(p.ctx, engine.DOC_ID(request.ID), data); err != nil {
+		return nil, err
+	}
+
+	return &pspb.CreateResponse{ID: request.ID, Result: pspb.WriteResult_CREATED}, nil
 }
 
 func (p *partition) updateInternal(request *pspb.UpdateRequest, batch engine.Batch) (*pspb.UpdateResponse, error) {
-	found, err := batch.UpdateDocument(p.ctx, &request.Doc, request.Upsert)
+	var data interface{}
+	if err := json.Unmarshal(request.Data, &data); err != nil {
+		return nil, err
+	}
+
+	found, err := batch.UpdateDocument(p.ctx, engine.DOC_ID(request.ID), data, request.Upsert)
 	if err != nil {
 		return nil, err
 	}
@@ -240,11 +221,11 @@ func (p *partition) updateInternal(request *pspb.UpdateRequest, batch engine.Bat
 	} else if request.Upsert {
 		result = pspb.WriteResult_CREATED
 	}
-	return &pspb.UpdateResponse{Id: request.Doc.Id, Result: result}, nil
+	return &pspb.UpdateResponse{ID: request.ID, Result: result}, nil
 }
 
 func (p *partition) deleteInternal(request *pspb.DeleteRequest, batch engine.Batch) (*pspb.DeleteResponse, error) {
-	n, err := batch.DeleteDocument(p.ctx, request.Id)
+	n, err := batch.DeleteDocument(p.ctx, engine.DOC_ID(request.ID))
 	if err != nil {
 		return nil, err
 	}
@@ -253,5 +234,5 @@ func (p *partition) deleteInternal(request *pspb.DeleteRequest, batch engine.Bat
 	if n > 0 {
 		result = pspb.WriteResult_DELETED
 	}
-	return &pspb.DeleteResponse{Id: request.Id, Result: result}, nil
+	return &pspb.DeleteResponse{ID: request.ID, Result: result}, nil
 }

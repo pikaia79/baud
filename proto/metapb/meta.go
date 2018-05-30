@@ -1,5 +1,7 @@
 package metapb
 
+import "fmt"
+
 type (
 	// DBID is a custom type for database ID
 	DBID = uint32
@@ -50,3 +52,27 @@ const (
 	PS_RESP_CODE_KEY_EXISTS     RespCode = 409
 	PS_RESP_CODE_KEY_NOT_EXISTS RespCode = 410
 )
+
+func (e *NotLeader) Error() string {
+	return fmt.Sprintf("partition(%d) is not leader", e.PartitionID)
+}
+
+func (e *NoLeader) Error() string {
+	return fmt.Sprintf("partition(%d) has no leader", e.PartitionID)
+}
+
+func (e *PartitionNotFound) Error() string {
+	return fmt.Sprintf("partition(%d) not found", e.PartitionID)
+}
+
+func (e *MsgTooLarge) Error() string {
+	return fmt.Sprintf("partition(%d) request message is too large(%d)", e.PartitionID, e.MsgSize)
+}
+
+func (e *TimeoutError) Error() string {
+	return "request timeout"
+}
+
+func (e *ServerError) Error() string {
+	return fmt.Sprintf("server occur internal error, cause is: %s", e.Cause)
+}
