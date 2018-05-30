@@ -10,21 +10,19 @@ import (
 
 type Cluster struct {
 	config *Config
+	gm     *GM
 
 	DbCache        *DBCache
 	PartitionCache *PartitionCache
 	ZoneCache      *ZoneCache
 
-	isGMLeader            bool
-	currentGMLeaderNodeID uint64
-	currentGMLeaderAddr   string
-
 	clusterLock sync.RWMutex
 }
 
-func NewCluster(config *Config) *Cluster {
+func NewCluster(config *Config, gm *GM) *Cluster {
 	return &Cluster{
 		config:         config,
+		gm:             gm,
 		DbCache:        NewDBCache(),
 		PartitionCache: NewPartitionCache(),
 		ZoneCache:      NewZoneCache(),
@@ -32,11 +30,6 @@ func NewCluster(config *Config) *Cluster {
 }
 
 func (c *Cluster) Start() error {
-
-	if err := c.registorGlobalEtcd(); err != nil {
-		log.Error("fail to registor global etcd. err:[%v]", err)
-		return err
-	}
 	if err := c.recoveryZoneCache(); err != nil {
 		log.Error("fail to recovery ZoneCache. err:[%v]", err)
 		return err
@@ -63,12 +56,6 @@ func (c *Cluster) Start() error {
 func (c *Cluster) Close() {
 	c.clearAllCache()
 	log.Info("Cluster has closed")
-}
-
-func (c *Cluster) registorGlobalEtcd() error {
-	//TODO ***** 启动时gm把自己注册到glocal etcd, 调用@杨洋提供的接口
-
-	return nil
 }
 
 func (c *Cluster) recoveryZoneCache() error {
@@ -146,9 +133,9 @@ func (c *Cluster) recoveryPartitionCache() error {
 		if db == nil {
 			log.Warn("Cannot find db for the partition[%v] when recovery partition. discord it", partition)
 
-			if err := partition.erase(); err != nil {
-				log.Error("fail to remove unused partition[%v] when recovery. err:[%v]", partition, err)
-			}
+			//if err := partition.erase(); err != nil {
+			//	log.Error("fail to remove unused partition[%v] when recovery. err:[%v]", partition, err)
+			//}
 			continue
 		}
 
@@ -156,13 +143,12 @@ func (c *Cluster) recoveryPartitionCache() error {
 		if space == nil {
 			log.Warn("Cannot find space for the partition[%v] when recovery partition. discord it", partition)
 
-			if err := partition.erase(); err != nil {
-				log.Error("fail to remove unused partition[%v] when recovery. err:[%v]", partition, err)
-			}
+			//if err := partition.erase(); err != nil {
+			//	log.Error("fail to remove unused partition[%v] when recovery. err:[%v]", partition, err)
+			//}
 			continue
 		}
 
-		space.searchTree.update(partition)
 		c.PartitionCache.AddPartition(partition)
 	}
 
@@ -317,7 +303,6 @@ func (c *Cluster) CreateSpace(dbName, spaceName string, policy *PartitionPolicy)
 
 	db.SpaceCache.AddSpace(space)
 	for _, partition := range partitions {
-		space.putPartition(partition)
 		c.PartitionCache.AddPartition(partition)
 	}
 

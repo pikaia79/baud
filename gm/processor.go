@@ -58,8 +58,6 @@ func GetPMSingle(cluster *Cluster) *ProcessorManager {
 		pm.pp = NewPartitionProcessor(pm.ctx, pm.cancel, cluster)
 
 		processorManagerSingle = pm
-		pm.start()
-
 		atomic.StoreUint32(&processorManagerSingleDone, 1)
 
 		log.Info("ProcessorManager single has started")
@@ -88,7 +86,7 @@ func (pm *ProcessorManager) Close() {
 	log.Info("ProcessorManager single has closed")
 }
 
-func (pm *ProcessorManager) start() {
+func (pm *ProcessorManager) Start() {
 	pm.wg.Add(1)
 	go func() {
 		defer pm.wg.Done()
@@ -141,40 +139,29 @@ type ProcessorEvent struct {
 	body interface{}
 }
 
-func NewPartitionCreateEvent(partition *Partition) *ProcessorEvent {
+type PartitionDeleteBody struct {
+	zoneMasterAddr string
+	partitionId    metapb.PartitionID
+	replica        *metapb.Replica
+}
+
+func NewPartitionCreateEvent(
+	partition *Partition) *ProcessorEvent {
 	return &ProcessorEvent{
 		typ:  EVENT_TYPE_PARTITION_CREATE,
 		body: partition,
 	}
 }
 
-// internal use
-type PartitionDeleteBody struct {
-	partitionId    metapb.PartitionID
-	leaderNodeId   metapb.NodeID
-	replicaRpcAddr string
-	replica        *metapb.Replica
-}
-
-func NewPartitionDeleteEvent(partitionId metapb.PartitionID, leaderNodeId metapb.NodeID,
+func NewPartitionDeleteEvent(
+	zoneMasterAddr string,
+	partitionId metapb.PartitionID,
 	replica *metapb.Replica) *ProcessorEvent {
 	return &ProcessorEvent{
 		typ: EVENT_TYPE_PARTITION_DELETE,
 		body: &PartitionDeleteBody{
-			partitionId:  partitionId,
-			leaderNodeId: leaderNodeId,
-			replica:      replica,
-		},
-	}
-}
-
-func NewForcePartitionDeleteEvent(partitionId metapb.PartitionID, replicaRpcAddr string,
-	replica *metapb.Replica) *ProcessorEvent {
-	return &ProcessorEvent{
-		typ: EVENT_TYPE_FORCE_PARTITION_DELETE,
-		body: &PartitionDeleteBody{
+			zoneMasterAddr: zoneMasterAddr,
 			partitionId:    partitionId,
-			replicaRpcAddr: replicaRpcAddr,
 			replica:        replica,
 		},
 	}
@@ -266,7 +253,6 @@ func (p *PartitionProcessor) Close() {
 	if p.eventCh != nil {
 		close(p.eventCh)
 	}
-
 	p.wg.Wait()
 }
 

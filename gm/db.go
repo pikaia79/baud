@@ -4,8 +4,8 @@ import (
 	"github.com/tiglabs/baudengine/proto/metapb"
 	"github.com/tiglabs/baudengine/topo"
 	"github.com/tiglabs/baudengine/util/log"
-	"sync"
 	"golang.org/x/net/context"
+	"sync"
 )
 
 type DB struct {
@@ -35,7 +35,7 @@ func NewDB(dbName string) (*DB, error) {
 
 func NewDBByTopo(topoDb *topo.DBTopo) *DB {
 	return &DB{
-		DBTopo:         topoDb,
+		DBTopo:     topoDb,
 		SpaceCache: NewSpaceCache(),
 	}
 }
@@ -43,7 +43,8 @@ func NewDBByTopo(topoDb *topo.DBTopo) *DB {
 func (db *DB) add() error {
 	db.propertyLock.Lock()
 	defer db.propertyLock.Unlock()
-	ctx := context.Background()
+	ctx, cancel := context.WithTimeout(context.Background(), ETCD_TIMEOUT)
+	defer cancel()
 
 	dbTopo, err := topoServer.AddDB(ctx, db.DBTopo.DB)
 	if err != nil {
@@ -58,7 +59,8 @@ func (db *DB) add() error {
 func (db *DB) update() error {
 	db.propertyLock.Lock()
 	defer db.propertyLock.Unlock()
-	ctx := context.Background()
+	ctx, cancel := context.WithTimeout(context.Background(), ETCD_TIMEOUT)
+	defer cancel()
 
 	err := topoServer.UpdateDB(ctx, db.DBTopo)
 	if err != nil {
@@ -72,7 +74,8 @@ func (db *DB) erase() error {
 	db.propertyLock.Lock()
 	defer db.propertyLock.Unlock()
 
-	ctx := context.Background()
+	ctx, cancel := context.WithTimeout(context.Background(), ETCD_TIMEOUT)
+	defer cancel()
 
 	err := topoServer.DeleteDB(ctx, db.DBTopo)
 	if err != nil {
@@ -164,7 +167,8 @@ func (c *DBCache) Recovery() ([]*DB, error) {
 
 	resultDBs := make([]*DB, 0)
 
-	ctx := context.Background()
+	ctx, cancel := context.WithTimeout(context.Background(), ETCD_TIMEOUT)
+	defer cancel()
 	dbsTopo, err := topoServer.GetAllDBs(ctx)
 	if err != nil {
 		log.Error("topoServer GetAllDBs error, err: [%v]", err)

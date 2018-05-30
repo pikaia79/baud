@@ -4,8 +4,8 @@ import (
 	"github.com/tiglabs/baudengine/proto/metapb"
 	"github.com/tiglabs/baudengine/topo"
 	"github.com/tiglabs/baudengine/util/log"
-	"sync"
 	"golang.org/x/net/context"
+	"sync"
 )
 
 type Zone struct {
@@ -29,7 +29,6 @@ func NewZone(zoneName, zoneEtcdAddr, zoneMasterAddr string) (*Zone, error) {
 	}
 	topoZone := &topo.ZoneTopo{
 		Zone: metaZone,
-
 	}
 	return NewZoneByTopo(topoZone), nil
 }
@@ -43,9 +42,11 @@ func NewZoneByTopo(topoZone *topo.ZoneTopo) *Zone {
 func (zone *Zone) add() error {
 	zone.propertyLock.Lock()
 	defer zone.propertyLock.Unlock()
-	ctx := context.Background()
 
-	zoneTopo, err:= topoServer.AddZone(ctx, zone.ZoneTopo.Zone)
+	ctx, cancel := context.WithTimeout(context.Background(), ETCD_TIMEOUT)
+	defer cancel()
+
+	zoneTopo, err := topoServer.AddZone(ctx, zone.ZoneTopo.Zone)
 	if err != nil {
 		log.Error("topoServer AddZone error, err: [%v]", err)
 		return err
@@ -59,7 +60,8 @@ func (zone *Zone) erase() error {
 	zone.propertyLock.Lock()
 	defer zone.propertyLock.Unlock()
 
-	ctx := context.Background()
+	ctx, cancel := context.WithTimeout(context.Background(), ETCD_TIMEOUT)
+	defer cancel()
 
 	err := topoServer.DeleteZone(ctx, zone.ZoneTopo)
 	if err != nil {
@@ -122,7 +124,10 @@ func (c *ZoneCache) GetAllZones() []*Zone {
 func (c *ZoneCache) Recovery() ([]*Zone, error) {
 
 	resultZones := make([]*Zone, 0)
-	ctx := context.Background()
+
+	ctx, cancel := context.WithTimeout(context.Background(), ETCD_TIMEOUT)
+	defer cancel()
+
 	zonesTopo, err := topoServer.GetAllZones(ctx)
 	if err != nil {
 		log.Error("topoServer GetAllZones error, err: [%v]", err)

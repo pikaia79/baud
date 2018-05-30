@@ -107,6 +107,10 @@ func (s *ApiServer) initAdminHandler() {
 }
 
 func (s *ApiServer) handleZoneCreate(w http.ResponseWriter, r *http.Request, params netutil.UriParams) {
+	if err := s.checkLeader(w); err != nil {
+		return
+	}
+
 	zoneName, err := checkMissingParam(w, r, ZONE_NAME)
 	if err != nil {
 		return
@@ -130,6 +134,10 @@ func (s *ApiServer) handleZoneCreate(w http.ResponseWriter, r *http.Request, par
 }
 
 func (s *ApiServer) handleZoneDelete(w http.ResponseWriter, r *http.Request, params netutil.UriParams) {
+	if err := s.checkLeader(w); err != nil {
+		return
+	}
+
 	zoneName, err := checkMissingParam(w, r, ZONE_NAME)
 	if err != nil {
 		return
@@ -142,7 +150,6 @@ func (s *ApiServer) handleZoneDelete(w http.ResponseWriter, r *http.Request, par
 
 	sendReply(w, newHttpSucReply(""))
 }
-
 
 func (s *ApiServer) handleZoneList(w http.ResponseWriter, r *http.Request, params netutil.UriParams) {
 	zones := s.cluster.ZoneCache.GetAllZones()
@@ -166,6 +173,10 @@ func (s *ApiServer) handleZoneDetail(w http.ResponseWriter, r *http.Request, par
 }
 
 func (s *ApiServer) handleDbCreate(w http.ResponseWriter, r *http.Request, params netutil.UriParams) {
+	if err := s.checkLeader(w); err != nil {
+		return
+	}
+
 	dbName, err := checkMissingParam(w, r, DB_NAME)
 	if err != nil {
 		return
@@ -180,8 +191,11 @@ func (s *ApiServer) handleDbCreate(w http.ResponseWriter, r *http.Request, param
 	sendReply(w, newHttpSucReply(db))
 }
 
-
 func (s *ApiServer) handleDbRename(w http.ResponseWriter, r *http.Request, params netutil.UriParams) {
+	if err := s.checkLeader(w); err != nil {
+		return
+	}
+
 	srcDbName, err := checkMissingParam(w, r, SRC_DB_NAME)
 	if err != nil {
 		return
@@ -200,6 +214,10 @@ func (s *ApiServer) handleDbRename(w http.ResponseWriter, r *http.Request, param
 }
 
 func (s *ApiServer) handleDbDelete(w http.ResponseWriter, r *http.Request, params netutil.UriParams) {
+	if err := s.checkLeader(w); err != nil {
+		return
+	}
+
 	dbName, err := checkMissingParam(w, r, DB_NAME)
 	if err != nil {
 		return
@@ -235,6 +253,10 @@ func (s *ApiServer) handleDbDetail(w http.ResponseWriter, r *http.Request, param
 }
 
 func (s *ApiServer) handleSpaceCreate(w http.ResponseWriter, r *http.Request, params netutil.UriParams) {
+	if err := s.checkLeader(w); err != nil {
+		return
+	}
+
 	dbName, err := checkMissingParam(w, r, DB_NAME)
 	if err != nil {
 		return
@@ -272,6 +294,10 @@ func (s *ApiServer) handleSpaceCreate(w http.ResponseWriter, r *http.Request, pa
 }
 
 func (s *ApiServer) handleSpaceRename(w http.ResponseWriter, r *http.Request, params netutil.UriParams) {
+	if err := s.checkLeader(w); err != nil {
+		return
+	}
+
 	dbName, err := checkMissingParam(w, r, DB_NAME)
 	if err != nil {
 		return
@@ -293,6 +319,10 @@ func (s *ApiServer) handleSpaceRename(w http.ResponseWriter, r *http.Request, pa
 }
 
 func (s *ApiServer) handleSpaceDelete(w http.ResponseWriter, r *http.Request, params netutil.UriParams) {
+	if err := s.checkLeader(w); err != nil {
+		return
+	}
+
 	dbName, err := checkMissingParam(w, r, DB_NAME)
 	if err != nil {
 		return
@@ -349,7 +379,6 @@ func (s *ApiServer) handleSpaceDetail(w http.ResponseWriter, r *http.Request, pa
 
 	sendReply(w, newHttpSucReply(space))
 }
-
 
 func (s *ApiServer) handlePartitionList(w http.ResponseWriter, r *http.Request, params netutil.UriParams) {
 	partitions := s.cluster.PartitionCache.GetAllPartitions()
@@ -422,6 +451,31 @@ func newHttpErrReply(err error) *HttpReply {
 			Msg:  ErrInternalError.Error(),
 		}
 	}
+}
+
+func (s *ApiServer) checkLeader(w http.ResponseWriter) error {
+	isGMLeader := s.cluster.gm.isGMLeader
+	currentGMLeaderNodeID := s.cluster.gm.currentGMLeaderNodeID
+	currentGMLeaderAddr := s.cluster.gm.currentGMLeaderAddr
+
+	if currentGMLeaderAddr == "" {
+		sendReply(w, newHttpErrReply(ErrNoMSLeader))
+		return ErrNoMSLeader
+	}
+
+	if !isGMLeader {
+		if currentGMLeaderAddr != "" {
+			log.Debug("current master leader is [%s]", currentGMLeaderAddr)
+			reply := newHttpErrReply(ErrNotMSLeader)
+			newMsg := fmt.Sprintf("%s, current leader[%s][%s]", reply.Msg, currentGMLeaderNodeID,
+				currentGMLeaderAddr)
+			reply.Msg = newMsg
+			sendReply(w, reply)
+			return ErrNotMSLeader
+		}
+	}
+
+	return nil
 }
 
 func checkMissingParam(w http.ResponseWriter, r *http.Request, paramName string) (string, error) {

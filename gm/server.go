@@ -3,8 +3,13 @@ package gm
 import (
 	"github.com/tiglabs/baudengine/topo"
 	"github.com/tiglabs/baudengine/util/log"
+	"golang.org/x/net/context"
+	"strings"
 	"sync"
+	"time"
 )
+
+const ETCD_TIMEOUT = 5 * time.Second
 
 var (
 	topoServer *topo.TopoServer
@@ -17,6 +22,10 @@ type GM struct {
 	cluster   *Cluster
 	apiServer *ApiServer
 	rpcServer *RpcServer
+
+	isGMLeader            bool
+	currentGMLeaderNodeID string
+	currentGMLeaderAddr   string
 
 	processorManager    *ProcessorManager
 	workerManager       *WorkerManager
@@ -32,55 +41,33 @@ func (gm *GM) Start(config *Config) error {
 	gm.config = config
 	topoServer = topo.Open()
 
-	gm.cluster = NewCluster(config)
+	gm.cluster = NewCluster(gm.config, gm)
 	if err := gm.cluster.Start(); err != nil {
 		log.Error("fail to start cluster. err:[%v]", err)
 		gm.Shutdown()
 		return err
 	}
 
-	gm.rpcServer = NewRpcServer(config, gm.cluster)
-	if err := gm.rpcServer.Start(); err != nil {
-		log.Error("fail to start rpc server. err:[%v]", err)
-		gm.Shutdown()
-		return err
-	}
-
-	gm.apiServer = NewApiServer(config, gm.cluster)
+	gm.apiServer = NewApiServer(gm.config, gm.cluster)
 	if err := gm.apiServer.Start(); err != nil {
 		log.Error("fail to start api server. err:[%v]", err)
 		gm.Shutdown()
 		return err
 	}
 
-	gm.idGenerator = GetIdGeneratorSingle()
-	gm.zoneMasterRpcClient = GetZoneMasterRpcClientSingle(config)
-	// processorManager start() when init
-	gm.processorManager = GetPMSingle(gm.cluster)
-
-	gm.workerManager = NewWorkerManager(gm.cluster)
-	if err := gm.workerManager.Start(); err != nil {
-		log.Error("fail to start worker manager. err:[%v]", err)
+	gm.rpcServer = NewRpcServer(gm.config, gm.cluster)
+	if err := gm.rpcServer.Start(); err != nil {
+		log.Error("fail to start rpc server. err:[%v]", err)
 		gm.Shutdown()
 		return err
 	}
-
-	gm.watchLeader()
-
+	gm.newMasterParticipation()
 	return nil
 }
 
 func (gm *GM) Shutdown() {
-	if gm.apiServer != nil {
-		gm.apiServer.Close()
-		gm.apiServer = nil
-	}
-	if gm.rpcServer != nil {
-		gm.rpcServer.Close()
-		gm.rpcServer = nil
-	}
 	if gm.workerManager != nil {
-		gm.workerManager.Shutdown()
+		gm.workerManager.Close()
 		gm.workerManager = nil
 	}
 	if gm.processorManager != nil {
@@ -95,6 +82,14 @@ func (gm *GM) Shutdown() {
 		gm.zoneMasterRpcClient.Close()
 		gm.zoneMasterRpcClient = nil
 	}
+	if gm.rpcServer != nil {
+		gm.rpcServer.Close()
+		gm.rpcServer = nil
+	}
+	if gm.apiServer != nil {
+		gm.apiServer.Close()
+		gm.apiServer = nil
+	}
 	if gm.cluster != nil {
 		gm.cluster.Close()
 		gm.cluster = nil
@@ -106,54 +101,96 @@ func (gm *GM) Shutdown() {
 	gm.wg.Wait()
 }
 
-func (gm *GM) watchLeader() {
+func (gm *GM) newMasterParticipation() {
+	ctx, cancel := context.WithTimeout(context.Background(), ETCD_TIMEOUT)
+	defer cancel()
 
-	gm.wg.Add(1)
+	masterParticipation, err := topoServer.NewMasterParticipation(
+		topo.GlobalZone,
+		gm.config.ClusterCfg.GmNodeIp+":"+gm.config.ClusterCfg.GmNodeId)
+	if err != nil {
+		log.Error("fail to invoke topoServer new master participation. err:[%v]", err)
+		return
+	}
 	go func() {
-		defer gm.wg.Done()
-
-		//TODO 调用global etcd进行gm leader选举, 接口由@杨洋提供
-
 		for {
-			select {
+			cmID, err := masterParticipation.GetCurrentMasterID(ctx)
+			if err != nil {
+				log.Error("fail to get current master ID. err:[%v]", err)
+				time.Sleep(5 * time.Second)
+				continue
+			}
 
-			case "":
-
-				if "leader2follower" == "" {
-					gm.cluster.isGMLeader = false
-					gm.cluster.currentGMLeaderNodeID = 0
-					gm.cluster.currentGMLeaderAddr = ""
+			if cmID == "" || cmID != gm.config.ClusterCfg.GmNodeIp+":"+gm.config.ClusterCfg.GmNodeId {
+				// last time I'm the gm leader, but now I'm not.
+				if gm.isGMLeader == true {
+					gm.isGMLeader = false
+					gm.currentGMLeaderNodeID = ""
+					gm.currentGMLeaderAddr = ""
 					if gm.workerManager != nil {
-						gm.workerManager.Shutdown()
+						gm.workerManager.Close()
 						gm.workerManager = nil
 					}
 					if gm.processorManager != nil {
 						gm.processorManager.Close()
 						gm.processorManager = nil
 					}
+					if gm.zoneMasterRpcClient != nil {
+						gm.zoneMasterRpcClient.Close()
+						gm.zoneMasterRpcClient = nil
+					}
 					if gm.idGenerator != nil {
 						gm.idGenerator.Close()
 						gm.idGenerator = nil
 					}
-				} else {
-					if gm.idGenerator == nil {
-						gm.idGenerator = GetIdGeneratorSingle()
-					}
-					if gm.processorManager == nil {
-						gm.processorManager = GetPMSingle(gm.cluster)
-					}
-					if gm.workerManager == nil {
-						gm.workerManager = NewWorkerManager(gm.cluster)
-						if err := gm.workerManager.Start(); err != nil {
-							log.Error("fail to restart worker manager. err:[%v]", err)
-							break
-						}
-					}
-					gm.cluster.isGMLeader = true
-					gm.cluster.currentGMLeaderNodeID = 0
-					gm.cluster.currentGMLeaderAddr = ""
 				}
+
+				ctxMastership, err := masterParticipation.WaitForMastership()
+				switch err {
+				case nil:
+					gm.isGMLeader = true
+					gm.currentGMLeaderNodeID = gm.config.ClusterCfg.GmNodeIp + ":" + gm.config.ClusterCfg.GmNodeId
+					gm.currentGMLeaderAddr = gm.config.ClusterCfg.GmNodeIp
+
+					gm.idGenerator = GetIdGeneratorSingle()
+					gm.zoneMasterRpcClient = GetZoneMasterRpcClientSingle(gm.config)
+					gm.processorManager = GetPMSingle(gm.cluster)
+					gm.processorManager.Start()
+					gm.workerManager = NewWorkerManager(gm.cluster)
+					gm.workerManager.Start()
+					select {
+					case <-ctxMastership.Done():
+						log.Info("Last time I'm the gm leader, but ctxMastership.Done invoked.")
+						continue
+					}
+				case topo.ErrInterrupted:
+					return
+				default:
+					log.Error("Got error while waiting for master, will retry in 5s: %v", err)
+					time.Sleep(5 * time.Second)
+					continue
+				}
+			} else {
+				// this branch should not be executed normally, but network jitter.
+				log.Info("Last time I'm the gm leader, and this time I'm the gm leader too.")
+				time.Sleep(300 * time.Second)
 			}
+		}
+	}()
+
+	go func() {
+		for {
+			cmID, err := masterParticipation.GetCurrentMasterID(ctx)
+			if err != nil {
+				log.Error("fail to get current master ID. err:[%v]", err)
+				time.Sleep(5 * time.Second)
+				continue
+			}
+			if cmID != "" && cmID != gm.config.ClusterCfg.GmNodeIp+":"+gm.config.ClusterCfg.GmNodeId {
+				gm.currentGMLeaderNodeID = cmID
+				gm.currentGMLeaderAddr = strings.Split(cmID, ":")[0]
+			}
+			time.Sleep(60 * time.Second)
 		}
 	}()
 }
