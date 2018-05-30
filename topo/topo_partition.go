@@ -292,25 +292,90 @@ func (s *TopoServer) WatchZonesForPartition(ctx context.Context, partitionId met
     return &ZonesForPartitionWatchData{zones:curVal}, changes, wdCancel
 }
 
-func (s *TopoServer) WatchPartition(ctx context.Context, partitionId metapb.PartitionID) (*PartitionWatchData,
-        <-chan *PartitionWatchData, CancelFunc) {
+//func (s *TopoServer) WatchPartition(ctx context.Context, partitionId metapb.PartitionID) (*PartitionWatchData,
+//        <-chan *PartitionWatchData, CancelFunc) {
+//    if ctx == nil {
+//        return &PartitionWatchData{Err: ErrNoNode}, nil, nil
+//    }
+//
+//    nodePath := path.Join(partitionsPath, fmt.Sprint(partitionId), PartitionTopoFile)
+//    current, wdChannel, wdCancel := s.backend.Watch(ctx, GlobalZone, nodePath)
+//    if current.Err != nil {
+//        return &PartitionWatchData{Err:current.Err}, nil, nil
+//    }
+//
+//    curVal := &metapb.Partition{}
+//    if err := proto.Unmarshal(current.Contents, curVal); err != nil {
+//        log.Error("Fail to unmarshal meta data for partition[%d]. err[%v]", partitionId, err)
+//        wdCancel()
+//        for range wdChannel {
+//        }
+//        return &PartitionWatchData{Err:err}, nil, nil
+//    }
+//
+//    changes := make(chan *PartitionWatchData, 10)
+//
+//    go func() {
+//        defer close(changes)
+//
+//        for wd := range wdChannel {
+//            if wd != nil {
+//                changes <- &PartitionWatchData{Err: wd.Err}
+//                return
+//            }
+//
+//            value := &metapb.Partition{}
+//            if err := proto.Unmarshal(wd.Contents, value); err != nil {
+//                log.Error("Fail to unmarshal meta data for partition[%d]. err[%v]", partitionId, err)
+//                wdCancel()
+//                for range wdChannel {
+//                }
+//                changes <- &PartitionWatchData{Err: err}
+//                return
+//            }
+//
+//            changes <- &PartitionWatchData{PartitionTopo: &PartitionTopo{Partition: value, version:wd.Version}}
+//        }
+//    }()
+//
+//    return &PartitionWatchData{PartitionTopo: &PartitionTopo{Partition: curVal, version:current.Version}}, changes, wdCancel
+//}
+
+func (s *TopoServer) WatchPartitions(ctx context.Context) (error, []*PartitionTopo, <-chan *PartitionWatchData, CancelFunc) {
     if ctx == nil {
-        return &PartitionWatchData{Err: ErrNoNode}, nil, nil
+        return ErrNoNode, nil, nil, nil
     }
 
-    nodePath := path.Join(partitionsPath, fmt.Sprint(partitionId), ZonesPath)
-    current, wdChannel, wdCancel := s.backend.Watch(ctx, GlobalZone, nodePath)
-    if current.Err != nil {
-        return &PartitionWatchData{Err:current.Err}, nil, nil
+    dirPath := path.Join(partitionsPath) + "/"
+    partitionIds, dirVersion, err := s.backend.ListDir(ctx, GlobalZone, dirPath)
+    if err != nil && err != ErrNoNode {
+        return err, nil, nil, nil
     }
 
-    curVal := &metapb.Partition{}
-    if err := proto.Unmarshal(current.Contents, curVal); err != nil {
-        log.Error("Fail to unmarshal meta data for partition[%d]. err[%v]", partitionId, err)
-        wdCancel()
-        for range wdChannel {
+    var partitionTopos []*PartitionTopo
+    if err != ErrNoNode && len(partitionIds) != 0 {
+        partitionTopos = make([]*PartitionTopo, 0, len(partitionIds))
+        for _, partitionId := range partitionIds {
+            contents, version, err := s.backend.Get(ctx, GlobalZone, path.Join(partitionsPath, fmt.Sprint(partitionId),
+                PartitionTopoFile))
+            if err != nil {
+                return err, nil, nil, nil
+            }
+
+            partitionMeta := &metapb.Partition{}
+            if err := proto.Unmarshal(contents, partitionMeta); err != nil {
+                log.Error("Fail to unmarshal meta data for partition[%d]. err[%v]", partitionId, err)
+                return err, nil, nil, nil
+            }
+
+            partition := &PartitionTopo{version:version, Partition: partitionMeta}
+            partitionTopos = append(partitionTopos, partition)
         }
-        return &PartitionWatchData{Err:err}, nil, nil
+    }
+
+    wdChannel, cancel, err := s.backend.WatchDir(ctx, GlobalZone, dirPath, dirVersion)
+    if err != nil {
+        return err, nil, nil, nil
     }
 
     changes := make(chan *PartitionWatchData, 10)
@@ -326,8 +391,8 @@ func (s *TopoServer) WatchPartition(ctx context.Context, partitionId metapb.Part
 
             value := &metapb.Partition{}
             if err := proto.Unmarshal(wd.Contents, value); err != nil {
-                log.Error("Fail to unmarshal meta data for partition[%d]. err[%v]", partitionId, err)
-                wdCancel()
+                log.Error("Fail to unmarshal meta data for partition. err[%v]", err)
+                cancel()
                 for range wdChannel {
                 }
                 changes <- &PartitionWatchData{Err: err}
@@ -338,5 +403,5 @@ func (s *TopoServer) WatchPartition(ctx context.Context, partitionId metapb.Part
         }
     }()
 
-    return &PartitionWatchData{PartitionTopo: &PartitionTopo{Partition: curVal, version:current.Version}}, changes, wdCancel
+    return nil, partitionTopos, changes, cancel
 }
