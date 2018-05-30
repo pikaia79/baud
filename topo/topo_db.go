@@ -19,11 +19,6 @@ type DBWatchData struct {
     Err error
 }
 
-//func (s *TopoServer) GetAllDBs(ctx context.Context) ([]*DBTopo, error) {
-//    dbs, _, err := s.doGetAllDBs(ctx)
-//    return dbs, err
-//}
-
 func (s *TopoServer) GetAllDBs(ctx context.Context) ([]*DBTopo, error) {
     if ctx == nil {
         return nil, ErrNoNode
@@ -55,72 +50,6 @@ func (s *TopoServer) GetAllDBs(ctx context.Context) ([]*DBTopo, error) {
     }
 
     return dbs, nil
-}
-
-// []*DBWatchData : current data returned
-// error          : error returned when first watching
-func (s *TopoServer) WatchDBs(ctx context.Context) (error, []*DBTopo, <-chan *DBWatchData, CancelFunc) {
-    if ctx == nil {
-       return ErrNoNode, nil, nil, nil
-    }
-
-    dirPath := path.Join(dbsPath) + "/"
-    dbIds, dirVersion, err := s.backend.ListDir(ctx, GlobalZone, dirPath)
-    if err != nil && err != ErrNoNode {
-       return err, nil, nil, nil
-    }
-
-    var dbs []*DBTopo
-    if err != ErrNoNode && len(dbIds) != 0 {
-       dbs = make([]*DBTopo, 0, len(dbIds))
-       for _, dbId := range dbIds {
-           contents, version, err := s.backend.Get(ctx, GlobalZone, path.Join(dbsPath, fmt.Sprint(dbId), DBTopoFile))
-           if err != nil {
-               return err, nil, nil, nil
-           }
-
-           dbMeta := &metapb.DB{}
-           if err := proto.Unmarshal(contents, dbMeta); err != nil {
-               log.Error("Fail to unmarshal meta data for db[%d]. err[%v]", dbId, err)
-               return err, nil, nil, nil
-           }
-
-           db := &DBTopo{version: version, DB: dbMeta}
-           dbs = append(dbs, db)
-       }
-    }
-
-    wdChannel, cancel, err := s.backend.WatchDir(ctx, GlobalZone, dirPath, dirVersion)
-    if err != nil {
-       return err, nil, nil, nil
-    }
-
-    changes := make(chan *DBWatchData, 10)
-
-    go func() {
-       defer close(changes)
-
-       for wd := range wdChannel {
-           if wd.Err != nil {
-               changes <- &DBWatchData{Err: wd.Err}
-               return
-           }
-
-           value := &metapb.DB{}
-           if err := proto.Unmarshal(wd.Contents, value); err != nil {
-               log.Error("Fail to unmarshal meta data for db from watch. err[%v]", err)
-               cancel()
-               for range wdChannel {
-               }
-               changes <- &DBWatchData{Err: err}
-               return
-           }
-
-           changes <- &DBWatchData{DBTopo: &DBTopo{DB: value, version: wd.Version}}
-       }
-    }()
-
-    return nil, dbs, changes, cancel
 }
 
 func (s *TopoServer) GetDB(ctx context.Context, dbId metapb.DBID) (*DBTopo, error) {
@@ -238,3 +167,69 @@ func (s *TopoServer) DeleteDB(ctx context.Context, db *DBTopo) error {
 //
 //    return &DBWatchData{DBTopo: &DBTopo{DB: curValue, version:current.Version}}, changes, cancel
 //}
+
+// []*DBWatchData : current data returned
+// error          : error returned when first watching
+func (s *TopoServer) WatchDBs(ctx context.Context) (error, []*DBTopo, <-chan *DBWatchData, CancelFunc) {
+    if ctx == nil {
+        return ErrNoNode, nil, nil, nil
+    }
+
+    dirPath := path.Join(dbsPath) + "/"
+    dbIds, dirVersion, err := s.backend.ListDir(ctx, GlobalZone, dirPath)
+    if err != nil && err != ErrNoNode {
+        return err, nil, nil, nil
+    }
+
+    var dbs []*DBTopo
+    if err != ErrNoNode && len(dbIds) != 0 {
+        dbs = make([]*DBTopo, 0, len(dbIds))
+        for _, dbId := range dbIds {
+            contents, version, err := s.backend.Get(ctx, GlobalZone, path.Join(dbsPath, fmt.Sprint(dbId), DBTopoFile))
+            if err != nil {
+                return err, nil, nil, nil
+            }
+
+            dbMeta := &metapb.DB{}
+            if err := proto.Unmarshal(contents, dbMeta); err != nil {
+                log.Error("Fail to unmarshal meta data for db[%d]. err[%v]", dbId, err)
+                return err, nil, nil, nil
+            }
+
+            db := &DBTopo{version: version, DB: dbMeta}
+            dbs = append(dbs, db)
+        }
+    }
+
+    wdChannel, cancel, err := s.backend.WatchDir(ctx, GlobalZone, dirPath, dirVersion)
+    if err != nil {
+        return err, nil, nil, nil
+    }
+
+    changes := make(chan *DBWatchData, 10)
+
+    go func() {
+        defer close(changes)
+
+        for wd := range wdChannel {
+            if wd.Err != nil {
+                changes <- &DBWatchData{Err: wd.Err}
+                return
+            }
+
+            value := &metapb.DB{}
+            if err := proto.Unmarshal(wd.Contents, value); err != nil {
+                log.Error("Fail to unmarshal meta data for db from watch. err[%v]", err)
+                cancel()
+                for range wdChannel {
+                }
+                changes <- &DBWatchData{Err: err}
+                return
+            }
+
+            changes <- &DBWatchData{DBTopo: &DBTopo{DB: value, version: wd.Version}}
+        }
+    }()
+
+    return nil, dbs, changes, cancel
+}

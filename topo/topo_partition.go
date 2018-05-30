@@ -285,7 +285,7 @@ func (s *TopoServer) WatchZonesForPartition(ctx context.Context, partitionId met
                 return
             }
 
-            changes <- &ZonesForPartitionWatchData{zones: parseZonesData(current.Contents)}
+            changes <- &ZonesForPartitionWatchData{zones: parseZonesData(wd.Contents)}
         }
     }()
 
@@ -325,7 +325,7 @@ func (s *TopoServer) WatchPartition(ctx context.Context, partitionId metapb.Part
             }
 
             value := &metapb.Partition{}
-            if err := proto.Unmarshal(current.Contents, value); err != nil {
+            if err := proto.Unmarshal(wd.Contents, value); err != nil {
                 log.Error("Fail to unmarshal meta data for partition[%d]. err[%v]", partitionId, err)
                 wdCancel()
                 for range wdChannel {

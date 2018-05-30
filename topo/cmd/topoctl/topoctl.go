@@ -12,6 +12,7 @@ import (
 	"time"
     "runtime/debug"
 	"github.com/tiglabs/baudengine/proto/metapb"
+    "sync"
 )
 
 var (

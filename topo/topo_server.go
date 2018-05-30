@@ -88,20 +88,22 @@ type Impl interface {
     UpdateDB(ctx context.Context, db *DBTopo) error
     DeleteDB(ctx context.Context, db *DBTopo) error
     // WatchDB(ctx context.Context, dbId metapb.DBID) (*DBWatchData, <-chan *DBWatchData, CancelFunc)
-    WatchDBs(ctx context.Context) (error, []*DBWatchData, <-chan *DBWatchData, CancelFunc)
+    WatchDBs(ctx context.Context) (error, []*DBTopo, <-chan *DBWatchData, CancelFunc)
 
     GetAllSpaces(ctx context.Context) ([]*SpaceTopo, error)
     GetSpace(ctx context.Context, dbId metapb.DBID, spaceId metapb.SpaceID) (*SpaceTopo, error)
     AddSpace(ctx context.Context, space *metapb.Space, partitions []*metapb.Partition) (*SpaceTopo, []*PartitionTopo, error)
     UpdateSpace(ctx context.Context, space *SpaceTopo) error
     DeleteSpace(ctx context.Context, space *SpaceTopo) error
-    WatchSpace(ctx context.Context, dbId metapb.DBID, spaceId metapb.SpaceID) (*SpaceWatchData, <-chan *SpaceWatchData, CancelFunc)
+    // WatchSpace(ctx context.Context, dbId metapb.DBID, spaceId metapb.SpaceID) (*SpaceWatchData, <-chan *SpaceWatchData, CancelFunc)
+    WatchSpaces(ctx context.Context) (error, []*SpaceTopo, <-chan *SpaceWatchData, CancelFunc)
 
     GetAllPartitions(ctx context.Context) ([]*PartitionTopo, error)
     GetPartition(ctx context.Context, partitionId metapb.PartitionID) (*PartitionTopo, error)
     UpdatePartition(ctx context.Context, partition *PartitionTopo) error
     DeletePartition(ctx context.Context, partition *PartitionTopo) error
-    WatchPartition(ctx context.Context, partitionId metapb.PartitionID) (*PartitionWatchData, <-chan *PartitionWatchData, CancelFunc)
+    // WatchPartition(ctx context.Context, partitionId metapb.PartitionID) (*PartitionWatchData, <-chan *PartitionWatchData, CancelFunc)
+    WatchPartitions(ctx context.Context) (error, []*PartitionTopo, <-chan *PartitionWatchData, CancelFunc)
 
     GetAllPsByZone(ctx context.Context, zoneName string) ([]*PsTopo, error)
     GetPsByZone(ctx context.Context, zoneName string, psId metapb.NodeID) (*PsTopo, error)
