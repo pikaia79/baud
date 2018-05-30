@@ -110,6 +110,7 @@ type Impl interface {
 
     SetZonesForPartition(ctx context.Context, partitionId metapb.PartitionID, zones []string) error
     GetZonesForPartition(ctx context.Context, partitionId metapb.PartitionID) ([]string, error)
+    WatchZonesForPartition(ctx context.Context, partitionId metapb.PartitionID) (*ZoneForPartitionWatchData, <-chan *ZoneForPartitionWatchData, CancelFunc)
 
     SetTask(ctx context.Context, zoneName string, task *metapb.Task, timeout time.Duration) error
     GetTask(ctx context.Context, zoneName string, taskType string, taskId string) (*metapb.Task, error)
