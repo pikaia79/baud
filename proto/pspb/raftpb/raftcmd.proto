@@ -2,7 +2,6 @@ syntax = "proto3";
 
 import "github.com/gogo/protobuf/gogoproto/gogo.proto";
 
-import "github.com/tiglabs/baudengine/proto/metapb/meta.proto";
 import "github.com/tiglabs/baudengine/proto/pspb/api.proto";
 
 option go_package = "raftpb";
@@ -27,6 +26,6 @@ enum CmdType {
 }
 
 message RaftCommand {
-    CmdType  type                           = 1;
-    repeated BulkItemRequest write_commands = 2 [(gogoproto.nullable) = false];
+    CmdType  type                        = 1;
+    repeated RequestUnion write_commands = 2 [(gogoproto.nullable) = false];
 }
