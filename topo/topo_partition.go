@@ -16,6 +16,11 @@ type PartitionTopo struct {
     *metapb.Partition
 }
 
+type PartitionWatchData struct {
+    *PartitionTopo
+    Err error
+}
+
 type PartitionInfoTopo struct {
     version Version
     *masterpb.PartitionInfo
@@ -244,6 +249,56 @@ func (s *TopoServer) GetZonesForPartition(ctx context.Context, partitionId metap
 
     return strings.Split(string(contents), "|"), nil
 }
+
+func (s *TopoServer) WatchPartition(ctx context.Context, partitionId metapb.PartitionID) (*PartitionWatchData,
+        <-chan *PartitionWatchData, CancelFunc) {
+    if ctx == nil {
+        return &PartitionWatchData{Err: ErrNoNode}, nil, nil
+    }
+
+    nodePath := path.Join(partitionsPath, fmt.Sprint(partitionId), ZonesPath)
+    current, wdChannel, wdCancel := s.backend.Watch(ctx, GlobalZone, nodePath)
+    if current.Err != nil {
+        return &PartitionWatchData{Err:current.Err}, nil, nil
+    }
+
+    curVal := &metapb.Partition{}
+    if err := proto.Unmarshal(current.Contents, curVal); err != nil {
+        log.Error("Fail to unmarshal meta data for partition[%d]. err[%v]", partitionId, err)
+        wdCancel()
+        for range wdChannel {
+        }
+        return &PartitionWatchData{Err:err}, nil, nil
+    }
+
+    changes := make(chan *PartitionWatchData, 10)
+
+    go func() {
+        defer close(changes)
+
+        for wd := range wdChannel {
+            if wd != nil {
+                changes <- &PartitionWatchData{Err: wd.Err}
+                return
+            }
+
+            value := &metapb.Partition{}
+            if err := proto.Unmarshal(current.Contents, value); err != nil {
+                log.Error("Fail to unmarshal meta data for partition[%d]. err[%v]", partitionId, err)
+                wdCancel()
+                for range wdChannel {
+                }
+                changes <- &PartitionWatchData{Err: err}
+                return
+            }
+
+            changes <- &PartitionWatchData{PartitionTopo: &PartitionTopo{Partition: value, version:wd.Version}}
+        }
+    }()
+
+    return &PartitionWatchData{PartitionTopo: &PartitionTopo{Partition: curVal, version:current.Version}}, changes, wdCancel
+}
+
 
 
 
