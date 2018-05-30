@@ -19,7 +19,7 @@ func (s *TopoServer) GetAllPsByZone(ctx context.Context, zoneName string) ([]*Ps
         return nil, ErrNoNode
     }
 
-    psIds, err := s.backend.ListDir(ctx, zoneName, partitionServersPath)
+    psIds, _, err := s.backend.ListDir(ctx, zoneName, partitionServersPath)
     if err != nil {
         return nil, err
     }

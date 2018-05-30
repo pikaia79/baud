@@ -36,7 +36,7 @@ func (s *TopoServer) GetAllPartitions(ctx context.Context) ([]*PartitionTopo, er
         return nil, ErrNoNode
     }
 
-    partitionIds, err := s.backend.ListDir(ctx, GlobalZone, partitionsPath)
+    partitionIds, _, err := s.backend.ListDir(ctx, GlobalZone, partitionsPath)
     if err != nil {
         return nil, err
     }
@@ -169,7 +169,7 @@ func (s *TopoServer) GetPartitionsOnPsByZone(ctx context.Context, zoneName strin
     }
 
     parentPath := path.Join(partitionServersPath, fmt.Sprint(psId), partitionsPath)
-    dirs, err := s.backend.ListDir(ctx, zoneName, parentPath)
+    dirs, _, err := s.backend.ListDir(ctx, zoneName, parentPath)
     if err != nil {
         return nil, err
     }

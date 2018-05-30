@@ -24,7 +24,7 @@ func (s *TopoServer) GetAllSpaces(ctx context.Context) ([]*SpaceTopo, error) {
         return nil, ErrNoNode
     }
 
-    dbAndSpaceIds, err := s.backend.ListDir(ctx, GlobalZone, path.Join(spacesPath))
+    dbAndSpaceIds, _, err := s.backend.ListDir(ctx, GlobalZone, path.Join(spacesPath))
     if err != nil {
         return nil, err
     }

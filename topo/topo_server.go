@@ -87,7 +87,8 @@ type Impl interface {
     AddDB(ctx context.Context, db *metapb.DB) (*DBTopo, error)
     UpdateDB(ctx context.Context, db *DBTopo) error
     DeleteDB(ctx context.Context, db *DBTopo) error
-    WatchDB(ctx context.Context, dbId metapb.DBID) (*DBWatchData, <-chan *DBWatchData, CancelFunc)
+    // WatchDB(ctx context.Context, dbId metapb.DBID) (*DBWatchData, <-chan *DBWatchData, CancelFunc)
+    WatchDBs(ctx context.Context) (error, []*DBWatchData, <-chan *DBWatchData, CancelFunc)
 
     GetAllSpaces(ctx context.Context) ([]*SpaceTopo, error)
     GetSpace(ctx context.Context, dbId metapb.DBID, spaceId metapb.SpaceID) (*SpaceTopo, error)

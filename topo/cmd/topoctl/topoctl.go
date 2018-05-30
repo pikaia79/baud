@@ -11,7 +11,8 @@ import (
 	"context"
 	"time"
     "runtime/debug"
-    "sync"
+	"sync"
+	"github.com/tiglabs/baudengine/proto/metapb"
 )
 
 var (
@@ -62,13 +63,20 @@ func main() {
     //   return
     //}
     //
-    //dbMeta := &metapb.DB{ID:1, Name:"mydb1"}
-    //dbTopo1, err := server.AddDB(ctx, dbMeta)
-    //if err != nil {
-    //   log.Error("AddDB err[%v]", err)
-    //   return
-    //}
-    //log.Debug("add new db[%v]", dbTopo1)
+    dbMeta1 := &metapb.DB{ID:1, Name:"mydb1"}
+    dbTopo1, err := server.AddDB(ctx, dbMeta1)
+    if err != nil {
+      log.Error("AddDB err[%v]", err)
+      return
+    }
+    log.Debug("add new db[%v]", dbTopo1)
+	dbMeta2 := &metapb.DB{ID:2, Name:"mydb2"}
+	dbTopo2, err := server.AddDB(ctx, dbMeta2)
+	if err != nil {
+		log.Error("AddDB err[%v]", err)
+		return
+	}
+	log.Debug("add new db[%v]", dbTopo2)
     //dbTopo, err := server.GetDB(ctx, 1)
     //if err != nil {
     //    log.Error("GetDB err[%v]", err)
@@ -78,41 +86,59 @@ func main() {
     //
     //dbTopos, err := server.GetAllDBs(ctx)
     //if err != nil {
-    //    log.Error("GetAllDBs err[%v]", err)
-    //    return
+    //   log.Error("GetAllDBs err[%v]", err)
+    //   return
     //}
     //log.Debug("all dbTopos=%v", dbTopos)
-    //
-    dbCur, dbChannel, _ := server.WatchDB(ctx, 1)
-    if dbCur == nil {
-       log.Error("WatchDB err[%v]", dbCur.Err)
-       return
-    }
-    log.Debug("watched current db[%v]", dbCur)
-    var wg sync.WaitGroup
-    wg.Add(1)
-    go func() {
-       defer wg.Done()
-       for db := range dbChannel {
-           if db.Err != nil {
-               log.Error("watch err[%v]", db.Err)
-               return
-           }
-           log.Debug("watched db[%v]", db.DB)
-       }
-    }()
+    //dbCur, dbChannel, _ := server.WatchDB(ctx, 1)
+    //if dbCur == nil {
+    //   log.Error("WatchDB err[%v]", dbCur.Err)
+    //   return
+    //}
+    //log.Debug("watched current db[%v]", dbCur)
+    //var wg sync.WaitGroup
+    //wg.Add(1)
+    //go func() {
+    //   defer wg.Done()
+    //   for db := range dbChannel {
+    //       if db.Err != nil {
+    //           log.Error("watch err[%v]", db.Err)
+    //           return
+    //       }
+    //       log.Debug("watched db[%v]", db.DB)
+    //   }
+    //}()
+
+	err, currentDbTopos, dbChannel, _ := server.WatchDBs(ctx)
+	if err != nil {
+		log.Debug("WatchDBs err[%v]", err)
+		return
+	}
+	log.Debug("current dbs[%v] before WatchDBs", currentDbTopos)
+	var wg sync.WaitGroup
+	wg.Add(1)
+	go func() {
+	  defer wg.Done()
+	  for db := range dbChannel {
+	      if db.Err != nil {
+	          log.Error("watch err[%v]", db.Err)
+	          return
+	      }
+	      log.Debug("watched db[%v]", db.DB)
+	  }
+	}()
+
     //time.Sleep(1 * time.Second)
     //dbTopo.Name = "mydb222"
     //if err := server.UpdateDB(ctx, dbTopo); err != nil {
     //    log.Error("UpdateDB err[%v]", err)
     //    return
     //}
-    //wg.Wait()
+    wg.Wait()
     //if err := server.DeleteDB(ctx, dbTopo1); err != nil {
     //   log.Error("DeleteDB err[%v]", err)
     //   return
     //}
-
    // spaceMeta1 := &metapb.Space{ID:11, DB:1, Name:"myspace1"}
    // partitionMetas := make([]*metapb.Partition, 0, 2)
    // partitionMetas = append(partitionMetas, &metapb.Partition{ID: 101, DB:1, Space:11, StartSlot:0, EndSlot:200})
