@@ -131,6 +131,9 @@ func (w *SpaceStateTransitionWorker) run() {
 	//2) zone/<zone name>/partitions/<partition id>/leader/<replica id>
 	//3) <zone name>/servers/<ps id>/partitions/<partition id>/replicas/<replica id>/replica_info       data:  metapb.Replica
 
+	//replicaZMAddr
+	//replicaLeaderZMAddr
+
 	dbs := w.cluster.DbCache.GetAllDBs()
 	for _, db := range dbs {
 		spaces := db.SpaceCache.GetAllSpaces()
@@ -158,7 +161,7 @@ func (w *SpaceStateTransitionWorker) run() {
 								log.Info("partition has task now, db:[%s], space:[%s], partition:[%d]", db.Name, space.Name, partition.ID)
 								continue
 							}
-							if err := GetPMSingle(w.cluster).PushEvent(NewPartitionCreateEvent(partition)); err != nil {
+							if err := GetPMSingle(w.cluster).PushEvent(NewPartitionCreateEvent("", "", partition)); err != nil {
 								log.Error("fail to push event for creating partition[%v].", partition)
 							}
 						}
@@ -184,12 +187,13 @@ func (w *SpaceStateTransitionWorker) run() {
 								continue
 							}
 							if partition.countReplicas() < FIXED_REPLICA_NUM {
-								if err := GetPMSingle(w.cluster).PushEvent(NewPartitionCreateEvent(partition)); err != nil {
+								// TODO 1. get zone master rpc, 2. sure the replica which will create to which zone
+								if err := GetPMSingle(w.cluster).PushEvent(NewPartitionCreateEvent("", "", partition)); err != nil {
 									log.Error("fail to push event for creating partition[%v].", partition)
 								}
 							} else {
 								// TODO 1. get zone master rpc, 2. sure the replica which will delete
-								if err := GetPMSingle(w.cluster).PushEvent(NewPartitionDeleteEvent("", partition.ID, nil)); err != nil {
+								if err := GetPMSingle(w.cluster).PushEvent(NewPartitionDeleteEvent("", "", partition.ID, nil)); err != nil {
 									log.Error("fail to push event for creating partition[%v].", partition)
 								}
 							}
@@ -214,7 +218,7 @@ func (w *SpaceStateTransitionWorker) run() {
 								continue
 							}
 							// TODO 1. get zone master rpc, 2. sure the replica which will delete
-							if err := GetPMSingle(w.cluster).PushEvent(NewPartitionDeleteEvent("", partition.ID, nil)); err != nil {
+							if err := GetPMSingle(w.cluster).PushEvent(NewPartitionDeleteEvent("", "", partition.ID, nil)); err != nil {
 								log.Error("fail to push event for creating partition[%v].", partition)
 							}
 						}
