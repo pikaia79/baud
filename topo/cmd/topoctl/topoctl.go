@@ -11,7 +11,6 @@ import (
 	"context"
 	"time"
     "runtime/debug"
-	"sync"
 	"github.com/tiglabs/baudengine/proto/metapb"
 )
 
@@ -63,20 +62,20 @@ func main() {
     //   return
     //}
     //
-    dbMeta1 := &metapb.DB{ID:1, Name:"mydb1"}
-    dbTopo1, err := server.AddDB(ctx, dbMeta1)
+    //dbMeta1 := &metapb.DB{ID:1, Name:"mydb1"}
+    //dbTopo1, err := server.AddDB(ctx, dbMeta1)
+    //if err != nil {
+    //  log.Error("AddDB err[%v]", err)
+    //  return
+    //}
+    //log.Debug("add new db[%v]", dbTopo1)
+    dbMeta2 := &metapb.DB{ID:2, Name:"mydb2"}
+    dbTopo2, err := server.AddDB(ctx, dbMeta2)
     if err != nil {
-      log.Error("AddDB err[%v]", err)
-      return
-    }
-    log.Debug("add new db[%v]", dbTopo1)
-	dbMeta2 := &metapb.DB{ID:2, Name:"mydb2"}
-	dbTopo2, err := server.AddDB(ctx, dbMeta2)
-	if err != nil {
 		log.Error("AddDB err[%v]", err)
 		return
-	}
-	log.Debug("add new db[%v]", dbTopo2)
+    }
+    log.Debug("add new db[%v]", dbTopo2)
     //dbTopo, err := server.GetDB(ctx, 1)
     //if err != nil {
     //    log.Error("GetDB err[%v]", err)
@@ -134,7 +133,7 @@ func main() {
     //    log.Error("UpdateDB err[%v]", err)
     //    return
     //}
-    wg.Wait()
+    //wg.Wait()
     //if err := server.DeleteDB(ctx, dbTopo1); err != nil {
     //   log.Error("DeleteDB err[%v]", err)
     //   return

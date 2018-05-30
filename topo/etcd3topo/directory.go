@@ -57,17 +57,22 @@ func (s *Server) ListDir(ctx context.Context, cell, dirPath string) ([]string, t
 }
 
 func (s *Server) WatchDir(ctx context.Context, cell, dirPath string, version topo.Version) (<-chan *topo.WatchData, topo.CancelFunc, error) {
-	c, err := s.clientForCell(ctx, cell)
+    c, err := s.clientForCell(ctx, cell)
 	if err != nil {
 		return nil, nil, fmt.Errorf("Watch cannot get cell: %v", err)
 	}
 
 	nodePath := path.Join(c.root, dirPath)
 	watchCtx, watchCancel := context.WithCancel(context.Background())
-	// Create the Watcher.  We start watching from the response we
-	// got, not from the file original version, as the server may
-	// not have that much history.
-	watcher := c.cli.Watch(watchCtx, nodePath + "/", clientv3.WithPrefix(), clientv3.WithRev(int64(version.(EtcdVersion))))
+
+	options := make([]clientv3.OpOption, 0)
+	options = append(options, clientv3.WithPrefix())
+	if version != nil {
+		options = append(options, clientv3.WithRev(int64(version.(EtcdVersion))))
+	} else {
+		options = append(options, clientv3.WithRev(0))
+	}
+	watcher := c.cli.Watch(watchCtx, nodePath + "/", options...)
 	if watcher == nil {
 		return nil, nil, fmt.Errorf("Watch failed")
 	}
