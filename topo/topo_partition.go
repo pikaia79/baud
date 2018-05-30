@@ -16,9 +16,19 @@ type PartitionTopo struct {
     *metapb.Partition
 }
 
+type PartitionWatchData struct {
+    *PartitionTopo
+    Err error
+}
+
 type PartitionInfoTopo struct {
     version Version
     *masterpb.PartitionInfo
+}
+
+type ZonesForPartitionWatchData struct {
+    zones []string
+    Err   error
 }
 
 func (s *TopoServer) GetAllPartitions(ctx context.Context) ([]*PartitionTopo, error) {
@@ -222,8 +232,7 @@ func (s *TopoServer) SetZonesForPartition(ctx context.Context, partitionId metap
     }
 
     nodePath := path.Join(partitionsPath, fmt.Sprint(partitionId), ZonesPath)
-    contents := []byte(strings.Join(zones, "|"))
-    _, err := s.backend.Update(ctx, GlobalZone, nodePath, contents, nil)
+    _, err := s.backend.Update(ctx, GlobalZone, nodePath, buildZonesData(zones), nil)
     if err != nil {
         return err
     }
@@ -242,9 +251,92 @@ func (s *TopoServer) GetZonesForPartition(ctx context.Context, partitionId metap
         return nil, err
     }
 
-    return strings.Split(string(contents), "|"), nil
+    return parseZonesData(contents), nil
 }
 
+func buildZonesData(zones []string) []byte {
+    return []byte(strings.Join(zones, "|"))
+}
 
+func parseZonesData(data []byte) []string {
+    return strings.Split(string(data), "|")
+}
 
+func (s *TopoServer) WatchZonesForPartition(ctx context.Context, partitionId metapb.PartitionID) (*ZonesForPartitionWatchData, <-chan *ZonesForPartitionWatchData, CancelFunc) {
+    if ctx == nil {
+        return &ZonesForPartitionWatchData{Err: ErrNoNode}, nil, nil
+    }
 
+    nodePath := path.Join(partitionsPath, fmt.Sprint(partitionId), ZonesPath)
+    current, wdChannel, wdCancel := s.backend.Watch(ctx, GlobalZone, nodePath)
+    if current.Err != nil {
+        return &ZonesForPartitionWatchData{Err:current.Err}, nil, nil
+    }
+    curVal := parseZonesData(current.Contents)
+
+    changes := make(chan *ZonesForPartitionWatchData, 10)
+
+    go func() {
+        defer close(changes)
+
+        for wd := range wdChannel {
+            if wd != nil {
+                changes <- &ZonesForPartitionWatchData{Err: wd.Err}
+                return
+            }
+
+            changes <- &ZonesForPartitionWatchData{zones: parseZonesData(current.Contents)}
+        }
+    }()
+
+    return &ZonesForPartitionWatchData{zones:curVal}, changes, wdCancel
+}
+
+func (s *TopoServer) WatchPartition(ctx context.Context, partitionId metapb.PartitionID) (*PartitionWatchData,
+        <-chan *PartitionWatchData, CancelFunc) {
+    if ctx == nil {
+        return &PartitionWatchData{Err: ErrNoNode}, nil, nil
+    }
+
+    nodePath := path.Join(partitionsPath, fmt.Sprint(partitionId), ZonesPath)
+    current, wdChannel, wdCancel := s.backend.Watch(ctx, GlobalZone, nodePath)
+    if current.Err != nil {
+        return &PartitionWatchData{Err:current.Err}, nil, nil
+    }
+
+    curVal := &metapb.Partition{}
+    if err := proto.Unmarshal(current.Contents, curVal); err != nil {
+        log.Error("Fail to unmarshal meta data for partition[%d]. err[%v]", partitionId, err)
+        wdCancel()
+        for range wdChannel {
+        }
+        return &PartitionWatchData{Err:err}, nil, nil
+    }
+
+    changes := make(chan *PartitionWatchData, 10)
+
+    go func() {
+        defer close(changes)
+
+        for wd := range wdChannel {
+            if wd != nil {
+                changes <- &PartitionWatchData{Err: wd.Err}
+                return
+            }
+
+            value := &metapb.Partition{}
+            if err := proto.Unmarshal(current.Contents, value); err != nil {
+                log.Error("Fail to unmarshal meta data for partition[%d]. err[%v]", partitionId, err)
+                wdCancel()
+                for range wdChannel {
+                }
+                changes <- &PartitionWatchData{Err: err}
+                return
+            }
+
+            changes <- &PartitionWatchData{PartitionTopo: &PartitionTopo{Partition: value, version:wd.Version}}
+        }
+    }()
+
+    return &PartitionWatchData{PartitionTopo: &PartitionTopo{Partition: curVal, version:current.Version}}, changes, wdCancel
+}

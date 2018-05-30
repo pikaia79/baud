@@ -11,7 +11,7 @@ import (
 	"context"
 	"time"
     "runtime/debug"
-	"sync"
+    "sync"
 )
 
 var (
@@ -58,16 +58,23 @@ func main() {
     //log.Debug("zoneTopos=%v", zoneTopos)
     //
     //if err := server.DeleteZone(ctx, zone1); err != nil {
-	 //   log.Error("DeleteZone err[%v]", err)
-	 //   return
+    //   log.Error("DeleteZone err[%v]", err)
+    //   return
     //}
     //
     //dbMeta := &metapb.DB{ID:1, Name:"mydb1"}
     //dbTopo1, err := server.AddDB(ctx, dbMeta)
     //if err != nil {
-    //    log.Error("AddDB err[%v]", err)
+    //   log.Error("AddDB err[%v]", err)
+    //   return
+    //}
+    //log.Debug("add new db[%v]", dbTopo1)
+    //dbTopo, err := server.GetDB(ctx, 1)
+    //if err != nil {
+    //    log.Error("GetDB err[%v]", err)
     //    return
     //}
+    //log.Debug("get db[%v]", dbTopo)
     //
     //dbTopos, err := server.GetAllDBs(ctx)
     //if err != nil {
@@ -76,9 +83,34 @@ func main() {
     //}
     //log.Debug("all dbTopos=%v", dbTopos)
     //
-    //if err := server.DeleteDB(ctx, dbTopo1); err != nil {
-    //    log.Error("DeleteDB err[%v]", err)
+    dbCur, dbChannel, _ := server.WatchDB(ctx, 1)
+    if dbCur == nil {
+       log.Error("WatchDB err[%v]", dbCur.Err)
+       return
+    }
+    log.Debug("watched current db[%v]", dbCur)
+    var wg sync.WaitGroup
+    wg.Add(1)
+    go func() {
+       defer wg.Done()
+       for db := range dbChannel {
+           if db.Err != nil {
+               log.Error("watch err[%v]", db.Err)
+               return
+           }
+           log.Debug("watched db[%v]", db.DB)
+       }
+    }()
+    //time.Sleep(1 * time.Second)
+    //dbTopo.Name = "mydb222"
+    //if err := server.UpdateDB(ctx, dbTopo); err != nil {
+    //    log.Error("UpdateDB err[%v]", err)
     //    return
+    //}
+    //wg.Wait()
+    //if err := server.DeleteDB(ctx, dbTopo1); err != nil {
+    //   log.Error("DeleteDB err[%v]", err)
+    //   return
     //}
 
    // spaceMeta1 := &metapb.Space{ID:11, DB:1, Name:"myspace1"}
@@ -208,35 +240,35 @@ func main() {
     //log.Debug("mp2 master id =%s", masterId2)
     //wg.Wait()
 
-    mp3, err := server.NewMasterParticipation("zone1", "193")
-    if err != nil {
-       log.Error("new master participation. err[%v]", err)
-       return
-    }
-    var wg sync.WaitGroup
-    wg.Add(1)
-    go func() {
-       defer wg.Done()
-       defer func() {
-           if e := recover(); e != nil {
-               log.Error("recover [%v]\n[%s]", e, debug.Stack())
-           }
-
-       }()
-       _, err := mp3.WaitForMastership()
-       if err != nil {
-           log.Error("%v", err)
-       }
-       log.Info("mp3 get master")
-
-    }()
-    time.Sleep(time.Second)
-    masterId3, err := mp3.GetCurrentMasterID(ctx)
-    if err != nil {
-      return
-    }
-    log.Debug("mp3 master id =%s", masterId3)
-    wg.Wait()
+    //mp3, err := server.NewMasterParticipation("zone1", "193")
+    //if err != nil {
+    //   log.Error("new master participation. err[%v]", err)
+    //   return
+    //}
+    //var wg sync.WaitGroup
+    //wg.Add(1)
+    //go func() {
+    //   defer wg.Done()
+    //   defer func() {
+    //       if e := recover(); e != nil {
+    //           log.Error("recover [%v]\n[%s]", e, debug.Stack())
+    //       }
+    //
+    //   }()
+    //   _, err := mp3.WaitForMastership()
+    //   if err != nil {
+    //       log.Error("%v", err)
+    //   }
+    //   log.Info("mp3 get master")
+    //
+    //}()
+    //time.Sleep(time.Second)
+    //masterId3, err := mp3.GetCurrentMasterID(ctx)
+    //if err != nil {
+    //  return
+    //}
+    //log.Debug("mp3 master id =%s", masterId3)
+    //wg.Wait()
 
     //var wg sync.WaitGroup
     //for i := 0; i < 100; i++ {
