@@ -98,6 +98,7 @@ message Replica {
     uint64        id            = 1 [(gogoproto.customname) = "ID", (gogoproto.casttype) = "ReplicaID"];
     uint32        nodeID        = 2 [(gogoproto.customname) = "NodeID", (gogoproto.casttype) = "NodeID"];
     ReplicaAddrs  replica_addrs = 3 [(gogoproto.nullable) = false, (gogoproto.embed) = true];
+    string        zone          = 4;
 }
 
 message Node {
@@ -145,6 +146,13 @@ message PartitionNotFound {
 message MsgTooLarge {
     uint32 partition_id  = 1 [(gogoproto.customname) = "PartitionID", (gogoproto.casttype) = "PartitionID"];
     uint64 msg_size      = 2;
+}
+
+message TimeoutError {
+}
+
+message ServerError {
+    string cause = 1;
 }
 
 message Error {

@@ -1,6 +1,6 @@
 # The Architecture of BaudEngine
 
-BaudEngine is a unified multi-model distributed database.
+BaudEngine is a distributed document database.
 
 ## Features
 
@@ -12,9 +12,11 @@ BaudEngine is a unified multi-model distributed database.
 
 * cloud-native
 
+* multi-model
+
 ## Data Model
 
-Field, Object, Space, Edge, DB
+Field, Object, Space, DB
 
 * Object (Document)
 
@@ -216,22 +218,21 @@ there are two PS roles, i.e. two modes of running instances:
 
 * the reader role. just reading from BaudStorage to serve partition read-only requests
 
-### partition data store
+### partition storage engine
 
-Each partition has a single key-value storage engine for both objects and indexes, which is persisted onto the Baudstorage datacenter filesystem
+Each partition has a storage engine for storing and indexing its objects. 
 
-* the primary index
+And the underlying storage engine should be log-structured so as to be persisted to the Baudstorage distributed filesystem. 
 
-(#PI, primaryKey, fieldName, fieldValue) -> timestamp
+There are two pluggable storage engines: blevesearch, and kernel. 
 
-* secondary indexes
+### batch operations
 
-(#SI, fieldName, fieldValue or term, primaryKey) -> timestamp
+multiple writes grouped into one batch within a partition
 
-### analyzer
+### change streaming
 
-term synonyms are stored as a file of Baudstorage and loaded by PS for document analysis.
-
+each individual change record contains the change type (insert/update/delete) and the pre and post-image of the fields modified. 
 
 ## Router
 
@@ -258,6 +259,12 @@ space = tables sharing the same partitioning key
 row vs object
 
 object fields = row fields + the field of 'tableid'
+
+
+compound indexes
+
+multiple columns form a new field
+
 
 ### schema management
 

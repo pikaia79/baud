@@ -6,7 +6,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/tiglabs/baudengine/kernel"
+	"github.com/tiglabs/baudengine/engine"
 	"github.com/tiglabs/baudengine/kernel/index"
 	"github.com/tiglabs/baudengine/kernel/store/kvstore/badgerdb"
 	"github.com/tiglabs/baudengine/proto/masterpb"
@@ -18,7 +18,6 @@ import (
 )
 
 var (
-	errorPartitonClosed  = errors.New("partition has closed")
 	errorPartitonCommand = errors.New("unsupported command")
 )
 
@@ -27,11 +26,12 @@ type partition struct {
 	ctxCancel context.CancelFunc
 
 	server    *Server
-	store     kernel.Engine
+	store     engine.Engine
 	closeOnce sync.Once
 
 	rwMutex    sync.RWMutex
 	leader     uint64
+	leaderAddr string
 	meta       metapb.Partition
 	statistics masterpb.PartitionStats
 }
@@ -54,7 +54,7 @@ func (p *partition) start() {
 		p.rwMutex.Lock()
 		p.meta.Status = metapb.PA_INVALID
 		p.rwMutex.Unlock()
-		log.Error("start partition[%d] create data and raft path error: %v", p.meta.ID, err)
+		log.Error("start partition[%d] create data and raft path error: %s", p.meta.ID, err)
 		return
 	}
 
@@ -68,7 +68,7 @@ func (p *partition) start() {
 		p.rwMutex.Lock()
 		p.meta.Status = metapb.PA_INVALID
 		p.rwMutex.Unlock()
-		log.Error("start partition[%d] open store engine error: %v", p.meta.ID, err)
+		log.Error("start partition[%d] open store engine error: %s", p.meta.ID, err)
 		return
 	}
 	p.store = index.NewIndexDriver(kvStore)
@@ -78,7 +78,7 @@ func (p *partition) start() {
 		p.meta.Status = metapb.PA_INVALID
 		p.rwMutex.Unlock()
 		p.store.Close()
-		log.Error("start partition[%d] get last apply index error: %v", p.meta.ID, err)
+		log.Error("start partition[%d] get last apply index error: %s", p.meta.ID, err)
 		return
 	}
 
@@ -89,7 +89,7 @@ func (p *partition) start() {
 		p.meta.Status = metapb.PA_INVALID
 		p.rwMutex.Unlock()
 		p.store.Close()
-		log.Error("start partition[%d] open raft store engine error: %v", p.meta.ID, err)
+		log.Error("start partition[%d] open raft store engine error: %s", p.meta.ID, err)
 		return
 	}
 
@@ -109,7 +109,7 @@ func (p *partition) start() {
 		p.meta.Status = metapb.PA_INVALID
 		p.rwMutex.Unlock()
 		p.store.Close()
-		log.Error("start partition[%d] create raft error: %v", p.meta.ID, err)
+		log.Error("start partition[%d] create raft error: %s", p.meta.ID, err)
 		return
 	}
 
@@ -140,7 +140,7 @@ func (p *partition) getPartitionInfo() *masterpb.PartitionInfo {
 	p.rwMutex.RLock()
 	info := new(masterpb.PartitionInfo)
 	info.ID = p.meta.ID
-	info.IsLeader = (p.leader == uint64(p.server.nodeID))
+	info.IsLeader = (p.leader == uint64(p.server.NodeID))
 	info.Status = p.meta.Status
 	info.Epoch = p.meta.Epoch
 	info.Statistics = p.statistics
@@ -151,7 +151,7 @@ func (p *partition) getPartitionInfo() *masterpb.PartitionInfo {
 		raftStatus := p.server.raftServer.Status(p.meta.ID)
 		info.RaftStatus = new(masterpb.RaftStatus)
 		for _, r := range replicas {
-			if r.NodeID == p.server.nodeID {
+			if r.NodeID == p.server.NodeID {
 				info.RaftStatus.Replica = r
 				info.RaftStatus.Term = raftStatus.Term
 				info.RaftStatus.Index = raftStatus.Index
@@ -181,48 +181,24 @@ func (p *partition) getPartitionInfo() *masterpb.PartitionInfo {
 	return info
 }
 
-func (p *partition) checkWritable() (err *metapb.Error) {
+func (p *partition) checkReadable(readLeader bool) (err error) {
 	p.rwMutex.RLock()
 
 	if p.meta.Status == metapb.PA_INVALID || p.meta.Status == metapb.PA_NOTREAD {
-		err = &metapb.Error{PartitionNotFound: &metapb.PartitionNotFound{p.meta.ID}}
+		err = &metapb.PartitionNotFound{p.meta.ID}
 		goto ret
 	}
 	if p.leader == 0 {
-		err = &metapb.Error{NoLeader: &metapb.NoLeader{p.meta.ID}}
+		err = &metapb.NoLeader{p.meta.ID}
 		goto ret
 	}
-	if p.leader != uint64(p.server.nodeID) {
-		err = &metapb.Error{NotLeader: &metapb.NotLeader{
+	if readLeader && p.leader != uint64(p.server.NodeID) {
+		err = &metapb.NotLeader{
 			PartitionID: p.meta.ID,
 			Leader:      metapb.NodeID(p.leader),
+			LeaderAddr:  p.leaderAddr,
 			Epoch:       p.meta.Epoch,
-		}}
-		goto ret
-	}
-
-ret:
-	p.rwMutex.RUnlock()
-	return
-}
-
-func (p *partition) checkReadable(readLeader bool) (err *metapb.Error) {
-	p.rwMutex.RLock()
-
-	if p.meta.Status == metapb.PA_INVALID || p.meta.Status == metapb.PA_NOTREAD {
-		err = &metapb.Error{PartitionNotFound: &metapb.PartitionNotFound{p.meta.ID}}
-		goto ret
-	}
-	if p.leader == 0 {
-		err = &metapb.Error{NoLeader: &metapb.NoLeader{p.meta.ID}}
-		goto ret
-	}
-	if readLeader && p.leader != uint64(p.server.nodeID) {
-		err = &metapb.Error{NotLeader: &metapb.NotLeader{
-			PartitionID: p.meta.ID,
-			Leader:      metapb.NodeID(p.leader),
-			Epoch:       p.meta.Epoch,
-		}}
+		}
 		goto ret
 	}
 

@@ -26,6 +26,10 @@ service MasterRpc {
     rpc PSHeartbeat(PSHeartbeatRequest) returns (PSHeartbeatResponse) {}
     rpc GetDB(GetDBRequest)             returns (GetDBResponse) {}
     rpc GetSpace(GetSpaceRequest)       returns (GetSpaceResponse) {}
+    rpc CreatePartition(CreatePartitionRequest) returns (CreatePartitionResponse) {}
+    rpc DeletePartition(DeletePartitionRequest) returns (DeletePartitionResponse) {}
+    rpc ChangeReplica(ChangeReplicaRequest) returns (ChangeReplicaResponse) {}
+    rpc ChangeLeader(ChangeLeaderRequest) returns (ChangeLeaderResponse) {}
 }
 
 message GMaster {
@@ -89,8 +93,53 @@ message PSRegisterRequest {
 message PSRegisterResponse {
     ResponseHeader     header     = 1 [(gogoproto.nullable) = false, (gogoproto.embed) = true];
     uint32             nodeID     = 2 [(gogoproto.customname) = "NodeID", (gogoproto.casttype) = "github.com/tiglabs/baudengine/proto/metapb.NodeID"];
-    PSConfig           config     = 3 [(gogoproto.nullable) = false, (gogoproto.embed) = true];
+//    PSConfig           config     = 3 [(gogoproto.nullable) = false, (gogoproto.embed) = true];
     repeated Partition partitions = 4 [(gogoproto.nullable) = false];
+}
+
+message CreatePartitionRequest {
+    RequestHeader   header    = 1 [(gogoproto.nullable) = false, (gogoproto.embed) = true];
+    Partition       partition = 2 [(gogoproto.nullable) = false];
+}
+
+message CreatePartitionResponse {
+    ResponseHeader  header    = 1 [(gogoproto.nullable) = false, (gogoproto.embed) = true];
+    Replica         replica   = 2 [(gogoproto.nullable) = false];
+}
+
+message DeletePartitionRequest {
+    RequestHeader   header      = 1 [(gogoproto.nullable) = false, (gogoproto.embed) = true];
+    uint32          partitionID = 2 [(gogoproto.customname) = "PartitionID", (gogoproto.casttype) = "github.com/tiglabs/baudengine/proto/metapb.PartitionID"];
+    uint32          nodeId      = 3 [(gogoproto.customname) = "NodeID", (gogoproto.casttype) = "github.com/tiglabs/baudengine/proto/metapb.NodeID"];
+}
+
+message DeletePartitionResponse {
+    ResponseHeader  header    = 1 [(gogoproto.nullable) = false, (gogoproto.embed) = true];
+}
+
+message ChangeReplicaRequest {
+    RequestHeader     header        = 1 [(gogoproto.nullable) = false, (gogoproto.embed) = true];
+    ReplicaChangeType type          = 2;
+    uint32            partition_id  = 3 [(gogoproto.customname) = "PartitionID", (gogoproto.casttype) = "github.com/tiglabs/baudengine/proto/metapb.PartitionID"];
+    Replica           replica       = 4 [(gogoproto.nullable) = false];
+}
+
+message ChangeReplicaResponse {
+    ResponseHeader  header    = 1 [(gogoproto.nullable) = false, (gogoproto.embed) = true];
+}
+
+message ChangeLeaderRequest {
+    RequestHeader     header        = 1 [(gogoproto.nullable) = false, (gogoproto.embed) = true];
+    uint32            partition_id  = 2 [(gogoproto.customname) = "PartitionID", (gogoproto.casttype) = "github.com/tiglabs/baudengine/proto/metapb.PartitionID"];
+}
+
+message ChangeLeaderResponse {
+    ResponseHeader  header    = 1 [(gogoproto.nullable) = false, (gogoproto.embed) = true];
+}
+
+enum ReplicaChangeType {
+    Add     = 0;
+    Remove  = 1;
 }
 
 message PSConfig {

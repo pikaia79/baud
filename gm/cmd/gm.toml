@@ -1,0 +1,22 @@
+# Global Master Configuration.
+
+[module]
+name = "gm"
+role = "gm"
+version = "v1"
+# web request request signature key
+signkey = ""
+data-path = "/tmp/baudengine/gm1/data"
+
+[log]
+log-path = "/tmp/baudengine/gm1/log"
+#debug, info, warn, error
+level="debug"
+
+[cluster]
+cluster-id = "1"
+gm-node-id = "1"
+gm-node-ip = "127.0.0.1"
+global-etcd = "localhost:2379"
+http-port=8817
+rpc-port=18817
