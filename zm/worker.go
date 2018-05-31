@@ -125,7 +125,7 @@ func (w *SpaceStateTransitionWorker) getName() string {
 }
 
 func (w *SpaceStateTransitionWorker) getInterval() time.Duration {
-    // TODO: add config
+	// TODO: add config
 	return time.Second * 60
 }
 
@@ -145,10 +145,9 @@ func (w *SpaceStateTransitionWorker) run() {
 					var pivotSlot metapb.SlotID
 					var batchNum = 100
 
-
 					for {
 						partitions := space.AscendScanPartition(pivotSlot, batchNum)
-						if partitions == nil  {
+						if partitions == nil {
 							break
 						}
 
@@ -156,7 +155,7 @@ func (w *SpaceStateTransitionWorker) run() {
 							if len(partition.Replicas) == 0 {
 								noReplica = true
 
-								if err := GetPMSingle(nil).PushEvent(NewPartitionCreateEvent(partition)); err != nil {
+								if err := GetProcessorManager(nil).PushEvent(NewPartitionCreateEvent(partition)); err != nil {
 									log.Error("fail to push event for creating partition[%v].", partition)
 								}
 							}
@@ -165,7 +164,7 @@ func (w *SpaceStateTransitionWorker) run() {
 						if len(partitions) < batchNum {
 							break
 						}
-						pivotSlot = partitions[len(partitions) - 1].StartSlot
+						pivotSlot = partitions[len(partitions)-1].StartSlot
 					}
 
 					if !noReplica {

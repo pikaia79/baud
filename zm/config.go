@@ -7,6 +7,7 @@ import (
 	"github.com/BurntSushi/toml"
 	"github.com/tiglabs/baudengine/util/log"
 	"os"
+	"time"
 )
 
 //const (
@@ -80,6 +81,8 @@ const (
 	CONFIG_LOG_LEVEL_INFO  = "info"
 	CONFIG_LOG_LEVEL_WARN  = "warn"
 	CONFIG_LOG_LEVEL_ERROR = "error"
+
+	TOPO_TIMEOUT = 30 * time.Second
 )
 
 type Config struct {
@@ -141,7 +144,7 @@ func (cfg *ModuleConfig) adjust() {
 }
 
 type ClusterNode struct {
-	NodeId            uint64 `toml:"node-id,omitempty" json:"node-id"`
+	NodeId            string `toml:"node-id,omitempty" json:"node-id"`
 	Host              string `toml:"host,omitempty" json:"host"`
 	HttpPort          uint32 `toml:"http-port,omitempty" json:"http-port"` // TODO: web admin port only need one in cluster
 	RpcPort           uint32 `toml:"rpc-port,omitempty" json:"rpc-port"`
@@ -150,27 +153,25 @@ type ClusterNode struct {
 }
 
 type ClusterConfig struct {
-	ZoneID             string         `toml:"zone-id,omitempty" json:"zone-id"`
-	CurNodeId             string         `toml:"node-id,omitempty" json:"node-id"`
-	Nodes                 []*ClusterNode `toml:"nodes,omitempty" json:"nodes"`
-	CurNode               *ClusterNode
+	ZoneID    string         `toml:"zone-id,omitempty" json:"zone-id"`
+	CurNodeId string         `toml:"node-id,omitempty" json:"node-id"`
+	Nodes     []*ClusterNode `toml:"nodes,omitempty" json:"nodes"`
+	CurNode   *ClusterNode
 }
 
 func (cfg *ClusterConfig) adjust() {
-	adjustString(&cfg.ClusterID, "no cluster-id")
-	adjustUint64(&cfg.CurNodeId, "no current node-id")
-	adjustUint64(&cfg.RaftHeartbeatInterval, "no raft heartbeat interval")
-	adjustUint64(&cfg.RaftRetainLogsCount, "no raft retain log count")
+	adjustString(&cfg.ZoneID, "no cluster-id")
+	adjustString(&cfg.CurNodeId, "no current node-id")
 
 	if len(cfg.Nodes) == 0 {
 		log.Panic("cluster nodes is empty")
 	}
 
 	// validate whether is node-id duplicated
-	tempNodes := make(map[uint64]*ClusterNode)
+	tempNodes := make(map[string]*ClusterNode)
 
 	for _, node := range cfg.Nodes {
-		adjustUint64(&node.NodeId, "no node-id")
+		adjustString(&node.NodeId, "no node-id")
 		adjustString(&node.Host, "no node host")
 
 		adjustUint32(&node.HttpPort, "no node http port")
@@ -242,15 +243,15 @@ func (c *LogConfig) adjust() {
 }
 
 type PsConfig struct {
-	RpcPort                 uint32        `toml:"rpc-port,omitempty" json:"rpc-port"`
-	AdminPort               uint32        `toml:"admin-port,omitempty" json:"admin-port"`
-	HeartbeatInterval       uint64 		  `toml:"heartbeat-interval,omitempty" json:"heartbeat-interval"`
-	RaftHeartbeatInterval   uint64        `toml:"raft-heartbeat-interval,omitempty" json:"raft-heartbeat-interval"`
-	RaftHeartbeatPort       uint32        `toml:"raft-heartbeat-port,omitempty" json:"raft-heartbeat-port"`
-	RaftReplicatePort       uint32        `toml:"raft-replicate-port,omitempty" json:"raft-replicate-port"`
-	RaftRetainLogs          uint64        `toml:"raft-retain-logs,omitempty" json:"raft-retain-logs"`
-	RaftReplicaConcurrency  uint32        `toml:"raft-replica-concurrency,omitempty" json:"raft-replica-concurrency"`
-	RaftSnapshotConcurrency uint32        `toml:"raft-snapshot-concurrency,omitempty" json:"raft-snapshot-concurrency"`
+	RpcPort                 uint32 `toml:"rpc-port,omitempty" json:"rpc-port"`
+	AdminPort               uint32 `toml:"admin-port,omitempty" json:"admin-port"`
+	HeartbeatInterval       uint64 `toml:"heartbeat-interval,omitempty" json:"heartbeat-interval"`
+	RaftHeartbeatInterval   uint64 `toml:"raft-heartbeat-interval,omitempty" json:"raft-heartbeat-interval"`
+	RaftHeartbeatPort       uint32 `toml:"raft-heartbeat-port,omitempty" json:"raft-heartbeat-port"`
+	RaftReplicatePort       uint32 `toml:"raft-replicate-port,omitempty" json:"raft-replicate-port"`
+	RaftRetainLogs          uint64 `toml:"raft-retain-logs,omitempty" json:"raft-retain-logs"`
+	RaftReplicaConcurrency  uint32 `toml:"raft-replica-concurrency,omitempty" json:"raft-replica-concurrency"`
+	RaftSnapshotConcurrency uint32 `toml:"raft-snapshot-concurrency,omitempty" json:"raft-snapshot-concurrency"`
 }
 
 func (cfg *PsConfig) adjust() {

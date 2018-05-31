@@ -1,10 +1,10 @@
 package zm
 
 import (
-	"fmt"
-	"github.com/gogo/protobuf/proto"
+	"context"
 	"github.com/tiglabs/baudengine/proto/masterpb"
 	"github.com/tiglabs/baudengine/proto/metapb"
+	"github.com/tiglabs/baudengine/topo"
 	"github.com/tiglabs/baudengine/util"
 	"github.com/tiglabs/baudengine/util/log"
 	"sync"
@@ -28,10 +28,10 @@ const (
 )
 
 type PartitionServer struct {
-	*metapb.Node
+	*topo.PsTopo
 	*masterpb.NodeSysStats
 
-	adminPort 	   uint32
+	adminPort      uint32
 	status         PSStatus
 	lastHeartbeat  time.Time
 	partitionCache *PartitionCache
@@ -41,7 +41,7 @@ type PartitionServer struct {
 func NewPartitionServer(ip string, psCfg *PsConfig) (*PartitionServer, error) {
 	newId, err := GetIdGeneratorSingle(nil).GenID()
 	if err != nil {
-		log.Error("fail to generate ps id. err[%v]", err)
+		log.Error("fail to allocate ps id. err[%v]", err)
 		return nil, ErrGenIdFailed
 	}
 
@@ -55,12 +55,12 @@ func NewPartitionServer(ip string, psCfg *PsConfig) (*PartitionServer, error) {
 			AdminAddr:     util.BuildAddr(ip, psCfg.AdminPort),
 		},
 	}
-	return NewPartitionServerByMeta(psCfg, metaNode), nil
+	return NewPartitionServerByMeta(psCfg, &topo.PsTopo{Node: metaNode}), nil
 }
 
-func NewPartitionServerByMeta(psCfg *PsConfig, metaPS *metapb.Node) *PartitionServer {
+func NewPartitionServerByMeta(psCfg *PsConfig, metaPS *topo.PsTopo) *PartitionServer {
 	return &PartitionServer{
-		Node:           metaPS,
+		PsTopo:         metaPS,
 		NodeSysStats:   new(masterpb.NodeSysStats),
 		status:         PS_INIT,
 		adminPort:      psCfg.AdminPort,
@@ -69,21 +69,19 @@ func NewPartitionServerByMeta(psCfg *PsConfig, metaPS *metapb.Node) *PartitionSe
 	}
 }
 
-func (p *PartitionServer) persistent(store Store) error {
+func (p *PartitionServer) persistent(zone string, topoServer *topo.TopoServer) error {
 	p.propertyLock.Lock()
 	defer p.propertyLock.Unlock()
 
-	val, err := proto.Marshal(p.Node)
-	if err != nil {
-		log.Error("marshal ps[%v] is failed.", p.Node)
-		return ErrInternalError
-	}
+	ctx, cancel := context.WithTimeout(context.Background(), TOPO_TIMEOUT)
+	defer cancel()
 
-	key := []byte(fmt.Sprintf("%s%d", PREFIX_PARTITION_SERVER, p.Node.ID))
-	if err := store.Put(key, val); err != nil {
+	psTopo, err := topoServer.AddPsByZone(ctx, zone, p.Node)
+	if err != nil {
 		log.Error("fail to store ps into store. err[%v]", err)
 		return ErrLocalDbOpsFailed
 	}
+	p.PsTopo = psTopo
 
 	return nil
 }
@@ -206,27 +204,17 @@ func (c *PSCache) AddServer(server *PartitionServer) {
 	c.ip2Servers[server.Ip] = server
 }
 
-func (c *PSCache) Recovery(store Store, psCfg *PsConfig) ([]*PartitionServer, error) {
-	prefix := []byte(PREFIX_PARTITION_SERVER)
-	startKey, limitKey := util.BytesPrefix(prefix)
+func (c *PSCache) Recovery(zone string, topoServer *topo.TopoServer, psCfg *PsConfig) ([]*PartitionServer, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), TOPO_TIMEOUT)
+	defer cancel()
+
+	partitionServers, err := topoServer.GetAllPsByZone(ctx, zone)
+	if err != nil {
+		log.Error("topoServer.GetAllPsByZone() failed: %s", err.Error())
+	}
 
 	resultServers := make([]*PartitionServer, 0)
-
-	iterator := store.Scan(startKey, limitKey)
-	defer iterator.Release()
-	for iterator.Next() {
-		if iterator.Key() == nil {
-			log.Error("ps store key is nil. never happened!!!")
-			continue
-		}
-
-		val := iterator.Value()
-		metaPS := new(metapb.Node)
-		if err := proto.Unmarshal(val, metaPS); err != nil {
-			log.Error("fail to unmarshal ps from store. err[%v]", err)
-			return nil, ErrInternalError
-		}
-
+	for _, metaPS := range partitionServers {
 		resultServers = append(resultServers, NewPartitionServerByMeta(psCfg, metaPS))
 	}
 

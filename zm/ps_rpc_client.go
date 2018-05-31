@@ -9,11 +9,11 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/status"
 	"sync"
-	"time"
 	"sync/atomic"
+	"time"
 )
 
-//go:generate mockgen -destination ps_rpc_client_mock.go -package zm github.com/tiglabs/baudengine/master PSRpcClient
+//go:allocate mockgen -destination ps_rpc_client_mock.go -package zm github.com/tiglabs/baudengine/master PSRpcClient
 const (
 	PS_GRPC_REQUEST_TIMEOUT = time.Second
 )
@@ -25,13 +25,13 @@ var (
 )
 
 type PSRpcClient interface {
-    CreatePartition(addr string, partition *metapb.Partition) error
-    DeletePartition(addr string, partitionId metapb.PartitionID) error
-    AddReplica(addr string, partitionId metapb.PartitionID, replicaAddrs *metapb.ReplicaAddrs,
-            replicaId metapb.ReplicaID, replicaNodeId metapb.NodeID) error
-    RemoveReplica(addr string, partitionId metapb.PartitionID, replicaAddrs *metapb.ReplicaAddrs,
-            replicaId metapb.ReplicaID, replicaNodeId metapb.NodeID) error
-    Close()
+	CreatePartition(addr string, partition *metapb.Partition) error
+	DeletePartition(addr string, partitionId metapb.PartitionID) error
+	AddReplica(addr string, partitionId metapb.PartitionID, replicaAddrs *metapb.ReplicaAddrs,
+		replicaId metapb.ReplicaID, replicaNodeId metapb.NodeID) error
+	RemoveReplica(addr string, partitionId metapb.PartitionID, replicaAddrs *metapb.ReplicaAddrs,
+		replicaId metapb.ReplicaID, replicaNodeId metapb.NodeID) error
+	Close()
 }
 
 type PSRpcClientImpl struct {
@@ -62,7 +62,7 @@ func GetPSRpcClientSingle(config *Config) PSRpcClient {
 		connMgrOpt := rpc.DefaultManagerOption
 		connMgr := rpc.NewConnectionMgr(psClientSingle.ctx, &connMgrOpt)
 		clientOpt := rpc.DefaultClientOption
-		clientOpt.ClusterID = config.ClusterCfg.ClusterID
+		clientOpt.ClusterID = config.ClusterCfg.ZoneID
 		clientOpt.ConnectMgr = connMgr
 		clientOpt.CreateFunc = func(cc *grpc.ClientConn) interface{} { return pspb.NewAdminGrpcClient(cc) }
 		psClientSingle.rpcClient = rpc.NewClient(1, &clientOpt)
@@ -163,7 +163,7 @@ func (c *PSRpcClientImpl) DeletePartition(addr string, partitionId metapb.Partit
 func (c *PSRpcClientImpl) AddReplica(addr string, partitionId metapb.PartitionID, replicaAddrs *metapb.ReplicaAddrs,
 	replicaId metapb.ReplicaID, replicaNodeId metapb.NodeID) error {
 	log.Info("add replicaId[%v] of partition[%v] in nodeid[%v] into addr[%v]",
-			replicaId, partitionId, replicaNodeId, addr)
+		replicaId, partitionId, replicaNodeId, addr)
 	client, err := c.getClient(addr)
 	if err != nil {
 		return err
@@ -201,7 +201,7 @@ func (c *PSRpcClientImpl) AddReplica(addr string, partitionId metapb.PartitionID
 func (c *PSRpcClientImpl) RemoveReplica(addr string, partitionId metapb.PartitionID, replicaAddrs *metapb.ReplicaAddrs,
 	replicaId metapb.ReplicaID, replicaNodeId metapb.NodeID) error {
 	log.Info("remove replicaId[%v] of partition[%v] in nodeid[%v] into addr[%v]",
-			replicaId, partitionId, replicaNodeId, addr)
+		replicaId, partitionId, replicaNodeId, addr)
 	client, err := c.getClient(addr)
 	if err != nil {
 		return err
@@ -209,8 +209,8 @@ func (c *PSRpcClientImpl) RemoveReplica(addr string, partitionId metapb.Partitio
 
 	req := &pspb.ChangeReplicaRequest{
 		RequestHeader: metapb.RequestHeader{},
-		Type:        pspb.ReplicaChangeType_Remove,
-		PartitionID: partitionId,
+		Type:          pspb.ReplicaChangeType_Remove,
+		PartitionID:   partitionId,
 		Replica: metapb.Replica{
 			ID:           replicaId,
 			NodeID:       replicaNodeId,
