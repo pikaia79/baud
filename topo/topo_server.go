@@ -122,7 +122,7 @@ type Impl interface {
     SetPartitionInfoByZone(ctx context.Context, zoneName string, partitionInfo *masterpb.PartitionInfo) error
     // SetPartitionLeaderByZone(ctx context.Context, zoneName string,
     //        partitionId *metapb.PartitionID, leaderReplicaId metapb.ReplicaID) error
-
+    GetAllPartitionIdsByZone(ctx context.Context, zoneName string) ([]metapb.PartitionID, error)
 
     GetPartitionsOnPsByZone(ctx context.Context, zoneName string, psId metapb.NodeID) ([]*PartitionTopo, error)
     SetPartitionsOnPSByZone(ctx context.Context, zoneName string, psId metapb.NodeID, partitions []*metapb.Partition) error

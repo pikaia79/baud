@@ -9,6 +9,7 @@ import (
     "fmt"
     "github.com/tiglabs/baudengine/util/log"
     "strings"
+    "strconv"
 )
 
 type PartitionTopo struct {
@@ -161,6 +162,33 @@ func (s *TopoServer) SetPartitionInfoByZone(ctx context.Context, zoneName string
 //    partitionId *metapb.PartitionID, leaderReplicaId metapb.ReplicaID) error {
 //    return nil
 //}
+
+func (s *TopoServer) GetAllPartitionIdsByZone(ctx context.Context, zoneName string) ([]metapb.PartitionID, error) {
+    if ctx == nil || len(zoneName) == 0 {
+        return nil, ErrNoNode
+    }
+
+    dirPath := path.Join(partitionsPath) + "/"
+    ids, _, err := s.backend.ListDir(ctx, zoneName, dirPath)
+    if err != nil && err != ErrNoNode {
+        return nil, err
+    }
+    if err == ErrNoNode || ids == nil || len(ids) == 0 {
+        return nil, nil
+    }
+
+    partitionIds := make([]metapb.PartitionID, 0, len(ids))
+    for _, id := range ids {
+        partitionId, err := strconv.Atoi(id)
+        if err != nil {
+            log.Error("Invalid paritionId sub directory[%s]", id)
+            continue
+        }
+        partitionIds = append(partitionIds, metapb.PartitionID(partitionId))
+    }
+
+    return partitionIds, nil
+}
 
 func (s *TopoServer) GetPartitionsOnPsByZone(ctx context.Context, zoneName string,
     psId metapb.NodeID) ([]*PartitionTopo, error) {
