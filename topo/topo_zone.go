@@ -18,7 +18,7 @@ func (s *TopoServer) GetAllZones(ctx context.Context) ([]*ZoneTopo, error) {
         return nil, ErrNoNode
     }
 
-    names, err := s.backend.ListDir(ctx, GlobalZone, ZonesPath)
+    names, _, err := s.backend.ListDir(ctx, GlobalZone, ZonesPath)
     if err != nil {
        return nil, err
     }

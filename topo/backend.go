@@ -38,8 +38,9 @@ type Backend interface {
 	// list should be sorted (by sort.Strings for instance).
 	// If there are no files under the provided path, returns ErrNoNode.
 	// dirPath is a path relative to the root directory of the cell.
-	ListDir(ctx context.Context, cell, dirPath string) ([]string, error)
+	ListDir(ctx context.Context, cell, dirPath string) ([]string, Version, error)
 
+	WatchDir(ctx context.Context, cell, dirPath string, version Version) (<-chan *WatchData, CancelFunc, error)
 	//
 	// File support
 	// if version == nil, then it’s an unconditional update / delete.

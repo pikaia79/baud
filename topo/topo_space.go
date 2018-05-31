@@ -24,7 +24,7 @@ func (s *TopoServer) GetAllSpaces(ctx context.Context) ([]*SpaceTopo, error) {
         return nil, ErrNoNode
     }
 
-    dbAndSpaceIds, err := s.backend.ListDir(ctx, GlobalZone, path.Join(spacesPath))
+    dbAndSpaceIds, _, err := s.backend.ListDir(ctx, GlobalZone, path.Join(spacesPath))
     if err != nil {
         return nil, err
     }
@@ -150,25 +150,89 @@ func (s *TopoServer) DeleteSpace(ctx context.Context, space *SpaceTopo) error {
     return s.backend.Delete(ctx, GlobalZone, nodePath, space.version)
 }
 
-func (s *TopoServer) WatchSpace(ctx context.Context, dbId metapb.DBID, spaceId metapb.SpaceID) (*SpaceWatchData,
-        <-chan *SpaceWatchData, CancelFunc) {
+//func (s *TopoServer) WatchSpace(ctx context.Context, dbId metapb.DBID, spaceId metapb.SpaceID) (*SpaceWatchData,
+//        <-chan *SpaceWatchData, CancelFunc) {
+//    if ctx == nil {
+//        return &SpaceWatchData{Err:ErrNoNode}, nil, nil
+//    }
+//
+//    nodePath := path.Join(spacesPath, fmt.Sprintf("%d-%d", dbId, spaceId), SpaceTopoFile)
+//    current, wdChannel, wdCancel := s.backend.Watch(ctx, GlobalZone, nodePath)
+//    if current.Err != nil {
+//        return &SpaceWatchData{Err:current.Err}, nil, nil
+//    }
+//
+//    curVal := &metapb.Space{}
+//    if err := proto.Unmarshal(current.Contents, curVal); err != nil {
+//        log.Error("Fail to unmarshal meta data for space[%d-%d]. err[%v]", dbId, spaceId, err)
+//        wdCancel()
+//        for range wdChannel {
+//        }
+//        return &SpaceWatchData{Err:err}, nil, nil
+//    }
+//
+//    changes := make(chan *SpaceWatchData, 10)
+//
+//    go func() {
+//        defer close(changes)
+//
+//        for wd := range wdChannel {
+//            if wd != nil {
+//                changes <- &SpaceWatchData{Err: wd.Err}
+//                return
+//            }
+//
+//            value := &metapb.Space{}
+//            if err := proto.Unmarshal(wd.Contents, value); err != nil {
+//                log.Error("Fail to unmarshal meta data for space[%d-%d]. err[%v]", dbId, spaceId, err)
+//                wdCancel()
+//                for range wdChannel {
+//                }
+//                changes <- &SpaceWatchData{Err: err}
+//                return
+//            }
+//
+//            changes <- &SpaceWatchData{SpaceTopo: &SpaceTopo{Space: value, version:wd.Version}}
+//        }
+//    }()
+//
+//    return &SpaceWatchData{SpaceTopo: &SpaceTopo{Space: curVal, version:current.Version}}, changes, wdCancel
+//}
+
+func (s *TopoServer) WatchSpaces(ctx context.Context) (error, []*SpaceTopo, <-chan *SpaceWatchData, CancelFunc) {
     if ctx == nil {
-        return &SpaceWatchData{Err:ErrNoNode}, nil, nil
+        return ErrNoNode, nil, nil, nil
     }
 
-    nodePath := path.Join(spacesPath, fmt.Sprintf("%d-%d", dbId, spaceId), SpaceTopoFile)
-    current, wdChannel, wdCancel := s.backend.Watch(ctx, GlobalZone, nodePath)
-    if current.Err != nil {
-        return &SpaceWatchData{Err:current.Err}, nil, nil
+    dirPath := path.Join(spacesPath) + "/"
+    dbAndSpaceIds, dirVersion, err := s.backend.ListDir(ctx, GlobalZone, dirPath)
+    if err != nil && err != ErrNoNode {
+        return err, nil, nil, nil
     }
 
-    curVal := &metapb.Space{}
-    if err := proto.Unmarshal(current.Contents, curVal); err != nil {
-        log.Error("Fail to unmarshal meta data for space[%d-%d]. err[%v]", dbId, spaceId, err)
-        wdCancel()
-        for range wdChannel {
+    var spaceTopos []*SpaceTopo
+    if err != ErrNoNode && len(dbAndSpaceIds) != 0 {
+        spaceTopos = make([]*SpaceTopo, 0)
+        for _, dbAndSpaceId := range dbAndSpaceIds {
+            contents, version, err := s.backend.Get(ctx, GlobalZone, path.Join(spacesPath, dbAndSpaceId, SpaceTopoFile))
+            if err != nil {
+                return err, nil, nil, nil
+            }
+
+            spaceMeta := &metapb.Space{}
+            if err := proto.Unmarshal(contents, spaceMeta); err != nil {
+                log.Error("Fail to unmarshal meta data for db-space[%d]. err[%v]", dbAndSpaceId, err)
+                return err, nil, nil, nil
+            }
+
+            spaceTopo := &SpaceTopo{version: version, Space: spaceMeta}
+            spaceTopos = append(spaceTopos, spaceTopo)
         }
-        return &SpaceWatchData{Err:err}, nil, nil
+    }
+
+    wdChannel, cancel, err := s.backend.WatchDir(ctx, GlobalZone, dirPath, dirVersion)
+    if err != nil {
+        return err, nil, nil, nil
     }
 
     changes := make(chan *SpaceWatchData, 10)
@@ -183,9 +247,9 @@ func (s *TopoServer) WatchSpace(ctx context.Context, dbId metapb.DBID, spaceId m
             }
 
             value := &metapb.Space{}
-            if err := proto.Unmarshal(current.Contents, value); err != nil {
-                log.Error("Fail to unmarshal meta data for space[%d-%d]. err[%v]", dbId, spaceId, err)
-                wdCancel()
+            if err := proto.Unmarshal(wd.Contents, value); err != nil {
+                log.Error("Fail to unmarshal meta data for space. err[%v]", err)
+                cancel()
                 for range wdChannel {
                 }
                 changes <- &SpaceWatchData{Err: err}
@@ -196,7 +260,8 @@ func (s *TopoServer) WatchSpace(ctx context.Context, dbId metapb.DBID, spaceId m
         }
     }()
 
-    return &SpaceWatchData{SpaceTopo: &SpaceTopo{Space: curVal, version:current.Version}}, changes, wdCancel
+    return nil, spaceTopos, changes, cancel
 }
+
 
 
