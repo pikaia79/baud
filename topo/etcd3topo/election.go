@@ -17,11 +17,11 @@ import (
 // NewMasterParticipation is part of the topo.Server interface
 func (s *Server) NewMasterParticipation(cell, id string) (topo.MasterParticipation, error) {
 	return &etcdMasterParticipation{
-		s:       s,
-		cell:    cell,
-		id:      id,
-		stop:    make(chan struct{}),
-		done:    make(chan struct{}),
+		s:    s,
+		cell: cell,
+		id:   id,
+		stop: make(chan struct{}),
+		done: make(chan struct{}),
 	}, nil
 }
 

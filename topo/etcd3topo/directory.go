@@ -4,11 +4,11 @@ import (
 	"path"
 	"strings"
 
+	"fmt"
 	"github.com/coreos/etcd/clientv3"
 	"github.com/coreos/etcd/mvcc/mvccpb"
-	"golang.org/x/net/context"
 	"github.com/tiglabs/baudengine/topo"
-	"fmt"
+	"golang.org/x/net/context"
 )
 
 // ListDir is part of the topo.Backend interface.
@@ -57,7 +57,7 @@ func (s *Server) ListDir(ctx context.Context, cell, dirPath string) ([]string, t
 }
 
 func (s *Server) WatchDir(ctx context.Context, cell, dirPath string, version topo.Version) (<-chan *topo.WatchData, topo.CancelFunc, error) {
-    c, err := s.clientForCell(ctx, cell)
+	c, err := s.clientForCell(ctx, cell)
 	if err != nil {
 		return nil, nil, fmt.Errorf("Watch cannot get cell: %v", err)
 	}
@@ -72,7 +72,7 @@ func (s *Server) WatchDir(ctx context.Context, cell, dirPath string, version top
 	} else {
 		options = append(options, clientv3.WithRev(0))
 	}
-	watcher := c.cli.Watch(watchCtx, nodePath + "/", options...)
+	watcher := c.cli.Watch(watchCtx, nodePath+"/", options...)
 	if watcher == nil {
 		return nil, nil, fmt.Errorf("Watch failed")
 	}

@@ -14,13 +14,11 @@ import (
 	"github.com/coreos/etcd/mvcc/mvccpb"
 	log "github.com/golang/glog"
 	"golang.org/x/net/context"
-
 )
 
 var (
 	leaseTTL = flag.Duration("topo_etcd_lease_ttl", 5, "Lease TTL for locks and master election. The client will use KeepAlive to keep the lease going.")
 )
-
 
 // waitOnLastRev waits on all revisions of the files in the provided
 // directory that have revisions smaller than the provided revision.
@@ -135,6 +133,7 @@ func (s *Server) unlock(ctx context.Context, cell, dirPath, actionPath string) e
 	}
 	return nil
 }
+
 //
 //// LockKeyspaceForAction implements topo.Server.
 //func (s *Server) LockKeyspaceForAction(ctx context.Context, keyspace, contents string) (string, error) {
