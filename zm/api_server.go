@@ -6,7 +6,6 @@ import (
 	"github.com/tiglabs/baudengine/util"
 	"github.com/tiglabs/baudengine/util/log"
 	"github.com/tiglabs/baudengine/util/netutil"
-	"math"
 	"net/http"
 	"strconv"
 	"sync"
@@ -14,7 +13,7 @@ import (
 )
 
 const (
-	DEFAULT_CONN_LIMIT = 100
+	DEFAULT_CONN_LIMIT    = 100
 	DEFAULT_CLOSE_TIMEOUT = 5 * time.Second
 
 	// definition for http url parameter name
@@ -37,17 +36,17 @@ type ApiServer struct {
 }
 
 func NewApiServer(config *Config, cluster *Cluster) *ApiServer {
-    cfg := &netutil.ServerConfig{
+	cfg := &netutil.ServerConfig{
 		Name:         "master-api-server",
 		Addr:         util.BuildAddr("0.0.0.0", config.ClusterCfg.CurNode.HttpPort),
 		Version:      "v1",
 		ConnLimit:    DEFAULT_CONN_LIMIT,
 		CloseTimeout: DEFAULT_CLOSE_TIMEOUT,
-    }
+	}
 
 	apiServer := &ApiServer{
 		config:     config,
-        httpServer: netutil.NewServer(cfg),
+		httpServer: netutil.NewServer(cfg),
 		cluster:    cluster,
 	}
 	apiServer.initAdminHandler()
@@ -87,25 +86,17 @@ func (s *ApiServer) initAdminHandler() {
 	s.httpServer.Handle(netutil.GET, "/manage/space/list", s.handleSpaceList)
 	s.httpServer.Handle(netutil.GET, "/manage/space/detail", s.handleSpaceDetail)
 
-    s.httpServer.Handle(netutil.GET, "/manage/partition/list", s.handlePartitionList)
+	s.httpServer.Handle(netutil.GET, "/manage/partition/list", s.handlePartitionList)
 	s.httpServer.Handle(netutil.GET, "/manage/ps/list", s.handlePSList)
 }
 
 func (s *ApiServer) handleDbList(w http.ResponseWriter, r *http.Request, params netutil.UriParams) {
-	if err := s.checkLeader(w); err != nil {
-		return
-	}
-
 	dbs := s.cluster.DbCache.GetAllDBs()
 
 	sendReply(w, newHttpSucReply(dbs))
 }
 
 func (s *ApiServer) handleDbDetail(w http.ResponseWriter, r *http.Request, params netutil.UriParams) {
-	if err := s.checkLeader(w); err != nil {
-		return
-	}
-
 	dbName, err := checkMissingParam(w, r, DB_NAME)
 	if err != nil {
 		return
@@ -121,10 +112,6 @@ func (s *ApiServer) handleDbDetail(w http.ResponseWriter, r *http.Request, param
 }
 
 func (s *ApiServer) handleSpaceDetail(w http.ResponseWriter, r *http.Request, params netutil.UriParams) {
-	if err := s.checkLeader(w); err != nil {
-		return
-	}
-
 	dbName, err := checkMissingParam(w, r, DB_NAME)
 	if err != nil {
 		return
@@ -150,10 +137,6 @@ func (s *ApiServer) handleSpaceDetail(w http.ResponseWriter, r *http.Request, pa
 }
 
 func (s *ApiServer) handleSpaceList(w http.ResponseWriter, r *http.Request, params netutil.UriParams) {
-    if err := s.checkLeader(w); err != nil {
-        return
-    }
-
 	dbName, err := checkMissingParam(w, r, DB_NAME)
 	if err != nil {
 		return
@@ -169,19 +152,11 @@ func (s *ApiServer) handleSpaceList(w http.ResponseWriter, r *http.Request, para
 }
 
 func (s *ApiServer) handlePartitionList(w http.ResponseWriter, r *http.Request, params netutil.UriParams) {
-	if err := s.checkLeader(w); err != nil {
-		return
-	}
-
 	partitions := s.cluster.PartitionCache.GetAllPartitions()
 	sendReply(w, newHttpSucReply(partitions))
 }
 
 func (s *ApiServer) handlePSList(w http.ResponseWriter, r *http.Request, params netutil.UriParams) {
-	if err := s.checkLeader(w); err != nil {
-		return
-	}
-
 	allPs := s.cluster.PsCache.GetAllServers()
 	sendReply(w, newHttpSucReply(allPs))
 }
@@ -219,32 +194,6 @@ func newHttpErrReply(err error) *HttpReply {
 	}
 }
 
-func (s *ApiServer) checkLeader(w http.ResponseWriter) error {
-	leaderInfo := s.cluster.store.GetLeaderSync()
-
-	if leaderInfo == nil {
-		sendReply(w, newHttpErrReply(ErrNoMSLeader))
-		return ErrNoMSLeader
-	}
-
-	if !leaderInfo.becomeLeader {
-		if leaderInfo.newLeaderId == 0 {
-			sendReply(w, newHttpErrReply(ErrNoMSLeader))
-			return ErrNoMSLeader
-		} else {
-			log.Debug("current master leader is [%v]", leaderInfo.newLeaderId)
-            reply := newHttpErrReply(ErrNotMSLeader)
-            newMsg := fmt.Sprintf("%s, current leader[%d][%s]", reply.Msg, leaderInfo.newLeaderId,
-                    leaderInfo.newLeaderAddr)
-            reply.Msg = newMsg
-			sendReply(w, reply)
-			return ErrNotMSLeader
-		}
-	}
-
-	return nil
-}
-
 func checkMissingParam(w http.ResponseWriter, r *http.Request, paramName string) (string, error) {
 	paramVal := r.FormValue(paramName)
 	if paramVal == "" {
@@ -255,30 +204,6 @@ func checkMissingParam(w http.ResponseWriter, r *http.Request, paramName string)
 		return "", ErrParamError
 	}
 	return paramVal, nil
-}
-
-func checkMissingAndUint32Param(w http.ResponseWriter, r *http.Request, paramName string) (uint32, error) {
-	paramValStr, err := checkMissingParam(w, r, paramName)
-	if err != nil {
-		return 0, err
-	}
-
-	paramValInt, err := strconv.Atoi(paramValStr)
-	if err != nil {
-		reply := newHttpErrReply(ErrParamError)
-		newMsg := fmt.Sprintf("%s, unmatched type[%s]", reply.Msg, paramName)
-		reply.Msg = newMsg
-		sendReply(w, reply)
-		return 0, ErrParamError
-	}
-	if paramValInt > math.MaxUint32 {
-		reply := newHttpErrReply(ErrParamError)
-		newMsg := fmt.Sprintf("%s, value of [%s] exceed uint32 limit", reply.Msg, paramName)
-		reply.Msg = newMsg
-		sendReply(w, reply)
-		return 0, ErrParamError
-	}
-	return uint32(paramValInt), nil
 }
 
 func sendReply(w http.ResponseWriter, httpReply *HttpReply) {

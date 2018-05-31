@@ -3,21 +3,24 @@ package zm
 import (
 	"github.com/tiglabs/baudengine/proto/masterpb"
 	"github.com/tiglabs/baudengine/proto/metapb"
+	"github.com/tiglabs/baudengine/topo"
 	"github.com/tiglabs/baudengine/util"
+	"github.com/tiglabs/baudengine/util/deepcopy"
 	"github.com/tiglabs/baudengine/util/log"
+	"github.com/tiglabs/baudengine/util/rpc"
 	"golang.org/x/net/context"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/reflection"
 	"net"
-	"github.com/tiglabs/baudengine/util/rpc"
 	"sync"
 )
 
 type RpcServer struct {
-	config     *Config
-	grpcServer *grpc.Server
-	cluster    *Cluster
-	wg         sync.WaitGroup
+	config         *Config
+	grpcServer     *grpc.Server
+	cluster        *Cluster
+	wg             sync.WaitGroup
+	serverSelector Selector
 }
 
 func NewRpcServer(config *Config, cluster *Cluster) *RpcServer {
@@ -26,7 +29,7 @@ func NewRpcServer(config *Config, cluster *Cluster) *RpcServer {
 	server.cluster = cluster
 
 	serverOption := &rpc.DefaultServerOption
-	serverOption.ClusterID = config.ClusterCfg.ClusterID
+	serverOption.ClusterID = config.ClusterCfg.ZoneID
 	server.grpcServer = rpc.NewGrpcServer(serverOption)
 	masterpb.RegisterMasterRpcServer(server.grpcServer, server)
 	reflection.Register(server.grpcServer)
@@ -65,16 +68,120 @@ func (rpcSrv *RpcServer) Close() {
 	log.Info("RPC server has closed")
 }
 
-func (rpcSrv *RpcServer) CreatePartition(ctx context.Context, in *masterpb.CreatePartitionRequest) (*masterpb.CreatePartitionResponse, error) {
+func (rpcSrv *RpcServer) CreatePartition(ctx context.Context, req *masterpb.CreatePartitionRequest) (*masterpb.CreatePartitionResponse, error) {
+	partitionToCreate := NewPartitionByMeta(&topo.PartitionTopo{Partition: &req.Partition})
 
+	replicaId, err := GetIdGeneratorSingle(nil).GenID()
+	if err != nil {
+		log.Error("fail to generate new replica ßid. err:[%v]", err)
+		resp := &masterpb.CreatePartitionResponse{
+			ResponseHeader: metapb.ResponseHeader{ReqId: req.ReqId, Code: metapb.RESP_CODE_SERVER_ERROR, Message: "cannot generate ID"},
+		}
+		return resp, nil
+	}
+	psToCreate := rpcSrv.serverSelector.SelectTarget(rpcSrv.cluster.PsCache.GetAllServers(), partitionToCreate.ID)
+	var newMetaReplica = &metapb.Replica{ID: metapb.ReplicaID(replicaId), NodeID: psToCreate.ID,
+		ReplicaAddrs: metapb.ReplicaAddrs{
+			HeartbeatAddr: psToCreate.HeartbeatAddr,
+			ReplicateAddr: psToCreate.ReplicateAddr,
+			RpcAddr:       psToCreate.RpcAddr,
+			AdminAddr:     psToCreate.AdminAddr,
+		}}
+
+	partitionCopy := deepcopy.Iface(partitionToCreate.Partition).(*metapb.Partition)
+	partitionCopy.Replicas = append(partitionCopy.Replicas, *newMetaReplica)
+	if err := GetPSRpcClientSingle(nil).CreatePartition(psToCreate.getRpcAddr(),
+		partitionCopy); err != nil {
+		log.Error("Rpc fail to create partition[%v] into ps. err:[%v]",
+			partitionToCreate.Partition, err)
+		resp := &masterpb.CreatePartitionResponse{
+			ResponseHeader: metapb.ResponseHeader{ReqId: req.ReqId, Code: metapb.RESP_CODE_SERVER_ERROR, Message: "rpc to PS failed!"},
+		}
+		return resp, err
+	}
+
+	return &masterpb.CreatePartitionResponse{
+		ResponseHeader: metapb.ResponseHeader{ReqId: req.ReqId, Code: metapb.RESP_CODE_OK},
+		Replica:        *newMetaReplica,
+	}, nil
 }
 
-func (rpcSrv *RpcServer) DeletePartition(ctx context.Context, in *masterpb.DeletePartitionRequest) (*masterpb.DeletePartitionResponse, error) {
+func (rpcSrv *RpcServer) DeletePartition(ctx context.Context, req *masterpb.DeletePartitionRequest) (*masterpb.DeletePartitionResponse, error) {
+	partitionToDelete := rpcSrv.cluster.PartitionCache.FindPartitionById(req.PartitionID)
+	if partitionToDelete == nil {
+		log.Error("cannot find partition %d", req.PartitionID)
+		resp := &masterpb.DeletePartitionResponse{
+			ResponseHeader: metapb.ResponseHeader{ReqId: req.ReqId, Code: metapb.RESP_CODE_SERVER_ERROR, Message: "cannot find partition!"},
+		}
+		return resp, nil
+	}
 
+	leaderPS := rpcSrv.cluster.PsCache.FindServerById(partitionToDelete.pickLeaderNodeId())
+	if leaderPS == nil {
+		log.Error("cannot find leaderPS for partition %d", req.PartitionID)
+		resp := &masterpb.DeletePartitionResponse{
+			ResponseHeader: metapb.ResponseHeader{ReqId: req.ReqId, Code: metapb.RESP_CODE_SERVER_ERROR, Message: "cannot find leaderPS for partition!"},
+		}
+		return resp, nil
+	}
+
+	if err := GetPSRpcClientSingle(nil).DeletePartition(leaderPS.getRpcAddr(),
+		req.PartitionID); err != nil {
+		log.Error("Rpc fail to delete partition[%v] from ps. err:[%v]", req.PartitionID, err)
+		resp := &masterpb.DeletePartitionResponse{
+			ResponseHeader: metapb.ResponseHeader{ReqId: req.ReqId, Code: metapb.RESP_CODE_SERVER_ERROR, Message: "fail to delete partition[ from ps"},
+		}
+		return resp, nil
+	}
+
+	return &masterpb.DeletePartitionResponse{
+		ResponseHeader: metapb.ResponseHeader{ReqId: req.ReqId, Code: metapb.RESP_CODE_OK},
+	}, nil
 }
 
-func (rpcSrv *RpcServer) ChangeReplica(ctx context.Context, in *masterpb.ChangeReplicaRequest) (*masterpb.ChangeReplicaResponse, error) {
+func (rpcSrv *RpcServer) ChangeReplica(ctx context.Context, req *masterpb.ChangeReplicaRequest) (*masterpb.ChangeReplicaResponse, error) {
+	partitionToDelete := rpcSrv.cluster.PartitionCache.FindPartitionById(req.PartitionID)
+	if partitionToDelete == nil {
+		log.Error("cannot find partition %d", req.PartitionID)
+		resp := &masterpb.ChangeReplicaResponse{
+			ResponseHeader: metapb.ResponseHeader{ReqId: req.ReqId, Code: metapb.RESP_CODE_SERVER_ERROR, Message: "cannot find partition!"},
+		}
+		return resp, nil
+	}
 
+	leaderPS := rpcSrv.cluster.PsCache.FindServerById(partitionToDelete.pickLeaderNodeId())
+	if leaderPS == nil {
+		log.Error("cannot find leaderPS for partition %d", req.PartitionID)
+		resp := &masterpb.ChangeReplicaResponse{
+			ResponseHeader: metapb.ResponseHeader{ReqId: req.ReqId, Code: metapb.RESP_CODE_SERVER_ERROR, Message: "cannot find leaderPS for partition!"},
+		}
+		return resp, nil
+	}
+
+	if req.Type == masterpb.ReplicaChangeType_Add {
+		if err := GetPSRpcClientSingle(nil).AddReplica(leaderPS.getRpcAddr(), req.PartitionID,
+			&req.Replica.ReplicaAddrs, req.Replica.ID, req.Replica.NodeID); err != nil {
+			log.Error("Rpc fail to add replica[%v] into leader ps. err[%v]", req.Replica, err)
+			resp := &masterpb.ChangeReplicaResponse{
+				ResponseHeader: metapb.ResponseHeader{ReqId: req.ReqId, Code: metapb.RESP_CODE_SERVER_ERROR, Message: "fail to add replica[%v] into leader ps"},
+			}
+			return resp, nil
+		}
+	} else {
+		if err := GetPSRpcClientSingle(nil).RemoveReplica(leaderPS.getRpcAddr(), req.PartitionID,
+			&req.Replica.ReplicaAddrs, req.Replica.ID, req.Replica.NodeID); err != nil {
+			log.Error("Rpc fail to remove replica[%v] from leader ps. err[%v]", req.Replica, err)
+			resp := &masterpb.ChangeReplicaResponse{
+				ResponseHeader: metapb.ResponseHeader{ReqId: req.ReqId, Code: metapb.RESP_CODE_SERVER_ERROR, Message: "fail to remove replica from leader ps"},
+			}
+			return resp, nil
+		}
+
+	}
+
+	return &masterpb.ChangeReplicaResponse{
+		ResponseHeader: metapb.ResponseHeader{ReqId: req.ReqId, Code: metapb.RESP_CODE_OK},
+	}, nil
 }
 
 func (rpcSrv *RpcServer) GetRoute(ctx context.Context,
@@ -119,8 +226,8 @@ func (rpcSrv *RpcServer) GetRoute(ctx context.Context,
 		}
 
 		resp.Routes = append(resp.Routes, route)
-    }
-    log.Debug("GetRoutes:[%v]", resp.Routes)
+	}
+	log.Debug("GetRoutes:[%v]", resp.Routes)
 	resp.ResponseHeader = *makeRpcRespHeader(ErrSuc)
 
 	return resp, nil
@@ -164,10 +271,13 @@ func (rpcSrv *RpcServer) PSRegister(ctx context.Context,
 	req *masterpb.PSRegisterRequest) (*masterpb.PSRegisterResponse, error) {
 	resp := new(masterpb.PSRegisterResponse)
 
-    if err, msLeader := rpcSrv.validateLeader(); err != nil {
-        resp.ResponseHeader = *makeRpcRespHeaderWithError(err, msLeader)
-        return resp, nil
-    }
+	if !rpcSrv.validateLeader() {
+		resp.ResponseHeader = metapb.ResponseHeader{
+			Code:    metapb.RESP_CODE_SERVER_ERROR,
+			Message: "",
+		}
+		return resp, nil
+	}
 
 	nodeId := req.NodeID
 
@@ -178,7 +288,7 @@ func (rpcSrv *RpcServer) PSRegister(ctx context.Context,
 			resp.ResponseHeader = *makeRpcRespHeader(err)
 			return resp, nil
 		}
-		ps.persistent(rpcSrv.cluster.store)
+		ps.persistent(rpcSrv.config.ClusterCfg.ZoneID, rpcSrv.cluster.topoServer)
 
 		ps.status = PS_REGISTERED
 		rpcSrv.cluster.PsCache.AddServer(ps)
@@ -186,7 +296,7 @@ func (rpcSrv *RpcServer) PSRegister(ctx context.Context,
 		resp.ResponseHeader = *makeRpcRespHeader(ErrSuc)
 		resp.NodeID = ps.ID
 		packPsRegRespWithCfg(resp, &rpcSrv.config.PsCfg)
-        log.Debug("new register response [%v]", resp)
+		log.Debug("new register response [%v]", resp)
 		return resp, nil
 	}
 
@@ -207,7 +317,7 @@ func (rpcSrv *RpcServer) PSRegister(ctx context.Context,
 	resp.NodeID = ps.ID
 	packPsRegRespWithCfg(resp, &rpcSrv.config.PsCfg)
 	resp.Partitions = *ps.partitionCache.GetAllMetaPartitions()
-    log.Debug("old nodeid[%v] register response [%v]", nodeId, resp)
+	log.Debug("old nodeid[%v] register response [%v]", nodeId, resp)
 
 	return resp, nil
 }
@@ -218,10 +328,13 @@ func (rpcSrv *RpcServer) PSHeartbeat(ctx context.Context,
 	resp := new(masterpb.PSHeartbeatResponse)
 	resp.ResponseHeader = *makeRpcRespHeader(ErrSuc)
 
-    if err, msLeader := rpcSrv.validateLeader(); err != nil {
-        resp.ResponseHeader = *makeRpcRespHeaderWithError(err, msLeader)
-        return resp, nil
-    }
+	if !rpcSrv.validateLeader() {
+		resp.ResponseHeader = metapb.ResponseHeader{
+			Code:    metapb.RESP_CODE_SERVER_ERROR,
+			Message: "",
+		}
+		return resp, nil
+	}
 
 	// process ps
 	psId := req.NodeID
@@ -247,7 +360,7 @@ func (rpcSrv *RpcServer) PSHeartbeat(ctx context.Context,
 			log.Info("ps heartbeat received a partition[%v], that not existed in cluster.", partitionId)
 			// force to delete
 			if replicaToDelete := pickReplicaToDelete(&partitionInfo); replicaToDelete != nil {
-				GetPMSingle(nil).PushEvent(NewForcePartitionDeleteEvent(partitionId, ps.getRpcAddr(), replicaToDelete))
+				GetProcessorManager(nil).PushEvent(NewForcePartitionDeleteEvent(partitionId, ps.getRpcAddr(), replicaToDelete))
 			}
 			continue
 		}
@@ -263,7 +376,7 @@ func (rpcSrv *RpcServer) PSHeartbeat(ctx context.Context,
 			}
 
 			if replicaToDelete := pickReplicaToDelete(&partitionInfo); replicaToDelete != nil {
-				GetPMSingle(nil).PushEvent(NewPartitionDeleteEvent(partitionInfo.ID, partitionMS.pickLeaderNodeId(),
+				GetProcessorManager(nil).PushEvent(NewPartitionDeleteEvent(partitionInfo.ID, partitionMS.pickLeaderNodeId(),
 					replicaToDelete))
 			}
 			continue
@@ -275,10 +388,9 @@ func (rpcSrv *RpcServer) PSHeartbeat(ctx context.Context,
 			}
 
 			// To force update whole leader and replicas group
-			if expired, ok := partitionMS.UpdateReplicaGroupByCond(rpcSrv.cluster.store, &partitionInfo, leaderReplicaHb);
-					expired || !ok {
-                log.Debug("Fail to update partition[%v] info. waiting next heartbeat. updateOk[%v]",
-                	partitionInfo.ID, ok)
+			if expired, ok := partitionMS.UpdateReplicaGroupByCond(rpcSrv.cluster.topoServer, &partitionInfo, leaderReplicaHb); expired || !ok {
+				log.Debug("Fail to update partition[%v] info. waiting next heartbeat. updateOk[%v]",
+					partitionInfo.ID, ok)
 				continue
 			}
 
@@ -302,15 +414,14 @@ func (rpcSrv *RpcServer) PSHeartbeat(ctx context.Context,
 				}
 				if replicaToDelete := pickReplicaToDelete(&partitionInfo); replicaToDelete != nil {
 					log.Info("try to delete replica[%v]", replicaToDelete)
-					GetPMSingle(nil).PushEvent(NewPartitionDeleteEvent(partitionInfo.ID, leaderReplicaHb.NodeID,
+					GetProcessorManager(nil).PushEvent(NewPartitionDeleteEvent(partitionInfo.ID, leaderReplicaHb.NodeID,
 						replicaToDelete))
 				}
 				continue
 			}
 			if !ok {
 				// To update whole leader and replicas group when leader in cluster is empty
-				if expired, ok := partitionMS.UpdateReplicaGroupByCond(rpcSrv.cluster.store, &partitionInfo, leaderReplicaHb);
-					expired || !ok {
+				if expired, ok := partitionMS.UpdateReplicaGroupByCond(rpcSrv.cluster.topoServer, &partitionInfo, leaderReplicaHb); expired || !ok {
 					log.Debug("Fail to update partition[%v] info. waiting next heartbeat. updateOk[%v]",
 						partitionInfo.ID, ok)
 					continue
@@ -334,7 +445,7 @@ func (rpcSrv *RpcServer) PSHeartbeat(ctx context.Context,
 				}
 
 				if replicaToDelete := pickReplicaToDelete(&partitionInfo); replicaToDelete != nil {
-					GetPMSingle(nil).PushEvent(NewPartitionDeleteEvent(partitionInfo.ID, partitionMS.pickLeaderNodeId(),
+					GetProcessorManager(nil).PushEvent(NewPartitionDeleteEvent(partitionInfo.ID, partitionMS.pickLeaderNodeId(),
 						replicaToDelete))
 				}
 
@@ -345,38 +456,22 @@ func (rpcSrv *RpcServer) PSHeartbeat(ctx context.Context,
 					continue
 				}
 
-				GetPMSingle(nil).PushEvent(NewPartitionCreateEvent(partitionMS))
+				GetProcessorManager(nil).PushEvent(NewPartitionCreateEvent(partitionMS))
 
 			} else {
 				log.Info("Normal replica count[%d] in heartbeat", FIXED_REPLICA_NUM)
 			}
 		}
-    }
+	}
 
 	return resp, nil
 }
 
-func (rpcSrv *RpcServer) validateLeader() (error, interface{}) {
-    leaderInfo :=  rpcSrv.cluster.store.GetLeaderSync()
-    if leaderInfo == nil {
-        return ErrNoMSLeader, nil
-    }
-
-	if !leaderInfo.becomeLeader {
-		if leaderInfo.newLeaderId == 0 {
-			return ErrNoMSLeader, nil
-		} else {
-			return ErrNotMSLeader, &metapb.NotLeader{
-				Leader:     metapb.NodeID(leaderInfo.newLeaderId),
-				LeaderAddr: leaderInfo.newLeaderAddr,
-			}
-		}
-	}
-
-    return nil, leaderInfo.newLeaderId
+func (rpcSrv *RpcServer) validateLeader() bool {
+	return MineIsLeader
 }
 
-func pickLeaderReplica(info *masterpb.PartitionInfo) (*metapb.Replica) {
+func pickLeaderReplica(info *masterpb.PartitionInfo) *metapb.Replica {
 	if info == nil || !info.IsLeader {
 		return nil
 	}
@@ -385,7 +480,7 @@ func pickLeaderReplica(info *masterpb.PartitionInfo) (*metapb.Replica) {
 }
 
 // policy : first follower then leader
-func pickReplicaToDelete(info *masterpb.PartitionInfo) (*metapb.Replica) {
+func pickReplicaToDelete(info *masterpb.PartitionInfo) *metapb.Replica {
 	if info == nil || info.RaftStatus == nil {
 		return nil
 	}
@@ -404,7 +499,7 @@ func pickReplicaToDelete(info *masterpb.PartitionInfo) (*metapb.Replica) {
 			continue
 		}
 
-        replicaToDelete = &follower.Replica
+		replicaToDelete = &follower.Replica
 		break
 	}
 	if replicaToDelete != nil {

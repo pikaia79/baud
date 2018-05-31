@@ -1,10 +1,9 @@
 package zm
 
 import (
-	"fmt"
-	"github.com/gogo/protobuf/proto"
+	"context"
 	"github.com/tiglabs/baudengine/proto/metapb"
-	"github.com/tiglabs/baudengine/util"
+	"github.com/tiglabs/baudengine/topo"
 	"github.com/tiglabs/baudengine/util/log"
 	"sync"
 )
@@ -14,15 +13,16 @@ const (
 )
 
 type DB struct {
-	*metapb.DB
-	parent *Cluster
-	spaceMap sync.Map
-	timeWheel TimeWheel
+	*topo.DBTopo
+	parent       *Cluster
+	SpaceCache   *SpaceCache  `json:"-"`
+	propertyLock sync.RWMutex `json:"-"`
+	timeWheel    TimeWheel
 }
 
-func NewDBByMeta(metaDb *metapb.DB) *DB {
+func NewDBByMeta(metaDb *topo.DBTopo) *DB {
 	return &DB{
-		DB:         metaDb,
+		DBTopo:     metaDb,
 		SpaceCache: NewSpaceCache(),
 	}
 }
@@ -95,6 +95,23 @@ func (c *DBCache) GetAllDBs() []*DB {
 	}
 
 	return dbs
+}
+
+func (c *DBCache) Recovery(topoServer *topo.TopoServer) ([]*DB, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), TOPO_TIMEOUT)
+	defer cancel()
+
+	DBs, err := topoServer.GetAllDBs(ctx)
+	if err != nil {
+		log.Error("topoServer.GetAllDBs() failed: %s", err.Error())
+	}
+
+	resultDBs := make([]*DB, 0)
+	for _, metaDb := range DBs {
+		resultDBs = append(resultDBs, NewDBByMeta(metaDb))
+	}
+
+	return resultDBs, nil
 }
 
 func (c *DBCache) Clear() {

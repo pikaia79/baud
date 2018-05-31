@@ -7,7 +7,6 @@ import (
 	"github.com/tiglabs/baudengine/util/log"
 	"runtime/debug"
 	"sync"
-	"sync/atomic"
 )
 
 const (
@@ -22,9 +21,8 @@ const (
 )
 
 var (
-	processorManagerSingle     *ProcessorManager
-	processorManagerSingleLock sync.Mutex
-	processorManagerSingleDone uint32
+	processorManager     *ProcessorManager
+	processorManagerOnce sync.Once
 )
 
 type ProcessorManager struct {
@@ -37,18 +35,8 @@ type ProcessorManager struct {
 	wg        sync.WaitGroup
 }
 
-func GetPMSingle(cluster *Cluster) *ProcessorManager {
-	if processorManagerSingle != nil {
-		return processorManagerSingle
-	}
-	if atomic.LoadUint32(&processorManagerSingleDone) == 1 {
-		return processorManagerSingle
-	}
-
-	processorManagerSingleLock.Lock()
-	defer processorManagerSingleLock.Unlock()
-
-	if atomic.LoadUint32(&processorManagerSingleDone) == 0 {
+func GetProcessorManager(cluster *Cluster) *ProcessorManager {
+	processorManagerOnce.Do(func() {
 		if cluster == nil {
 			log.Error("cluster should not be nil at first time when create ProcessorManager single")
 		}
@@ -57,15 +45,13 @@ func GetPMSingle(cluster *Cluster) *ProcessorManager {
 		pm.ctx, pm.cancel = context.WithCancel(context.Background())
 		pm.pp = NewPartitionProcessor(pm.ctx, pm.cancel, cluster)
 
-		processorManagerSingle = pm
+		processorManager = pm
 		pm.start()
 
-		atomic.StoreUint32(&processorManagerSingleDone, 1)
-
 		log.Info("ProcessorManager single has started")
-	}
+	})
 
-	return processorManagerSingle
+	return processorManager
 }
 
 func (pm *ProcessorManager) Close() {
@@ -78,12 +64,6 @@ func (pm *ProcessorManager) Close() {
 	pm.wg.Wait()
 
 	pm.pp.Close()
-
-	processorManagerSingleLock.Lock()
-	defer processorManagerSingleLock.Unlock()
-
-	processorManagerSingle = nil
-	atomic.StoreUint32(&processorManagerSingleDone, 0)
 
 	log.Info("ProcessorManager single has closed")
 }
@@ -280,7 +260,7 @@ func (p *PartitionProcessor) createPartition(partitionToCreate *Partition, psToC
 
 	replicaId, err := GetIdGeneratorSingle(nil).GenID()
 	if err != nil {
-		log.Error("fail to generate new replica ßid. err:[%v]", err)
+		log.Error("fail to allocate new replica ßid. err:[%v]", err)
 		return
 	}
 	var newMetaReplica = &metapb.Replica{ID: metapb.ReplicaID(replicaId), NodeID: psToCreate.ID,
@@ -309,8 +289,8 @@ func (p *PartitionProcessor) createPartition(partitionToCreate *Partition, psToC
 	}
 }
 
-func (p *PartitionProcessor) deletePartition (partitionId metapb.PartitionID, leaderNodeId metapb.NodeID,
-			replica *metapb.Replica) {
+func (p *PartitionProcessor) deletePartition(partitionId metapb.PartitionID, leaderNodeId metapb.NodeID,
+	replica *metapb.Replica) {
 	leaderPS := p.cluster.PsCache.FindServerById(leaderNodeId)
 	if leaderPS == nil {
 		log.Debug("can not find leader ps when notify deleting replicas to leader")
@@ -335,8 +315,8 @@ func (p *PartitionProcessor) deletePartition (partitionId metapb.PartitionID, le
 	}
 }
 
-func (p *PartitionProcessor) forceDeletePartition (partitionId metapb.PartitionID, replicaRpcAddr string,
-			replica *metapb.Replica) {
+func (p *PartitionProcessor) forceDeletePartition(partitionId metapb.PartitionID, replicaRpcAddr string,
+	replica *metapb.Replica) {
 	if err := GetPSRpcClientSingle(nil).DeletePartition(replicaRpcAddr, partitionId); err != nil {
 		log.Error("Rpc fail to delete partition[%v] from ps. err:[%v]", partitionId, err)
 		return

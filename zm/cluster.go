@@ -2,32 +2,31 @@ package zm
 
 import (
 	"github.com/tiglabs/baudengine/proto/metapb"
-	"github.com/tiglabs/baudengine/util"
-	"github.com/tiglabs/baudengine/util/log"
-	"math"
-	"sync"
 	"github.com/tiglabs/baudengine/topo"
+	"github.com/tiglabs/baudengine/util/log"
+	"sync"
 )
 
 type Cluster struct {
-	config *Config
+	config     *Config
 	topoServer *topo.TopoServer
 
 	spaceMap sync.Map
 	// timeWheel to check timeout and refresh cache
-	timeWheel TimeWheel
+	timeWheel      TimeWheel
 	DbCache        *DBCache
 	PsCache        *PSCache
+	PartitionCache *PartitionCache
 
 	clusterLock sync.RWMutex
 }
 
 func NewCluster(config *Config, topoServer *topo.TopoServer) *Cluster {
 	return &Cluster{
-		config:         config,
-		topoServer:          topoServer,
-		DbCache:        NewDBCache(),
-		PsCache:        NewPSCache(),
+		config:     config,
+		topoServer: topoServer,
+		DbCache:    NewDBCache(),
+		PsCache:    NewPSCache(),
 	}
 }
 
@@ -57,7 +56,6 @@ func (c *Cluster) Start() error {
 
 func (c *Cluster) Close() {
 	c.clearAllCache()
-	c.topoServer.GetAllZones()
 	log.Info("Cluster has closed")
 }
 
@@ -65,7 +63,7 @@ func (c *Cluster) recoveryPSCache() error {
 	c.clusterLock.Lock()
 	defer c.clusterLock.Unlock()
 
-	servers, err := c.PsCache.Recovery(c.store, &c.config.PsCfg)
+	servers, err := c.PsCache.Recovery(c.config.ClusterCfg.ZoneID, c.topoServer, &c.config.PsCfg)
 	if err != nil {
 		return err
 	}
@@ -81,7 +79,7 @@ func (c *Cluster) recoveryDBCache() error {
 	c.clusterLock.Lock()
 	defer c.clusterLock.Unlock()
 
-	dbs, err := c.DbCache.Recovery(c.store)
+	dbs, err := c.DbCache.Recovery(c.topoServer)
 	if err != nil {
 		return err
 	}
@@ -102,7 +100,7 @@ func (c *Cluster) recoverySpaceCache() error {
 		return nil
 	}
 
-	allSpaces, err := dbs[0].SpaceCache.Recovery(c.store)
+	allSpaces, err := dbs[0].SpaceCache.Recovery(c.topoServer)
 	if err != nil {
 		return err
 	}
@@ -111,13 +109,8 @@ func (c *Cluster) recoverySpaceCache() error {
 		db := c.DbCache.FindDbById(space.DB)
 		if db == nil {
 			log.Warn("Cannot find db for the space[%v] when recovery space. discord it", space)
-
-			if err := space.erase(c.store); err != nil {
-				log.Error("fail to remove unused space[%v] when recovery. err:[%v]", space, err)
-			}
 			continue
 		}
-
 		db.SpaceCache.AddSpace(space)
 	}
 
@@ -128,7 +121,7 @@ func (c *Cluster) recoveryPartitionCache() error {
 	c.clusterLock.Lock()
 	defer c.clusterLock.Unlock()
 
-	partitions, err := c.PartitionCache.Recovery(c.store)
+	partitions, err := c.PartitionCache.Recovery(c.topoServer)
 	if err != nil {
 		return err
 	}
@@ -137,20 +130,12 @@ func (c *Cluster) recoveryPartitionCache() error {
 		db := c.DbCache.FindDbById(partition.DB)
 		if db == nil {
 			log.Warn("Cannot find db for the partition[%v] when recovery partition. discord it", partition)
-
-			if err := partition.erase(c.store); err != nil {
-				log.Error("fail to remove unused partition[%v] when recovery. err:[%v]", partition, err)
-			}
 			continue
 		}
 
 		space := db.SpaceCache.FindSpaceById(partition.Space)
 		if space == nil {
 			log.Warn("Cannot find space for the partition[%v] when recovery partition. discord it", partition)
-
-			if err := partition.erase(c.store); err != nil {
-				log.Error("fail to remove unused partition[%v] when recovery. err:[%v]", partition, err)
-			}
 			continue
 		}
 
@@ -168,7 +153,7 @@ func (c *Cluster) recoveryPartitionCache() error {
 
 			ps.addPartition(partition)
 		}
-		if err := partition.deleteReplica(c.store, delMetaReplicas...); err != nil {
+		if err := partition.deleteReplica(c.topoServer, delMetaReplicas...); err != nil {
 			log.Error("fail to remove unused replicas when recovery partition[%v]. err[%v]", partition, err)
 			continue
 		}
@@ -185,4 +170,3 @@ func (c *Cluster) clearAllCache() {
 	c.DbCache.Clear()
 	c.PartitionCache.Clear()
 }
-
