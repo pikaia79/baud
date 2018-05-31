@@ -10,8 +10,8 @@ import (
 	"github.com/tiglabs/baudengine/engine"
 )
 
-func(w *BleveEngine) SetApplyID(applyID uint64) (err error) {
-	batch := NewBatch(w.driver)
+func(w *Bleve) SetApplyID(applyID uint64) (err error) {
+	batch := NewBatch(w.index)
 	defer func() {
 		if err == nil {
 			err = batch.Commit()
@@ -24,8 +24,8 @@ func(w *BleveEngine) SetApplyID(applyID uint64) (err error) {
 	return
 }
 
-func (w *BleveEngine)AddDocument(ctx context.Context, docID engine.DOC_ID, doc interface{}) (err error) {
-	batch := NewBatch(w.driver)
+func (w *Bleve)AddDocument(ctx context.Context, docID engine.DOC_ID, doc interface{}) (err error) {
+	batch := NewBatch(w.index)
 	defer func() {
 		if err == nil {
 			err = batch.Commit()
@@ -37,8 +37,8 @@ func (w *BleveEngine)AddDocument(ctx context.Context, docID engine.DOC_ID, doc i
 	return
 }
 
-func(w *BleveEngine) UpdateDocument(ctx context.Context, docID engine.DOC_ID, doc interface{}, upsert bool) (found bool, err error) {
-	batch := NewBatch(w.driver)
+func(w *Bleve) UpdateDocument(ctx context.Context, docID engine.DOC_ID, doc interface{}, upsert bool) (found bool, err error) {
+	batch := NewBatch(w.index)
 	defer func() {
 		if err == nil {
 			err = batch.Commit()
@@ -49,8 +49,8 @@ func(w *BleveEngine) UpdateDocument(ctx context.Context, docID engine.DOC_ID, do
 	return batch.UpdateDocument(ctx, docID, doc, upsert)
 }
 
-func(w *BleveEngine) DeleteDocument(ctx context.Context, docID engine.DOC_ID) (count int, err error) {
-	batch := NewBatch(w.driver)
+func(w *Bleve) DeleteDocument(ctx context.Context, docID engine.DOC_ID) (count int, err error) {
+	batch := NewBatch(w.index)
 	defer func() {
 		if err == nil {
 			err = batch.Commit()

@@ -10,8 +10,8 @@ import (
 	"github.com/tiglabs/baudengine/engine"
 )
 
-func(r *BleveEngine)GetApplyID() (uint64, error) {
-	v, err := r.driver.GetInternal(RAFT_APPLY_ID)
+func(r *Bleve)GetApplyID() (uint64, error) {
+	v, err := r.index.GetInternal(RAFT_APPLY_ID)
 	if err != nil {
 		return 0, err
 	}
@@ -24,8 +24,8 @@ func(r *BleveEngine)GetApplyID() (uint64, error) {
 	return binary.BigEndian.Uint64(v), nil
 }
 
-func(r *BleveEngine)GetDocument(ctx context.Context, docID engine.DOC_ID) (engine.DOCUMENT, bool) {
-	_doc, err := r.driver.Document(docID.ToString())
+func(r *Bleve)GetDocument(ctx context.Context, docID engine.DOC_ID) (engine.DOCUMENT, bool) {
+	_doc, err := r.index.Document(docID.ToString())
 	if err != nil {
 		// todo panic ???
 		return nil, false
@@ -72,10 +72,10 @@ func(r *BleveEngine)GetDocument(ctx context.Context, docID engine.DOC_ID) (engin
 	return doc, true
 }
 
-func(r *BleveEngine)Search(ctx context.Context, req *engine.SearchRequest)(*engine.SearchResult, error) {
-
+func(r *Bleve)Search(ctx context.Context, req *engine.SearchRequest)(*engine.SearchResult, error) {
+	r.index.SearchInContext(ctx, )
 }
 
-func (r *BleveEngine)Close() error {
-	return r.driver.Close()
+func (r *Bleve)Close() error {
+	return r.index.Close()
 }
