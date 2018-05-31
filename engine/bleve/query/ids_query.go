@@ -7,8 +7,7 @@ import (
 
 type IdsQuery struct {
 	query.Query     `json:"-"`
-	Type  string    `json:"type,omitempty"`
-	Ids   []string  `json:"values"`
+
 }
 
 func NewIdsQuery() *IdsQuery {
@@ -20,11 +19,15 @@ func (i *IdsQuery) SetQuery(query query.Query) {
 }
 
 func (i *IdsQuery) UnmarshalJSON(data []byte) error {
-	err := json.Unmarshal(data, i)
+	tmp := struct {
+		Type  string    `json:"type,omitempty"`
+		Ids   []string  `json:"values"`
+	}{}
+	err := json.Unmarshal(data, &tmp)
 	if err != nil {
 		return err
 	}
-	q := query.NewDocIDQuery(i.Ids)
+	q := query.NewDocIDQuery(tmp.Ids)
 	i.Query = q
 	return nil
 }

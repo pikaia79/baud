@@ -7,21 +7,27 @@ import (
 	"encoding/json"
 )
 
-func TestIdsQuery(t *testing.T) {
-	groups := []QueryTestGroup{QueryTestGroup{`{
-        "type" : "my_type",
-        "values" : ["1", "4", "100"]
-    }`,
+func TestMatchAllQuery(t *testing.T) {
+	groups := []QueryTestGroup{QueryTestGroup{`{ }`,
 		func() query.Query {
-			utq := query.NewDocIDQuery([]string{"1", "4", "100"})
-			q := NewIdsQuery()
+			utq := query.NewMatchAllQuery()
+			q := NewMatchAllQuery()
 			q.SetQuery(utq)
 			return q
 		}(),},
+
+		QueryTestGroup{`{ "boost" : 1.2 }`,
+			func() query.Query {
+				utq := query.NewMatchAllQuery()
+				utq.SetBoost(1.2)
+				q := NewMatchAllQuery()
+				q.SetQuery(utq)
+				return q
+			}(),},
 	}
 
 	for _, group := range groups {
-		tq := NewIdsQuery()
+		tq := NewMatchAllQuery()
 		err := json.Unmarshal([]byte(group.input), tq)
 		if err != nil {
 			t.Fatal(err)
