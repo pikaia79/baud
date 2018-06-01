@@ -7,8 +7,6 @@ import (
 	"time"
 
 	"github.com/tiglabs/baudengine/engine"
-	"github.com/tiglabs/baudengine/kernel/index"
-	"github.com/tiglabs/baudengine/kernel/store/kvstore/badgerdb"
 	"github.com/tiglabs/baudengine/proto/masterpb"
 	"github.com/tiglabs/baudengine/proto/metapb"
 	"github.com/tiglabs/baudengine/util/log"
@@ -58,12 +56,12 @@ func (p *partition) start() {
 		return
 	}
 
-	storeOpt := &badgerdb.StoreConfig{
-		Path:     dataPath,
-		Sync:     false,
-		ReadOnly: false,
+	storeOpt := engine.EngineConfig{
+		ReadOnly:     false,
+		Path:         dataPath,
+		ExtraOptions: p.server.StoreOption,
 	}
-	kvStore, err := badgerdb.New(storeOpt)
+	store, err := engine.Build(p.server.StoreEngine, storeOpt)
 	if err != nil {
 		p.rwMutex.Lock()
 		p.meta.Status = metapb.PA_INVALID
@@ -71,7 +69,7 @@ func (p *partition) start() {
 		log.Error("start partition[%d] open store engine error: %s", p.meta.ID, err)
 		return
 	}
-	p.store = index.NewIndexDriver(kvStore)
+	p.store = store
 	apply, err := p.store.GetApplyID()
 	if err != nil {
 		p.rwMutex.Lock()
