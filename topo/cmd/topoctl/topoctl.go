@@ -5,15 +5,15 @@ import (
 	"flag"
 	"fmt"
 	//"github.com/tiglabs/baudengine/proto/metapb"
+	"github.com/tiglabs/baudengine/proto/metapb"
 	"github.com/tiglabs/baudengine/topo"
 	_ "github.com/tiglabs/baudengine/topo/etcd3topo"
 	"github.com/tiglabs/baudengine/util/log"
 	_ "net/http/pprof"
 	"runtime"
 	"runtime/debug"
+	"sync"
 	"time"
-	"github.com/tiglabs/baudengine/proto/metapb"
-    "sync"
 )
 
 var (
@@ -80,8 +80,8 @@ func main() {
 	log.Debug("add new db[%v]", dbTopo2)
 	dbTopo, err := server.GetDB(ctx, 2)
 	if err != nil {
-	  log.Error("GetDB err[%v]", err)
-	  return
+		log.Error("GetDB err[%v]", err)
+		return
 	}
 	log.Debug("get db[%v], version=%d", dbTopo, dbTopo.Version)
 

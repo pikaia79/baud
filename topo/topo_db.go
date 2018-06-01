@@ -7,8 +7,8 @@ import (
 	"github.com/tiglabs/baudengine/proto/metapb"
 	"github.com/tiglabs/baudengine/util/log"
 	"path"
-	"strings"
 	"strconv"
+	"strings"
 )
 
 type DBTopo struct {

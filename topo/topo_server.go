@@ -4,10 +4,10 @@ import (
 	"context"
 	"errors"
 	"flag"
+	"github.com/tiglabs/baudengine/proto/masterpb"
 	"github.com/tiglabs/baudengine/proto/metapb"
 	"github.com/tiglabs/baudengine/util/log"
-    "time"
-    "github.com/tiglabs/baudengine/proto/masterpb"
+	"time"
 )
 
 const (
