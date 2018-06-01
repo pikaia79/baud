@@ -1,6 +1,7 @@
 package gm
 
 import (
+	"github.com/jddb/jddb-k8s/third_party/golang/go/doc/testdata"
 	"github.com/tiglabs/baudengine/proto/metapb"
 	"github.com/tiglabs/baudengine/topo"
 	"github.com/tiglabs/baudengine/util/log"
@@ -109,6 +110,17 @@ func (c *ZoneCache) DeleteZone(zone *Zone) {
 	delete(c.zones, zone.Name)
 }
 
+func (c *ZoneCache) GetAllZonesName() []string {
+	c.lock.RLock()
+	defer c.lock.RUnlock()
+
+	zonesName := make([]string, 0, len(c.zones))
+	for zoneName := range c.zones {
+		zonesName = append(zonesName, zoneName)
+	}
+	return zonesName
+}
+
 func (c *ZoneCache) GetAllZones() []*Zone {
 	c.lock.RLock()
 	defer c.lock.RUnlock()
@@ -119,6 +131,13 @@ func (c *ZoneCache) GetAllZones() []*Zone {
 	}
 
 	return zones
+}
+
+func (c *ZoneCache) GetAllZonesMap() map[string]*Zone {
+	c.lock.RLock()
+	defer c.lock.RUnlock()
+
+	return c.zones
 }
 
 func (c *ZoneCache) Recovery() ([]*Zone, error) {

@@ -28,7 +28,7 @@ type Field struct {
 	MultiValue  bool
 }
 
-func NewSpace(dbId metapb.DBID, dbName, spaceName string, policy *PartitionPolicy) (*Space, error) {
+func NewSpace(dbId metapb.DBID, dbName, spaceName, spaceSchema string, policy *PartitionPolicy) (*Space, error) {
 	spaceId, err := GetIdGeneratorSingle().GenID()
 	if err != nil {
 		log.Error("generate space id is failed. err:[%v]", err)
@@ -37,6 +37,7 @@ func NewSpace(dbId metapb.DBID, dbName, spaceName string, policy *PartitionPolic
 
 	spaceMeta := &metapb.Space{
 		Name:   spaceName,
+		Schema: spaceSchema,
 		ID:     metapb.SpaceID(spaceId),
 		DB:     dbId,
 		DbName: dbName,

@@ -31,6 +31,7 @@ const (
 	PARTITION_FUNC   = "partition_func"
 	PARTITION_NUM    = "partition_num"
 	PARTITION_ID     = "partition_id"
+	SPACE_SCHEMA     = "space_schema"
 )
 
 type ApiServer struct {
@@ -265,6 +266,10 @@ func (s *ApiServer) handleSpaceCreate(w http.ResponseWriter, r *http.Request, pa
 	if err != nil {
 		return
 	}
+	spaceSchema, err := checkMissingParam(w, r, SPACE_SCHEMA)
+	if err != nil {
+		return
+	}
 	partitionKey, err := checkMissingParam(w, r, PARTITION_KEY)
 	if err != nil {
 		return
@@ -284,7 +289,7 @@ func (s *ApiServer) handleSpaceCreate(w http.ResponseWriter, r *http.Request, pa
 		Function: partitionFunc,
 		Number:   partitionNum,
 	}
-	space, err := s.cluster.CreateSpace(dbName, spaceName, policy)
+	space, err := s.cluster.CreateSpace(dbName, spaceName, spaceSchema, policy)
 	if err != nil {
 		sendReply(w, newHttpErrReply(err))
 		return

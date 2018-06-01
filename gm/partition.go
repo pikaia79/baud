@@ -1,8 +1,10 @@
 package gm
 
 import (
+	"github.com/tiglabs/baudengine/proto/masterpb"
 	"github.com/tiglabs/baudengine/proto/metapb"
 	"github.com/tiglabs/baudengine/topo"
+	"github.com/tiglabs/baudengine/util/deepcopy"
 	"github.com/tiglabs/baudengine/util/log"
 	"golang.org/x/net/context"
 	"sync"
@@ -16,7 +18,9 @@ const (
 type Partition struct {
 	*topo.PartitionTopo
 
-	Zones map[string]*topo.ZoneTopo
+	ReplicaLeader *metapb.Replica
+	Term          uint64
+	Zones         map[string]*topo.ZoneTopo
 
 	propertyLock sync.RWMutex
 }
@@ -49,6 +53,56 @@ func NewPartitionByTopo(partitionTopo *topo.PartitionTopo) *Partition {
 	return &Partition{
 		PartitionTopo: partitionTopo,
 	}
+}
+
+func (p *Partition) update() error {
+	p.propertyLock.Lock()
+	defer p.propertyLock.Unlock()
+
+	ctx, cancel := context.WithTimeout(context.Background(), ETCD_TIMEOUT)
+	defer cancel()
+
+	err := topoServer.UpdatePartition(ctx, p.PartitionTopo)
+	if err != nil {
+		log.Error("topoServer UpdatePartition error, err: [%v]", err)
+		return err
+	}
+
+	return nil
+}
+
+//GetZonesForPartition(ctx context.Context, partitionId metapb.PartitionID) ([]string, error)
+
+func (p *Partition) setZones(zonesName []string) error {
+	p.propertyLock.Lock()
+	defer p.propertyLock.Unlock()
+
+	ctx, cancel := context.WithTimeout(context.Background(), ETCD_TIMEOUT)
+	defer cancel()
+
+	err := topoServer.SetZonesForPartition(ctx, p.ID, zonesName)
+	if err != nil {
+		log.Error("topoServer SetZonesForPartition error, err: [%v]", err)
+		return err
+	}
+
+	return nil
+}
+
+func (p *Partition) getZones() ([]string, error) {
+	p.propertyLock.Lock()
+	defer p.propertyLock.Unlock()
+
+	ctx, cancel := context.WithTimeout(context.Background(), ETCD_TIMEOUT)
+	defer cancel()
+
+	zonesName, err := topoServer.GetZonesForPartition(ctx, p.ID)
+	if err != nil {
+		log.Error("topoServer GetZonesForPartition error, err: [%v]", err)
+		return nil, err
+	}
+
+	return zonesName, nil
 }
 
 func (p *Partition) countReplicas() int {
@@ -130,6 +184,84 @@ func (p *Partition) setPartitionTask(zoneName string, task *metapb.Task, timeout
 		return err
 	}
 	return nil
+}
+
+func (p *Partition) updateReplicaGroup(partitionInfo *masterpb.PartitionInfo) (bool, error) {
+	p.propertyLock.Lock()
+	defer p.propertyLock.Unlock()
+
+	if !partitionInfo.IsLeader {
+		return false, nil
+	}
+	if partitionInfo.Epoch.ConfVersion < p.Epoch.ConfVersion {
+		return false, nil
+	}
+	if partitionInfo.Epoch.ConfVersion == p.Epoch.ConfVersion {
+		if p.ReplicaLeader != nil && partitionInfo.RaftStatus.Replica.ID == p.ReplicaLeader.ID {
+			return false, nil
+		}
+		if p.ReplicaLeader != nil && partitionInfo.RaftStatus.Replica.ID != p.ReplicaLeader.ID {
+			if partitionInfo.RaftStatus.Term <= p.Term {
+				return false, nil
+			}
+		}
+	}
+
+	zonesNameMap := make(map[string]string)
+	zonesName := make([]string, 0)
+	PartitionTopoCopy := deepcopy.Iface(p.PartitionTopo).(*topo.PartitionTopo)
+	PartitionTopoCopy.Replicas = make([]metapb.Replica, 0, len(partitionInfo.RaftStatus.Followers)+1)
+	PartitionTopoCopy.Epoch = partitionInfo.Epoch
+	PartitionTopoCopy.Status = partitionInfo.Status
+
+	PartitionTopoCopy.Replicas = append(PartitionTopoCopy.Replicas, partitionInfo.RaftStatus.Replica)
+	zonesNameMap[partitionInfo.RaftStatus.Replica.Zone] = partitionInfo.RaftStatus.Replica.Zone
+	for _, follower := range partitionInfo.RaftStatus.Followers {
+		PartitionTopoCopy.Replicas = append(PartitionTopoCopy.Replicas, follower.Replica)
+		zonesNameMap[follower.Replica.Zone] = follower.Replica.Zone
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), ETCD_TIMEOUT)
+	defer cancel()
+
+	err := topoServer.UpdatePartition(ctx, PartitionTopoCopy)
+	if err != nil {
+		log.Error("topoServer UpdatePartition error, err: [%v]", err)
+		return false, err
+	}
+	p.PartitionTopo = PartitionTopoCopy
+	p.ReplicaLeader = &partitionInfo.RaftStatus.Replica
+	p.Term = partitionInfo.RaftStatus.Term
+
+	for _, zoneNameMap := range zonesNameMap {
+		zonesName = append(zonesName, zoneNameMap)
+	}
+	err = p.setZones(zonesName)
+	if err != nil {
+		log.Error("setZones error, err: [%v]", err)
+		return false, err
+	}
+
+	return true, nil
+}
+
+func (p *Partition) pickReplicaToDelete() *metapb.Replica {
+	var replicaToDelete *metapb.Replica
+
+	if p.Replicas == nil || len(p.Replicas) == 0 {
+		return nil
+	}
+	if len(p.Replicas) == 1 {
+		return &p.Replicas[0]
+	}
+	for _, replica := range p.Replicas {
+		if p.ReplicaLeader != nil && replica.ID == p.ReplicaLeader.ID {
+			continue
+		}
+		replicaToDelete = &replica
+		break
+	}
+	return replicaToDelete
 }
 
 // PartitionCache

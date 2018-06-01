@@ -73,37 +73,34 @@ func (id *IdGenerator) GenID() (uint64, error) {
 	if id == nil {
 		return 0, ErrInternalError
 	}
-
 	if id.base == id.end {
 		id.lock.Lock()
+		defer id.lock.Unlock()
 
 		if id.base == id.end {
 			log.Debug("[GENID] before generate!!!!!! (base %d, end %d)", id.base, id.end)
-			end, err := id.generate()
+			start, end, err := id.generate()
 			if err != nil {
 				id.lock.Unlock()
 				return 0, err
 			}
-
+			id.base = start
 			id.end = end
-			id.base = id.end - id.step
 			log.Debug("[GENID] after generate!!!!!! (base %d, end %d)", id.base, id.end)
+			return id.base, nil
 		}
-
-		id.lock.Unlock()
 	}
 
 	atomic.AddUint64(&id.base, 1)
 	return id.base, nil
 }
 
-func (id *IdGenerator) generate() (uint64, error) {
+func (id *IdGenerator) generate() (uint64, uint64, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
-	start, err := topoServer.GenerateNewId(ctx)
+	start, end, err := topoServer.GenerateNewId(ctx, GEN_STEP)
 	if err != nil {
-		return 0, err
+		return 0, 0, err
 	}
-	end := start + id.step
-	return end, nil
+	return start, end, nil
 }

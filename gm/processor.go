@@ -140,6 +140,7 @@ type ProcessorEvent struct {
 
 type PartitionCreateBody struct {
 	replicaZMAddr       string
+	replicaZoneName     string
 	replicaLeaderZMAddr string
 	partition           *Partition
 }
@@ -158,12 +159,14 @@ type PartitionForceDeleteBody struct {
 
 func NewPartitionCreateEvent(
 	replicaZMAddr string,
+	replicaZoneName string,
 	replicaLeaderZMAddr string,
 	partition *Partition) *ProcessorEvent {
 	return &ProcessorEvent{
 		typ: EVENT_TYPE_PARTITION_CREATE,
 		body: &PartitionCreateBody{
 			replicaZMAddr:       replicaZMAddr,
+			replicaZoneName:     replicaZoneName,
 			replicaLeaderZMAddr: replicaLeaderZMAddr,
 			partition:           partition,
 		},
@@ -241,7 +244,7 @@ func (pp *PartitionProcessor) Run() {
 					defer pp.wg.Done()
 					body := event.body.(*PartitionCreateBody)
 					log.Debug("EVENT_TYPE_PARTITION_CREATE replicaZMAddr: [%s], replicaLeaderZMAddr:[%s], partition:[%v]", body.replicaZMAddr, body.replicaLeaderZMAddr, body.partition)
-					pp.createPartition(body.replicaZMAddr, body.replicaLeaderZMAddr, body.partition)
+					pp.createPartition(body.replicaZMAddr, body.replicaZoneName, body.replicaLeaderZMAddr, body.partition)
 				}()
 			} else if event.typ == EVENT_TYPE_PARTITION_DELETE {
 				go func() {
@@ -269,14 +272,15 @@ func (pp *PartitionProcessor) Close() {
 	pp.wg.Wait()
 }
 
-func (pp *PartitionProcessor) createPartition(replicaZMAddr, replicaLeaderZMAddr string, partition *Partition) {
+func (pp *PartitionProcessor) createPartition(replicaZMAddr, replicaZoneName, replicaLeaderZMAddr string, partition *Partition) {
 	replicaId, err := GetIdGeneratorSingle().GenID()
 	if err != nil {
 		log.Error("fail to generate new replica id. err:[%v]", err)
 		return
 	}
 	newMetaReplica := &metapb.Replica{
-		ID: metapb.ReplicaID(replicaId),
+		ID:   metapb.ReplicaID(replicaId),
+		Zone: replicaZoneName,
 	}
 
 	partitionCopy := deepcopy.Iface(partition).(*metapb.Partition)
@@ -306,8 +310,8 @@ func (pp *PartitionProcessor) deletePartition(replicaZMAddr, replicaLeaderZMAddr
 	}
 }
 
-func (pp *PartitionProcessor) forceDeletePartition(replicaRpcAddr string, partitionId metapb.PartitionID) {
-	if err := GetZoneMasterRpcClientSingle(pp.cluster.gm.config).DeletePartition(replicaRpcAddr, partitionId); err != nil {
+func (pp *PartitionProcessor) forceDeletePartition(replicaZMAddr string, partitionId metapb.PartitionID) {
+	if err := GetZoneMasterRpcClientSingle(pp.cluster.gm.config).DeletePartition(replicaZMAddr, partitionId); err != nil {
 		log.Error("Rpc fail to delete partition[%s] in replicaZMAddr:[%s]. err:[%v]", partitionId, err)
 		return
 	}
