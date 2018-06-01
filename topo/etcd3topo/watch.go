@@ -144,7 +144,7 @@ func (s *Server) WatchDir(ctx context.Context, cell, dirPath string, version top
 						// send value deleted
 						notifications <- &topo.WatchData{
 							Contents: ev.Kv.Value,
-							Version:  EtcdVersion(ev.Kv.Version),
+							Version:  EtcdVersion(ev.Kv.ModRevision),
 						}
 					case mvccpb.DELETE:
 						// return node path, that excluded root path
@@ -153,7 +153,7 @@ func (s *Server) WatchDir(ctx context.Context, cell, dirPath string, version top
 						// send key deleted
 						notifications <- &topo.WatchData{
 							Contents: []byte(keyDel),
-							Version:  EtcdVersion(ev.Kv.Version),
+							Version:  EtcdVersion(ev.Kv.ModRevision),
 							Err:      topo.ErrNoNode,
 						}
 					default:
