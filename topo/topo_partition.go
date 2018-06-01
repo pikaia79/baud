@@ -13,7 +13,7 @@ import (
 )
 
 type PartitionTopo struct {
-	version Version
+	Version Version
 	*metapb.Partition
 }
 
@@ -23,7 +23,7 @@ type PartitionWatchData struct {
 }
 
 type PartitionInfoTopo struct {
-	version Version
+	Version Version
 	*masterpb.PartitionInfo
 }
 
@@ -59,7 +59,7 @@ func (s *TopoServer) GetAllPartitions(ctx context.Context) ([]*PartitionTopo, er
 			return nil, err
 		}
 
-		partition := &PartitionTopo{version: version, Partition: partitionMeta}
+		partition := &PartitionTopo{Version: version, Partition: partitionMeta}
 		partitions = append(partitions, partition)
 	}
 
@@ -83,7 +83,7 @@ func (s *TopoServer) GetPartition(ctx context.Context, partitionId metapb.Partit
 		return nil, err
 	}
 
-	partition := &PartitionTopo{version: version, Partition: partitionMeta}
+	partition := &PartitionTopo{Version: version, Partition: partitionMeta}
 	return partition, nil
 }
 
@@ -99,11 +99,11 @@ func (s *TopoServer) UpdatePartition(ctx context.Context, partition *PartitionTo
 	}
 
 	newVersion, err := s.backend.Update(ctx, GlobalZone,
-		path.Join(partitionsPath, fmt.Sprint(partition.ID), PartitionTopoFile), contents, partition.version)
+		path.Join(partitionsPath, fmt.Sprint(partition.ID), PartitionTopoFile), contents, partition.Version)
 	if err != nil {
 		return err
 	}
-	partition.version = newVersion
+	partition.Version = newVersion
 
 	return nil
 }
@@ -114,7 +114,7 @@ func (s *TopoServer) DeletePartition(ctx context.Context, partition *PartitionTo
 	}
 
 	return s.backend.Delete(ctx, GlobalZone, path.Join(partitionsPath, fmt.Sprint(partition.ID), PartitionTopoFile),
-		partition.version)
+		partition.Version)
 }
 
 func (s *TopoServer) GetPartitionInfoByZone(ctx context.Context, zoneName string,
@@ -219,7 +219,7 @@ func (s *TopoServer) GetPartitionsOnPsByZone(ctx context.Context, zoneName strin
 			return nil, err
 		}
 
-		partitions = append(partitions, &PartitionTopo{version: version, Partition: partitionMeta})
+		partitions = append(partitions, &PartitionTopo{Version: version, Partition: partitionMeta})
 	}
 
 	return partitions, nil
@@ -396,7 +396,7 @@ func (s *TopoServer) WatchPartitions(ctx context.Context) (error, []*PartitionTo
 				return err, nil, nil, nil
 			}
 
-			partition := &PartitionTopo{version: version, Partition: partitionMeta}
+			partition := &PartitionTopo{Version: version, Partition: partitionMeta}
 			partitionTopos = append(partitionTopos, partition)
 		}
 	}
@@ -427,7 +427,7 @@ func (s *TopoServer) WatchPartitions(ctx context.Context) (error, []*PartitionTo
 				return
 			}
 
-			changes <- &PartitionWatchData{PartitionTopo: &PartitionTopo{Partition: value, version: wd.Version}}
+			changes <- &PartitionWatchData{PartitionTopo: &PartitionTopo{Partition: value, Version: wd.Version}}
 		}
 	}()
 

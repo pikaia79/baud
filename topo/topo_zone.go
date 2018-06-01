@@ -9,7 +9,7 @@ import (
 )
 
 type ZoneTopo struct {
-	version Version
+	Version Version
 	*metapb.Zone
 }
 
@@ -40,7 +40,7 @@ func (s *TopoServer) GetAllZones(ctx context.Context) ([]*ZoneTopo, error) {
 			return nil, err
 		}
 
-		zone := &ZoneTopo{version: version, Zone: zoneMeta}
+		zone := &ZoneTopo{Version: version, Zone: zoneMeta}
 		zones = append(zones, zone)
 	}
 
@@ -63,7 +63,7 @@ func (s *TopoServer) GetZone(ctx context.Context, zoneName string) (*ZoneTopo, e
 		return nil, err
 	}
 
-	zone := &ZoneTopo{version: version, Zone: zoneMeta}
+	zone := &ZoneTopo{Version: version, Zone: zoneMeta}
 
 	return zone, nil
 }
@@ -84,14 +84,14 @@ func (s *TopoServer) AddZone(ctx context.Context, zone *metapb.Zone) (*ZoneTopo,
 		return nil, err
 	}
 
-	return &ZoneTopo{version: version, Zone: zone}, nil
+	return &ZoneTopo{Version: version, Zone: zone}, nil
 }
 
 func (s *TopoServer) DeleteZone(ctx context.Context, zone *ZoneTopo) error {
 	if ctx == nil || zone == nil {
 		return ErrNoNode
 	}
-	return s.backend.Delete(ctx, GlobalZone, path.Join(ZonesPath, zone.Name, ZoneTopoFile), zone.version)
+	return s.backend.Delete(ctx, GlobalZone, path.Join(ZonesPath, zone.Name, ZoneTopoFile), zone.Version)
 }
 
 //// GetKnownCells implements topo.Server.GetKnownCells.

@@ -10,7 +10,7 @@ import (
 )
 
 type SpaceTopo struct {
-	version Version
+	Version Version
 	*metapb.Space
 }
 
@@ -45,7 +45,7 @@ func (s *TopoServer) GetAllSpaces(ctx context.Context) ([]*SpaceTopo, error) {
 			return nil, err
 		}
 
-		spaceTopo := &SpaceTopo{version: version, Space: spaceMeta}
+		spaceTopo := &SpaceTopo{Version: version, Space: spaceMeta}
 		spaceTopos = append(spaceTopos, spaceTopo)
 	}
 
@@ -69,7 +69,7 @@ func (s *TopoServer) GetSpace(ctx context.Context, dbId metapb.DBID, spaceId met
 		return nil, err
 	}
 
-	spaceTopo := &SpaceTopo{version: version, Space: spaceMeta}
+	spaceTopo := &SpaceTopo{Version: version, Space: spaceMeta}
 
 	return spaceTopo, nil
 }
@@ -110,10 +110,10 @@ func (s *TopoServer) AddSpace(ctx context.Context, space *metapb.Space,
 		return nil, nil, ErrNoNode
 	}
 
-	spaceTopo := &SpaceTopo{version: opResults[0].(*TxnCreateOpResult).Version, Space: space}
+	spaceTopo := &SpaceTopo{Version: opResults[0].(*TxnCreateOpResult).Version, Space: space}
 	partitionTopos := make([]*PartitionTopo, 0)
 	for i := 0; i < len(partitions); i++ {
-		partitionTopo := &PartitionTopo{version: opResults[i+1].(*TxnCreateOpResult).Version, Partition: partitions[i]}
+		partitionTopo := &PartitionTopo{Version: opResults[i+1].(*TxnCreateOpResult).Version, Partition: partitions[i]}
 		partitionTopos = append(partitionTopos, partitionTopo)
 	}
 
@@ -132,12 +132,12 @@ func (s *TopoServer) UpdateSpace(ctx context.Context, space *SpaceTopo) error {
 		return err
 	}
 
-	newVersion, err := s.backend.Update(ctx, GlobalZone, nodePath, contents, space.version)
+	newVersion, err := s.backend.Update(ctx, GlobalZone, nodePath, contents, space.Version)
 	if err != nil {
 		return ErrNoNode
 	}
 
-	space.version = newVersion
+	space.Version = newVersion
 	return nil
 }
 
@@ -147,7 +147,7 @@ func (s *TopoServer) DeleteSpace(ctx context.Context, space *SpaceTopo) error {
 	}
 
 	nodePath := path.Join(spacesPath, fmt.Sprintf("%d-%d", space.DB, space.ID), SpaceTopoFile)
-	return s.backend.Delete(ctx, GlobalZone, nodePath, space.version)
+	return s.backend.Delete(ctx, GlobalZone, nodePath, space.Version)
 }
 
 //func (s *TopoServer) WatchSpace(ctx context.Context, dbId metapb.DBID, spaceId metapb.SpaceID) (*SpaceWatchData,
@@ -225,7 +225,7 @@ func (s *TopoServer) WatchSpaces(ctx context.Context) (error, []*SpaceTopo, <-ch
 				return err, nil, nil, nil
 			}
 
-			spaceTopo := &SpaceTopo{version: version, Space: spaceMeta}
+			spaceTopo := &SpaceTopo{Version: version, Space: spaceMeta}
 			spaceTopos = append(spaceTopos, spaceTopo)
 		}
 	}
@@ -256,7 +256,7 @@ func (s *TopoServer) WatchSpaces(ctx context.Context) (error, []*SpaceTopo, <-ch
 				return
 			}
 
-			changes <- &SpaceWatchData{SpaceTopo: &SpaceTopo{Space: value, version: wd.Version}}
+			changes <- &SpaceWatchData{SpaceTopo: &SpaceTopo{Space: value, Version: wd.Version}}
 		}
 	}()
 

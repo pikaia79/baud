@@ -73,6 +73,8 @@ var (
 	ErrNoUpdateNeeded = errors.New("no update needed")
 
 	ErrZoneNotExists = errors.New("zone not exists")
+
+	ErrInvalidPath = errors.New("invalid path")
 )
 
 type Impl interface {
