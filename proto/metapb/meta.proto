@@ -65,6 +65,7 @@ message Space {
     SpaceType   type    = 5;
     SpaceStatus status  = 6;
     KeyPolicy   key_policy = 7;
+    string      schema  = 8;
 }
 
 enum PartitionStatus {
