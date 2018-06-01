@@ -8,7 +8,10 @@ import (
 	"time"
 )
 
-var MineIsLeader = false
+var (
+	MineIsLeader = false
+	LeaderNodeId = ""
+)
 
 type ZoneMaster struct {
 	config *Config
@@ -33,9 +36,17 @@ func NewServer() *ZoneMaster {
 func (zm *ZoneMaster) Start(config *Config) error {
 	zm.config = config
 
-	zm.topoServer = topo.Open()
+	topoServer, err := topo.OpenServer("etcd3", config.ClusterCfg.GlobalServerAddrs, config.ClusterCfg.GlobalRootDir)
+	if err != nil {
+		log.Error("topo.OpenServer() failed. err:[%v]", err)
+		zm.Shutdown()
+		return err
+	}
 
-	zm.cluster = NewCluster(config, zm.topoServer)
+	zm.topoServer = topoServer
+	masterCtx, cancelMaster := context.WithCancel(context.Background())
+	defer cancelMaster()
+	zm.cluster = NewCluster(masterCtx, config, zm.topoServer)
 	if err := zm.cluster.Start(); err != nil {
 		log.Error("fail to start cluster. err:[%v]", err)
 		zm.Shutdown()
@@ -58,7 +69,6 @@ func (zm *ZoneMaster) Start(config *Config) error {
 
 	zm.psRpcClient = GetPSRpcClientSingle(config)
 
-	var err error
 	zm.participation, err = zm.topoServer.NewMasterParticipation(config.ClusterCfg.ZoneID, config.ClusterCfg.CurNodeId)
 	if err != nil {
 		return err
@@ -69,12 +79,14 @@ func (zm *ZoneMaster) Start(config *Config) error {
 		switch err {
 		case nil:
 			MineIsLeader = true
+			LeaderNodeId = config.ClusterCfg.CurNodeId
 			for {
 				ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
 				id, err := zm.participation.GetCurrentMasterID(ctx)
 				cancel()
 				if err != nil || id != config.ClusterCfg.CurNodeId {
 					MineIsLeader = false
+					LeaderNodeId = id
 					break
 				}
 			}

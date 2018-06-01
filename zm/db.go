@@ -20,9 +20,17 @@ type DB struct {
 	timeWheel    TimeWheel
 }
 
-func NewDBByMeta(metaDb *topo.DBTopo) *DB {
+func (db *DB) Update(dbTopo *topo.DBTopo) {
+	db.propertyLock.Lock()
+	defer db.propertyLock.Unlock()
+
+	db.DBTopo = dbTopo
+}
+
+func NewDBByMeta(parent *Cluster, metaDb *topo.DBTopo) *DB {
 	return &DB{
 		DBTopo:     metaDb,
+		parent:     parent,
 		SpaceCache: NewSpaceCache(),
 	}
 }
@@ -97,18 +105,18 @@ func (c *DBCache) GetAllDBs() []*DB {
 	return dbs
 }
 
-func (c *DBCache) Recovery(topoServer *topo.TopoServer) ([]*DB, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), TOPO_TIMEOUT)
+func (c *DBCache) Recovery(cluster *Cluster) ([]*DB, error) {
+	ctx, cancel := context.WithTimeout(cluster.masterCtx, TOPO_TIMEOUT)
 	defer cancel()
 
-	DBs, err := topoServer.GetAllDBs(ctx)
+	DBs, err := cluster.topoServer.GetAllDBs(ctx)
 	if err != nil {
 		log.Error("topoServer.GetAllDBs() failed: %s", err.Error())
 	}
 
 	resultDBs := make([]*DB, 0)
 	for _, metaDb := range DBs {
-		resultDBs = append(resultDBs, NewDBByMeta(metaDb))
+		resultDBs = append(resultDBs, NewDBByMeta(cluster, metaDb))
 	}
 
 	return resultDBs, nil

@@ -6,7 +6,6 @@ import (
 
 	"github.com/BurntSushi/toml"
 	"github.com/tiglabs/baudengine/util/log"
-	"os"
 	"time"
 )
 
@@ -33,45 +32,17 @@ role = "master"
 version = "v1"
 # web request request signature key
 signkey = ""
-data-path = "/tmp/baudengine/master/data"
-
-[log]
-log-path = "/tmp/baudengine/master/log"
-#debug, info, warn, error
-level="debug"
-#debug, info, warn
-raft-level="info"
 
 [cluster]
 cluster-id = "1"
 node-id = 1
-raft-heartbeat-interval=500
-raft-retain-logs-count=100
+global-server-addrs = "0.0.0.0:1234"
+global-root-dir = "/"
 
-[[cluster.nodes]]
-node-id = 1
-http-port = 8887
-rpc-port = 18887
-raft-heartbeat-port=8886
-raft-replicate-port=8885
-
-[[cluster.nodes]]
-node-id = 2
-http-port = 8897
-rpc-port = 18897
-raft-heartbeat-port=8896
-raft-replicate-port=8895
-
-[ps]
-rpc-port=8000
-admin-port=8001
-heartbeat-interval=5000
-raft-heartbeat-interval=100
-raft-heartbeat-port=8002
-raft-replicate-port=8003
-raft-retain-logs=10000
-raft-replica-concurrency=1
-raft-snapshot-concurrency=1
+log]
+log-path = "/tmp/zm_log"
+#debug, info, warn, error
+level="debug"
 `
 
 const (
@@ -87,9 +58,8 @@ const (
 
 type Config struct {
 	ModuleCfg  ModuleConfig  `toml:"module,omitempty" json:"module"`
-	LogCfg     LogConfig     `toml:"log,omitempty" json:"log"`
 	ClusterCfg ClusterConfig `toml:"cluster,omitempty" json:"cluster"`
-	PsCfg      PsConfig      `toml:"ps,omitempty" json:"ps"`
+	LogCfg LogConfig         `toml:"log,omitempty" json:"log"`
 }
 
 func NewConfig(path string) *Config {
@@ -113,9 +83,8 @@ func NewConfig(path string) *Config {
 
 func (c *Config) adjust() {
 	c.ModuleCfg.adjust()
-	c.LogCfg.adjust()
 	c.ClusterCfg.adjust()
-	c.PsCfg.adjust()
+	c.LogCfg.adjust()
 }
 
 type ModuleConfig struct {
@@ -123,7 +92,6 @@ type ModuleConfig struct {
 	Role     string `toml:"role,omitempty" json:"role"`
 	Version  string `toml:"version,omitempty" json:"version"`
 	SignKey  string `toml:"signkey,omitempty" json:"signkey"`
-	DataPath string `toml:"data-path,omitempty" json:"data-path"`
 }
 
 func (cfg *ModuleConfig) adjust() {
@@ -133,14 +101,6 @@ func (cfg *ModuleConfig) adjust() {
 	if strings.Compare(cfg.Role, CONFIG_ROLE_MASTER) != 0 {
 		log.Panic("invalid role[%v]", cfg.Role)
 	}
-
-	adjustString(&cfg.DataPath, "no data path")
-	_, err := os.Stat(cfg.DataPath)
-	if os.IsNotExist(err) {
-		if err := os.MkdirAll(cfg.DataPath, os.ModePerm); err != nil {
-			log.Panic("fail to create meta data path[%v]. err[%v]", cfg.DataPath, err)
-		}
-	}
 }
 
 type ClusterNode struct {
@@ -148,122 +108,29 @@ type ClusterNode struct {
 	Host              string `toml:"host,omitempty" json:"host"`
 	HttpPort          uint32 `toml:"http-port,omitempty" json:"http-port"` // TODO: web admin port only need one in cluster
 	RpcPort           uint32 `toml:"rpc-port,omitempty" json:"rpc-port"`
-	RaftHeartbeatPort uint32 `toml:"raft-heartbeat-port,omitempty" json:"raft-heartbeat-port"`
-	RaftReplicatePort uint32 `toml:"raft-replicate-port,omitempty" json:"raft-replicate-port"`
 }
 
 type ClusterConfig struct {
-	ZoneID    string         `toml:"zone-id,omitempty" json:"zone-id"`
-	CurNodeId string         `toml:"node-id,omitempty" json:"node-id"`
-	Nodes     []*ClusterNode `toml:"nodes,omitempty" json:"nodes"`
-	CurNode   *ClusterNode
+	ZoneID            string         `toml:"zone-id,omitempty" json:"zone-id"`
+	CurNodeId         string         `toml:"node-id,omitempty" json:"node-id"`
+	GlobalServerAddrs string         `toml:"global-server-addrs,omitempty" json:"global-server-addrs"`
+	GlobalRootDir     string         `toml:"global-root-dir,omitempty" json:"global-root-dir"`
+}
+
+type LogConfig struct {
+	LogPath   string `toml:"log-path,omitempty" json:"log-path"`
+	Level     string `toml:"level,omitempty" json:"level"`
+}
+
+func (cfg *LogConfig) adjust() {
+	adjustString(&cfg.LogPath, "no log-path")
+	adjustString(&cfg.Level, "no level")
 }
 
 func (cfg *ClusterConfig) adjust() {
 	adjustString(&cfg.ZoneID, "no cluster-id")
 	adjustString(&cfg.CurNodeId, "no current node-id")
 
-	if len(cfg.Nodes) == 0 {
-		log.Panic("cluster nodes is empty")
-	}
-
-	// validate whether is node-id duplicated
-	tempNodes := make(map[string]*ClusterNode)
-
-	for _, node := range cfg.Nodes {
-		adjustString(&node.NodeId, "no node-id")
-		adjustString(&node.Host, "no node host")
-
-		adjustUint32(&node.HttpPort, "no node http port")
-		if node.HttpPort <= 1024 || node.HttpPort > 65535 {
-			log.Panic("out of node http port %d", node.HttpPort)
-		}
-
-		adjustUint32(&node.RpcPort, "no node rpc port")
-		if node.RpcPort <= 1024 || node.RpcPort > 65535 {
-			log.Panic("out of node rpc port %d", node.RpcPort)
-		}
-
-		adjustUint32(&node.RaftHeartbeatPort, "no node raft heartbeat port")
-		if node.RaftHeartbeatPort <= 1024 || node.RaftHeartbeatPort > 65535 {
-			log.Panic("out of node raft heartbeat port %d", node.RaftHeartbeatPort)
-		}
-
-		adjustUint32(&node.RaftReplicatePort, "no node raft replicate port")
-		if node.RaftReplicatePort <= 1024 || node.RaftReplicatePort > 65535 {
-			log.Panic("out of node raft replicate port %d", node.RaftReplicatePort)
-		}
-
-		if _, ok := tempNodes[node.NodeId]; ok {
-			log.Panic("duplicated node-id[%v]", node.NodeId)
-		}
-		tempNodes[node.NodeId] = node
-
-		if node.NodeId == cfg.CurNodeId {
-			cfg.CurNode = node
-		}
-	}
-}
-
-type LogConfig struct {
-	LogPath   string `toml:"log-path,omitempty" json:"log-path"`
-	Level     string `toml:"level,omitempty" json:"level"`
-	RaftLevel string `toml:"raft-level,omitempty" json:"raft-level"`
-}
-
-func (c *LogConfig) adjust() {
-	adjustString(&c.LogPath, "no log path")
-	_, err := os.Stat(c.LogPath)
-	if os.IsNotExist(err) {
-		if err := os.MkdirAll(c.LogPath, os.ModePerm); err != nil {
-			log.Panic("fail to create log path[%v]. err[%v]", c.LogPath, err)
-		}
-	}
-
-	adjustString(&c.Level, "no log level")
-	c.Level = strings.ToLower(c.Level)
-	switch c.Level {
-	case CONFIG_LOG_LEVEL_DEBUG:
-	case CONFIG_LOG_LEVEL_INFO:
-	case CONFIG_LOG_LEVEL_WARN:
-	case CONFIG_LOG_LEVEL_ERROR:
-	default:
-		log.Panic("Invalid log level[%v]", c.Level)
-	}
-
-	adjustString(&c.RaftLevel, "no raft log level")
-	c.RaftLevel = strings.ToLower(c.RaftLevel)
-	switch c.RaftLevel {
-	case CONFIG_LOG_LEVEL_DEBUG:
-	case CONFIG_LOG_LEVEL_INFO:
-	case CONFIG_LOG_LEVEL_WARN:
-	default:
-		log.Panic("Invalid raft log level[%v]", c.RaftLevel)
-	}
-}
-
-type PsConfig struct {
-	RpcPort                 uint32 `toml:"rpc-port,omitempty" json:"rpc-port"`
-	AdminPort               uint32 `toml:"admin-port,omitempty" json:"admin-port"`
-	HeartbeatInterval       uint64 `toml:"heartbeat-interval,omitempty" json:"heartbeat-interval"`
-	RaftHeartbeatInterval   uint64 `toml:"raft-heartbeat-interval,omitempty" json:"raft-heartbeat-interval"`
-	RaftHeartbeatPort       uint32 `toml:"raft-heartbeat-port,omitempty" json:"raft-heartbeat-port"`
-	RaftReplicatePort       uint32 `toml:"raft-replicate-port,omitempty" json:"raft-replicate-port"`
-	RaftRetainLogs          uint64 `toml:"raft-retain-logs,omitempty" json:"raft-retain-logs"`
-	RaftReplicaConcurrency  uint32 `toml:"raft-replica-concurrency,omitempty" json:"raft-replica-concurrency"`
-	RaftSnapshotConcurrency uint32 `toml:"raft-snapshot-concurrency,omitempty" json:"raft-snapshot-concurrency"`
-}
-
-func (cfg *PsConfig) adjust() {
-	adjustUint32(&cfg.RpcPort, "no ps raft port")
-	adjustUint32(&cfg.AdminPort, "no ps admin port")
-	adjustUint64(&cfg.HeartbeatInterval, "no ps heartbeat interval")
-	adjustUint64(&cfg.RaftHeartbeatInterval, "no ps raft heartbeat interval")
-	adjustUint32(&cfg.RaftHeartbeatPort, "no ps raft heartbeat port")
-	adjustUint32(&cfg.RaftReplicatePort, "no ps raft replicate port")
-	adjustUint64(&cfg.RaftRetainLogs, "no ps raft retain logs")
-	adjustUint32(&cfg.RaftReplicaConcurrency, "no ps raft replicate concurrency")
-	adjustUint32(&cfg.RaftSnapshotConcurrency, "no ps raft snapshot concurrency")
 }
 
 func adjustString(v *string, errMsg string) {

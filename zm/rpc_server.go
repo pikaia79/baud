@@ -69,6 +69,15 @@ func (rpcSrv *RpcServer) Close() {
 }
 
 func (rpcSrv *RpcServer) CreatePartition(ctx context.Context, req *masterpb.CreatePartitionRequest) (*masterpb.CreatePartitionResponse, error) {
+	if !rpcSrv.validateLeader() {
+		resp := &masterpb.CreatePartitionResponse{ResponseHeader: metapb.ResponseHeader{
+			ReqId: req.ReqId,
+			Code:  metapb.MASTER_RESP_CODE_NOT_LEADER,
+			Error: metapb.Error{NotLeader: &metapb.NotLeader{LeaderAddr: LeaderNodeId}},
+		}}
+		return resp, nil
+	}
+
 	partitionToCreate := NewPartitionByMeta(&topo.PartitionTopo{Partition: &req.Partition})
 
 	replicaId, err := GetIdGeneratorSingle(nil).GenID()
@@ -107,6 +116,15 @@ func (rpcSrv *RpcServer) CreatePartition(ctx context.Context, req *masterpb.Crea
 }
 
 func (rpcSrv *RpcServer) DeletePartition(ctx context.Context, req *masterpb.DeletePartitionRequest) (*masterpb.DeletePartitionResponse, error) {
+	if !rpcSrv.validateLeader() {
+		resp := &masterpb.DeletePartitionResponse{ResponseHeader: metapb.ResponseHeader{
+			ReqId: req.ReqId,
+			Code:  metapb.MASTER_RESP_CODE_NOT_LEADER,
+			Error: metapb.Error{NotLeader: &metapb.NotLeader{LeaderAddr: LeaderNodeId}},
+		}}
+		return resp, nil
+	}
+
 	partitionToDelete := rpcSrv.cluster.PartitionCache.FindPartitionById(req.PartitionID)
 	if partitionToDelete == nil {
 		log.Error("cannot find partition %d", req.PartitionID)
@@ -140,6 +158,15 @@ func (rpcSrv *RpcServer) DeletePartition(ctx context.Context, req *masterpb.Dele
 }
 
 func (rpcSrv *RpcServer) ChangeReplica(ctx context.Context, req *masterpb.ChangeReplicaRequest) (*masterpb.ChangeReplicaResponse, error) {
+	if !rpcSrv.validateLeader() {
+		resp := &masterpb.ChangeReplicaResponse{ResponseHeader: metapb.ResponseHeader{
+			ReqId: req.ReqId,
+			Code:  metapb.MASTER_RESP_CODE_NOT_LEADER,
+			Error: metapb.Error{NotLeader: &metapb.NotLeader{LeaderAddr: LeaderNodeId}},
+		}}
+		return resp, nil
+	}
+
 	partitionToDelete := rpcSrv.cluster.PartitionCache.FindPartitionById(req.PartitionID)
 	if partitionToDelete == nil {
 		log.Error("cannot find partition %d", req.PartitionID)
@@ -182,6 +209,10 @@ func (rpcSrv *RpcServer) ChangeReplica(ctx context.Context, req *masterpb.Change
 	return &masterpb.ChangeReplicaResponse{
 		ResponseHeader: metapb.ResponseHeader{ReqId: req.ReqId, Code: metapb.RESP_CODE_OK},
 	}, nil
+}
+
+func (rpcSrv *RpcServer) ChangeLeader(context.Context, *masterpb.ChangeLeaderRequest) (*masterpb.ChangeLeaderResponse, error) {
+	return nil, nil
 }
 
 func (rpcSrv *RpcServer) GetRoute(ctx context.Context,
@@ -272,10 +303,11 @@ func (rpcSrv *RpcServer) PSRegister(ctx context.Context,
 	resp := new(masterpb.PSRegisterResponse)
 
 	if !rpcSrv.validateLeader() {
-		resp.ResponseHeader = metapb.ResponseHeader{
-			Code:    metapb.RESP_CODE_SERVER_ERROR,
-			Message: "",
-		}
+		resp := &masterpb.PSRegisterResponse{ResponseHeader: metapb.ResponseHeader{
+			ReqId: req.ReqId,
+			Code:  metapb.MASTER_RESP_CODE_NOT_LEADER,
+			Error: metapb.Error{NotLeader: &metapb.NotLeader{LeaderAddr: LeaderNodeId}},
+		}}
 		return resp, nil
 	}
 
@@ -295,7 +327,7 @@ func (rpcSrv *RpcServer) PSRegister(ctx context.Context,
 
 		resp.ResponseHeader = *makeRpcRespHeader(ErrSuc)
 		resp.NodeID = ps.ID
-		packPsRegRespWithCfg(resp, &rpcSrv.config.PsCfg)
+		//packPsRegRespWithCfg(resp, &rpcSrv.config.PsCfg)
 		log.Debug("new register response [%v]", resp)
 		return resp, nil
 	}
@@ -315,7 +347,7 @@ func (rpcSrv *RpcServer) PSRegister(ctx context.Context,
 
 	resp.ResponseHeader = *makeRpcRespHeader(ErrSuc)
 	resp.NodeID = ps.ID
-	packPsRegRespWithCfg(resp, &rpcSrv.config.PsCfg)
+	//packPsRegRespWithCfg(resp, &rpcSrv.config.PsCfg)
 	resp.Partitions = *ps.partitionCache.GetAllMetaPartitions()
 	log.Debug("old nodeid[%v] register response [%v]", nodeId, resp)
 
@@ -329,10 +361,11 @@ func (rpcSrv *RpcServer) PSHeartbeat(ctx context.Context,
 	resp.ResponseHeader = *makeRpcRespHeader(ErrSuc)
 
 	if !rpcSrv.validateLeader() {
-		resp.ResponseHeader = metapb.ResponseHeader{
-			Code:    metapb.RESP_CODE_SERVER_ERROR,
-			Message: "",
-		}
+		resp := &masterpb.PSHeartbeatResponse{ResponseHeader: metapb.ResponseHeader{
+			ReqId: req.ReqId,
+			Code:  metapb.MASTER_RESP_CODE_NOT_LEADER,
+			Error: metapb.Error{NotLeader: &metapb.NotLeader{LeaderAddr: LeaderNodeId}},
+		}}
 		return resp, nil
 	}
 
@@ -388,7 +421,7 @@ func (rpcSrv *RpcServer) PSHeartbeat(ctx context.Context,
 			}
 
 			// To force update whole leader and replicas group
-			if expired, ok := partitionMS.UpdateReplicaGroupByCond(rpcSrv.cluster.topoServer, &partitionInfo, leaderReplicaHb); expired || !ok {
+			if expired, ok := partitionMS.UpdateReplicaGroupByCond(rpcSrv.cluster, &partitionInfo, leaderReplicaHb); expired || !ok {
 				log.Debug("Fail to update partition[%v] info. waiting next heartbeat. updateOk[%v]",
 					partitionInfo.ID, ok)
 				continue
@@ -421,7 +454,7 @@ func (rpcSrv *RpcServer) PSHeartbeat(ctx context.Context,
 			}
 			if !ok {
 				// To update whole leader and replicas group when leader in cluster is empty
-				if expired, ok := partitionMS.UpdateReplicaGroupByCond(rpcSrv.cluster.topoServer, &partitionInfo, leaderReplicaHb); expired || !ok {
+				if expired, ok := partitionMS.UpdateReplicaGroupByCond(rpcSrv.cluster, &partitionInfo, leaderReplicaHb); expired || !ok {
 					log.Debug("Fail to update partition[%v] info. waiting next heartbeat. updateOk[%v]",
 						partitionInfo.ID, ok)
 					continue
@@ -509,14 +542,14 @@ func pickReplicaToDelete(info *masterpb.PartitionInfo) *metapb.Replica {
 	return &leaderReplica
 }
 
-func packPsRegRespWithCfg(resp *masterpb.PSRegisterResponse, psCfg *PsConfig) {
-	resp.RPCPort = int(psCfg.RpcPort)
-	resp.AdminPort = int(psCfg.AdminPort)
-	resp.HeartbeatInterval = int(psCfg.HeartbeatInterval)
-	resp.RaftHeartbeatInterval = int(psCfg.RaftHeartbeatInterval)
-	resp.RaftHeartbeatPort = int(psCfg.RaftHeartbeatPort)
-	resp.RaftReplicatePort = int(psCfg.RaftReplicatePort)
-	resp.RaftRetainLogs = psCfg.RaftRetainLogs
-	resp.RaftReplicaConcurrency = int(psCfg.RaftReplicaConcurrency)
-	resp.RaftSnapshotConcurrency = int(psCfg.RaftSnapshotConcurrency)
-}
+//func packPsRegRespWithCfg(resp *masterpb.PSRegisterResponse, psCfg *PsConfig) {
+//	resp.RPCPort = int(psCfg.RpcPort)
+//	resp.AdminPort = int(psCfg.AdminPort)
+//	resp.HeartbeatInterval = int(psCfg.HeartbeatInterval)
+//	resp.RaftHeartbeatInterval = int(psCfg.RaftHeartbeatInterval)
+//	resp.RaftHeartbeatPort = int(psCfg.RaftHeartbeatPort)
+//	resp.RaftReplicatePort = int(psCfg.RaftReplicatePort)
+//	resp.RaftRetainLogs = psCfg.RaftRetainLogs
+//	resp.RaftReplicaConcurrency = int(psCfg.RaftReplicaConcurrency)
+//	resp.RaftSnapshotConcurrency = int(psCfg.RaftSnapshotConcurrency)
+//}
