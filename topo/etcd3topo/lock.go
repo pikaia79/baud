@@ -133,39 +133,3 @@ func (s *Server) unlock(ctx context.Context, cell, dirPath, actionPath string) e
 	}
 	return nil
 }
-
-//
-//// LockKeyspaceForAction implements topo.Server.
-//func (s *Server) LockKeyspaceForAction(ctx context.Context, keyspace, contents string) (string, error) {
-//	// Check the keyspace exists first.
-//	keyspacePath := path.Join(keyspacesPath, keyspace, topo.KeyspaceFile)
-//	_, _, err := s.Get(ctx, topo.GlobalCell, keyspacePath)
-//	if err != nil {
-//		return "", err
-//	}
-//
-//	return s.lock(ctx, path.Join(s.global.root, keyspacesPath, keyspace, locksPath), contents)
-//}
-//
-//// UnlockKeyspaceForAction implements topo.Server.
-//func (s *Server) UnlockKeyspaceForAction(ctx context.Context, keyspace, actionPath, results string) error {
-//	log.Infof("results of %v: %v", actionPath, results)
-//	return s.unlock(ctx, path.Join(s.global.root, keyspacesPath, keyspace, locksPath), actionPath)
-//}
-//
-//// LockShardForAction implements topo.Server.
-//func (s *Server) LockShardForAction(ctx context.Context, keyspace, shard, contents string) (string, error) {
-//	shardPath := path.Join(keyspacesPath, keyspace, shardsPath, shard, topo.ShardFile)
-//	_, _, err := s.Get(ctx, topo.GlobalCell, shardPath)
-//	if err != nil {
-//		return "", err
-//	}
-//
-//	return s.lock(ctx, path.Join(s.global.root, keyspacesPath, keyspace, shardsPath, shard, locksPath), contents)
-//}
-//
-//// UnlockShardForAction implements topo.Server.
-//func (s *Server) UnlockShardForAction(ctx context.Context, keyspace, shard, actionPath, results string) error {
-//	log.Infof("results of %v: %v", actionPath, results)
-//	return s.unlock(ctx, path.Join(s.global.root, keyspacesPath, keyspace, shardsPath, shard, locksPath), actionPath)
-//}

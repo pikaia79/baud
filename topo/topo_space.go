@@ -150,55 +150,6 @@ func (s *TopoServer) DeleteSpace(ctx context.Context, space *SpaceTopo) error {
 	return s.backend.Delete(ctx, GlobalZone, nodePath, space.Version)
 }
 
-//func (s *TopoServer) WatchSpace(ctx context.Context, dbId metapb.DBID, spaceId metapb.SpaceID) (*SpaceWatchData,
-//        <-chan *SpaceWatchData, CancelFunc) {
-//    if ctx == nil {
-//        return &SpaceWatchData{Err:ErrNoNode}, nil, nil
-//    }
-//
-//    nodePath := path.Join(spacesPath, fmt.Sprintf("%d-%d", dbId, spaceId), SpaceTopoFile)
-//    current, wdChannel, wdCancel := s.backend.Watch(ctx, GlobalZone, nodePath)
-//    if current.Err != nil {
-//        return &SpaceWatchData{Err:current.Err}, nil, nil
-//    }
-//
-//    curVal := &metapb.Space{}
-//    if err := proto.Unmarshal(current.Contents, curVal); err != nil {
-//        log.Error("Fail to unmarshal meta data for space[%d-%d]. err[%v]", dbId, spaceId, err)
-//        wdCancel()
-//        for range wdChannel {
-//        }
-//        return &SpaceWatchData{Err:err}, nil, nil
-//    }
-//
-//    changes := make(chan *SpaceWatchData, 10)
-//
-//    go func() {
-//        defer close(changes)
-//
-//        for wd := range wdChannel {
-//            if wd != nil {
-//                changes <- &SpaceWatchData{Err: wd.Err}
-//                return
-//            }
-//
-//            value := &metapb.Space{}
-//            if err := proto.Unmarshal(wd.Contents, value); err != nil {
-//                log.Error("Fail to unmarshal meta data for space[%d-%d]. err[%v]", dbId, spaceId, err)
-//                wdCancel()
-//                for range wdChannel {
-//                }
-//                changes <- &SpaceWatchData{Err: err}
-//                return
-//            }
-//
-//            changes <- &SpaceWatchData{SpaceTopo: &SpaceTopo{Space: value, version:wd.Version}}
-//        }
-//    }()
-//
-//    return &SpaceWatchData{SpaceTopo: &SpaceTopo{Space: curVal, version:current.Version}}, changes, wdCancel
-//}
-
 func (s *TopoServer) WatchSpaces(ctx context.Context) (error, []*SpaceTopo, <-chan *SpaceWatchData, CancelFunc) {
 	if ctx == nil {
 		return ErrNoNode, nil, nil, nil

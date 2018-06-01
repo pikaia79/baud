@@ -12,7 +12,8 @@ import (
 	"runtime"
 	"runtime/debug"
 	"time"
-	"sync"
+	"github.com/tiglabs/baudengine/proto/metapb"
+    "sync"
 )
 
 var (
@@ -70,14 +71,14 @@ func main() {
 	//  return
 	//}
 	//log.Debug("add new db[%v]", dbTopo1)
-	//dbMeta2 := &metapb.DB{ID: 8, Name: "mydb8"}
-	//dbTopo2, err := server.AddDB(ctx, dbMeta2)
-	//if err != nil {
-	//	log.Error("AddDB err[%v]", err)
-	//	return
-	//}
-	//log.Debug("add new db[%v]", dbTopo2)
-	dbTopo, err := server.GetDB(ctx, 6)
+	dbMeta2 := &metapb.DB{ID: 2, Name: "mydb2"}
+	dbTopo2, err := server.AddDB(ctx, dbMeta2)
+	if err != nil {
+		log.Error("AddDB err[%v]", err)
+		return
+	}
+	log.Debug("add new db[%v]", dbTopo2)
+	dbTopo, err := server.GetDB(ctx, 2)
 	if err != nil {
 	  log.Error("GetDB err[%v]", err)
 	  return
@@ -119,6 +120,7 @@ func main() {
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
+
 		for db := range dbChannel {
 			if db.Err != nil && db.Err != topo.ErrNoNode {
 				log.Error("watch err[%v]", db.Err)
@@ -136,13 +138,13 @@ func main() {
 	//time.Sleep(1 * time.Second)
 	//dbTopo.Name = "mydb666"
 	//if err := server.UpdateDB(ctx, dbTopo); err != nil {
-	//    log.Error("UpdateDB err[%v]", err)
-	//    return
+	//   log.Error("UpdateDB err[%v]", err)
+	//   return
 	//}
-	wg.Wait()
+	//wg.Wait()
 	//if err := server.DeleteDB(ctx, dbTopo); err != nil {
-	// log.Error("DeleteDB err[%v]", err)
-	// return
+	//	log.Error("DeleteDB err[%v]", err)
+	//	return
 	//}
 	// spaceMeta1 := &metapb.Space{ID:11, DB:1, Name:"myspace1"}
 	// partitionMetas := make([]*metapb.Partition, 0, 2)
