@@ -226,22 +226,16 @@ func (w *SpaceStateTransitionWorker) handleCompensation(partitionInfo *masterpb.
 		log.Info("received a partition[%v], that not existed in cluster.", partitionInfo.ID)
 		// force to delete
 		replica := pickReplicaToDelete(partitionInfo)
-		replicaZoneParticipation, err := topoServer.NewMasterParticipation(replica.Zone, w.cluster.config.ClusterCfg.GmNodeId)
+		replicaZoneAddr, err := w.getZMLeaderAddr(replica.Zone, w.cluster.config.ClusterCfg.GmNodeId)
 		if err != nil {
-			log.Error("topoServer NewMasterParticipation error. err:[%v]", err)
-			return err
-		}
-		ctx, cancel := context.WithTimeout(context.Background(), ETCD_TIMEOUT)
-		replicaZoneAddr, err := replicaZoneParticipation.GetCurrentMasterID(ctx)
-		cancel()
-		if err != nil {
-			log.Error("replicaZoneParticipation GetCurrentMasterID error. err:[%v]", err)
+			log.Error("getZMLeaderAddr() replicaZoneAddr error. err:[%v]", err)
 			return err
 		}
 		if replicaZoneAddr == "" {
-			log.Info("replicaZoneParticipation GetCurrentMasterID has no leader now.")
+			log.Info("getZMLeaderAddr() replicaZoneAddr has no leader now.")
 			return ErrNoMSLeader
 		}
+
 		isGrabed, err := partitionInCluster.grabPartitionTaskLock(topo.GlobalZone, "partition", string(partitionInCluster.ID))
 		if err != nil {
 			log.Error("partition grab Partition Task error, partition:[%d]", partitionInCluster.ID)
@@ -262,7 +256,7 @@ func (w *SpaceStateTransitionWorker) handleCompensation(partitionInfo *masterpb.
 	// partitionInfo confver小于 partition元数据的confver, 说明这个版本的副本有问题, 应该删除
 	if partitionInfo.Epoch.ConfVersion < partitionInCluster.Epoch.ConfVersion {
 		// delete all replicas and leader
-		replicaZoneAddr, replica, replicaLeaderZoneAddr, err := w.getReplicaZoneAddrAndRelicaLeaderZoneAddrForDeleteByPartitionInfo(partitionInfo)
+		replicaZoneAddr, replica, replicaLeaderZoneAddr, err := w.getReplicaZoneAddrAndRelicaLeaderZoneAddrForDelete(nil, partitionInfo)
 		if err != nil {
 			log.Error("getReplicaZoneAddrAndRelicaLeaderZoneAddr error, err:[%v]", err)
 			return err
@@ -288,7 +282,7 @@ func (w *SpaceStateTransitionWorker) handleCompensation(partitionInfo *masterpb.
 		if partitionInCluster.ReplicaLeader != nil && partitionInfo.RaftStatus.Replica.ID != partitionInCluster.ReplicaLeader.ID {
 			if partitionInfo.RaftStatus.Term < partitionInCluster.Term {
 				// delete all replicas and leader
-				replicaZoneAddr, replica, replicaLeaderZoneAddr, err := w.getReplicaZoneAddrAndRelicaLeaderZoneAddrForDeleteByPartitionInfo(partitionInfo)
+				replicaZoneAddr, replica, replicaLeaderZoneAddr, err := w.getReplicaZoneAddrAndRelicaLeaderZoneAddrForDelete(nil, partitionInfo)
 				if err != nil {
 					log.Error("getReplicaZoneAddrAndRelicaLeaderZoneAddr error, err:[%v]", err)
 					return err
@@ -376,7 +370,7 @@ func (w *SpaceStateTransitionWorker) handleSpaceStateSSRunning(db *DB, space *Sp
 					continue
 				}
 			} else if partition.countReplicas() > FIXED_REPLICA_NUM {
-				replicaZoneAddr, replica, replicaLeaderZoneAddr, err := w.getReplicaZoneAddrAndRelicaLeaderZoneAddrForDelete(partition)
+				replicaZoneAddr, replica, replicaLeaderZoneAddr, err := w.getReplicaZoneAddrAndRelicaLeaderZoneAddrForDelete(partition, nil)
 				if err != nil {
 					log.Error("getReplicaZoneAddrAndRelicaLeaderZoneAddr error, err:[%v]", err)
 					continue
@@ -409,7 +403,7 @@ func (w *SpaceStateTransitionWorker) handleSpaceStateSSDeleting(db *DB, space *S
 	for _, partition := range partitionsMap {
 		if partition.countReplicas() > 0 {
 			isSpaceCanDelete = false
-			replicaZoneAddr, replica, replicaLeaderZoneAddr, err := w.getReplicaZoneAddrAndRelicaLeaderZoneAddrForDelete(partition)
+			replicaZoneAddr, replica, replicaLeaderZoneAddr, err := w.getReplicaZoneAddrAndRelicaLeaderZoneAddrForDelete(partition, nil)
 			if err != nil {
 				log.Error("getReplicaZoneAddrAndRelicaLeaderZoneAddr error, err:[%v]", err)
 				continue
@@ -444,123 +438,85 @@ func (w *SpaceStateTransitionWorker) getReplicaZoneAddrAndRelicaLeaderZoneAddrFo
 	} else {
 		replicaLeaderZone = replicaZoneName
 	}
-	replicaZoneParticipation, err := topoServer.NewMasterParticipation(replicaZoneName, w.cluster.config.ClusterCfg.GmNodeId)
+
+	replicaZoneAddr, err := w.getZMLeaderAddr(replicaZoneName, w.cluster.config.ClusterCfg.GmNodeId)
 	if err != nil {
-		log.Error("topoServer NewMasterParticipation error. err:[%v]", err)
-		return "", "", "", err
-	}
-	ctx, cancel := context.WithTimeout(context.Background(), ETCD_TIMEOUT)
-	replicaZoneAddr, err := replicaZoneParticipation.GetCurrentMasterID(ctx)
-	cancel()
-	if err != nil {
-		log.Error("replicaZoneParticipation GetCurrentMasterID error. err:[%v]", err)
+		log.Error("getZMLeaderAddr() replicaZoneAddr error. err:[%v]", err)
 		return "", "", "", err
 	}
 	if replicaZoneAddr == "" {
-		log.Info("replicaZoneParticipation GetCurrentMasterID has no leader now.")
+		log.Info("getZMLeaderAddr() replicaZoneAddr has no leader now.")
 		return "", "", "", ErrNoMSLeader
 	}
-	replicaLeaderZoneParticipation, err := topoServer.NewMasterParticipation(replicaLeaderZone, w.cluster.config.ClusterCfg.GmNodeId)
+
+	replicaLeaderZoneAddr, err := w.getZMLeaderAddr(replicaLeaderZone, w.cluster.config.ClusterCfg.GmNodeId)
 	if err != nil {
-		log.Error("topoServer NewMasterParticipation error. err:[%v]", err)
-		return "", "", "", err
-	}
-	ctx, cancel = context.WithTimeout(context.Background(), ETCD_TIMEOUT)
-	replicaLeaderZoneAddr, err := replicaLeaderZoneParticipation.GetCurrentMasterID(ctx)
-	cancel()
-	if err != nil {
-		log.Error("replicaZoneParticipation GetCurrentMasterID error. err:[%v]", err)
+		log.Error("getZMLeaderAddr() replicaLeaderZoneAddr error. err:[%v]", err)
 		return "", "", "", err
 	}
 	if replicaLeaderZoneAddr == "" {
-		log.Info("replicaZoneParticipation GetCurrentMasterID has no leader now.")
+		log.Info("getZMLeaderAddr() replicaLeaderZoneAddr has no leader now.")
 		return "", "", "", ErrNoMSLeader
 	}
 	return replicaZoneAddr, replicaZoneName, replicaLeaderZoneAddr, nil
 }
 
-func (w *SpaceStateTransitionWorker) getReplicaZoneAddrAndRelicaLeaderZoneAddrForDelete(partition *Partition) (string, *metapb.Replica, string, error) {
-	if partition.ReplicaLeader == nil {
-		log.Info("partition has no leader now.")
-		return "", nil, "", ErrNoMSLeader
+func (w *SpaceStateTransitionWorker) getReplicaZoneAddrAndRelicaLeaderZoneAddrForDelete(partition *Partition, partitionInfo *masterpb.PartitionInfo) (string, *metapb.Replica, string, error) {
+	var replicaLeaderZone string
+	var replica *metapb.Replica
+	if partition != nil {
+		log.Debug("getAddr by partition")
+		if partition.ReplicaLeader == nil {
+			log.Info("partition has no leader now.")
+			return "", nil, "", ErrNoMSLeader
+		}
+		replicaLeaderZone = partition.ReplicaLeader.Zone
+		replica = partition.pickReplicaToDelete()
 	}
-	replicaLeaderZone := partition.ReplicaLeader.Zone
-	replica := partition.pickReplicaToDelete()
+	if partitionInfo != nil {
+		log.Debug("getAddr by partitionInfo")
+		if !partitionInfo.IsLeader {
+			log.Info("partitionInfo has no leader now.")
+			return "", nil, "", ErrNoMSLeader
+		}
+		replicaLeaderZone = partitionInfo.RaftStatus.Replica.Zone
+		replica = pickReplicaToDelete(partitionInfo)
+	}
 	replicaZoneName := replica.Zone
-	replicaZoneParticipation, err := topoServer.NewMasterParticipation(replicaZoneName, w.cluster.config.ClusterCfg.GmNodeId)
+	replicaZoneAddr, err := w.getZMLeaderAddr(replicaZoneName, w.cluster.config.ClusterCfg.GmNodeId)
 	if err != nil {
-		log.Error("topoServer NewMasterParticipation error. err:[%v]", err)
-		return "", nil, "", err
-	}
-	ctx, cancel := context.WithTimeout(context.Background(), ETCD_TIMEOUT)
-	replicaZoneAddr, err := replicaZoneParticipation.GetCurrentMasterID(ctx)
-	cancel()
-	if err != nil {
-		log.Error("replicaZoneParticipation GetCurrentMasterID error. err:[%v]", err)
+		log.Error("getZMLeaderAddr() replicaZoneAddr error. err:[%v]", err)
 		return "", nil, "", err
 	}
 	if replicaZoneAddr == "" {
-		log.Info("replicaZoneParticipation GetCurrentMasterID has no leader now.")
+		log.Info("getZMLeaderAddr() replicaZoneAddr has no leader now.")
 		return "", nil, "", ErrNoMSLeader
 	}
-	replicaLeaderZoneParticipation, err := topoServer.NewMasterParticipation(replicaLeaderZone, w.cluster.config.ClusterCfg.GmNodeId)
+
+	replicaLeaderZoneAddr, err := w.getZMLeaderAddr(replicaLeaderZone, w.cluster.config.ClusterCfg.GmNodeId)
 	if err != nil {
-		log.Error("topoServer NewMasterParticipation error. err:[%v]", err)
-		return "", nil, "", err
-	}
-	ctx, cancel = context.WithTimeout(context.Background(), ETCD_TIMEOUT)
-	replicaLeaderZoneAddr, err := replicaLeaderZoneParticipation.GetCurrentMasterID(ctx)
-	cancel()
-	if err != nil {
-		log.Error("replicaZoneParticipation GetCurrentMasterID error. err:[%v]", err)
+		log.Error("getZMLeaderAddr() replicaLeaderZoneAddr error. err:[%v]", err)
 		return "", nil, "", err
 	}
 	if replicaLeaderZoneAddr == "" {
-		log.Info("replicaZoneParticipation GetCurrentMasterID has no leader now.")
+		log.Info("getZMLeaderAddr() replicaLeaderZoneAddr has no leader now.")
 		return "", nil, "", ErrNoMSLeader
 	}
 	return replicaZoneAddr, replica, replicaLeaderZoneAddr, nil
 }
 
-func (w *SpaceStateTransitionWorker) getReplicaZoneAddrAndRelicaLeaderZoneAddrForDeleteByPartitionInfo(partitionInfo *masterpb.PartitionInfo) (string, *metapb.Replica, string, error) {
-	if !partitionInfo.IsLeader {
-		log.Info("partitionInfo has no leader now.")
-		return "", nil, "", ErrNoMSLeader
-	}
-	replicaLeaderZone := partitionInfo.RaftStatus.Replica.Zone
-	replica := pickReplicaToDelete(partitionInfo)
-	replicaZoneName := replica.Zone
-	replicaZoneParticipation, err := topoServer.NewMasterParticipation(replicaZoneName, w.cluster.config.ClusterCfg.GmNodeId)
+func (w *SpaceStateTransitionWorker) getZMLeaderAddr(zoneName, id string) (string, error) {
+	replicaZoneParticipation, err := topoServer.NewMasterParticipation(zoneName, id)
 	if err != nil {
 		log.Error("topoServer NewMasterParticipation error. err:[%v]", err)
-		return "", nil, "", err
+		return "", err
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), ETCD_TIMEOUT)
 	replicaZoneAddr, err := replicaZoneParticipation.GetCurrentMasterID(ctx)
 	cancel()
 	if err != nil {
 		log.Error("replicaZoneParticipation GetCurrentMasterID error. err:[%v]", err)
-		return "", nil, "", err
+		return "", err
 	}
-	if replicaZoneAddr == "" {
-		log.Info("replicaZoneParticipation GetCurrentMasterID has no leader now.")
-		return "", nil, "", ErrNoMSLeader
-	}
-	replicaLeaderZoneParticipation, err := topoServer.NewMasterParticipation(replicaLeaderZone, w.cluster.config.ClusterCfg.GmNodeId)
-	if err != nil {
-		log.Error("topoServer NewMasterParticipation error. err:[%v]", err)
-		return "", nil, "", err
-	}
-	ctx, cancel = context.WithTimeout(context.Background(), ETCD_TIMEOUT)
-	replicaLeaderZoneAddr, err := replicaLeaderZoneParticipation.GetCurrentMasterID(ctx)
-	cancel()
-	if err != nil {
-		log.Error("replicaZoneParticipation GetCurrentMasterID error. err:[%v]", err)
-		return "", nil, "", err
-	}
-	if replicaLeaderZoneAddr == "" {
-		log.Info("replicaZoneParticipation GetCurrentMasterID has no leader now.")
-		return "", nil, "", ErrNoMSLeader
-	}
-	return replicaZoneAddr, replica, replicaLeaderZoneAddr, nil
+	return replicaZoneAddr, nil
 }
