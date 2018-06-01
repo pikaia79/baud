@@ -156,7 +156,6 @@ func (s *Server) WatchDir(ctx context.Context, cell, dirPath string, version top
 							Version:  EtcdVersion(ev.Kv.Version),
 							Err:      topo.ErrNoNode,
 						}
-						return
 					default:
 						notifications <- &topo.WatchData{
 							Err: fmt.Errorf("unexpected event received: %v", ev),
