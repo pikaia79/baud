@@ -7,8 +7,8 @@ import (
 	"github.com/tiglabs/baudengine/proto/metapb"
 	"github.com/tiglabs/baudengine/util/log"
 	"path"
-	"strings"
 	"strconv"
+	"strings"
 )
 
 type SpaceTopo struct {
@@ -208,7 +208,6 @@ func (s *TopoServer) WatchSpaces(ctx context.Context) (error, []*SpaceTopo, <-ch
 				changes <- &SpaceWatchData{Err: err}
 				return
 			}
-
 
 			if wd.Err == ErrNoNode { // node deleted
 				keyDel := string(wd.Contents)
