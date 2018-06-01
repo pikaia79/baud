@@ -2,8 +2,10 @@ package server
 
 import (
 	"errors"
+	"fmt"
 	"strconv"
 
+	"github.com/tiglabs/baudengine/engine"
 	"github.com/tiglabs/baudengine/proto/metapb"
 	"github.com/tiglabs/baudengine/util/bytes"
 	"github.com/tiglabs/baudengine/util/config"
@@ -16,7 +18,9 @@ type Config struct {
 	ClusterID         string        `json:"cluster-id,omitempty"`
 	NodeID            metapb.NodeID `json:"node-id,omitempty"`
 	MasterServer      string        `json:"master-server,omitempty"`
-	DataPath          string        `json:"data-path,omitempty"`
+	StoreEngine       string        `json:"store-engine,omitempty"`
+	StorePath         string        `json:"store-path,omitempty"`
+	StoreOption       string        `json:"store-option,omitempty"`
 	DiskQuota         uint64        `json:"disk-quota,omitempty"`
 	RPCPort           int           `json:"rpc-port,omitempty"`
 	AdminPort         int           `json:"admin-port,omitempty"`
@@ -43,7 +47,9 @@ func LoadConfig(conf *config.Config) *Config {
 
 	c.ClusterID = conf.GetString("cluster.id")
 	c.MasterServer = conf.GetString("master.server")
-	c.DataPath = conf.GetString("data.path")
+	c.StoreEngine = conf.GetString("store.engine")
+	c.StorePath = conf.GetString("store.path")
+	c.StoreOption = conf.GetString("store.option")
 	c.LogDir = conf.GetString("log.dir")
 	c.LogModule = conf.GetString("log.module")
 	c.LogLevel = conf.GetString("log.level")
@@ -94,8 +100,13 @@ func (c *Config) Validate() error {
 	if c.ClusterID == "" {
 		multierr.Append(errors.New("cluster.id not specified"))
 	}
-	if c.DataPath == "" {
-		multierr.Append(errors.New("data.path not specified"))
+	if c.StoreEngine == "" {
+		multierr.Append(errors.New("store.engine not specified"))
+	} else if !engine.Exist(c.StoreEngine) {
+		multierr.Append(fmt.Errorf("store.engine(%s) not exist", c.StoreEngine))
+	}
+	if c.StorePath == "" {
+		multierr.Append(errors.New("store.path not specified"))
 	}
 	if c.LogDir == "" {
 		multierr.Append(errors.New("log.dir not specified"))

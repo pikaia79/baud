@@ -47,7 +47,6 @@ type Server struct {
 	raftServer   *raft.RaftServer
 
 	connMgr         *rpc.ConnectionMgr
-	apiServer       *grpc.Server
 	adminServer     *grpc.Server
 	masterClient    *rpc.Client
 	masterHeartbeat *heartbeatWork
@@ -64,16 +63,15 @@ func NewServer(conf *Config) *Server {
 	s := &Server{
 		Config:       *conf,
 		ip:           netutil.GetPrivateIP().String(),
-		meta:         newServerMeta(conf.DataPath),
+		meta:         newServerMeta(conf.StorePath),
 		nodeResolver: NewNodeResolver(),
-		systemMetric: metric.NewSystemMetric(conf.DataPath, conf.DiskQuota),
+		systemMetric: metric.NewSystemMetric(conf.StorePath, conf.DiskQuota),
 		adminEventCh: make(chan proto.Message, 64),
 	}
 	s.ctx, s.ctxCancel = context.WithCancel(context.Background())
 
 	serverOpt := rpc.DefaultServerOption
 	serverOpt.ClusterID = conf.ClusterID
-	s.apiServer = rpc.NewGrpcServer(&serverOpt)
 	s.adminServer = rpc.NewGrpcServer(&serverOpt)
 
 	connMgrOpt := rpc.DefaultManagerOption
@@ -168,19 +166,6 @@ func (s *Server) doStart(init bool) error {
 
 	// Start server
 	if init {
-		if ln, err := net.Listen("tcp", fmt.Sprintf(":%d", s.RPCPort)); err != nil {
-			return fmt.Errorf("Server failed to listen api port: %s", err)
-		} else {
-			pspb.RegisterApiGrpcServer(s.apiServer, s)
-			reflection.Register(s.apiServer)
-			go func() {
-				if err = s.apiServer.Serve(ln); err != nil {
-					log.Fatal("Server failed to start api grpc: %s", err)
-				}
-			}()
-			log.Info("Server api grpc listen on: %s", fmt.Sprintf(":%d", s.RPCPort))
-		}
-
 		if ln, err := net.Listen("tcp", fmt.Sprintf(":%d", s.AdminPort)); err != nil {
 			return fmt.Errorf("Server failed to listen admin port: %s", err)
 		} else {
@@ -215,9 +200,6 @@ func (s *Server) Close() error {
 
 	if s.masterHeartbeat != nil {
 		s.masterHeartbeat.stop()
-	}
-	if s.apiServer != nil {
-		s.apiServer.GracefulStop()
 	}
 	if s.adminServer != nil {
 		s.adminServer.GracefulStop()

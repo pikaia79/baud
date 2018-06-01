@@ -6,6 +6,8 @@ import (
 	"os"
 	"path/filepath"
 
+	"strconv"
+
 	"github.com/tiglabs/baudengine/proto/metapb"
 	"github.com/tiglabs/baudengine/proto/pspb"
 )
@@ -59,6 +61,34 @@ func (m *serverMeta) mkMetaFile() {
 			panic(err)
 		}
 	}
+}
+
+func (m *serverMeta) getAllPartitions() []metapb.PartitionID {
+	ids := make(map[string]struct{}, 64)
+
+	if dir, err := ioutil.ReadDir(filepath.Join(m.rootPath, "data")); err == nil {
+		for _, fi := range dir {
+			if fi.IsDir() {
+				ids[fi.Name()] = struct{}{}
+			}
+		}
+	}
+	if dir, err := ioutil.ReadDir(filepath.Join(m.rootPath, "raft")); err == nil {
+		for _, fi := range dir {
+			if fi.IsDir() {
+				ids[fi.Name()] = struct{}{}
+			}
+		}
+	}
+
+	retVal := make([]metapb.PartitionID, 0, len(ids))
+	for id := range ids {
+		if v, err := strconv.ParseUint(id, 10, 64); err == nil {
+			retVal = append(retVal, v)
+		}
+	}
+
+	return retVal
 }
 
 func (m *serverMeta) getDataAndRaftPath(id metapb.PartitionID) (data, raft string, err error) {
