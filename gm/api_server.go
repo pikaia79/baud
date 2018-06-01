@@ -18,20 +18,20 @@ const (
 	DEFAULT_CLOSE_TIMEOUT = 5 * time.Second
 
 	// definition for http url parameter name
-	ZONE_NAME        = "zone_name"
-	ZONE_ETCD_ADDR   = "zone_etcd_addr"
-	ZONE_MASTER_ADDR = "zone_master_addr"
-	DB_NAME          = "db_name"
-	SRC_DB_NAME      = "src_db_name"
-	DEST_DB_NAME     = "dest_db_name"
-	SPACE_NAME       = "space_name"
-	SRC_SPACE_NAME   = "src_space_name"
-	DEST_SPACE_NAME  = "dest_space_name"
-	PARTITION_KEY    = "partition_key"
-	PARTITION_FUNC   = "partition_func"
-	PARTITION_NUM    = "partition_num"
-	PARTITION_ID     = "partition_id"
-	SPACE_SCHEMA     = "space_schema"
+	ZONE_NAME       = "zone_name"
+	ZONE_ETCD_ADDR  = "zone_etcd_addr"
+	ZONE_ROOT_DIR   = "zone_root_dir"
+	DB_NAME         = "db_name"
+	SRC_DB_NAME     = "src_db_name"
+	DEST_DB_NAME    = "dest_db_name"
+	SPACE_NAME      = "space_name"
+	SRC_SPACE_NAME  = "src_space_name"
+	DEST_SPACE_NAME = "dest_space_name"
+	PARTITION_KEY   = "partition_key"
+	PARTITION_FUNC  = "partition_func"
+	PARTITION_NUM   = "partition_num"
+	PARTITION_ID    = "partition_id"
+	SPACE_SCHEMA    = "space_schema"
 )
 
 type ApiServer struct {
@@ -120,7 +120,11 @@ func (s *ApiServer) handleZoneCreate(w http.ResponseWriter, r *http.Request, par
 	if err != nil {
 		return
 	}
-	zone, err := s.cluster.CreateZone(zoneName, zoneEtcdAddr)
+	zoneRootDir, err := checkMissingParam(w, r, ZONE_ROOT_DIR)
+	if err != nil {
+		return
+	}
+	zone, err := s.cluster.CreateZone(zoneName, zoneEtcdAddr, zoneRootDir)
 	if err != nil {
 		sendReply(w, newHttpErrReply(err))
 		return
@@ -524,13 +528,6 @@ func checkMissingAndUint64Param(w http.ResponseWriter, r *http.Request, paramNam
 	if err != nil {
 		reply := newHttpErrReply(ErrParamError)
 		newMsg := fmt.Sprintf("%s, unmatched type[%s]", reply.Msg, paramName)
-		reply.Msg = newMsg
-		sendReply(w, reply)
-		return 0, ErrParamError
-	}
-	if paramValInt > math.MaxUint64 {
-		reply := newHttpErrReply(ErrParamError)
-		newMsg := fmt.Sprintf("%s, value of [%s] exceed uint32 limit", reply.Msg, paramName)
 		reply.Msg = newMsg
 		sendReply(w, reply)
 		return 0, ErrParamError

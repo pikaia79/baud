@@ -62,9 +62,9 @@ func (p *Partition) update() error {
 	ctx, cancel := context.WithTimeout(context.Background(), ETCD_TIMEOUT)
 	defer cancel()
 
-	err := topoServer.UpdatePartition(ctx, p.PartitionTopo)
+	err := TopoServer.UpdatePartition(ctx, p.PartitionTopo)
 	if err != nil {
-		log.Error("topoServer UpdatePartition error, err: [%v]", err)
+		log.Error("TopoServer UpdatePartition error, err: [%v]", err)
 		return err
 	}
 
@@ -80,9 +80,9 @@ func (p *Partition) setZones(zonesName []string) error {
 	ctx, cancel := context.WithTimeout(context.Background(), ETCD_TIMEOUT)
 	defer cancel()
 
-	err := topoServer.SetZonesForPartition(ctx, p.ID, zonesName)
+	err := TopoServer.SetZonesForPartition(ctx, p.ID, zonesName)
 	if err != nil {
-		log.Error("topoServer SetZonesForPartition error, err: [%v]", err)
+		log.Error("TopoServer SetZonesForPartition error, err: [%v]", err)
 		return err
 	}
 
@@ -96,9 +96,9 @@ func (p *Partition) getZones() ([]string, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), ETCD_TIMEOUT)
 	defer cancel()
 
-	zonesName, err := topoServer.GetZonesForPartition(ctx, p.ID)
+	zonesName, err := TopoServer.GetZonesForPartition(ctx, p.ID)
 	if err != nil {
-		log.Error("topoServer GetZonesForPartition error, err: [%v]", err)
+		log.Error("TopoServer GetZonesForPartition error, err: [%v]", err)
 		return nil, err
 	}
 
@@ -162,9 +162,9 @@ func (p *Partition) getPartitionTask(zoneName, taskType, taskId string) (*metapb
 
 	ctx, cancel := context.WithTimeout(context.Background(), ETCD_TIMEOUT)
 	defer cancel()
-	taskMeta, err := topoServer.GetTask(ctx, zoneName, taskType, taskId)
+	taskMeta, err := TopoServer.GetTask(ctx, zoneName, taskType, taskId)
 	if err != nil {
-		log.Error("topoServer GetTask error, err: [%v]", err)
+		log.Error("TopoServer GetTask error, err: [%v]", err)
 		return nil, err
 	}
 
@@ -178,9 +178,9 @@ func (p *Partition) setPartitionTask(zoneName string, task *metapb.Task, timeout
 	ctx, cancel := context.WithTimeout(context.Background(), ETCD_TIMEOUT)
 	defer cancel()
 
-	err := topoServer.AddTask(ctx, zoneName, task, timeout)
+	err := TopoServer.AddTask(ctx, zoneName, task, timeout)
 	if err != nil {
-		log.Error("topoServer SetTask error, err: [%v]", err)
+		log.Error("TopoServer SetTask error, err: [%v]", err)
 		return err
 	}
 	return nil
@@ -224,9 +224,9 @@ func (p *Partition) updateReplicaGroup(partitionInfo *masterpb.PartitionInfo) (b
 	ctx, cancel := context.WithTimeout(context.Background(), ETCD_TIMEOUT)
 	defer cancel()
 
-	err := topoServer.UpdatePartition(ctx, PartitionTopoCopy)
+	err := TopoServer.UpdatePartition(ctx, PartitionTopoCopy)
 	if err != nil {
-		log.Error("topoServer UpdatePartition error, err: [%v]", err)
+		log.Error("TopoServer UpdatePartition error, err: [%v]", err)
 		return false, err
 	}
 	p.PartitionTopo = PartitionTopoCopy
@@ -333,9 +333,9 @@ func (c *PartitionCache) Recovery() ([]*Partition, error) {
 
 	ctx, cancel := context.WithTimeout(context.Background(), ETCD_TIMEOUT)
 	defer cancel()
-	partitionsTopo, err := topoServer.GetAllPartitions(ctx)
+	partitionsTopo, err := TopoServer.GetAllPartitions(ctx)
 	if err != nil {
-		log.Error("topoServer GetAllPartitions error, err: [%v]", err)
+		log.Error("TopoServer GetAllPartitions error, err: [%v]", err)
 		return nil, err
 	}
 	if partitionsTopo != nil {

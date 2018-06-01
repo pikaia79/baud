@@ -164,7 +164,7 @@ func (c *Cluster) clearAllCache() {
 	c.ZoneCache.Clear()
 }
 
-func (c *Cluster) CreateZone(zoneName, zoneEtcdAddr string) (*Zone, error) {
+func (c *Cluster) CreateZone(zoneName, zoneEtcdAddr, zoneRootDir string) (*Zone, error) {
 	c.clusterLock.Lock()
 	defer c.clusterLock.Unlock()
 
@@ -173,7 +173,7 @@ func (c *Cluster) CreateZone(zoneName, zoneEtcdAddr string) (*Zone, error) {
 		return nil, ErrDupZone
 	}
 
-	zone, err := NewZone(zoneName, zoneEtcdAddr)
+	zone, err := NewZone(zoneName, zoneEtcdAddr, zoneRootDir)
 	if err != nil {
 		return nil, err
 	}

@@ -29,7 +29,9 @@ level="debug"
 cluster-id = "1"
 gm-node-id = "1"
 gm-node-ip = "127.0.0.1"
-global-etcd = "localhost:2379"
+topo = "etcd"
+topo-endpoints = "localhost:2379"
+topo-root-dir = "/global"
 http-port=8817
 rpc-port=18817
 `
@@ -100,19 +102,23 @@ func (cfg *ModuleConfig) adjust() {
 }
 
 type ClusterConfig struct {
-	ClusterID  string `toml:"cluster-id,omitempty" json:"cluster-id"`
-	GmNodeId   string `toml:"gm-node-id,omitempty" json:"gm-node-id"`
-	GmNodeIp   string `toml:"gm-node-ip,omitempty" json:"gm-node-ip"`
-	GlobalEtcd string `toml:"global-etcd,omitempty" json:"global-etcd"`
-	HttpPort   uint32 `toml:"http-port,omitempty" json:"http-port"`
-	RpcPort    uint32 `toml:"rpc-port,omitempty" json:"rpc-port"`
+	ClusterID     string `toml:"cluster-id,omitempty" json:"cluster-id"`
+	GmNodeId      string `toml:"gm-node-id,omitempty" json:"gm-node-id"`
+	GmNodeIp      string `toml:"gm-node-ip,omitempty" json:"gm-node-ip"`
+	Topo          string `toml:"topo,omitempty" json:"topo"`
+	TopoEndPoints string `toml:"topo-endpoints,omitempty" json:"topo-endpoints"`
+	TopoRootDir   string `toml:"topo-root-dir,omitempty" json:"topo-root-dir"`
+	HttpPort      uint32 `toml:"http-port,omitempty" json:"http-port"`
+	RpcPort       uint32 `toml:"rpc-port,omitempty" json:"rpc-port"`
 }
 
 func (cfg *ClusterConfig) adjust() {
 	adjustString(&cfg.ClusterID, "no cluster-id")
 	adjustString(&cfg.GmNodeId, "no gm-node-id")
 	adjustString(&cfg.GmNodeIp, "no gm-node-ip")
-	adjustString(&cfg.GlobalEtcd, "no global-etcd")
+	adjustString(&cfg.Topo, "no topo")
+	adjustString(&cfg.TopoEndPoints, "no topo-endpoints")
+	adjustString(&cfg.TopoRootDir, "no topo-root-dir")
 	adjustUint32(&cfg.HttpPort, "no http-port")
 	adjustUint32(&cfg.RpcPort, "no rpc-port")
 }
