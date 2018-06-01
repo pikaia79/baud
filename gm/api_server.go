@@ -120,12 +120,7 @@ func (s *ApiServer) handleZoneCreate(w http.ResponseWriter, r *http.Request, par
 	if err != nil {
 		return
 	}
-	zoneMasterAddr, err := checkMissingParam(w, r, ZONE_MASTER_ADDR)
-	if err != nil {
-		return
-	}
-
-	zone, err := s.cluster.CreateZone(zoneName, zoneEtcdAddr, zoneMasterAddr)
+	zone, err := s.cluster.CreateZone(zoneName, zoneEtcdAddr)
 	if err != nil {
 		sendReply(w, newHttpErrReply(err))
 		return
