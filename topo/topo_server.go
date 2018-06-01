@@ -35,8 +35,7 @@ const (
 var (
 	topoImplementation    = flag.String("topo_implementation", "etcd3", "the topology implementation to use")
 	topoGlobalServerAddrs = flag.String("topo_global_server_addrs", "", "topo global server addresses")
-	topoGlobalRootDir     = flag.String("topo_global_root_dir", "/",
-		"the path of the global topology data in the global topology server")
+	topoGlobalRootDir     = flag.String("topo_global_root_dir", "/", "the path of the global topology data in the global topology server")
 )
 
 var (
@@ -77,7 +76,7 @@ var (
 	ErrInvalidPath = errors.New("invalid path")
 )
 
-type Impl interface {
+type Service interface {
 	GetAllZones(ctx context.Context) ([]*ZoneTopo, error)
 	GetZone(ctx context.Context, zoneName string) (*ZoneTopo, error)
 	AddZone(ctx context.Context, zone *metapb.Zone) (*ZoneTopo, error)
