@@ -7,8 +7,8 @@ import (
 	"github.com/tiglabs/baudengine/proto/metapb"
 	"github.com/tiglabs/baudengine/util/log"
 	"path"
-	"strings"
 	"strconv"
+	"strings"
 )
 
 type DBTopo struct {
@@ -123,54 +123,7 @@ func (s *TopoServer) DeleteDB(ctx context.Context, db *DBTopo) error {
 	return s.backend.Delete(ctx, GlobalZone, path.Join(dbsPath, fmt.Sprint(db.ID), DBTopoFile), db.Version)
 }
 
-//func (s *TopoServer) WatchDB(ctx context.Context, dbId metapb.DBID) (*DBWatchData, <-chan *DBWatchData, CancelFunc) {
-//    if ctx == nil {
-//        return &DBWatchData{Err:ErrNoNode}, nil, nil
-//    }
-//
-//    current, wdChannel, cancel := s.backend.Watch(ctx, GlobalZone, path.Join(dbsPath, fmt.Sprint(dbId), DBTopoFile))
-//    if current.Err != nil {
-//        return &DBWatchData{Err:current.Err}, nil, nil
-//    }
-//
-//    curValue := &metapb.DB{}
-//    if err := proto.Unmarshal(current.Contents, curValue); err != nil {
-//        log.Error("Fail to unmarshal meta data for db[%d]. err[%v]", dbId, err)
-//        cancel()
-//        for range wdChannel {
-//        }
-//        return &DBWatchData{Err: err}, nil, nil
-//    }
-//
-//    changes := make(chan *DBWatchData, 10)
-//
-//    go func() {
-//        defer close(changes)
-//
-//        for wd := range wdChannel {
-//            if wd.Err != nil {
-//                changes <- &DBWatchData{Err: wd.Err}
-//                return
-//            }
-//
-//            value := &metapb.DB{}
-//            if err := proto.Unmarshal(wd.Contents, value); err != nil {
-//                log.Error("Fail to unmarshal meta data for db from watch. err[%v]", err)
-//                cancel()
-//                for range wdChannel {
-//                }
-//                changes <- &DBWatchData{Err: err}
-//                return
-//            }
-//
-//            changes <- &DBWatchData{DBTopo: &DBTopo{DB: value, version:wd.Version}}
-//        }
-//    }()
-//
-//    return &DBWatchData{DBTopo: &DBTopo{DB: curValue, version:current.Version}}, changes, cancel
-//}
-
-// []*DBWatchData : current data returned
+// []*DBTopo : initial data returned
 // error          : error returned when first watching
 func (s *TopoServer) WatchDBs(ctx context.Context) (error, []*DBTopo, <-chan *DBWatchData, CancelFunc) {
 	if ctx == nil {

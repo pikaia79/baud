@@ -7,6 +7,8 @@ import (
 	"github.com/tiglabs/baudengine/proto/metapb"
 	"github.com/tiglabs/baudengine/util/log"
 	"path"
+	"strconv"
+	"strings"
 )
 
 type SpaceTopo struct {
@@ -150,55 +152,6 @@ func (s *TopoServer) DeleteSpace(ctx context.Context, space *SpaceTopo) error {
 	return s.backend.Delete(ctx, GlobalZone, nodePath, space.Version)
 }
 
-//func (s *TopoServer) WatchSpace(ctx context.Context, dbId metapb.DBID, spaceId metapb.SpaceID) (*SpaceWatchData,
-//        <-chan *SpaceWatchData, CancelFunc) {
-//    if ctx == nil {
-//        return &SpaceWatchData{Err:ErrNoNode}, nil, nil
-//    }
-//
-//    nodePath := path.Join(spacesPath, fmt.Sprintf("%d-%d", dbId, spaceId), SpaceTopoFile)
-//    current, wdChannel, wdCancel := s.backend.Watch(ctx, GlobalZone, nodePath)
-//    if current.Err != nil {
-//        return &SpaceWatchData{Err:current.Err}, nil, nil
-//    }
-//
-//    curVal := &metapb.Space{}
-//    if err := proto.Unmarshal(current.Contents, curVal); err != nil {
-//        log.Error("Fail to unmarshal meta data for space[%d-%d]. err[%v]", dbId, spaceId, err)
-//        wdCancel()
-//        for range wdChannel {
-//        }
-//        return &SpaceWatchData{Err:err}, nil, nil
-//    }
-//
-//    changes := make(chan *SpaceWatchData, 10)
-//
-//    go func() {
-//        defer close(changes)
-//
-//        for wd := range wdChannel {
-//            if wd != nil {
-//                changes <- &SpaceWatchData{Err: wd.Err}
-//                return
-//            }
-//
-//            value := &metapb.Space{}
-//            if err := proto.Unmarshal(wd.Contents, value); err != nil {
-//                log.Error("Fail to unmarshal meta data for space[%d-%d]. err[%v]", dbId, spaceId, err)
-//                wdCancel()
-//                for range wdChannel {
-//                }
-//                changes <- &SpaceWatchData{Err: err}
-//                return
-//            }
-//
-//            changes <- &SpaceWatchData{SpaceTopo: &SpaceTopo{Space: value, version:wd.Version}}
-//        }
-//    }()
-//
-//    return &SpaceWatchData{SpaceTopo: &SpaceTopo{Space: curVal, version:current.Version}}, changes, wdCancel
-//}
-
 func (s *TopoServer) WatchSpaces(ctx context.Context) (error, []*SpaceTopo, <-chan *SpaceWatchData, CancelFunc) {
 	if ctx == nil {
 		return ErrNoNode, nil, nil, nil
@@ -241,7 +194,7 @@ func (s *TopoServer) WatchSpaces(ctx context.Context) (error, []*SpaceTopo, <-ch
 		defer close(changes)
 
 		for wd := range wdChannel {
-			if wd != nil {
+			if wd != nil && wd.Err != ErrNoNode {
 				changes <- &SpaceWatchData{Err: wd.Err}
 				return
 			}
@@ -256,7 +209,44 @@ func (s *TopoServer) WatchSpaces(ctx context.Context) (error, []*SpaceTopo, <-ch
 				return
 			}
 
-			changes <- &SpaceWatchData{SpaceTopo: &SpaceTopo{Space: value, Version: wd.Version}}
+			if wd.Err == ErrNoNode { // node deleted
+				keyDel := string(wd.Contents)
+				segs := strings.Split(keyDel, "/")
+				if len(segs) < 3 {
+					log.Error("invalid db-space id path[%s]", string(wd.Contents))
+					changes <- &SpaceWatchData{Err: ErrInvalidPath}
+					return
+				}
+				ids := strings.Split(segs[1], "-")
+				if len(ids) != 2 {
+					log.Error("invalid db-space id path[%s]", keyDel)
+					changes <- &SpaceWatchData{Err: ErrInvalidPath}
+					return
+				}
+				dbId, dErr := strconv.Atoi(ids[0])
+				spaceId, sErr := strconv.Atoi(ids[1])
+				if dErr != nil || sErr != nil {
+					log.Error("invalid db-space id path[%s]", keyDel)
+					changes <- &SpaceWatchData{Err: ErrInvalidPath}
+					return
+				}
+
+				value := &metapb.Space{ID: metapb.SpaceID(spaceId), DB: metapb.DBID(dbId)}
+				changes <- &SpaceWatchData{Err: ErrNoNode, SpaceTopo: &SpaceTopo{Space: value, Version: wd.Version}}
+
+			} else { // node added or updated
+				value := &metapb.Space{}
+				if err := proto.Unmarshal(wd.Contents, value); err != nil {
+					log.Error("Fail to unmarshal meta data for partition. err[%v]", err)
+					cancel()
+					for range wdChannel {
+					}
+					changes <- &SpaceWatchData{Err: err}
+					return
+				}
+
+				changes <- &SpaceWatchData{SpaceTopo: &SpaceTopo{Space: value, Version: wd.Version}}
+			}
 		}
 	}()
 

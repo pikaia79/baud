@@ -93,30 +93,3 @@ func (s *TopoServer) DeleteZone(ctx context.Context, zone *ZoneTopo) error {
 	}
 	return s.backend.Delete(ctx, GlobalZone, path.Join(ZonesPath, zone.Name, ZoneTopoFile), zone.Version)
 }
-
-//// GetKnownCells implements topo.Server.GetKnownCells.
-//func (s *Server) GetKnownCells(ctx context.Context) ([]string, error) {
-//	nodePath := path.Join(s.global.root, cellsPath) + "/"
-//	resp, err := s.global.cli.Get(ctx, nodePath,
-//		clientv3.WithPrefix(),
-//		clientv3.WithSort(clientv3.SortByKey, clientv3.SortAscend),
-//		clientv3.WithKeysOnly())
-//	if err != nil {
-//		return nil, convertError(err)
-//	}
-//
-//	prefixLen := len(nodePath)
-//	suffix := "/" + topo.CellInfoFile
-//	suffixLen := len(suffix)
-//
-//	var result []string
-//	for _, ev := range resp.Kvs {
-//		p := string(ev.Key)
-//		if strings.HasPrefix(p, nodePath) && strings.HasSuffix(p, suffix) {
-//			p = p[prefixLen : len(p)-suffixLen]
-//			result = append(result, p)
-//		}
-//	}
-//
-//	return result, nil
-//}
