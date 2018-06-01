@@ -1,7 +1,6 @@
 package gm
 
 import (
-	"github.com/jddb/jddb-k8s/third_party/golang/go/doc/testdata"
 	"github.com/tiglabs/baudengine/proto/metapb"
 	"github.com/tiglabs/baudengine/topo"
 	"github.com/tiglabs/baudengine/util/log"
@@ -12,21 +11,13 @@ import (
 type Zone struct {
 	*topo.ZoneTopo
 
-	// name
-	// type "global/local"
-	// global etcd addr
-	// global master addr
-	// zone etcd addr
-	// zone master addr
-
 	propertyLock sync.RWMutex
 }
 
-func NewZone(zoneName, zoneEtcdAddr, zoneMasterAddr string) (*Zone, error) {
+func NewZone(zoneName, zoneEtcdAddr string) (*Zone, error) {
 	metaZone := &metapb.Zone{
-		Name: zoneName,
-		// etcdAddr: zoneEtcdAddr,
-		// zoneMasterAddr: zoneMasterAddr
+		Name:        zoneName,
+		ServerAddrs: zoneEtcdAddr,
 	}
 	topoZone := &topo.ZoneTopo{
 		Zone: metaZone,
