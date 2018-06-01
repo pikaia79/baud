@@ -52,7 +52,7 @@ type Backend interface {
 	Create(ctx context.Context, cell, filePath string, contents []byte) (Version, error)
 
 	CreateUniqueEphemeral(ctx context.Context, cell string, filePath string, contents []byte,
-			timeout time.Duration) (Version, error)
+		timeout time.Duration) (Version, error)
 
 	// Update updates the file with the provided filename with the
 	// new content.
@@ -159,10 +159,10 @@ type Backend interface {
 type TxnOpType int32
 
 const (
-	OPTYPE_CREATE    = 1
-	OPTYPE_DELETE    = 2
-	OPTYPE_UPDATE    = 3
-	OPTYPE_ERROR     = 4
+	OPTYPE_CREATE = 1
+	OPTYPE_DELETE = 2
+	OPTYPE_UPDATE = 3
+	OPTYPE_ERROR  = 4
 )
 
 type TxnOpResult interface {
