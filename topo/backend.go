@@ -38,8 +38,9 @@ type Backend interface {
 	// list should be sorted (by sort.Strings for instance).
 	// If there are no files under the provided path, returns ErrNoNode.
 	// dirPath is a path relative to the root directory of the cell.
-	ListDir(ctx context.Context, cell, dirPath string) ([]string, error)
+	ListDir(ctx context.Context, cell, dirPath string) ([]string, Version, error)
 
+	WatchDir(ctx context.Context, cell, dirPath string, version Version) (<-chan *WatchData, CancelFunc, error)
 	//
 	// File support
 	// if version == nil, then it’s an unconditional update / delete.
@@ -51,7 +52,7 @@ type Backend interface {
 	Create(ctx context.Context, cell, filePath string, contents []byte) (Version, error)
 
 	CreateUniqueEphemeral(ctx context.Context, cell string, filePath string, contents []byte,
-			timeout time.Duration) (Version, error)
+		timeout time.Duration) (Version, error)
 
 	// Update updates the file with the provided filename with the
 	// new content.
@@ -158,10 +159,10 @@ type Backend interface {
 type TxnOpType int32
 
 const (
-	OPTYPE_CREATE    = 1
-	OPTYPE_DELETE    = 2
-	OPTYPE_UPDATE    = 3
-	OPTYPE_ERROR     = 4
+	OPTYPE_CREATE = 1
+	OPTYPE_DELETE = 2
+	OPTYPE_UPDATE = 3
+	OPTYPE_ERROR  = 4
 )
 
 type TxnOpResult interface {

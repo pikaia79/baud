@@ -4,8 +4,8 @@ import (
 	"path"
 
 	"github.com/coreos/etcd/clientv3"
-	"golang.org/x/net/context"
 	"github.com/tiglabs/baudengine/topo"
+	"golang.org/x/net/context"
 )
 
 // Create is part of the topo.Backend interface.

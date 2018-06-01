@@ -1,9 +1,7 @@
 package gm
 
 import (
-	"github.com/fzzy/radix/redis/resp"
 	"github.com/tiglabs/baudengine/proto/masterpb"
-	"github.com/tiglabs/baudengine/proto/metapb"
 	"github.com/tiglabs/baudengine/util"
 	"github.com/tiglabs/baudengine/util/log"
 	"github.com/tiglabs/baudengine/util/rpc"
@@ -66,55 +64,6 @@ func (s *RpcServer) Close() {
 	log.Info("RPC server has closed")
 }
 
-func (s *RpcServer) GetRoute(ctx context.Context,
-	req *masterpb.GetRouteRequest) (*masterpb.GetRouteResponse, error) {
-	resp := new(masterpb.GetRouteResponse)
-
-	db := s.cluster.DbCache.FindDbById(req.DB)
-	if db == nil {
-		resp.ResponseHeader = *makeRpcRespHeader(ErrDbNotExists)
-		return resp, nil
-	}
-
-	space := db.SpaceCache.FindSpaceById(req.Space)
-	if space == nil {
-		resp.ResponseHeader = *makeRpcRespHeader(ErrSpaceNotExists)
-		return resp, nil
-	}
-
-	partitions := space.searchTree.multipleSearch(req.Slot, 10)
-	if partitions == nil || len(partitions) == 0 {
-		resp.ResponseHeader = *makeRpcRespHeader(ErrRouteNotFound)
-		return resp, nil
-	}
-
-	resp.Routes = make([]masterpb.Route, 0, len(partitions))
-	for _, partition := range partitions {
-		route := masterpb.Route{
-			Partition: *partition.Partition,
-			Leader:    partition.pickLeaderNodeId(),
-		}
-
-		replicas := partition.Replicas
-		if replicas != nil || len(replicas) != 0 {
-			nodes := make([]*metapb.Node, 0, len(replicas))
-			for _, replica := range replicas {
-				ps := s.cluster.PsCache.FindServerById(replica.NodeID)
-				if ps != nil {
-					nodes = append(nodes, ps.Node)
-				}
-			}
-			route.Nodes = nodes
-		}
-
-		resp.Routes = append(resp.Routes, route)
-	}
-	log.Debug("GetRoutes:[%v]", resp.Routes)
-	resp.ResponseHeader = *makeRpcRespHeader(ErrSuc)
-
-	return resp, nil
-}
-
 func (s *RpcServer) GetDB(ctx context.Context, req *masterpb.GetDBRequest) (*masterpb.GetDBResponse, error) {
 	resp := new(masterpb.GetDBResponse)
 
@@ -149,265 +98,40 @@ func (s *RpcServer) GetSpace(ctx context.Context, req *masterpb.GetSpaceRequest)
 	return resp, nil
 }
 
+// GM do not implement
+func (s *RpcServer) GetRoute(ctx context.Context,
+	req *masterpb.GetRouteRequest) (*masterpb.GetRouteResponse, error) {
+	return nil, ErrMethodNotImplement
+}
+
+// GM do not implement
 func (s *RpcServer) PSRegister(ctx context.Context,
 	req *masterpb.PSRegisterRequest) (*masterpb.PSRegisterResponse, error) {
-	resp := new(masterpb.PSRegisterResponse)
-
-	if err, msLeader := s.validateLeader(); err != nil {
-		resp.ResponseHeader = *makeRpcRespHeaderWithError(err, msLeader)
-		return resp, nil
-	}
-
-	nodeId := req.NodeID
-
-	if nodeId == 0 {
-		// this is a new ps unregistered never, distribute new psid to it
-		ps, err := NewPartitionServer(req.Ip, &s.config.PsCfg)
-		if err != nil {
-			resp.ResponseHeader = *makeRpcRespHeader(err)
-			return resp, nil
-		}
-		ps.persistent(s.cluster.store)
-
-		ps.status = PS_REGISTERED
-		s.cluster.PsCache.AddServer(ps)
-
-		resp.ResponseHeader = *makeRpcRespHeader(ErrSuc)
-		resp.NodeID = ps.ID
-		packPsRegRespWithCfg(resp, &s.config.PsCfg)
-		log.Debug("new register response [%v]", resp)
-		return resp, nil
-	}
-
-	// use nodeid reserved by ps to recognize same one ps
-	ps := s.cluster.PsCache.FindServerById(nodeId)
-	if ps == nil {
-		// illegal ps will register
-		log.Warn("Can not find nodeid[%v] in master.", nodeId)
-		resp.ResponseHeader = *makeRpcRespHeader(ErrPSNotExists)
-
-		return resp, nil
-	}
-
-	// old ps rebooted
-	ps.changeStatus(PS_REGISTERED)
-
-	resp.ResponseHeader = *makeRpcRespHeader(ErrSuc)
-	resp.NodeID = ps.ID
-	packPsRegRespWithCfg(resp, &s.config.PsCfg)
-	resp.Partitions = *ps.partitionCache.GetAllMetaPartitions()
-	log.Debug("old nodeid[%v] register response [%v]", nodeId, resp)
-
-	return resp, nil
+	return nil, ErrMethodNotImplement
 }
 
+// GM do not implement
 func (s *RpcServer) PSHeartbeat(ctx context.Context,
 	req *masterpb.PSHeartbeatRequest) (*masterpb.PSHeartbeatResponse, error) {
-	log.Debug("Received PS Heartbeat req:[%v]", req)
-	resp := new(masterpb.PSHeartbeatResponse)
-	resp.ResponseHeader = *makeRpcRespHeader(ErrSuc)
-
-	if err, msLeader := s.validateLeader(); err != nil {
-		resp.ResponseHeader = *makeRpcRespHeaderWithError(err, msLeader)
-		return resp, nil
-	}
-
-	// process ps
-	psId := req.NodeID
-	ps := s.cluster.PsCache.FindServerById(psId)
-	if ps == nil {
-		log.Error("ps heartbeat received invalid ps. id[%v]", psId)
-		resp.ResponseHeader = *makeRpcRespHeader(ErrPSNotExists)
-		return resp, nil
-	}
-	ps.updateHb()
-
-	partitionInfos := req.Partitions
-	if partitionInfos == nil {
-		// TODO:this is empty ps, check ps status to destroy ps or create new partition to it
-		return resp, nil
-	}
-
-	// process partition
-	for _, partitionInfo := range partitionInfos {
-		partitionId := partitionInfo.ID
-		partitionMS := s.cluster.PartitionCache.FindPartitionById(partitionId)
-		if partitionMS == nil {
-			log.Info("ps heartbeat received a partition[%v], that not existed in cluster.", partitionId)
-			// force to delete
-			if replicaToDelete := pickReplicaToDelete(&partitionInfo); replicaToDelete != nil {
-				GetPMSingle(nil).PushEvent(NewForcePartitionDeleteEvent(partitionId, ps.getRpcAddr(), replicaToDelete))
-			}
-			continue
-		}
-
-		confVerMS := partitionMS.Epoch.ConfVersion
-		confVerHb := partitionInfo.Epoch.ConfVersion
-		log.Info("partition id[%v], confVerHb[%v], confVerMS[%v]", partitionId, confVerHb, confVerMS)
-		var needToCheckingReplicasCount bool
-		if confVerHb < confVerMS {
-			// force delete all replicas and leader
-			if !partitionMS.takeChangeMemberTask() {
-				continue
-			}
-
-			if replicaToDelete := pickReplicaToDelete(&partitionInfo); replicaToDelete != nil {
-				GetPMSingle(nil).PushEvent(NewPartitionDeleteEvent(partitionInfo.ID, partitionMS.pickLeaderNodeId(),
-					replicaToDelete))
-			}
-			continue
-
-		} else if confVerHb > confVerMS {
-			leaderReplicaHb := pickLeaderReplica(&partitionInfo)
-			if leaderReplicaHb == nil {
-				continue
-			}
-
-			// To force update whole leader and replicas group
-			if expired, ok := partitionMS.UpdateReplicaGroupByCond(s.cluster.store, &partitionInfo, leaderReplicaHb); expired || !ok {
-				log.Debug("Fail to update partition[%v] info. waiting next heartbeat. updateOk[%v]",
-					partitionInfo.ID, ok)
-				continue
-			}
-
-			needToCheckingReplicasCount = true
-
-		} else if confVerHb == confVerMS {
-			leaderReplicaHb := pickLeaderReplica(&partitionInfo)
-			if leaderReplicaHb == nil {
-				continue
-			}
-
-			// To delete invalid replica group for the leader, because its replicaid is not exists in cluster
-			expired, illegal, ok := partitionMS.ValidateAndUpdateLeaderByCond(&partitionInfo, leaderReplicaHb)
-			if expired {
-				log.Debug("Fail to update partition[%v] info. waiting next heartbeat.", partitionInfo.ID)
-				continue
-			}
-			if illegal {
-				if !partitionMS.takeChangeMemberTask() {
-					continue
-				}
-				if replicaToDelete := pickReplicaToDelete(&partitionInfo); replicaToDelete != nil {
-					log.Info("try to delete replica[%v]", replicaToDelete)
-					GetPMSingle(nil).PushEvent(NewPartitionDeleteEvent(partitionInfo.ID, leaderReplicaHb.NodeID,
-						replicaToDelete))
-				}
-				continue
-			}
-			if !ok {
-				// To update whole leader and replicas group when leader in cluster is empty
-				if expired, ok := partitionMS.UpdateReplicaGroupByCond(s.cluster.store, &partitionInfo, leaderReplicaHb); expired || !ok {
-					log.Debug("Fail to update partition[%v] info. waiting next heartbeat. updateOk[%v]",
-						partitionInfo.ID, ok)
-					continue
-				}
-			}
-
-			log.Debug("Updated leader of partition[%v]", partitionInfo.ID)
-			needToCheckingReplicasCount = true
-		}
-
-		if needToCheckingReplicasCount {
-			// add or delete replica
-			replicaCount := partitionMS.countReplicas()
-			if replicaCount > FIXED_REPLICA_NUM {
-				// the count of heartbeat replicas may be great then 4 when making snapshot.
-				// TODO: check partition status is not transfering replica now, then to delete
-
-				log.Info("Too many replicas，need to delete. cur count:[%v]", replicaCount)
-				if !partitionMS.takeChangeMemberTask() {
-					continue
-				}
-
-				if replicaToDelete := pickReplicaToDelete(&partitionInfo); replicaToDelete != nil {
-					GetPMSingle(nil).PushEvent(NewPartitionDeleteEvent(partitionInfo.ID, partitionMS.pickLeaderNodeId(),
-						replicaToDelete))
-				}
-
-			} else if replicaCount < FIXED_REPLICA_NUM {
-
-				log.Info("Too little replicas，need to add. cur count:[%v]", replicaCount)
-				if !partitionMS.takeChangeMemberTask() {
-					continue
-				}
-
-				GetPMSingle(nil).PushEvent(NewPartitionCreateEvent(partitionMS))
-
-			} else {
-				log.Info("Normal replica count[%d] in heartbeat", FIXED_REPLICA_NUM)
-			}
-		}
-	}
-
-	return resp, nil
+	return nil, ErrMethodNotImplement
 }
 
-func (s *RpcServer) validateLeader() (error, interface{}) {
-	leaderInfo := s.cluster.store.GetLeaderSync()
-	if leaderInfo == nil {
-		return ErrNoMSLeader, nil
-	}
-
-	if !leaderInfo.becomeLeader {
-		if leaderInfo.newLeaderId == 0 {
-			return ErrNoMSLeader, nil
-		} else {
-			return ErrNotMSLeader, &metapb.NotLeader{
-				Leader:     metapb.NodeID(leaderInfo.newLeaderId),
-				LeaderAddr: leaderInfo.newLeaderAddr,
-			}
-		}
-	}
-
-	return nil, leaderInfo.newLeaderId
+// GM do not implement
+func (s *RpcServer) CreatePartition(ctx context.Context, request *masterpb.CreatePartitionRequest) (*masterpb.CreatePartitionResponse, error) {
+	return nil, ErrMethodNotImplement
 }
 
-func pickLeaderReplica(info *masterpb.PartitionInfo) *metapb.Replica {
-	if info == nil || !info.IsLeader {
-		return nil
-	}
-
-	return &info.RaftStatus.Replica
+// GM do not implement
+func (s *RpcServer) DeletePartition(ctx context.Context, request *masterpb.DeletePartitionRequest) (*masterpb.DeletePartitionResponse, error) {
+	return nil, ErrMethodNotImplement
 }
 
-// policy : first follower then leader
-func pickReplicaToDelete(info *masterpb.PartitionInfo) *metapb.Replica {
-	if info == nil || info.RaftStatus == nil {
-		return nil
-	}
-
-	followers := info.RaftStatus.Followers
-	var replicaToDelete *metapb.Replica
-
-	if !info.IsLeader {
-		replicaToDelete = &followers[0].Replica
-		return replicaToDelete
-	}
-
-	leaderReplica := info.RaftStatus.Replica
-	for _, follower := range followers {
-		if follower.ID == leaderReplica.ID {
-			continue
-		}
-
-		replicaToDelete = &follower.Replica
-		break
-
-		return replicaToDelete
-	}
-
-	return &leaderReplica
+// GM do not implement
+func (s *RpcServer) ChangeReplica(ctx context.Context, request *masterpb.ChangeReplicaRequest) (*masterpb.ChangeReplicaResponse, error) {
+	return nil, ErrMethodNotImplement
 }
 
-func packPsRegRespWithCfg(resp *masterpb.PSRegisterResponse, psCfg *PsConfig) {
-	resp.RPCPort = int(psCfg.RpcPort)
-	resp.AdminPort = int(psCfg.AdminPort)
-	resp.HeartbeatInterval = int(psCfg.HeartbeatInterval)
-	resp.RaftHeartbeatInterval = int(psCfg.RaftHeartbeatInterval)
-	resp.RaftHeartbeatPort = int(psCfg.RaftHeartbeatPort)
-	resp.RaftReplicatePort = int(psCfg.RaftReplicatePort)
-	resp.RaftRetainLogs = psCfg.RaftRetainLogs
-	resp.RaftReplicaConcurrency = int(psCfg.RaftReplicaConcurrency)
-	resp.RaftSnapshotConcurrency = int(psCfg.RaftSnapshotConcurrency)
+// GM do not implement
+func (s *RpcServer) ChangeLeader(ctx context.Context, request *masterpb.ChangeLeaderRequest) (*masterpb.ChangeLeaderResponse, error) {
+	return nil, ErrMethodNotImplement
 }

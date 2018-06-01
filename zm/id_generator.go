@@ -1,15 +1,16 @@
 package zm
 
 import (
+	"context"
 	"fmt"
-	"github.com/tiglabs/baudengine/util"
+	"github.com/tiglabs/baudengine/topo"
 	"github.com/tiglabs/baudengine/util/log"
 	"sync"
 	"sync/atomic"
 )
 
 var (
-	GEN_STEP          uint32 = 10
+	GEN_STEP          uint32 = 100
 	AUTO_INCREMENT_ID        = fmt.Sprintf("$auto_increment_id")
 
 	idGeneratorSingle     IDGenerator
@@ -18,11 +19,11 @@ var (
 )
 
 type IDGenerator interface {
-	GenID() (uint32, error)
+	GenID() (uint64, error)
 	Close()
 }
 
-func GetIdGeneratorSingle(store Store) IDGenerator {
+func GetIdGeneratorSingle(topoServer *topo.TopoServer) IDGenerator {
 	if idGeneratorSingle != nil {
 		return idGeneratorSingle
 	}
@@ -34,11 +35,11 @@ func GetIdGeneratorSingle(store Store) IDGenerator {
 	defer idGeneratorSingleLock.Unlock()
 
 	if atomic.LoadUint32(&idGeneratorSingleDone) == 0 {
-		if store == nil {
-			log.Error("store should not be nil at first time when create IdGenerator single")
+		if topoServer == nil {
+			log.Error("topoServer should not be nil at first time when create IdGenerator single")
 			return nil
 		}
-		idGeneratorSingle = NewIDGenerator([]byte(AUTO_INCREMENT_ID), GEN_STEP, store)
+		idGeneratorSingle = NewIDGenerator(GEN_STEP, topoServer)
 		atomic.StoreUint32(&idGeneratorSingleDone, 1)
 
 		log.Info("IdGenerator single has started")
@@ -49,54 +50,55 @@ func GetIdGeneratorSingle(store Store) IDGenerator {
 
 type StoreIdGenerator struct {
 	lock sync.Mutex
-	base uint32
-	end  uint32
+	base uint64
+	end  uint64
 
-	key  []byte
 	step uint32
 
 	// TODO: put operation of this store transfer new end value yielded through raft message,
 	// may be slow GenID()
-	store Store
+	topoServer *topo.TopoServer
 }
 
-func NewIDGenerator(key []byte, step uint32, store Store) *StoreIdGenerator {
-	return &StoreIdGenerator{key: key, step: step, store: store}
+func NewIDGenerator(step uint32, topoServer *topo.TopoServer) *StoreIdGenerator {
+	return &StoreIdGenerator{step: step, topoServer: topoServer}
 }
 
-func (id *StoreIdGenerator) GenID() (uint32, error) {
-    if id == nil {
-        return 0, ErrInternalError
-    }
+func (id *StoreIdGenerator) GenID() (uint64, error) {
+	if id == nil {
+		return 0, ErrInternalError
+	}
 
 	if id.base == id.end {
 		id.lock.Lock()
 
 		if id.base == id.end {
-			log.Debug("[GENID] before generate!!!!!! (base %d, end %d)", id.base, id.end)
-			end, err := id.generate()
+			log.Debug("[GENID] before allocate!!!!!! (base %d, end %d)", id.base, id.end)
+			ctx, cancel := context.WithTimeout(context.Background(), TOPO_TIMEOUT)
+			defer cancel()
+			start, end, err := id.topoServer.GenerateNewId(ctx, uint64(id.step))
 			if err != nil {
 				id.lock.Unlock()
 				return 0, err
 			}
 
+			id.base = start
 			id.end = end
-			id.base = id.end - id.step
-			log.Debug("[GENID] after generate!!!!!! (base %d, end %d)", id.base, id.end)
+			log.Debug("[GENID] after allocate!!!!!! (base %d, end %d)", id.base, id.end)
 		}
 
 		id.lock.Unlock()
 	}
 
-	atomic.AddUint32(&(id.base), 1)
+	atomic.AddUint64(&(id.base), 1)
 
 	return id.base, nil
 }
 
 func (id *StoreIdGenerator) Close() {
-    if id == nil {
-        return
-    }
+	if id == nil {
+		return
+	}
 
 	idGeneratorSingleLock.Lock()
 	defer idGeneratorSingleLock.Unlock()
@@ -105,41 +107,4 @@ func (id *StoreIdGenerator) Close() {
 	atomic.StoreUint32(&idGeneratorSingleDone, 0)
 
 	log.Info("IdGenerator single has closed")
-}
-
-func (id *StoreIdGenerator) get(key []byte) ([]byte, error) {
-	value, err := id.store.Get(key)
-	if err != nil {
-		return nil, err
-	}
-	return value, nil
-}
-
-func (id *StoreIdGenerator) put(key, value []byte) error {
-	return id.store.Put(key, value)
-}
-
-func (id *StoreIdGenerator) generate() (uint32, error) {
-	value, err := id.get(id.key)
-	if err != nil {
-		return 0, err
-	}
-
-	if value != nil && len(value) != 4 {
-		log.Error("invalid data, must 4 bytes, but %d", len(value))
-		return 0, ErrInternalError
-	}
-
-    var end uint32
-	if len(value) != 0 {
-        end = util.BytesToUint32(value)
-    }
-	end += id.step
-	value = util.Uint32ToBytes(end)
-	err = id.put(id.key, value)
-	if err != nil {
-		return 0, err
-	}
-
-	return end, nil
 }

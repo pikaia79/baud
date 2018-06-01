@@ -1,12 +1,13 @@
 package zm
 
 import (
+	"context"
 	"fmt"
 	"github.com/gogo/protobuf/proto"
 	"github.com/google/btree"
 	"github.com/tiglabs/baudengine/proto/masterpb"
 	"github.com/tiglabs/baudengine/proto/metapb"
-	"github.com/tiglabs/baudengine/util"
+	"github.com/tiglabs/baudengine/topo"
 	"github.com/tiglabs/baudengine/util/deepcopy"
 	"github.com/tiglabs/baudengine/util/log"
 	"sync"
@@ -16,73 +17,38 @@ import (
 const (
 	PREFIX_PARTITION   = "schema partition "
 	defaultBTreeDegree = 64
-	FIXED_REPLICA_NUM  = 1  // TODO: add config
+	FIXED_REPLICA_NUM  = 1 // TODO: add config
 )
 
 type Partition struct {
-	*metapb.Partition // !!! Do not directly operate the Replicas，must be firstly take the propertyLock
+	*topo.PartitionTopo // !!! Do not directly operate the Replicas，must be firstly take the propertyLock
 
-	Leader *metapb.Replica      `json:"leader"`
+	Leader *metapb.Replica `json:"leader"`
 	parent *Space
 
 	// TODO: temporary policy, finally using global task to replace it
 	taskFlag    bool
 	taskTimeout time.Time
 
-	LastHeartbeat time.Time 	`json:"last_heartbeat"`
+	LastHeartbeat time.Time `json:"last_heartbeat"`
 	propertyLock  sync.RWMutex
 }
 
-func NewPartitionByMeta(metaPartition *metapb.Partition) *Partition {
+func NewPartitionByMeta(metaPartition *topo.PartitionTopo) *Partition {
 	return &Partition{
-		Partition: metaPartition,
+		PartitionTopo: metaPartition,
 	}
 }
 
-func (p *Partition) deleteReplica(store Store, metaReplicas ...*metapb.Replica) error {
+func (p *Partition) deleteReplica(topoServer *topo.TopoServer, metaReplicas ...*metapb.Replica) error {
 	p.propertyLock.Lock()
 	defer p.propertyLock.Unlock()
-
-	copy := deepcopy.Iface(p.Partition).(*metapb.Partition)
-	for i := len(copy.Replicas) - 1; i >= 0; i-- {
-		for _, metaReplica := range metaReplicas {
-			if copy.Replicas[i].ID == metaReplica.ID {
-				copy.Replicas = append(copy.Replicas[:i], copy.Replicas[i+1:]...)
-			}
-		}
-	}
-
-	key, val, err := doMetaMarshal(copy)
-	if err != nil {
-		return err
-	}
-	if err := store.Put(key, val); err != nil {
-		return err
-	}
-
-	p.Partition = copy
 	return nil
 }
 
-func (p *Partition) addReplica(store Store, metaReplicas ...*metapb.Replica) error {
+func (p *Partition) addReplica(topoServer *topo.TopoServer, metaReplicas ...*metapb.Replica) error {
 	p.propertyLock.Lock()
 	defer p.propertyLock.Unlock()
-
-	copy := deepcopy.Iface(p.Partition).(*metapb.Partition)
-	for _, r := range metaReplicas {
-		copy.Replicas = append(copy.Replicas, *r)
-	}
-
-	key, val, err := doMetaMarshal(copy)
-	if err != nil {
-		return err
-	}
-	if err := store.Put(key, val); err != nil {
-		return err
-	}
-
-	p.Partition = copy
-
 	return nil
 }
 
@@ -91,8 +57,8 @@ func (p *Partition) addReplica(store Store, metaReplicas ...*metapb.Replica) err
 //    or current cluster partition have no leader
 // 2. update only the leader when confVer of partitionInfo is equals to confVer of cluster partition,
 //    and the leader of partitionInfo is exists in replica group of current cluster partition
-func (p *Partition) UpdateReplicaGroupByCond(store Store, info *masterpb.PartitionInfo,
-		leaderReplica *metapb.Replica) (verExpired, updateOk bool) {
+func (p *Partition) UpdateReplicaGroupByCond(zone string, topoServer *topo.TopoServer, info *masterpb.PartitionInfo,
+	leaderReplica *metapb.Replica) (verExpired, updateOk bool) {
 	p.propertyLock.Lock()
 	defer p.propertyLock.Unlock()
 
@@ -100,6 +66,10 @@ func (p *Partition) UpdateReplicaGroupByCond(store Store, info *masterpb.Partiti
 		(info.Epoch.ConfVersion == p.Epoch.ConfVersion && p.Leader != nil) {
 		return true, false
 	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), TOPO_TIMEOUT)
+	defer cancel()
+	topoServer.SetPartitionInfoByZone(ctx, zone, info)
 
 	copy := deepcopy.Iface(p.Partition).(*metapb.Partition)
 	copy.Epoch = info.Epoch
@@ -110,13 +80,6 @@ func (p *Partition) UpdateReplicaGroupByCond(store Store, info *masterpb.Partiti
 	for _, follower := range info.RaftStatus.Followers {
 		replica := &follower.Replica
 		copy.Replicas = append(copy.Replicas, *replica)
-	}
-	key, val, err := doMetaMarshal(copy)
-	if err != nil {
-		return false, false
-	}
-	if err := store.Put(key, val); err != nil {
-		return false, false
 	}
 
 	p.Partition = copy
@@ -131,7 +94,7 @@ func (p *Partition) UpdateReplicaGroupByCond(store Store, info *masterpb.Partiti
 }
 
 func (p *Partition) ValidateAndUpdateLeaderByCond(info *masterpb.PartitionInfo,
-       leaderReplica *metapb.Replica) (verExpired, illegal, updateOk bool) {
+	leaderReplica *metapb.Replica) (verExpired, illegal, updateOk bool) {
 	p.propertyLock.Lock()
 	defer p.propertyLock.Unlock()
 
@@ -259,16 +222,16 @@ func (c *PartitionCache) AddPartition(partition *Partition) {
 }
 
 func (c *PartitionCache) GetAllPartitions() *[]Partition {
-    c.lock.RLock()
-    defer c.lock.RUnlock()
+	c.lock.RLock()
+	defer c.lock.RUnlock()
 
-    partitions := make([]Partition, 0, len(c.partitions))
-    for _, partition := range c.partitions {
-        log.Debug("api get all partition[%p] ", partition)
-        partitions = append(partitions, *partition)
-    }
+	partitions := make([]Partition, 0, len(c.partitions))
+	for _, partition := range c.partitions {
+		log.Debug("api get all partition[%p] ", partition)
+		partitions = append(partitions, *partition)
+	}
 
-    return &partitions
+	return &partitions
 }
 
 func (c *PartitionCache) GetAllMetaPartitions() *[]metapb.Partition {
@@ -283,27 +246,17 @@ func (c *PartitionCache) GetAllMetaPartitions() *[]metapb.Partition {
 	return &partitions
 }
 
-func (c *PartitionCache) Recovery(store Store) ([]*Partition, error) {
-	prefix := []byte(PREFIX_PARTITION)
-	startKey, limitKey := util.BytesPrefix(prefix)
+func (c *PartitionCache) Recovery(topoServer *topo.TopoServer) ([]*Partition, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), TOPO_TIMEOUT)
+	defer cancel()
+
+	partitions, err := topoServer.GetAllPartitions(ctx)
+	if err != nil {
+		log.Error("topoServer.GetAllPartition() failed: %s", err.Error())
+	}
 
 	resultPartitions := make([]*Partition, 0)
-
-	iterator := store.Scan(startKey, limitKey)
-	defer iterator.Release()
-	for iterator.Next() {
-		if iterator.Key() == nil {
-			log.Error("partition store key is nil. never happened!!!")
-			continue
-		}
-
-		val := iterator.Value()
-		metaPartition := new(metapb.Partition)
-		if err := proto.Unmarshal(val, metaPartition); err != nil {
-			log.Error("fail to unmarshal partition from store. err[%v]", err)
-			return nil, ErrInternalError
-		}
-
+	for _, metaPartition := range partitions {
 		resultPartitions = append(resultPartitions, NewPartitionByMeta(metaPartition))
 	}
 
@@ -399,7 +352,7 @@ func (t *PartitionTree) remove(rng *Partition) {
 // search returns a region that contains the key.
 func (t *PartitionTree) search(slot metapb.SlotID) *Partition {
 	rng := &Partition{
-		Partition: &metapb.Partition{
+		PartitionTopo: &metapb.Partition{
 			StartSlot: slot,
 		},
 	}
@@ -413,7 +366,7 @@ func (t *PartitionTree) search(slot metapb.SlotID) *Partition {
 
 func (t *PartitionTree) multipleSearch(slot metapb.SlotID, num int) []*Partition {
 	rng := &Partition{
-		Partition: &metapb.Partition{
+		PartitionTopo: &metapb.Partition{
 			StartSlot: slot,
 		},
 	}

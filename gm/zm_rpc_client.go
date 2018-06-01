@@ -15,7 +15,7 @@ import (
 
 //go:generate mockgen -destination zm_rpc_client_mock.go -package gm github.com/tiglabs/baudengine/gm ZoneMasterRpcClient
 const (
-	ZONE_MASTER_GRPC_REQUEST_TIMEOUT = 3 * time.Second
+	ZONE_MASTER_GRPC_REQUEST_TIMEOUT = 5 * time.Second
 )
 
 var (
@@ -25,12 +25,10 @@ var (
 )
 
 type ZoneMasterRpcClient interface {
-	CreatePartition(addr string, partition *metapb.Partition) error
+	CreatePartition(addr string, partition *metapb.Partition) (*metapb.Replica, error)
 	DeletePartition(addr string, partitionId metapb.PartitionID) error
-	AddReplica(addr string, partitionId metapb.PartitionID,
-		replicaId metapb.ReplicaID) error
-	RemoveReplica(addr string, partitionId metapb.PartitionID,
-		replicaId metapb.ReplicaID) error
+	AddReplica(addr string, partitionId metapb.PartitionID, replica *metapb.Replica) error
+	RemoveReplica(addr string, partitionId metapb.PartitionID, replica *metapb.Replica) error
 	Close()
 }
 
@@ -99,12 +97,12 @@ func (c *ZoneMasterRpcClientImpl) getClient(addr string) (masterpb.MasterRpcClie
 	return client.(masterpb.MasterRpcClient), nil
 }
 
-func (c *ZoneMasterRpcClientImpl) CreatePartition(addr string, partition *metapb.Partition) error {
-	log.Info("create partition[%v] into addr[%v]", partition, addr)
+func (c *ZoneMasterRpcClientImpl) CreatePartition(addr string, partition *metapb.Partition) (*metapb.Replica, error) {
+	log.Info("create partition[%d] into addr[%s]", partition, addr)
 
 	client, err := c.getClient(addr)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	req := &masterpb.CreatePartitionRequest{
@@ -112,26 +110,26 @@ func (c *ZoneMasterRpcClientImpl) CreatePartition(addr string, partition *metapb
 		Partition:     *partition,
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), ZONE_MASTER_GRPC_REQUEST_TIMEOUT)
+	defer cancel()
 	resp, err := client.CreatePartition(ctx, req)
-	cancel()
 	if err != nil {
 		if status, ok := status.FromError(err); ok {
 			err = status.Err()
 		}
 		log.Error("grpc invoke is failed. err[%v]", err)
-		return ErrRpcInvokeFailed
+		return nil, ErrRpcInvokeFailed
 	}
 
 	if resp.ResponseHeader.Code == metapb.RESP_CODE_OK {
-		return nil
+		return &resp.Replica, nil
 	} else {
 		log.Error("grpc CreatePartition response err[%v]", resp.ResponseHeader)
-		return ErrRpcInvokeFailed
+		return nil, ErrRpcInvokeFailed
 	}
 }
 
 func (c *ZoneMasterRpcClientImpl) DeletePartition(addr string, partitionId metapb.PartitionID) error {
-	log.Info("delete partitionId[%v] into addr[%v]", partitionId, addr)
+	log.Info("delete partitionId[%d] into addr[%s]", partitionId, addr)
 	client, err := c.getClient(addr)
 	if err != nil {
 		return err
@@ -139,11 +137,11 @@ func (c *ZoneMasterRpcClientImpl) DeletePartition(addr string, partitionId metap
 
 	req := &masterpb.DeletePartitionRequest{
 		RequestHeader: metapb.RequestHeader{},
-		ID:            partitionId,
+		PartitionID:   partitionId,
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), ZONE_MASTER_GRPC_REQUEST_TIMEOUT)
+	defer cancel()
 	resp, err := client.DeletePartition(ctx, req)
-	cancel()
 	if err != nil {
 		if status, ok := status.FromError(err); ok {
 			err = status.Err()
@@ -160,10 +158,8 @@ func (c *ZoneMasterRpcClientImpl) DeletePartition(addr string, partitionId metap
 	}
 }
 
-func (c *ZoneMasterRpcClientImpl) AddReplica(addr string, partitionId metapb.PartitionID,
-	replicaId metapb.ReplicaID) error {
-	log.Info("add replicaId[%v] of partition[%v] into addr[%v]",
-		replicaId, partitionId, addr)
+func (c *ZoneMasterRpcClientImpl) AddReplica(addr string, partitionId metapb.PartitionID, replica *metapb.Replica) error {
+	log.Info("add replica[%v] of partitionId[%s] into addr[%s]", replica, partitionId, addr)
 	client, err := c.getClient(addr)
 	if err != nil {
 		return err
@@ -173,13 +169,11 @@ func (c *ZoneMasterRpcClientImpl) AddReplica(addr string, partitionId metapb.Par
 		RequestHeader: metapb.RequestHeader{},
 		Type:          masterpb.ReplicaChangeType_Add,
 		PartitionID:   partitionId,
-		Replica: metapb.Replica{
-			ID: replicaId,
-		},
+		Replica:       *replica,
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), ZONE_MASTER_GRPC_REQUEST_TIMEOUT)
+	defer cancel()
 	resp, err := client.ChangeReplica(ctx, req)
-	cancel()
 	if err != nil {
 		if status, ok := status.FromError(err); ok {
 			err = status.Err()
@@ -196,10 +190,8 @@ func (c *ZoneMasterRpcClientImpl) AddReplica(addr string, partitionId metapb.Par
 	}
 }
 
-func (c *ZoneMasterRpcClientImpl) RemoveReplica(addr string, partitionId metapb.PartitionID,
-	replicaId metapb.ReplicaID) error {
-	log.Info("remove replicaId[%v] of partition[%v] into addr[%v]",
-		replicaId, partitionId, addr)
+func (c *ZoneMasterRpcClientImpl) RemoveReplica(addr string, partitionId metapb.PartitionID, replica *metapb.Replica) error {
+	log.Info("remove replica[%v] of partitionId[%d] into addr[%s]", replica, partitionId, addr)
 	client, err := c.getClient(addr)
 	if err != nil {
 		return err
@@ -209,13 +201,11 @@ func (c *ZoneMasterRpcClientImpl) RemoveReplica(addr string, partitionId metapb.
 		RequestHeader: metapb.RequestHeader{},
 		Type:          masterpb.ReplicaChangeType_Remove,
 		PartitionID:   partitionId,
-		Replica: metapb.Replica{
-			ID: replicaId,
-		},
+		Replica:       *replica,
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), ZONE_MASTER_GRPC_REQUEST_TIMEOUT)
+	defer cancel()
 	resp, err := client.ChangeReplica(ctx, req)
-	cancel()
 	if err != nil {
 		if status, ok := status.FromError(err); ok {
 			err = status.Err()

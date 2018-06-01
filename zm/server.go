@@ -1,11 +1,14 @@
 package zm
 
 import (
+	"context"
 	"github.com/tiglabs/baudengine/topo"
 	"github.com/tiglabs/baudengine/util/log"
 	"sync"
 	"time"
 )
+
+var MineIsLeader = false
 
 type ZoneMaster struct {
 	config *Config
@@ -62,15 +65,25 @@ func (zm *ZoneMaster) Start(config *Config) error {
 	}
 
 	for {
-		ctx, err := zm.participation.WaitForMastership()
+		_, err := zm.participation.WaitForMastership()
 		switch err {
 		case nil:
+			MineIsLeader = true
+			for {
+				ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
+				id, err := zm.participation.GetCurrentMasterID(ctx)
+				cancel()
+				if err != nil || id != config.ClusterCfg.CurNodeId {
+					MineIsLeader = false
+					break
+				}
+			}
 			break
 		case topo.ErrInterrupted:
 			break
 		default:
 			//log.Errorf("Got error while waiting for master, will retry in 5s: %v", err)
-			time.Sleep(5 * time.Second)
+			time.Sleep(1 * time.Second)
 		}
 	}
 

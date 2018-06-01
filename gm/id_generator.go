@@ -1,16 +1,15 @@
 package gm
 
 import (
-	"fmt"
-	"github.com/tiglabs/baudengine/util"
 	"github.com/tiglabs/baudengine/util/log"
+	"golang.org/x/net/context"
 	"sync"
 	"sync/atomic"
+	"time"
 )
 
 var (
-	GEN_STEP          uint32 = 100
-	AUTO_INCREMENT_ID        = fmt.Sprintf("$auto_increment_id")
+	GEN_STEP uint64 = 100
 
 	idGeneratorSingle     IDGenerator
 	idGeneratorSingleLock sync.Mutex
@@ -18,7 +17,7 @@ var (
 )
 
 type IDGenerator interface {
-	GenID() (uint32, error)
+	GenID() (uint64, error)
 	Close()
 }
 
@@ -34,7 +33,7 @@ func GetIdGeneratorSingle() IDGenerator {
 	defer idGeneratorSingleLock.Unlock()
 
 	if atomic.LoadUint32(&idGeneratorSingleDone) == 0 {
-		idGeneratorSingle = NewIDGenerator([]byte(AUTO_INCREMENT_ID), GEN_STEP)
+		idGeneratorSingle = NewIDGenerator([]byte("$auto_id"), GEN_STEP)
 		atomic.StoreUint32(&idGeneratorSingleDone, 1)
 
 		log.Info("IdGenerator single has started")
@@ -43,20 +42,34 @@ func GetIdGeneratorSingle() IDGenerator {
 	return idGeneratorSingle
 }
 
-type StoreIdGenerator struct {
+type IdGenerator struct {
 	lock sync.Mutex
-	base uint32
-	end  uint32
+	base uint64
+	end  uint64
 
 	key  []byte
-	step uint32
+	step uint64
 }
 
-func NewIDGenerator(key []byte, step uint32) *StoreIdGenerator {
-	return &StoreIdGenerator{key: key, step: step}
+func NewIDGenerator(key []byte, step uint64) *IdGenerator {
+	return &IdGenerator{key: key, step: step}
 }
 
-func (id *StoreIdGenerator) GenID() (uint32, error) {
+func (id *IdGenerator) Close() {
+	if id == nil {
+		return
+	}
+
+	idGeneratorSingleLock.Lock()
+	defer idGeneratorSingleLock.Unlock()
+
+	idGeneratorSingle = nil
+	atomic.StoreUint32(&idGeneratorSingleDone, 0)
+
+	log.Info("IdGenerator single has closed")
+}
+
+func (id *IdGenerator) GenID() (uint64, error) {
 	if id == nil {
 		return 0, ErrInternalError
 	}
@@ -80,60 +93,17 @@ func (id *StoreIdGenerator) GenID() (uint32, error) {
 		id.lock.Unlock()
 	}
 
-	atomic.AddUint32(&(id.base), 1)
-
+	atomic.AddUint64(&id.base, 1)
 	return id.base, nil
 }
 
-func (id *StoreIdGenerator) Close() {
-	if id == nil {
-		return
-	}
-
-	idGeneratorSingleLock.Lock()
-	defer idGeneratorSingleLock.Unlock()
-
-	idGeneratorSingle = nil
-	atomic.StoreUint32(&idGeneratorSingleDone, 0)
-
-	log.Info("IdGenerator single has closed")
-}
-
-func (id *StoreIdGenerator) get(key []byte) ([]byte, error) {
-	// TODO: 调用global etcd, 得到自增ID, 接口由@杨洋提供
-	value, err := id.store.Get(key)
-	if err != nil {
-		return nil, err
-	}
-	return value, nil
-}
-
-func (id *StoreIdGenerator) put(key, value []byte) error {
-	// TODO: 调用global etcd, 更新自增ID, 接口由@杨洋提供
-	return id.store.Put(key, value)
-}
-
-func (id *StoreIdGenerator) generate() (uint32, error) {
-	value, err := id.get(id.key)
+func (id *IdGenerator) generate() (uint64, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	start, err := topoServer.GenerateNewId(ctx)
 	if err != nil {
 		return 0, err
 	}
-
-	if value != nil && len(value) != 4 {
-		log.Error("invalid data, must 4 bytes, but %d", len(value))
-		return 0, ErrInternalError
-	}
-
-	var end uint32
-	if len(value) != 0 {
-		end = util.BytesToUint32(value)
-	}
-	end += id.step
-	value = util.Uint32ToBytes(end)
-	err = id.put(id.key, value)
-	if err != nil {
-		return 0, err
-	}
-
+	end := start + id.step
 	return end, nil
 }

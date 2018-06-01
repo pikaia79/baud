@@ -93,7 +93,7 @@ message PSRegisterRequest {
 message PSRegisterResponse {
     ResponseHeader     header     = 1 [(gogoproto.nullable) = false, (gogoproto.embed) = true];
     uint32             nodeID     = 2 [(gogoproto.customname) = "NodeID", (gogoproto.casttype) = "github.com/tiglabs/baudengine/proto/metapb.NodeID"];
-    PSConfig           config     = 3 [(gogoproto.nullable) = false, (gogoproto.embed) = true];
+//    PSConfig           config     = 3 [(gogoproto.nullable) = false, (gogoproto.embed) = true];
     repeated Partition partitions = 4 [(gogoproto.nullable) = false];
 }
 

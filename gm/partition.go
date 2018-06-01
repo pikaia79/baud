@@ -1,26 +1,24 @@
 package gm
 
 import (
-	"github.com/gogo/protobuf/proto"
-	"github.com/google/btree"
 	"github.com/tiglabs/baudengine/proto/metapb"
 	"github.com/tiglabs/baudengine/topo"
 	"github.com/tiglabs/baudengine/util/log"
-	"sync"
 	"golang.org/x/net/context"
+	"sync"
+	"time"
 )
 
 const (
-	defaultBTreeDegree = 64
-	FIXED_REPLICA_NUM  = 1
+	FIXED_REPLICA_NUM = 3
 )
 
 type Partition struct {
 	*topo.PartitionTopo
 
-    Zones    map[string]*topo.ZoneTopo
+	Zones map[string]*topo.ZoneTopo
 
-	propertyLock  sync.RWMutex
+	propertyLock sync.RWMutex
 }
 
 func NewPartition(dbId metapb.DBID, spaceId metapb.SpaceID, startSlot, endSlot metapb.SlotID) (*Partition, error) {
@@ -72,15 +70,6 @@ func (p *Partition) getAllReplicas() []*metapb.Replica {
 	return replicas
 }
 
-func (p *Partition) pickLeaderNodeId() metapb.NodeID {
-	p.propertyLock.RLock()
-	defer p.propertyLock.RUnlock()
-
-	// TODO 得到一个partition的replica leader
-	// TODO 需要watch所有zone的etcd后,才能分析出来
-
-}
-
 func (p *Partition) findReplicaById(replicaId metapb.ReplicaID) *metapb.Replica {
 	p.propertyLock.RLock()
 	defer p.propertyLock.RUnlock()
@@ -94,17 +83,56 @@ func (p *Partition) findReplicaById(replicaId metapb.ReplicaID) *metapb.Replica 
 	return nil
 }
 
-func (p *Partition) takeChangeMemberTask() bool {
+func (p *Partition) grabPartitionTaskLock(zoneName, taskType, taskId string) (bool, error) {
+	task, err := p.getPartitionTask(zoneName, taskType, taskId)
+	if err != nil {
+		return false, err
+	}
+	if task != nil {
+		return false, nil
+	}
+	task = &metapb.Task{
+		Id:   taskId,
+		Type: taskType,
+	}
+	err = p.setPartitionTask(zoneName, task, 30*time.Second)
+	if err != nil {
+		return false, err
+	}
+	return true, nil
+}
+
+func (p *Partition) getPartitionTask(zoneName, taskType, taskId string) (*metapb.Task, error) {
 	p.propertyLock.Lock()
 	defer p.propertyLock.Unlock()
 
-	// TODO 得到一个partition的任务标识， 接口由@杨洋提供
+	ctx, cancel := context.WithTimeout(context.Background(), ETCD_TIMEOUT)
+	defer cancel()
+	taskMeta, err := topoServer.GetTask(ctx, zoneName, taskType, taskId)
+	if err != nil {
+		log.Error("topoServer GetTask error, err: [%v]", err)
+		return nil, err
+	}
 
-	return false
+	return taskMeta, nil
+}
+
+func (p *Partition) setPartitionTask(zoneName string, task *metapb.Task, timeout time.Duration) error {
+	p.propertyLock.Lock()
+	defer p.propertyLock.Unlock()
+
+	ctx, cancel := context.WithTimeout(context.Background(), ETCD_TIMEOUT)
+	defer cancel()
+
+	err := topoServer.AddTask(ctx, zoneName, task, timeout)
+	if err != nil {
+		log.Error("topoServer SetTask error, err: [%v]", err)
+		return err
+	}
+	return nil
 }
 
 // PartitionCache
-
 type PartitionCache struct {
 	lock       sync.RWMutex
 	partitions map[metapb.PartitionID]*Partition
@@ -171,7 +199,8 @@ func (c *PartitionCache) Recovery() ([]*Partition, error) {
 
 	resultPartitions := make([]*Partition, 0)
 
-	ctx := context.Background()
+	ctx, cancel := context.WithTimeout(context.Background(), ETCD_TIMEOUT)
+	defer cancel()
 	partitionsTopo, err := topoServer.GetAllPartitions(ctx)
 	if err != nil {
 		log.Error("topoServer GetAllPartitions error, err: [%v]", err)
@@ -194,170 +223,4 @@ func (c *PartitionCache) Clear() {
 	defer c.lock.Unlock()
 
 	c.partitions = make(map[metapb.PartitionID]*Partition)
-}
-
-// PartitionItem
-
-type PartitionItem struct {
-	partition *Partition
-}
-
-// Less returns true if the region start key is greater than the other.
-// So we will sort the region with start key reversely.
-func (r *PartitionItem) Less(other btree.Item) bool {
-	left := r.partition.StartSlot
-	right := other.(*PartitionItem).partition.StartSlot
-	//return bytes.Compare(left, right) > 0
-	return left > right
-}
-
-func (r *PartitionItem) Contains(slot metapb.SlotID) bool {
-	start, end := r.partition.StartSlot, r.partition.EndSlot
-	//return bytes.Compare(key, start) >= 0 && bytes.Compare(key, end) < 0
-	return slot >= start && slot < end
-}
-
-type PartitionTree struct {
-	tree *btree.BTree
-}
-
-func NewPartitionTree() *PartitionTree {
-	return &PartitionTree{
-		tree: btree.New(defaultBTreeDegree),
-	}
-}
-
-func (pt *PartitionTree) length() int {
-	return pt.tree.Len()
-}
-
-// update updates the tree with the region.
-// It finds and deletes all the overlapped regions first, and then
-// insert the region.
-func (pt *PartitionTree) update(partition *Partition) {
-	item := &PartitionItem{partition: partition}
-
-	result := pt.find(partition)
-	if result == nil {
-		result = item
-	}
-
-	var overlaps []*PartitionItem
-	var count int
-	pt.tree.DescendLessOrEqual(result, func(i btree.Item) bool {
-		over := i.(*PartitionItem)
-		//if bytes.Compare(rng.EndSlot, over.region.StartKey) <= 0 {
-		if partition.EndSlot <= over.partition.StartSlot {
-			return false
-		}
-		overlaps = append(overlaps, over)
-		count++
-		return true
-	})
-
-	if count > 2 {
-		log.Warn("=========many overlaps ranges %v, new range[%v]", overlaps, partition)
-	}
-	for _, o := range overlaps {
-		pt.tree.Delete(o)
-	}
-
-	pt.tree.ReplaceOrInsert(item)
-}
-
-// remove removes a region if the region is in the tree.
-// It will do nothing if it cannot find the region or the found region
-// is not the same with the region.
-func (pt *PartitionTree) remove(partition *Partition) {
-	result := pt.find(partition)
-	if result == nil || result.partition.ID != partition.ID {
-		return
-	}
-
-	pt.tree.Delete(result)
-}
-
-// search returns a region that contains the key.
-func (pt *PartitionTree) search(slot metapb.SlotID) *Partition {
-	rng := &Partition{
-		Partition: &metapb.Partition{
-			StartSlot: slot,
-		},
-	}
-	log.Debug("################### len=%v", pt.tree.Len())
-	result := pt.find(rng)
-	if result == nil {
-		return nil
-	}
-	return result.partition
-}
-
-func (pt *PartitionTree) multipleSearch(slot metapb.SlotID, num int) []*Partition {
-	rng := &Partition{
-		Partition: &metapb.Partition{
-			StartSlot: slot,
-		},
-	}
-	results := pt.ascendScan(rng, num)
-	var ranges = make([]*Partition, 0, num)
-	var endSlot metapb.SlotID
-	var isFound = false
-	for _, r := range results {
-		//if len(endKey) != 0 {
-		if isFound {
-			//if bytes.Compare(r.region.GetStartKey(), endKey) != 0 {
-			if r.partition.StartSlot != endSlot {
-				break
-			}
-		}
-		ranges = append(ranges, r.partition)
-		endSlot = r.partition.EndSlot
-		isFound = true
-	}
-	return ranges
-}
-
-// This is a helper function to find an item.
-func (pt *PartitionTree) find(partition *Partition) *PartitionItem {
-	item := &PartitionItem{partition: partition}
-
-	var result *PartitionItem
-	pt.tree.AscendGreaterOrEqual(item, func(i btree.Item) bool {
-		result = i.(*PartitionItem)
-		return false
-	})
-
-	log.Debug("####range find: result=%v, startkey=%v", result, partition.StartSlot)
-
-	if result != nil {
-		log.Debug("####range find: result range =%v, startkey=%v", result.partition, partition.StartSlot)
-	}
-
-	if result == nil || !result.Contains(partition.StartSlot) {
-		return nil
-	}
-
-	return result
-}
-
-func (pt *PartitionTree) ascendScan(partition *Partition, num int) []*PartitionItem {
-	result := pt.find(partition)
-	if result == nil {
-		return nil
-	}
-
-	var results []*PartitionItem
-	//var firstItem *rangeItem
-	results = make([]*PartitionItem, 0, num)
-	count := 0
-	pt.tree.DescendLessOrEqual(result, func(i btree.Item) bool {
-		results = append(results, i.(*PartitionItem))
-		count++
-		if count == num {
-			return false
-		} else {
-			return true
-		}
-	})
-	return results
 }
