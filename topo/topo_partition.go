@@ -358,22 +358,40 @@ func (s *TopoServer) WatchPartitions(ctx context.Context) (error, []*PartitionTo
 		defer close(changes)
 
 		for wd := range wdChannel {
-			if wd != nil {
+			if wd.Err != nil && wd.Err != ErrNoNode {
 				changes <- &PartitionWatchData{Err: wd.Err}
 				return
 			}
 
-			value := &metapb.Partition{}
-			if err := proto.Unmarshal(wd.Contents, value); err != nil {
-				log.Error("Fail to unmarshal meta data for partition. err[%v]", err)
-				cancel()
-				for range wdChannel {
+			if wd.Err == ErrNoNode { // node deleted
+				keyDel := string(wd.Contents)
+				segs := strings.Split(keyDel, "/")
+				if len(segs) < 3 {
+					changes <- &PartitionWatchData{Err: ErrInvalidPath}
+					return
 				}
-				changes <- &PartitionWatchData{Err: err}
-				return
-			}
+				partitionId, err := strconv.Atoi(segs[1])
+				if err != nil {
+					changes <- &PartitionWatchData{Err: ErrInvalidPath}
+					return
+				}
 
-			changes <- &PartitionWatchData{PartitionTopo: &PartitionTopo{Partition: value, Version: wd.Version}}
+				value := &metapb.Partition{ID: metapb.PartitionID(partitionId)}
+				changes <- &PartitionWatchData{Err: ErrNoNode, PartitionTopo: &PartitionTopo{Partition: value, Version: wd.Version}}
+
+			} else { // node added or updated
+				value := &metapb.Partition{}
+				if err := proto.Unmarshal(wd.Contents, value); err != nil {
+					log.Error("Fail to unmarshal meta data for partition. err[%v]", err)
+					cancel()
+					for range wdChannel {
+					}
+					changes <- &PartitionWatchData{Err: err}
+					return
+				}
+
+				changes <- &PartitionWatchData{PartitionTopo: &PartitionTopo{Partition: value, Version: wd.Version}}
+			}
 		}
 	}()
 

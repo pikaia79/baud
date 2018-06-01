@@ -7,6 +7,8 @@ import (
 	"github.com/tiglabs/baudengine/proto/metapb"
 	"github.com/tiglabs/baudengine/util/log"
 	"path"
+	"strings"
+	"strconv"
 )
 
 type SpaceTopo struct {
@@ -192,7 +194,7 @@ func (s *TopoServer) WatchSpaces(ctx context.Context) (error, []*SpaceTopo, <-ch
 		defer close(changes)
 
 		for wd := range wdChannel {
-			if wd != nil {
+			if wd != nil && wd.Err != ErrNoNode {
 				changes <- &SpaceWatchData{Err: wd.Err}
 				return
 			}
@@ -207,7 +209,45 @@ func (s *TopoServer) WatchSpaces(ctx context.Context) (error, []*SpaceTopo, <-ch
 				return
 			}
 
-			changes <- &SpaceWatchData{SpaceTopo: &SpaceTopo{Space: value, Version: wd.Version}}
+
+			if wd.Err == ErrNoNode { // node deleted
+				keyDel := string(wd.Contents)
+				segs := strings.Split(keyDel, "/")
+				if len(segs) < 3 {
+					log.Error("invalid db-space id path[%s]", string(wd.Contents))
+					changes <- &SpaceWatchData{Err: ErrInvalidPath}
+					return
+				}
+				ids := strings.Split(segs[1], "-")
+				if len(ids) != 2 {
+					log.Error("invalid db-space id path[%s]", keyDel)
+					changes <- &SpaceWatchData{Err: ErrInvalidPath}
+					return
+				}
+				dbId, dErr := strconv.Atoi(ids[0])
+				spaceId, sErr := strconv.Atoi(ids[1])
+				if dErr != nil || sErr != nil {
+					log.Error("invalid db-space id path[%s]", keyDel)
+					changes <- &SpaceWatchData{Err: ErrInvalidPath}
+					return
+				}
+
+				value := &metapb.Space{ID: metapb.SpaceID(spaceId), DB: metapb.DBID(dbId)}
+				changes <- &SpaceWatchData{Err: ErrNoNode, SpaceTopo: &SpaceTopo{Space: value, Version: wd.Version}}
+
+			} else { // node added or updated
+				value := &metapb.Space{}
+				if err := proto.Unmarshal(wd.Contents, value); err != nil {
+					log.Error("Fail to unmarshal meta data for partition. err[%v]", err)
+					cancel()
+					for range wdChannel {
+					}
+					changes <- &SpaceWatchData{Err: err}
+					return
+				}
+
+				changes <- &SpaceWatchData{SpaceTopo: &SpaceTopo{Space: value, Version: wd.Version}}
+			}
 		}
 	}()
 
