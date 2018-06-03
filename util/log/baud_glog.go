@@ -1239,6 +1239,10 @@ func Fatal(format string, args ...interface{}) {
 	}
 }
 
+func Panic(format string, args ...interface{}) {
+	Fatal(format, args)
+}
+
 // fatalNoStacks is non-zero if we are to exit without dumping goroutine stacks.
 // It allows Exit and relatives to use the Fatal logs.
 var fatalNoStacks uint32
