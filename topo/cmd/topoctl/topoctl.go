@@ -4,16 +4,15 @@ import (
 	"context"
 	"flag"
 	"fmt"
-	//"github.com/tiglabs/baudengine/proto/metapb"
-	"github.com/tiglabs/baudengine/proto/metapb"
+
 	"github.com/tiglabs/baudengine/topo"
 	_ "github.com/tiglabs/baudengine/topo/etcd3topo"
 	"github.com/tiglabs/baudengine/util/log"
 	_ "net/http/pprof"
 	"runtime"
 	"runtime/debug"
-	"sync"
 	"time"
+    "sync"
 )
 
 var (
@@ -35,6 +34,7 @@ func main() {
 	flag.Parse()
 
 	log.InitFileLog(*logPath, *logName, *logLevel)
+    defer log.Flush()
 
 	//for multi-cpu scheduling
 	runtime.GOMAXPROCS(runtime.NumCPU())
@@ -71,19 +71,19 @@ func main() {
 	//  return
 	//}
 	//log.Debug("add new db[%v]", dbTopo1)
-	dbMeta2 := &metapb.DB{ID: 2, Name: "mydb2"}
-	dbTopo2, err := server.AddDB(ctx, dbMeta2)
-	if err != nil {
-		log.Error("AddDB err[%v]", err)
-		return
-	}
-	log.Debug("add new db[%v]", dbTopo2)
-	dbTopo, err := server.GetDB(ctx, 2)
-	if err != nil {
-		log.Error("GetDB err[%v]", err)
-		return
-	}
-	log.Debug("get db[%v], version=%d", dbTopo, dbTopo.Version)
+	//dbMeta2 := &metapb.DB{ID: 2, Name: "mydb2"}
+	//dbTopo2, err := server.AddDB(ctx, dbMeta2)
+	//if err != nil {
+	//	log.Error("AddDB err[%v]", err)
+	//	return
+	//}
+	//log.Debug("add new db[%v]", dbTopo2)
+	//dbTopo, err := server.GetDB(ctx, 2)
+	//if err != nil {
+	//	log.Error("GetDB err[%v]", err)
+	//	return
+	//}
+	//log.Debug("get db[%v], version=%d", dbTopo, dbTopo.Version)
 
 	//dbTopos, err := server.GetAllDBs(ctx)
 	//if err != nil {
@@ -110,30 +110,30 @@ func main() {
 	//   }
 	//}()
 
-	err, currentDbTopos, dbChannel, _ := server.WatchDBs(ctx)
-	if err != nil {
-		log.Debug("WatchDBs err[%v]", err)
-		return
-	}
-	log.Debug("current dbs[%v] before WatchDBs", currentDbTopos)
-	var wg sync.WaitGroup
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
-
-		for db := range dbChannel {
-			if db.Err != nil && db.Err != topo.ErrNoNode {
-				log.Error("watch err[%v]", db.Err)
-				return
-			}
-
-			if db.Err == topo.ErrNoNode {
-				log.Debug("watched deleted db[%v]", db.DBTopo)
-			} else {
-				log.Debug("watched added or updated db[%v]", db.DBTopo)
-			}
-		}
-	}()
+	//err, currentDbTopos, dbChannel, _ := server.WatchDBs(ctx)
+	//if err != nil {
+	//	log.Debug("WatchDBs err[%v]", err)
+	//	return
+	//}
+	//log.Debug("current dbs[%v] before WatchDBs", currentDbTopos)
+	//var wg sync.WaitGroup
+	//wg.Add(1)
+	//go func() {
+	//	defer wg.Done()
+    //
+	//	for db := range dbChannel {
+	//		if db.Err != nil && db.Err != topo.ErrNoNode {
+	//			log.Error("watch err[%v]", db.Err)
+	//			return
+	//		}
+    //
+	//		if db.Err == topo.ErrNoNode {
+	//			log.Debug("watched deleted db[%v]", db.DBTopo)
+	//		} else {
+	//			log.Debug("watched added or updated db[%v]", db.DBTopo)
+	//		}
+	//	}
+	//}()
 
 	//time.Sleep(1 * time.Second)
 	//dbTopo.Name = "mydb666"
@@ -303,22 +303,22 @@ func main() {
 	//log.Debug("mp3 master id =%s", masterId3)
 	//wg.Wait()
 
-	//var wg sync.WaitGroup
-	//for i := 0; i < 100; i++ {
-	//    wg.Add(1)
-	//    go func() {
-	//        defer wg.Done()
-	//        for i := 0; i < 10; i++ {
-	//            start, end, err := server.GenerateNewId(ctx, 10)
-	//            if err != nil {
-	//                log.Error("GenerateNewId err[%v]", err)
-	//                return
-	//            }
-	//            log.Debug("start=%d, end=%d", start, end)
-	//        }
-	//    }()
-	//}
-	//wg.Wait()
+	var wg sync.WaitGroup
+	for i := 0; i < 100; i++ {
+	   wg.Add(1)
+	   go func() {
+	       defer wg.Done()
+	       for i := 0; i < 100; i++ {
+	           start, end, err := server.GenerateNewId(ctx, 10)
+	           if err != nil {
+	               log.Error("GenerateNewId err[%v]", err)
+	               return
+	           }
+	           log.Debug("start=%d, end=%d", start, end)
+	       }
+	   }()
+	}
+	wg.Wait()
 
 	//err := server.SetZonesForPartition(ctx, 120, []string{"zone1", "zone2", "zone3"})
 	//if err != nil {

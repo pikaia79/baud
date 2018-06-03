@@ -74,7 +74,6 @@ import (
 	"bufio"
 	"bytes"
 	"errors"
-	"flag"
 	"fmt"
 	"io"
 	stdLog "log"
@@ -98,18 +97,20 @@ type severity int32 // sync/atomic int32
 // A message written to a high-severity log file is also written to each
 // lower-severity log file.
 const (
-	infoLog severity = iota
+	debugLog severity = iota
+	infoLog
 	warningLog
 	errorLog
 	fatalLog
-	numSeverity = 4
+	numSeverity
 )
 
-const severityChar = "IWEF"
+const severityChar = "DIWEF"
 
 var severityName = []string{
+	debugLog:   "DEBUG",
 	infoLog:    "INFO",
-	warningLog: "WARNING",
+	warningLog: "WARN",
 	errorLog:   "ERROR",
 	fatalLog:   "FATAL",
 }
@@ -180,10 +181,11 @@ func (s *OutputStats) Bytes() int64 {
 // Stats tracks the number of lines of output and number of bytes
 // per severity level. Values must be read with atomic.LoadInt64.
 var Stats struct {
-	Info, Warning, Error OutputStats
+	Debug, Info, Warning, Error OutputStats
 }
 
 var severityStats = [numSeverity]*OutputStats{
+	debugLog:   &Stats.Debug,
 	infoLog:    &Stats.Info,
 	warningLog: &Stats.Warning,
 	errorLog:   &Stats.Error,
@@ -396,18 +398,26 @@ type flushSyncWriter interface {
 }
 
 func init() {
-	flag.BoolVar(&logging.toStderr, "logtostderr", false, "log to standard error instead of files")
-	flag.BoolVar(&logging.alsoToStderr, "alsologtostderr", false, "log to standard error as well as files")
-	flag.Var(&logging.verbosity, "v", "log level for V logs")
-	flag.Var(&logging.stderrThreshold, "stderrthreshold", "logs at or above this threshold go to stderr")
-	flag.Var(&logging.vmodule, "vmodule", "comma-separated list of pattern=N settings for file-filtered logging")
-	flag.Var(&logging.traceLocation, "log_backtrace_at", "when logging hits line file:N, emit a stack trace")
+	logging.toStderr = false
+	logging.alsoToStderr = false
+	logging.rotateSize = defaultRotateSize
+	logging.outputLevel = infoLog
+	logging.dir = os.TempDir()
 
 	// Default stderrThreshold is ERROR.
 	logging.stderrThreshold = errorLog
 
 	logging.setVState(0, nil, false)
 	go logging.flushDaemon()
+}
+
+func InitFileLog(dir, module, level string) {
+	logging.dir = dir
+	logging.module = module
+	var ok bool
+	if logging.outputLevel, ok = severityByName(level); !ok {
+		panic("Unknown output log level")
+	}
 }
 
 // Flush flushes all pending log I/O.
@@ -453,6 +463,11 @@ type loggingT struct {
 	// safely using atomic.LoadInt32.
 	vmodule   moduleSpec // The state of the -vmodule flag.
 	verbosity Level      // V logging level, the value of the -v flag/
+
+	module      string
+	dir         string
+	outputLevel severity
+	rotateSize  uint64
 }
 
 // buffer holds a byte Buffer for reuse. The zero value is ready for use.
@@ -676,10 +691,7 @@ func (l *loggingT) output(s severity, buf *buffer, file string, line int, alsoTo
 		}
 	}
 	data := buf.Bytes()
-	if !flag.Parsed() {
-		os.Stderr.Write([]byte("ERROR: logging before flag.Parse: "))
-		os.Stderr.Write(data)
-	} else if l.toStderr {
+	if l.toStderr {
 		os.Stderr.Write(data)
 	} else {
 		if alsoToStderr || l.alsoToStderr || s >= l.stderrThreshold.get() {
@@ -693,16 +705,34 @@ func (l *loggingT) output(s severity, buf *buffer, file string, line int, alsoTo
 		}
 		switch s {
 		case fatalLog:
-			l.file[fatalLog].Write(data)
+		    if logging.outputLevel > fatalLog {
+                break
+            }
+            l.file[fatalLog].Write(data)
 			fallthrough
 		case errorLog:
+            if logging.outputLevel > errorLog {
+                break
+            }
 			l.file[errorLog].Write(data)
 			fallthrough
 		case warningLog:
+            if logging.outputLevel > warningLog {
+                break
+            }
 			l.file[warningLog].Write(data)
 			fallthrough
 		case infoLog:
+            if logging.outputLevel > infoLog {
+                break
+            }
 			l.file[infoLog].Write(data)
+			fallthrough
+		case debugLog:
+            if logging.outputLevel > debugLog {
+                break
+            }
+			l.file[debugLog].Write(data)
 		}
 	}
 	if s == fatalLog {
@@ -722,7 +752,7 @@ func (l *loggingT) output(s severity, buf *buffer, file string, line int, alsoTo
 		// Write the stack trace for all goroutines to the files.
 		trace := stacks(true)
 		logExitFunc = func(error) {} // If we get a write error, we'll still exit below.
-		for log := fatalLog; log >= infoLog; log-- {
+		for log := fatalLog; log >= debugLog; log-- {
 			if f := l.file[log]; f != nil { // Can be nil if -logtostderr is set.
 				f.Write(trace)
 			}
@@ -812,7 +842,7 @@ func (sb *syncBuffer) Sync() error {
 }
 
 func (sb *syncBuffer) Write(p []byte) (n int, err error) {
-	if sb.nbytes+uint64(len(p)) >= *rotateSize {
+	if sb.nbytes+uint64(len(p)) >= logging.rotateSize {
 		if err := sb.rotateFile(time.Now()); err != nil {
 			sb.logger.exit(err)
 		}
@@ -832,7 +862,7 @@ func (sb *syncBuffer) rotateFile(now time.Time) error {
 		sb.file.Close()
 	}
 	var err error
-	sb.file, err = renameAndCreate(severityName[sb.sev], now)
+	sb.file, err = renameAndCreate(logging.module, severityName[sb.sev], now)
 	sb.nbytes = 0
 	if err != nil {
 		return err
@@ -859,15 +889,15 @@ const bufferSize = 256 * 1024
 // createFiles creates all the log files for severity from sev down to infoLog.
 // l.mu is held.
 func (l *loggingT) createFiles(sev severity) error {
-	now := time.Now()
+	// now := time.Now()
 	// Files are created in decreasing severity order, so as soon as we find one
 	// has already been created, we can stop.
-	for s := sev; s >= infoLog && l.file[s] == nil; s-- {
+	for s := sev; s >= logging.outputLevel && l.file[s] == nil; s-- {
 		sb := &syncBuffer{
 			logger: l,
 			sev:    s,
 		}
-		f, n, err := create(severityName[s], now)
+		f, n, err := create(logging.module, severityName[s])
 		if err != nil {
 			return err
 		}
@@ -900,7 +930,7 @@ func (l *loggingT) lockAndFlushAll() {
 // l.mu is held.
 func (l *loggingT) flushAll() {
 	// Flush from fatal down, in case there's trouble flushing.
-	for s := fatalLog; s >= infoLog; s-- {
+	for s := fatalLog; s >= debugLog; s-- {
 		file := l.file[s]
 		if file != nil {
 			file.Flush() // ignore error
@@ -1054,132 +1084,188 @@ func (v Verbose) Infof(format string, args ...interface{}) {
 	}
 }
 
-// Info logs to the INFO log.
-// Arguments are handled in the manner of fmt.Print; a newline is appended if missing.
-func Info(args ...interface{}) {
-	logging.print(infoLog, args...)
+//func Debug(args ...interface{}) {
+//	if debugLog >= logging.outputLevel {
+//		logging.print(debugLog, args...)
+//	}
+//}
+//
+//func DebugDepth(depth int, args ...interface{}) {
+//	if debugLog >= logging.outputLevel {
+//		logging.printDepth(debugLog, depth, args...)
+//	}
+//}
+//
+//func Debugln(args ...interface{}) {
+//	if debugLog >= logging.outputLevel {
+//		logging.println(debugLog, args...)
+//	}
+//}
+
+func Debug(format string, args ...interface{}) {
+	if debugLog >= logging.outputLevel {
+		logging.printf(debugLog, format, args...)
+	}
 }
 
-// InfoDepth acts as Info but uses depth to determine which call frame to log.
-// InfoDepth(0, "msg") is the same as Info("msg").
-func InfoDepth(depth int, args ...interface{}) {
-	logging.printDepth(infoLog, depth, args...)
-}
-
-// Infoln logs to the INFO log.
-// Arguments are handled in the manner of fmt.Println; a newline is appended if missing.
-func Infoln(args ...interface{}) {
-	logging.println(infoLog, args...)
-}
+//// Info logs to the INFO log.
+//// Arguments are handled in the manner of fmt.Print; a newline is appended if missing.
+//func Info(args ...interface{}) {
+//	if infoLog >= logging.outputLevel {
+//		logging.print(infoLog, args...)
+//	}
+//}
+//
+//// InfoDepth acts as Info but uses depth to determine which call frame to log.
+//// InfoDepth(0, "msg") is the same as Info("msg").
+//func InfoDepth(depth int, args ...interface{}) {
+//	if infoLog >= logging.outputLevel {
+//		logging.printDepth(infoLog, depth, args...)
+//	}
+//}
+//
+//// Infoln logs to the INFO log.
+//// Arguments are handled in the manner of fmt.Println; a newline is appended if missing.
+//func Infoln(args ...interface{}) {
+//	if infoLog >= logging.outputLevel {
+//		logging.println(infoLog, args...)
+//	}
+//}
 
 // Infof logs to the INFO log.
 // Arguments are handled in the manner of fmt.Printf; a newline is appended if missing.
-func Infof(format string, args ...interface{}) {
-	logging.printf(infoLog, format, args...)
+func Info(format string, args ...interface{}) {
+	if infoLog >= logging.outputLevel {
+		logging.printf(infoLog, format, args...)
+	}
 }
 
-// Warning logs to the WARNING and INFO logs.
-// Arguments are handled in the manner of fmt.Print; a newline is appended if missing.
-func Warning(args ...interface{}) {
-	logging.print(warningLog, args...)
-}
-
-// WarningDepth acts as Warning but uses depth to determine which call frame to log.
-// WarningDepth(0, "msg") is the same as Warning("msg").
-func WarningDepth(depth int, args ...interface{}) {
-	logging.printDepth(warningLog, depth, args...)
-}
-
-// Warningln logs to the WARNING and INFO logs.
-// Arguments are handled in the manner of fmt.Println; a newline is appended if missing.
-func Warningln(args ...interface{}) {
-	logging.println(warningLog, args...)
-}
+//// Warning logs to the WARNING and INFO logs.
+//// Arguments are handled in the manner of fmt.Print; a newline is appended if missing.
+//func Warning(args ...interface{}) {
+//	if warningLog >= logging.outputLevel {
+//		logging.print(warningLog, args...)
+//	}
+//}
+//
+//// WarningDepth acts as Warning but uses depth to determine which call frame to log.
+//// WarningDepth(0, "msg") is the same as Warning("msg").
+//func WarningDepth(depth int, args ...interface{}) {
+//	if warningLog >= logging.outputLevel {
+//		logging.printDepth(warningLog, depth, args...)
+//	}
+//}
+//
+//// Warningln logs to the WARNING and INFO logs.
+//// Arguments are handled in the manner of fmt.Println; a newline is appended if missing.
+//func Warningln(args ...interface{}) {
+//	if warningLog >= logging.outputLevel {
+//		logging.println(warningLog, args...)
+//	}
+//}
 
 // Warningf logs to the WARNING and INFO logs.
 // Arguments are handled in the manner of fmt.Printf; a newline is appended if missing.
-func Warningf(format string, args ...interface{}) {
-	logging.printf(warningLog, format, args...)
+func Warn(format string, args ...interface{}) {
+	if warningLog >= logging.outputLevel {
+		logging.printf(warningLog, format, args...)
+	}
 }
 
-// Error logs to the ERROR, WARNING, and INFO logs.
-// Arguments are handled in the manner of fmt.Print; a newline is appended if missing.
-func Error(args ...interface{}) {
-	logging.print(errorLog, args...)
-}
-
-// ErrorDepth acts as Error but uses depth to determine which call frame to log.
-// ErrorDepth(0, "msg") is the same as Error("msg").
-func ErrorDepth(depth int, args ...interface{}) {
-	logging.printDepth(errorLog, depth, args...)
-}
-
-// Errorln logs to the ERROR, WARNING, and INFO logs.
-// Arguments are handled in the manner of fmt.Println; a newline is appended if missing.
-func Errorln(args ...interface{}) {
-	logging.println(errorLog, args...)
-}
+//// Error logs to the ERROR, WARNING, and INFO logs.
+//// Arguments are handled in the manner of fmt.Print; a newline is appended if missing.
+//func Error(args ...interface{}) {
+//	if errorLog >= logging.outputLevel {
+//		logging.print(errorLog, args...)
+//	}
+//}
+//
+//// ErrorDepth acts as Error but uses depth to determine which call frame to log.
+//// ErrorDepth(0, "msg") is the same as Error("msg").
+//func ErrorDepth(depth int, args ...interface{}) {
+//	if errorLog >= logging.outputLevel {
+//		logging.printDepth(errorLog, depth, args...)
+//	}
+//}
+//
+//// Errorln logs to the ERROR, WARNING, and INFO logs.
+//// Arguments are handled in the manner of fmt.Println; a newline is appended if missing.
+//func Errorln(args ...interface{}) {
+//	if errorLog >= logging.outputLevel {
+//		logging.println(errorLog, args...)
+//	}
+//}
 
 // Errorf logs to the ERROR, WARNING, and INFO logs.
 // Arguments are handled in the manner of fmt.Printf; a newline is appended if missing.
-func Errorf(format string, args ...interface{}) {
-	logging.printf(errorLog, format, args...)
+func Error(format string, args ...interface{}) {
+	if errorLog >= logging.outputLevel {
+		logging.printf(errorLog, format, args...)
+	}
 }
 
-// Fatal logs to the FATAL, ERROR, WARNING, and INFO logs,
-// including a stack trace of all running goroutines, then calls os.Exit(255).
-// Arguments are handled in the manner of fmt.Print; a newline is appended if missing.
-func Fatal(args ...interface{}) {
-	logging.print(fatalLog, args...)
-}
-
-// FatalDepth acts as Fatal but uses depth to determine which call frame to log.
-// FatalDepth(0, "msg") is the same as Fatal("msg").
-func FatalDepth(depth int, args ...interface{}) {
-	logging.printDepth(fatalLog, depth, args...)
-}
-
-// Fatalln logs to the FATAL, ERROR, WARNING, and INFO logs,
-// including a stack trace of all running goroutines, then calls os.Exit(255).
-// Arguments are handled in the manner of fmt.Println; a newline is appended if missing.
-func Fatalln(args ...interface{}) {
-	logging.println(fatalLog, args...)
-}
+//// Fatal logs to the FATAL, ERROR, WARNING, and INFO logs,
+//// including a stack trace of all running goroutines, then calls os.Exit(255).
+//// Arguments are handled in the manner of fmt.Print; a newline is appended if missing.
+//func Fatal(args ...interface{}) {
+//	if fatalLog >= logging.outputLevel {
+//		logging.print(fatalLog, args...)
+//	}
+//}
+//
+//// FatalDepth acts as Fatal but uses depth to determine which call frame to log.
+//// FatalDepth(0, "msg") is the same as Fatal("msg").
+//func FatalDepth(depth int, args ...interface{}) {
+//	if fatalLog >= logging.outputLevel {
+//		logging.printDepth(fatalLog, depth, args...)
+//	}
+//}
+//
+//// Fatalln logs to the FATAL, ERROR, WARNING, and INFO logs,
+//// including a stack trace of all running goroutines, then calls os.Exit(255).
+//// Arguments are handled in the manner of fmt.Println; a newline is appended if missing.
+//func Fatalln(args ...interface{}) {
+//	if fatalLog >= logging.outputLevel {
+//		logging.println(fatalLog, args...)
+//	}
+//}
 
 // Fatalf logs to the FATAL, ERROR, WARNING, and INFO logs,
 // including a stack trace of all running goroutines, then calls os.Exit(255).
 // Arguments are handled in the manner of fmt.Printf; a newline is appended if missing.
-func Fatalf(format string, args ...interface{}) {
-	logging.printf(fatalLog, format, args...)
+func Fatal(format string, args ...interface{}) {
+	if fatalLog >= logging.outputLevel {
+		logging.printf(fatalLog, format, args...)
+	}
 }
 
 // fatalNoStacks is non-zero if we are to exit without dumping goroutine stacks.
 // It allows Exit and relatives to use the Fatal logs.
 var fatalNoStacks uint32
-
-// Exit logs to the FATAL, ERROR, WARNING, and INFO logs, then calls os.Exit(1).
-// Arguments are handled in the manner of fmt.Print; a newline is appended if missing.
-func Exit(args ...interface{}) {
-	atomic.StoreUint32(&fatalNoStacks, 1)
-	logging.print(fatalLog, args...)
-}
-
-// ExitDepth acts as Exit but uses depth to determine which call frame to log.
-// ExitDepth(0, "msg") is the same as Exit("msg").
-func ExitDepth(depth int, args ...interface{}) {
-	atomic.StoreUint32(&fatalNoStacks, 1)
-	logging.printDepth(fatalLog, depth, args...)
-}
-
-// Exitln logs to the FATAL, ERROR, WARNING, and INFO logs, then calls os.Exit(1).
-func Exitln(args ...interface{}) {
-	atomic.StoreUint32(&fatalNoStacks, 1)
-	logging.println(fatalLog, args...)
-}
-
-// Exitf logs to the FATAL, ERROR, WARNING, and INFO logs, then calls os.Exit(1).
-// Arguments are handled in the manner of fmt.Printf; a newline is appended if missing.
-func Exitf(format string, args ...interface{}) {
-	atomic.StoreUint32(&fatalNoStacks, 1)
-	logging.printf(fatalLog, format, args...)
-}
+//
+//// Exit logs to the FATAL, ERROR, WARNING, and INFO logs, then calls os.Exit(1).
+//// Arguments are handled in the manner of fmt.Print; a newline is appended if missing.
+//func Exit(args ...interface{}) {
+//	atomic.StoreUint32(&fatalNoStacks, 1)
+//	logging.print(fatalLog, args...)
+//}
+//
+//// ExitDepth acts as Exit but uses depth to determine which call frame to log.
+//// ExitDepth(0, "msg") is the same as Exit("msg").
+//func ExitDepth(depth int, args ...interface{}) {
+//	atomic.StoreUint32(&fatalNoStacks, 1)
+//	logging.printDepth(fatalLog, depth, args...)
+//}
+//
+//// Exitln logs to the FATAL, ERROR, WARNING, and INFO logs, then calls os.Exit(1).
+//func Exitln(args ...interface{}) {
+//	atomic.StoreUint32(&fatalNoStacks, 1)
+//	logging.println(fatalLog, args...)
+//}
+//
+//// Exitf logs to the FATAL, ERROR, WARNING, and INFO logs, then calls os.Exit(1).
+//// Arguments are handled in the manner of fmt.Printf; a newline is appended if missing.
+//func Exitf(format string, args ...interface{}) {
+//	atomic.StoreUint32(&fatalNoStacks, 1)
+//	logging.printf(fatalLog, format, args...)
+//}

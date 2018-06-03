@@ -20,7 +20,6 @@ package log
 
 import (
 	"errors"
-	"flag"
 	"fmt"
 	"os"
 	"os/user"
@@ -30,17 +29,10 @@ import (
 	"time"
 )
 
-// MaxSize is the maximum size of a log file in bytes.
-//var MaxSize uint64 = 1024 * 1024 * 1800
-//var MaxSize uint64 = 1024 * 1024 * 1
-
-var rotateSize = flag.Uint64("log_max_size", 1024 * 1024 * 100, "max size of log file")
-// If non-empty, overrides the choice of directory in which to write logs.
-// See createLogDirs for the full list of possible destinations.
-var logDir = flag.String("log_dir", "", "If non-empty, write log files in this directory")
+const defaultRotateSize = 1024 * 1024 * 100
 
 func createLogDirs() {
-	var dir = *logDir
+	var dir = logging.dir
 	if dir == "" {
 		dir = os.TempDir()
 	}
@@ -90,9 +82,9 @@ func shortHostname(hostname string) string {
 
 // logName returns a new log file name containing tag, with start time t, and
 // the name for the symlink for tag.
-func lastLogName(tag string, t time.Time) (name string) {
+func lastLogName(prefix, tag string, t time.Time) (name string) {
 	name = fmt.Sprintf("%s.%s.log.%04d%02d%02d-%02d%02d%02d",
-		program,
+		prefix,
 		tag,
 		t.Year(),
 		t.Month(),
@@ -103,8 +95,8 @@ func lastLogName(tag string, t time.Time) (name string) {
 	return name
 }
 
-func appendLogName(tag string) string {
-	return fmt.Sprintf("%s.%s.log", program, tag)
+func appendLogName(prefix, tag string) string {
+	return fmt.Sprintf("%s.%s.log", prefix, tag)
 }
 
 var onceLogDirs sync.Once
@@ -113,11 +105,11 @@ var onceLogDirs sync.Once
 // contains tag ("INFO", "FATAL", etc.) and t.  If the file is created
 // successfully, create also attempts to update the symlink for that tag, ignoring
 // errors.
-func create(tag string, t time.Time) (*os.File, int64, error) {
+func create(prefix, tag string) (*os.File, int64, error) {
 	onceLogDirs.Do(createLogDirs)
 
-	var dir = *logDir
-	fName := appendLogName(tag)
+	var dir = logging.dir
+	fName := appendLogName(prefix, tag)
 	fPath := filepath.Join(dir, fName)
 
 	fOpt := os.O_RDWR | os.O_CREATE | os.O_APPEND
@@ -134,10 +126,11 @@ func create(tag string, t time.Time) (*os.File, int64, error) {
 	return f, fInfo.Size(), nil
 }
 
-func renameAndCreate(tag string, t time.Time) (*os.File, error) {
-	var dir = *logDir
-	fOldName := appendLogName(tag)
-	fNewName := lastLogName(tag, t)
+func renameAndCreate(prefix, tag string, t time.Time) (*os.File, error) {
+	var dir = logging.dir
+	fOldName := appendLogName(prefix, tag)
+	// TODO: it's better that naming last log name using file create time
+	fNewName := lastLogName(prefix, tag, t)
 
 	fOldPath := filepath.Join(dir, fOldName)
 	fNewPath := filepath.Join(dir, fNewName)
@@ -145,6 +138,6 @@ func renameAndCreate(tag string, t time.Time) (*os.File, error) {
 		return nil, errors.New(fmt.Sprintf("rename log file err[%v]", err))
 	}
 
-	f, _, err := create(tag, t)
+	f, _, err := create(prefix, tag)
 	return f, err
 }
