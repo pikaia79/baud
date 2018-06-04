@@ -28,7 +28,7 @@ type Field struct {
 	MultiValue  bool
 }
 
-func NewSpace(dbId metapb.DBID, dbName, spaceName string, policy *PartitionPolicy) (*Space, error) {
+func NewSpace(dbId metapb.DBID, dbName, spaceName, spaceSchema string, policy *PartitionPolicy) (*Space, error) {
 	spaceId, err := GetIdGeneratorSingle().GenID()
 	if err != nil {
 		log.Error("generate space id is failed. err:[%v]", err)
@@ -37,6 +37,7 @@ func NewSpace(dbId metapb.DBID, dbName, spaceName string, policy *PartitionPolic
 
 	spaceMeta := &metapb.Space{
 		Name:   spaceName,
+		Schema: spaceSchema,
 		ID:     metapb.SpaceID(spaceId),
 		DB:     dbId,
 		DbName: dbName,
@@ -72,9 +73,9 @@ func (s *Space) add(partitions []*Partition) error {
 		partitionsMeta = append(partitionsMeta, partition.PartitionTopo.Partition)
 	}
 
-	spaceTopo, partitionsTopo, err := topoServer.AddSpace(ctx, s.SpaceTopo.Space, partitionsMeta)
+	spaceTopo, partitionsTopo, err := TopoServer.AddSpace(ctx, s.SpaceTopo.Space, partitionsMeta)
 	if err != nil {
-		log.Error("topoServer AddSpace error, err: [%v]", err)
+		log.Error("TopoServer AddSpace error, err: [%v]", err)
 		return err
 	}
 	s.SpaceTopo = spaceTopo
@@ -97,9 +98,9 @@ func (s *Space) update() error {
 	ctx, cancel := context.WithTimeout(context.Background(), ETCD_TIMEOUT)
 	defer cancel()
 
-	err := topoServer.UpdateSpace(ctx, s.SpaceTopo)
+	err := TopoServer.UpdateSpace(ctx, s.SpaceTopo)
 	if err != nil {
-		log.Error("topoServer UpdateSpace error, err: [%v]", err)
+		log.Error("TopoServer UpdateSpace error, err: [%v]", err)
 		return err
 	}
 
@@ -114,9 +115,9 @@ func (s *Space) erase() error {
 	defer cancel()
 
 	// TODO partition是否在删除space时一起删除???
-	err := topoServer.DeleteSpace(ctx, s.SpaceTopo)
+	err := TopoServer.DeleteSpace(ctx, s.SpaceTopo)
 	if err != nil {
-		log.Error("topoServer DeleteSpace error, err: [%v]", err)
+		log.Error("TopoServer DeleteSpace error, err: [%v]", err)
 		return err
 	}
 	return nil
@@ -209,9 +210,9 @@ func (c *SpaceCache) Recovery() ([]*Space, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), ETCD_TIMEOUT)
 	defer cancel()
 
-	spacesTopo, err := topoServer.GetAllSpaces(ctx)
+	spacesTopo, err := TopoServer.GetAllSpaces(ctx)
 	if err != nil {
-		log.Error("topoServer GetAllSpaces error, err: [%v]", err)
+		log.Error("TopoServer GetAllSpaces error, err: [%v]", err)
 		return nil, err
 	}
 	if spacesTopo != nil {

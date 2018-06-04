@@ -12,7 +12,7 @@ import (
 const ETCD_TIMEOUT = 5 * time.Second
 
 var (
-	topoServer *topo.TopoServer
+	TopoServer *topo.TopoServer
 )
 
 type GM struct {
@@ -39,8 +39,12 @@ func NewServer() *GM {
 
 func (gm *GM) Start(config *Config) error {
 	gm.config = config
-	topoServer = topo.Open()
-
+	topoServer, err := topo.OpenServer(gm.config.ClusterCfg.Topo, gm.config.ClusterCfg.TopoEndPoints, gm.config.ClusterCfg.TopoRootDir)
+	if err != nil {
+		log.Error("Fail to create topo server. err[%v]", err)
+		return err
+	}
+	TopoServer = topoServer
 	gm.cluster = NewCluster(gm.config, gm)
 	if err := gm.cluster.Start(); err != nil {
 		log.Error("fail to start cluster. err:[%v]", err)
@@ -94,9 +98,9 @@ func (gm *GM) Shutdown() {
 		gm.cluster.Close()
 		gm.cluster = nil
 	}
-	if topoServer != nil {
-		topoServer.Close()
-		topoServer = nil
+	if TopoServer != nil {
+		TopoServer.Close()
+		TopoServer = nil
 	}
 	gm.wg.Wait()
 }
@@ -105,11 +109,11 @@ func (gm *GM) newMasterParticipation() {
 	ctx, cancel := context.WithTimeout(context.Background(), ETCD_TIMEOUT)
 	defer cancel()
 
-	masterParticipation, err := topoServer.NewMasterParticipation(
+	masterParticipation, err := TopoServer.NewMasterParticipation(
 		topo.GlobalZone,
 		gm.config.ClusterCfg.GmNodeIp+":"+gm.config.ClusterCfg.GmNodeId)
 	if err != nil {
-		log.Error("fail to invoke topoServer new master participation. err:[%v]", err)
+		log.Error("fail to invoke TopoServer new master participation. err:[%v]", err)
 		return
 	}
 	go func() {

@@ -1,0 +1,17 @@
+[module]
+name = "master"
+role = "master"
+version = "v1"
+# web request request signature key
+signkey = ""
+
+[cluster]
+cluster-id = "1"
+node-id = 1
+global-server-addrs = "0.0.0.0:1234"
+global-root-dir = "/"
+
+[log]
+log-path = "/tmp/zm_log"
+#debug, info, warn, error
+level="debug"

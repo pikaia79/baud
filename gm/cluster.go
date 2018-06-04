@@ -47,7 +47,6 @@ func (c *Cluster) Start() error {
 		log.Error("fail to recovery PartitionCache. err[%v]", err)
 		return err
 	}
-
 	log.Info("finish to recovery whole cluster")
 	log.Info("Cluster has started")
 	return nil
@@ -165,7 +164,7 @@ func (c *Cluster) clearAllCache() {
 	c.ZoneCache.Clear()
 }
 
-func (c *Cluster) CreateZone(zoneName, zoneEtcdAddr, zoneMasterAddr string) (*Zone, error) {
+func (c *Cluster) CreateZone(zoneName, zoneEtcdAddr, zoneRootDir string) (*Zone, error) {
 	c.clusterLock.Lock()
 	defer c.clusterLock.Unlock()
 
@@ -174,7 +173,7 @@ func (c *Cluster) CreateZone(zoneName, zoneEtcdAddr, zoneMasterAddr string) (*Zo
 		return nil, ErrDupZone
 	}
 
-	zone, err := NewZone(zoneName, zoneEtcdAddr, zoneMasterAddr)
+	zone, err := NewZone(zoneName, zoneEtcdAddr, zoneRootDir)
 	if err != nil {
 		return nil, err
 	}
@@ -266,7 +265,7 @@ func (c *Cluster) DeleteDb(dbName string) error {
 	return nil
 }
 
-func (c *Cluster) CreateSpace(dbName, spaceName string, policy *PartitionPolicy) (*Space, error) {
+func (c *Cluster) CreateSpace(dbName, spaceName, spaceSchema string, policy *PartitionPolicy) (*Space, error) {
 	c.clusterLock.Lock()
 	defer c.clusterLock.Unlock()
 
@@ -278,7 +277,7 @@ func (c *Cluster) CreateSpace(dbName, spaceName string, policy *PartitionPolicy)
 		return nil, ErrDupSpace
 	}
 
-	space, err := NewSpace(db.ID, dbName, spaceName, policy)
+	space, err := NewSpace(db.ID, dbName, spaceName, spaceSchema, policy)
 	if err != nil {
 		return nil, err
 	}
@@ -354,8 +353,8 @@ func (c *Cluster) DeleteSpace(dbName, spaceName string) error {
 		return err
 	}
 	db.SpaceCache.DeleteSpace(space)
-	for _, partitionTopo := range space.partitionsTopo {
-		c.PartitionCache.DeletePartition(partitionTopo.Partition.ID)
+	for _, partition := range space.partitions {
+		c.PartitionCache.DeletePartition(partition.PartitionTopo.Partition.ID)
 	}
 
 	return nil

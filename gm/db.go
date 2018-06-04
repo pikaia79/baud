@@ -46,7 +46,7 @@ func (db *DB) add() error {
 	ctx, cancel := context.WithTimeout(context.Background(), ETCD_TIMEOUT)
 	defer cancel()
 
-	dbTopo, err := topoServer.AddDB(ctx, db.DBTopo.DB)
+	dbTopo, err := TopoServer.AddDB(ctx, db.DBTopo.DB)
 	if err != nil {
 		log.Error("topoServer AddDB error, err: [%v]", err)
 		return err
@@ -62,9 +62,9 @@ func (db *DB) update() error {
 	ctx, cancel := context.WithTimeout(context.Background(), ETCD_TIMEOUT)
 	defer cancel()
 
-	err := topoServer.UpdateDB(ctx, db.DBTopo)
+	err := TopoServer.UpdateDB(ctx, db.DBTopo)
 	if err != nil {
-		log.Error("topoServer UpdateDB error, err: [%v]", err)
+		log.Error("TopoServer UpdateDB error, err: [%v]", err)
 		return err
 	}
 	return nil
@@ -77,9 +77,9 @@ func (db *DB) erase() error {
 	ctx, cancel := context.WithTimeout(context.Background(), ETCD_TIMEOUT)
 	defer cancel()
 
-	err := topoServer.DeleteDB(ctx, db.DBTopo)
+	err := TopoServer.DeleteDB(ctx, db.DBTopo)
 	if err != nil {
-		log.Error("topoServer DeleteDB error, err: [%v]", err)
+		log.Error("TopoServer DeleteDB error, err: [%v]", err)
 		return err
 	}
 
@@ -169,9 +169,9 @@ func (c *DBCache) Recovery() ([]*DB, error) {
 
 	ctx, cancel := context.WithTimeout(context.Background(), ETCD_TIMEOUT)
 	defer cancel()
-	dbsTopo, err := topoServer.GetAllDBs(ctx)
+	dbsTopo, err := TopoServer.GetAllDBs(ctx)
 	if err != nil {
-		log.Error("topoServer GetAllDBs error, err: [%v]", err)
+		log.Error("TopoServer GetAllDBs error, err: [%v]", err)
 		return nil, err
 	}
 	if dbsTopo != nil {

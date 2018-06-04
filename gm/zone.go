@@ -11,21 +11,14 @@ import (
 type Zone struct {
 	*topo.ZoneTopo
 
-	// name
-	// type "global/local"
-	// global etcd addr
-	// global master addr
-	// zone etcd addr
-	// zone master addr
-
 	propertyLock sync.RWMutex
 }
 
-func NewZone(zoneName, zoneEtcdAddr, zoneMasterAddr string) (*Zone, error) {
+func NewZone(zoneName, zoneEtcdAddr, zoneRootDir string) (*Zone, error) {
 	metaZone := &metapb.Zone{
-		Name: zoneName,
-		// etcdAddr: zoneEtcdAddr,
-		// zoneMasterAddr: zoneMasterAddr
+		Name:        zoneName,
+		ServerAddrs: zoneEtcdAddr,
+		RootDir:     zoneRootDir,
 	}
 	topoZone := &topo.ZoneTopo{
 		Zone: metaZone,
@@ -46,9 +39,9 @@ func (zone *Zone) add() error {
 	ctx, cancel := context.WithTimeout(context.Background(), ETCD_TIMEOUT)
 	defer cancel()
 
-	zoneTopo, err := topoServer.AddZone(ctx, zone.ZoneTopo.Zone)
+	zoneTopo, err := TopoServer.AddZone(ctx, zone.ZoneTopo.Zone)
 	if err != nil {
-		log.Error("topoServer AddZone error, err: [%v]", err)
+		log.Error("TopoServer AddZone error, err: [%v]", err)
 		return err
 	}
 	zone.ZoneTopo = zoneTopo
@@ -63,9 +56,9 @@ func (zone *Zone) erase() error {
 	ctx, cancel := context.WithTimeout(context.Background(), ETCD_TIMEOUT)
 	defer cancel()
 
-	err := topoServer.DeleteZone(ctx, zone.ZoneTopo)
+	err := TopoServer.DeleteZone(ctx, zone.ZoneTopo)
 	if err != nil {
-		log.Error("topoServer DeleteZone error, err: [%v]", err)
+		log.Error("TopoServer DeleteZone error, err: [%v]", err)
 		return err
 	}
 
@@ -109,6 +102,17 @@ func (c *ZoneCache) DeleteZone(zone *Zone) {
 	delete(c.zones, zone.Name)
 }
 
+func (c *ZoneCache) GetAllZonesName() []string {
+	c.lock.RLock()
+	defer c.lock.RUnlock()
+
+	zonesName := make([]string, 0, len(c.zones))
+	for zoneName := range c.zones {
+		zonesName = append(zonesName, zoneName)
+	}
+	return zonesName
+}
+
 func (c *ZoneCache) GetAllZones() []*Zone {
 	c.lock.RLock()
 	defer c.lock.RUnlock()
@@ -121,6 +125,13 @@ func (c *ZoneCache) GetAllZones() []*Zone {
 	return zones
 }
 
+func (c *ZoneCache) GetAllZonesMap() map[string]*Zone {
+	c.lock.RLock()
+	defer c.lock.RUnlock()
+
+	return c.zones
+}
+
 func (c *ZoneCache) Recovery() ([]*Zone, error) {
 
 	resultZones := make([]*Zone, 0)
@@ -128,9 +139,9 @@ func (c *ZoneCache) Recovery() ([]*Zone, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), ETCD_TIMEOUT)
 	defer cancel()
 
-	zonesTopo, err := topoServer.GetAllZones(ctx)
+	zonesTopo, err := TopoServer.GetAllZones(ctx)
 	if err != nil {
-		log.Error("topoServer GetAllZones error, err: [%v]", err)
+		log.Error("TopoServer GetAllZones error, err: [%v]", err)
 		return nil, err
 	}
 	if zonesTopo != nil {

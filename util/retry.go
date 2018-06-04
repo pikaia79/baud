@@ -4,8 +4,15 @@ import (
 	"context"
 	"math"
 	"math/rand"
+	"sync"
 	"time"
 )
+
+var retryPool = &sync.Pool{
+	New: func() interface{} {
+		return new(Retry)
+	},
+}
 
 var retryClosedCh = func() <-chan time.Time {
 	c := make(chan time.Time)
@@ -57,7 +64,8 @@ func NewRetry(opt *RetryOption) *Retry {
 		opt.Context = context.Background()
 	}
 
-	r := &Retry{option: *opt}
+	r := retryPool.Get().(*Retry)
+	r.option = *opt
 	r.Reset()
 	return r
 }
@@ -77,6 +85,12 @@ func (r *Retry) Reset() {
 // Stop stop retry loop
 func (r *Retry) Stop() {
 	r.isStart = false
+}
+
+func (r *Retry) Close() error {
+	r.Stop()
+	retryPool.Put(r)
+	return nil
 }
 
 // Next returns whether the retry loop should continue.
@@ -127,6 +141,8 @@ func RetryMaxAttempt(opt *RetryOption, fn func() error) error {
 		}
 		ok, _ = r.Next()
 	}
+
+	r.Close()
 	return err
 }
 
