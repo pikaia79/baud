@@ -12,9 +12,9 @@ func getPartitionInfoByZone(zoneName string, partitionId metapb.PartitionID) (*m
 	ctx, cancel := context.WithTimeout(context.Background(), ETCD_TIMEOUT)
 	defer cancel()
 
-	partitionInfoMeta, err := topoServer.GetPartitionInfoByZone(ctx, zoneName, partitionId)
+	partitionInfoMeta, err := TopoServer.GetPartitionInfoByZone(ctx, zoneName, partitionId)
 	if err != nil {
-		log.Error("topoServer GetPartitionInfoByZone error, err: [%v]", err)
+		log.Error("TopoServer GetPartitionInfoByZone error, err: [%v]", err)
 		return nil, err
 	}
 
@@ -29,9 +29,9 @@ func getPartitionIdsByZone(zoneName string) ([]metapb.PartitionID, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), ETCD_TIMEOUT)
 	defer cancel()
 
-	partitionIds, err := topoServer.GetAllPartitionIdsByZone(ctx, zoneName)
+	partitionIds, err := TopoServer.GetAllPartitionIdsByZone(ctx, zoneName)
 	if err != nil {
-		log.Error("topoServer GetAllPartitionIdsByZone error, err: [%v]", err)
+		log.Error("TopoServer GetAllPartitionIdsByZone error, err: [%v]", err)
 		return nil, err
 	}
 

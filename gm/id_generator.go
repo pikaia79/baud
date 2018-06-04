@@ -98,7 +98,7 @@ func (id *IdGenerator) GenID() (uint64, error) {
 func (id *IdGenerator) generate() (uint64, uint64, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
-	start, end, err := topoServer.GenerateNewId(ctx, GEN_STEP)
+	start, end, err := TopoServer.GenerateNewId(ctx, GEN_STEP)
 	if err != nil {
 		return 0, 0, err
 	}

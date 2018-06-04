@@ -3,8 +3,6 @@ package server
 import (
 	"context"
 	"fmt"
-	"io/ioutil"
-	"strconv"
 
 	"github.com/gogo/protobuf/proto"
 
@@ -148,26 +146,19 @@ func (s *Server) doPartitionDelete(id metapb.PartitionID) {
 }
 
 func (s *Server) destroyExcludePartition(partitions []metapb.Partition) {
-	dir, err := ioutil.ReadDir(s.DataPath)
-	if err != nil {
-		return
-	}
+	ids := s.meta.getAllPartitions()
 
-	for _, fi := range dir {
-		if fi.IsDir() {
-			if id, err := strconv.ParseUint(fi.Name(), 10, 64); err == nil {
-				delete := true
-				for _, p := range partitions {
-					if p.ID == id {
-						delete = false
-						break
-					}
-				}
-
-				if delete {
-					s.meta.clear(id)
-				}
+	for _, id := range ids {
+		delete := true
+		for _, p := range partitions {
+			if p.ID == id {
+				delete = false
+				break
 			}
+		}
+
+		if delete {
+			s.meta.clear(id)
 		}
 	}
 }
@@ -210,6 +201,5 @@ func (s *Server) doAdminEvent(event proto.Message) {
 	case *pspb.DeletePartitionRequest:
 		s.doPartitionDelete(e.ID)
 		s.masterHeartbeat.trigger()
-
 	}
 }

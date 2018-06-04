@@ -506,9 +506,9 @@ func (w *SpaceStateTransitionWorker) getReplicaZoneAddrAndRelicaLeaderZoneAddrFo
 }
 
 func (w *SpaceStateTransitionWorker) getZMLeaderAddr(zoneName, id string) (string, error) {
-	replicaZoneParticipation, err := topoServer.NewMasterParticipation(zoneName, id)
+	replicaZoneParticipation, err := TopoServer.NewMasterParticipation(zoneName, id)
 	if err != nil {
-		log.Error("topoServer NewMasterParticipation error. err:[%v]", err)
+		log.Error("TopoServer NewMasterParticipation error. err:[%v]", err)
 		return "", err
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), ETCD_TIMEOUT)
