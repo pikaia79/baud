@@ -2,6 +2,7 @@ package gm
 
 import (
 	"github.com/tiglabs/baudengine/proto/metapb"
+	"github.com/tiglabs/baudengine/topo"
 	"github.com/tiglabs/baudengine/util"
 	"github.com/tiglabs/baudengine/util/log"
 	"golang.org/x/net/context"
@@ -10,17 +11,23 @@ import (
 )
 
 type Cluster struct {
+	ctx    context.Context
 	config *Config
 	gm     *GM
 
 	DbCache        *DBCache
 	PartitionCache *PartitionCache
 
+	cancelDBWatch        topo.CancelFunc
+	cancelSpaceWatch     topo.CancelFunc
+	cancelPartitionWatch topo.CancelFunc
+
 	clusterLock sync.RWMutex
 }
 
-func NewCluster(config *Config, gm *GM) *Cluster {
+func NewCluster(ctx context.Context, config *Config, gm *GM) *Cluster {
 	return &Cluster{
+		ctx:            ctx,
 		config:         config,
 		gm:             gm,
 		DbCache:        NewDBCache(),
@@ -52,19 +59,20 @@ func (c *Cluster) Close() {
 	log.Info("Cluster has closed")
 }
 
+// recovery
 func (c *Cluster) recoveryDBCache() error {
 	c.clusterLock.Lock()
 	defer c.clusterLock.Unlock()
 
-	dbs, err := c.DbCache.Recovery()
-	if err != nil {
-		return err
+	dbsTopo := c.watchDBChange()
+	if dbsTopo != nil {
+		for _, dbTopo := range dbsTopo {
+			db := &DB{
+				DBTopo: dbTopo,
+			}
+			c.DbCache.AddDb(db)
+		}
 	}
-
-	for _, db := range dbs {
-		c.DbCache.AddDb(db)
-	}
-
 	return nil
 }
 
@@ -101,33 +109,142 @@ func (c *Cluster) recoveryPartitionCache() error {
 	c.clusterLock.Lock()
 	defer c.clusterLock.Unlock()
 
-	partitions, err := c.PartitionCache.Recovery()
-	if err != nil {
-		return err
-	}
+	partitionsTopo := c.watchPartitionChange()
+	if partitionsTopo != nil {
+		for _, partitionTopo := range partitionsTopo {
+			db := c.DbCache.FindDbById(partitionTopo.DB)
+			if db == nil {
+				log.Warn("Cannot find db for the partition[%v] when recovery partition. discord it", partitionTopo)
+				continue
+			}
 
-	for _, partition := range partitions {
-		db := c.DbCache.FindDbById(partition.DB)
-		if db == nil {
-			log.Warn("Cannot find db for the partition[%v] when recovery partition. discord it", partition)
-			continue
+			space := db.SpaceCache.FindSpaceById(partitionTopo.Space)
+			if space == nil {
+				log.Warn("Cannot find space for the partition[%v] when recovery partition. discord it", partitionTopo)
+				continue
+			}
+			partition := &Partition{
+				PartitionTopo: partitionTopo,
+			}
+			c.PartitionCache.AddPartition(partition)
 		}
-
-		space := db.SpaceCache.FindSpaceById(partition.Space)
-		if space == nil {
-			log.Warn("Cannot find space for the partition[%v] when recovery partition. discord it", partition)
-			continue
-		}
-
-		c.PartitionCache.AddPartition(partition)
 	}
-
 	return nil
 }
 
-func (c *Cluster) watchZonesTopo() error {
+// watch
+func (c *Cluster) watchDBChange() []*topo.DBTopo {
+	err, currentDbTopos, dbChannel, dbCancel := TopoServer.WatchDBs(c.ctx)
+	if err != nil {
+		log.Debug("WatchDBs err[%v]", err)
+		return nil
+	}
+	c.cancelDBWatch = dbCancel
+	log.Debug("current dbs[%v] before WatchDBs", currentDbTopos)
 
-	return nil
+	go func() {
+		for dbWatchData := range dbChannel {
+			if dbWatchData.Err != nil {
+				if dbWatchData.Err == topo.ErrNoNode {
+					log.Debug("watched db[%v] deleted", dbWatchData.ID)
+					oldDB := c.DbCache.FindDbById(dbWatchData.ID)
+					if oldDB != nil {
+						c.DbCache.DeleteDb(oldDB)
+					}
+					continue
+				}
+				log.Error("watch err[%v], stop watch db.", dbWatchData.Err)
+				return
+			}
+			log.Debug("watched db[%v] updated", dbWatchData.DB)
+			oldDB := c.DbCache.FindDbById(dbWatchData.ID)
+			if oldDB == nil {
+				c.DbCache.AddDb(&DB{DBTopo: dbWatchData.DBTopo})
+			} else {
+				c.DbCache.DeleteDb(oldDB)
+				c.DbCache.AddDb(&DB{DBTopo: dbWatchData.DBTopo})
+			}
+		}
+	}()
+
+	return currentDbTopos
+}
+
+func (c *Cluster) WatchSpaceChange() []*topo.SpaceTopo {
+	err, currentSpaceTopos, spaceChannel, spaceCancel := TopoServer.WatchSpaces(c.ctx)
+	if err != nil {
+		log.Debug("WatchSpaces err[%v]", err)
+		return nil
+	}
+	c.cancelSpaceWatch = spaceCancel
+	log.Debug("current spaces[%v] before WatchSpaces", currentSpaceTopos)
+
+	go func() {
+		for spaceWatchData := range spaceChannel {
+			if spaceWatchData.Err != nil {
+				if spaceWatchData.Err == topo.ErrNoNode {
+					log.Debug("watched space[%v] deleted", spaceWatchData)
+					db := c.DbCache.FindDbById(spaceWatchData.DB)
+					if db != nil {
+						oldSpace := db.SpaceCache.FindSpaceById(spaceWatchData.ID)
+						if oldSpace != nil {
+							db.SpaceCache.DeleteSpace(oldSpace)
+						}
+					}
+					continue
+				}
+				log.Error("watch err[%v], stop watch space.", spaceWatchData.Err)
+				return
+			}
+			log.Debug("watched space[%v]", spaceWatchData.Space)
+			db := c.DbCache.FindDbById(spaceWatchData.DB)
+			if db != nil {
+				oldSpace := db.SpaceCache.FindSpaceById(spaceWatchData.ID)
+				if oldSpace == nil {
+					db.SpaceCache.AddSpace(&Space{SpaceTopo: spaceWatchData.SpaceTopo})
+				} else {
+					db.SpaceCache.DeleteSpace(oldSpace)
+					db.SpaceCache.AddSpace(&Space{SpaceTopo: spaceWatchData.SpaceTopo})
+				}
+			}
+		}
+	}()
+
+	return currentSpaceTopos
+}
+
+func (c *Cluster) watchPartitionChange() []*topo.PartitionTopo {
+	err, currentPartitionTopos, partitionChannel, partitionCancel := TopoServer.WatchPartitions(c.ctx)
+	if err != nil {
+		log.Debug("WatchPartitions err[%v]", err)
+		return nil
+	}
+	c.cancelPartitionWatch = partitionCancel
+	log.Debug("current partitions[%v] before WatchPartitions", currentPartitionTopos)
+
+	go func() {
+		for partitionWatchData := range partitionChannel {
+			if partitionWatchData.Err != nil {
+				if partitionWatchData.Err == topo.ErrNoNode {
+					log.Debug("watched partition[%v] deleted", partitionWatchData)
+					c.PartitionCache.DeletePartition(partitionWatchData.Partition.ID)
+					continue
+				}
+				log.Error("watch err[%v], stop watch partition.", partitionWatchData.Err)
+				return
+			}
+			log.Debug("watched partition[%v] updated", partitionWatchData)
+			oldPartition := c.PartitionCache.FindPartitionById(partitionWatchData.ID)
+			if oldPartition == nil {
+				c.PartitionCache.AddPartition(&Partition{PartitionTopo: partitionWatchData.PartitionTopo})
+			} else {
+				c.PartitionCache.DeletePartition(oldPartition.ID)
+				c.PartitionCache.AddPartition(&Partition{PartitionTopo: partitionWatchData.PartitionTopo})
+			}
+		}
+	}()
+
+	return currentPartitionTopos
 }
 
 func (c *Cluster) clearAllCache() {

@@ -163,29 +163,6 @@ func (c *DBCache) GetAllDBs() []*DB {
 	return dbs
 }
 
-func (c *DBCache) Recovery() ([]*DB, error) {
-
-	resultDBs := make([]*DB, 0)
-
-	ctx, cancel := context.WithTimeout(context.Background(), ETCD_TIMEOUT)
-	defer cancel()
-	dbsTopo, err := TopoServer.GetAllDBs(ctx)
-	if err != nil {
-		log.Error("TopoServer GetAllDBs error, err: [%v]", err)
-		return nil, err
-	}
-	if dbsTopo != nil {
-		for _, dbTopo := range dbsTopo {
-			db := &DB{
-				DBTopo: dbTopo,
-			}
-			resultDBs = append(resultDBs, db)
-		}
-	}
-
-	return resultDBs, nil
-}
-
 func (c *DBCache) Clear() {
 	c.lock.Lock()
 	defer c.lock.Unlock()
