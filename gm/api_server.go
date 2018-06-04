@@ -152,8 +152,10 @@ func (s *ApiServer) handleZoneDelete(w http.ResponseWriter, r *http.Request, par
 }
 
 func (s *ApiServer) handleZoneList(w http.ResponseWriter, r *http.Request, params netutil.UriParams) {
-	zones := s.cluster.ZoneCache.GetAllZones()
-
+	zones, err := s.cluster.GetAllZones()
+	if err != nil {
+		return
+	}
 	sendReply(w, newHttpSucReply(zones))
 }
 
@@ -163,7 +165,10 @@ func (s *ApiServer) handleZoneDetail(w http.ResponseWriter, r *http.Request, par
 		return
 	}
 
-	zone := s.cluster.ZoneCache.FindZoneByName(zoneName)
+	zone, err := s.cluster.GetZone(zoneName)
+	if err != nil {
+		return
+	}
 	if zone == nil {
 		sendReply(w, newHttpErrReply(ErrDbNotExists))
 		return

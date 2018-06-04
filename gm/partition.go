@@ -327,29 +327,6 @@ func (c *PartitionCache) GetAllMetaPartitions() []*metapb.Partition {
 	return partitionsMeta
 }
 
-func (c *PartitionCache) Recovery() ([]*Partition, error) {
-
-	resultPartitions := make([]*Partition, 0)
-
-	ctx, cancel := context.WithTimeout(context.Background(), ETCD_TIMEOUT)
-	defer cancel()
-	partitionsTopo, err := TopoServer.GetAllPartitions(ctx)
-	if err != nil {
-		log.Error("TopoServer GetAllPartitions error, err: [%v]", err)
-		return nil, err
-	}
-	if partitionsTopo != nil {
-		for _, partitionTopo := range partitionsTopo {
-			partition := &Partition{
-				PartitionTopo: partitionTopo,
-			}
-			resultPartitions = append(resultPartitions, partition)
-		}
-	}
-
-	return resultPartitions, nil
-}
-
 func (c *PartitionCache) Clear() {
 	c.lock.Lock()
 	defer c.lock.Unlock()
