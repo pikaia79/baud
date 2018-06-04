@@ -127,8 +127,16 @@ func (w *SpaceStateTransitionWorker) getInterval() time.Duration {
 }
 
 func (w *SpaceStateTransitionWorker) run() {
-	zonesMap := w.cluster.ZoneCache.GetAllZonesMap()
-	zonesName := w.cluster.ZoneCache.GetAllZonesName()
+	zonesMap, err := w.cluster.GetAllZonesMap()
+	if err != nil {
+		log.Error("GetAllZonesMap error, err:[%v]", err)
+		return
+	}
+	zonesName, err := w.cluster.GetAllZonesName()
+	if err != nil {
+		log.Error("GetAllZonesName error, err:[%v]", err)
+		return
+	}
 	partitionInfosCacheMap := make(map[metapb.PartitionID]*masterpb.PartitionInfo)
 
 	// Get latest partitionInfo from different zones

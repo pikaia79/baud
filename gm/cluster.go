@@ -4,6 +4,7 @@ import (
 	"github.com/tiglabs/baudengine/proto/metapb"
 	"github.com/tiglabs/baudengine/util"
 	"github.com/tiglabs/baudengine/util/log"
+	"golang.org/x/net/context"
 	"math"
 	"sync"
 )
@@ -14,7 +15,6 @@ type Cluster struct {
 
 	DbCache        *DBCache
 	PartitionCache *PartitionCache
-	ZoneCache      *ZoneCache
 
 	clusterLock sync.RWMutex
 }
@@ -25,15 +25,10 @@ func NewCluster(config *Config, gm *GM) *Cluster {
 		gm:             gm,
 		DbCache:        NewDBCache(),
 		PartitionCache: NewPartitionCache(),
-		ZoneCache:      NewZoneCache(),
 	}
 }
 
 func (c *Cluster) Start() error {
-	if err := c.recoveryZoneCache(); err != nil {
-		log.Error("fail to recovery ZoneCache. err:[%v]", err)
-		return err
-	}
 	// recovery memory meta data
 	if err := c.recoveryDBCache(); err != nil {
 		log.Error("fail to recovery DbCache. err[%v]", err)
@@ -55,22 +50,6 @@ func (c *Cluster) Start() error {
 func (c *Cluster) Close() {
 	c.clearAllCache()
 	log.Info("Cluster has closed")
-}
-
-func (c *Cluster) recoveryZoneCache() error {
-	c.clusterLock.Lock()
-	defer c.clusterLock.Unlock()
-
-	zones, err := c.ZoneCache.Recovery()
-	if err != nil {
-		return err
-	}
-
-	for _, zone := range zones {
-		c.ZoneCache.AddZone(zone)
-	}
-
-	return nil
 }
 
 func (c *Cluster) recoveryDBCache() error {
@@ -131,25 +110,22 @@ func (c *Cluster) recoveryPartitionCache() error {
 		db := c.DbCache.FindDbById(partition.DB)
 		if db == nil {
 			log.Warn("Cannot find db for the partition[%v] when recovery partition. discord it", partition)
-
-			//if err := partition.erase(); err != nil {
-			//	log.Error("fail to remove unused partition[%v] when recovery. err:[%v]", partition, err)
-			//}
 			continue
 		}
 
 		space := db.SpaceCache.FindSpaceById(partition.Space)
 		if space == nil {
 			log.Warn("Cannot find space for the partition[%v] when recovery partition. discord it", partition)
-
-			//if err := partition.erase(); err != nil {
-			//	log.Error("fail to remove unused partition[%v] when recovery. err:[%v]", partition, err)
-			//}
 			continue
 		}
 
 		c.PartitionCache.AddPartition(partition)
 	}
+
+	return nil
+}
+
+func (c *Cluster) watchZonesTopo() error {
 
 	return nil
 }
@@ -161,15 +137,23 @@ func (c *Cluster) clearAllCache() {
 	c.PartitionCache.Clear()
 	// SpaceCache in DbCache
 	c.DbCache.Clear()
-	c.ZoneCache.Clear()
 }
 
+// zone, db, space, parititon
+// zone
 func (c *Cluster) CreateZone(zoneName, zoneEtcdAddr, zoneRootDir string) (*Zone, error) {
 	c.clusterLock.Lock()
 	defer c.clusterLock.Unlock()
 
-	zone := c.ZoneCache.FindZoneByName(zoneName)
-	if zone != nil {
+	ctx, cancel := context.WithTimeout(context.Background(), ETCD_TIMEOUT)
+	defer cancel()
+
+	zoneTopo, err := TopoServer.GetZone(ctx, zoneName)
+	if err != nil {
+		log.Error("TopoServer GetZone error, err: [%v]", err)
+		return nil, err
+	}
+	if zoneTopo != nil {
 		return nil, ErrDupZone
 	}
 
@@ -181,7 +165,6 @@ func (c *Cluster) CreateZone(zoneName, zoneEtcdAddr, zoneRootDir string) (*Zone,
 	if err := zone.add(); err != nil {
 		return nil, err
 	}
-	c.ZoneCache.AddZone(zone)
 
 	return zone, nil
 }
@@ -190,19 +173,100 @@ func (c *Cluster) DeleteZone(zoneName string) error {
 	c.clusterLock.Lock()
 	defer c.clusterLock.Unlock()
 
-	zone := c.ZoneCache.FindZoneByName(zoneName)
-	if zone == nil {
+	ctx, cancel := context.WithTimeout(context.Background(), ETCD_TIMEOUT)
+	defer cancel()
+
+	zoneTopo, err := TopoServer.GetZone(ctx, zoneName)
+	if err != nil {
+		log.Error("TopoServer GetZone error, err: [%v]", err)
+		return err
+	}
+	if zoneTopo == nil {
 		return ErrZoneNotExists
 	}
-
+	zone := &Zone{
+		ZoneTopo: zoneTopo,
+	}
 	if err := zone.erase(); err != nil {
 		return err
 	}
-	c.ZoneCache.DeleteZone(zone)
 
 	return nil
 }
 
+func (c *Cluster) GetAllZones() ([]*Zone, error) {
+	c.clusterLock.Lock()
+	defer c.clusterLock.Unlock()
+
+	zones := make([]*Zone, 0)
+	ctx, cancel := context.WithTimeout(context.Background(), ETCD_TIMEOUT)
+	defer cancel()
+
+	zonesTopo, err := TopoServer.GetAllZones(ctx)
+	if err != nil {
+		log.Error("TopoServer GetAllZones error, err: [%v]", err)
+		return nil, err
+	}
+	for _, zoneTopo := range zonesTopo {
+		zones = append(zones, &Zone{ZoneTopo: zoneTopo})
+	}
+	return zones, nil
+}
+
+func (c *Cluster) GetAllZonesMap() (map[string]*Zone, error) {
+	c.clusterLock.Lock()
+	defer c.clusterLock.Unlock()
+
+	zonesMap := make(map[string]*Zone)
+	ctx, cancel := context.WithTimeout(context.Background(), ETCD_TIMEOUT)
+	defer cancel()
+
+	zonesTopo, err := TopoServer.GetAllZones(ctx)
+	if err != nil {
+		log.Error("TopoServer GetAllZones error, err: [%v]", err)
+		return nil, err
+	}
+	for _, zoneTopo := range zonesTopo {
+		zonesMap[zoneTopo.Name] = &Zone{ZoneTopo: zoneTopo}
+	}
+	return zonesMap, nil
+}
+
+func (c *Cluster) GetAllZonesName() ([]string, error) {
+	c.clusterLock.Lock()
+	defer c.clusterLock.Unlock()
+
+	zonesName := make([]string, 0)
+	ctx, cancel := context.WithTimeout(context.Background(), ETCD_TIMEOUT)
+	defer cancel()
+
+	zonesTopo, err := TopoServer.GetAllZones(ctx)
+	if err != nil {
+		log.Error("TopoServer GetAllZones error, err: [%v]", err)
+		return nil, err
+	}
+	for _, zoneTopo := range zonesTopo {
+		zonesName = append(zonesName, zoneTopo.Name)
+	}
+	return zonesName, nil
+}
+
+func (c *Cluster) GetZone(zoneName string) (*Zone, error) {
+	c.clusterLock.Lock()
+	defer c.clusterLock.Unlock()
+
+	ctx, cancel := context.WithTimeout(context.Background(), ETCD_TIMEOUT)
+	defer cancel()
+
+	zoneTopo, err := TopoServer.GetZone(ctx, zoneName)
+	if err != nil {
+		log.Error("TopoServer GetZone error, err: [%v]", err)
+		return nil, err
+	}
+	return &Zone{ZoneTopo: zoneTopo}, nil
+}
+
+// db
 func (c *Cluster) CreateDb(dbName string) (*DB, error) {
 	c.clusterLock.Lock()
 	defer c.clusterLock.Unlock()
@@ -265,6 +329,7 @@ func (c *Cluster) DeleteDb(dbName string) error {
 	return nil
 }
 
+// space
 func (c *Cluster) CreateSpace(dbName, spaceName, spaceSchema string, policy *PartitionPolicy) (*Space, error) {
 	c.clusterLock.Lock()
 	defer c.clusterLock.Unlock()
