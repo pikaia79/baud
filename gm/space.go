@@ -203,26 +203,3 @@ func (c *SpaceCache) DeleteSpace(space *Space) {
 	delete(c.spaces, space.ID)
 	delete(c.name2Ids, oldSpace.Name)
 }
-
-func (c *SpaceCache) Recovery() ([]*Space, error) {
-	resultSpaces := make([]*Space, 0)
-
-	ctx, cancel := context.WithTimeout(context.Background(), ETCD_TIMEOUT)
-	defer cancel()
-
-	spacesTopo, err := TopoServer.GetAllSpaces(ctx)
-	if err != nil {
-		log.Error("TopoServer GetAllSpaces error, err: [%v]", err)
-		return nil, err
-	}
-	if spacesTopo != nil {
-		for _, spaceTopo := range spacesTopo {
-			space := &Space{
-				SpaceTopo: spaceTopo,
-			}
-			resultSpaces = append(resultSpaces, space)
-		}
-	}
-
-	return resultSpaces, nil
-}

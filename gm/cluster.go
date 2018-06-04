@@ -80,26 +80,11 @@ func (c *Cluster) recoverySpaceCache() error {
 	c.clusterLock.Lock()
 	defer c.clusterLock.Unlock()
 
-	dbs := c.DbCache.GetAllDBs()
-	if dbs == nil || len(dbs) == 0 {
-		return nil
-	}
-
-	for _, db := range dbs {
-		allSpaces, err := db.SpaceCache.Recovery()
-		if err != nil {
-			return err
-		}
-
-		for _, space := range allSpaces {
-			dbTemp := c.DbCache.FindDbById(space.DB)
-			if dbTemp == nil {
-				log.Warn("Cannot find db for the space[%v] when recovery space. discord it", space)
-				if err := space.erase(); err != nil {
-					log.Error("fail to remove unused space[%v] when recovery. err:[%v]", space, err)
-				}
-			}
-			db.SpaceCache.AddSpace(space)
+	spacesTopo := c.WatchSpaceChange()
+	for _, spaceTopo := range spacesTopo {
+		db := c.DbCache.FindDbById(spaceTopo.DB)
+		if db != nil {
+			db.SpaceCache.AddSpace(&Space{SpaceTopo: spaceTopo})
 		}
 	}
 	return nil

@@ -27,7 +27,7 @@ func NewRpcServer(config *Config, cluster *Cluster) *RpcServer {
 	serverOption := &rpc.DefaultServerOption
 	serverOption.ClusterID = config.ClusterCfg.ClusterID
 	server.grpcServer = rpc.NewGrpcServer(serverOption)
-	masterpb.RegisterMasterRpcServer(server.grpcServer, server)
+	masterpb.RegisterGMRpcServer(server.grpcServer, server)
 	reflection.Register(server.grpcServer)
 
 	return server
@@ -96,42 +96,4 @@ func (s *RpcServer) GetSpace(ctx context.Context, req *masterpb.GetSpaceRequest)
 	resp.Space = *space.Space
 	resp.ResponseHeader = *makeRpcRespHeader(ErrSuc)
 	return resp, nil
-}
-
-// GM do not implement
-func (s *RpcServer) GetRoute(ctx context.Context,
-	req *masterpb.GetRouteRequest) (*masterpb.GetRouteResponse, error) {
-	return nil, ErrMethodNotImplement
-}
-
-// GM do not implement
-func (s *RpcServer) PSRegister(ctx context.Context,
-	req *masterpb.PSRegisterRequest) (*masterpb.PSRegisterResponse, error) {
-	return nil, ErrMethodNotImplement
-}
-
-// GM do not implement
-func (s *RpcServer) PSHeartbeat(ctx context.Context,
-	req *masterpb.PSHeartbeatRequest) (*masterpb.PSHeartbeatResponse, error) {
-	return nil, ErrMethodNotImplement
-}
-
-// GM do not implement
-func (s *RpcServer) CreatePartition(ctx context.Context, request *masterpb.CreatePartitionRequest) (*masterpb.CreatePartitionResponse, error) {
-	return nil, ErrMethodNotImplement
-}
-
-// GM do not implement
-func (s *RpcServer) DeletePartition(ctx context.Context, request *masterpb.DeletePartitionRequest) (*masterpb.DeletePartitionResponse, error) {
-	return nil, ErrMethodNotImplement
-}
-
-// GM do not implement
-func (s *RpcServer) ChangeReplica(ctx context.Context, request *masterpb.ChangeReplicaRequest) (*masterpb.ChangeReplicaResponse, error) {
-	return nil, ErrMethodNotImplement
-}
-
-// GM do not implement
-func (s *RpcServer) ChangeLeader(ctx context.Context, request *masterpb.ChangeLeaderRequest) (*masterpb.ChangeLeaderResponse, error) {
-	return nil, ErrMethodNotImplement
 }
