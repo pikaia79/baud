@@ -1,9 +1,9 @@
 package zm
 
 import (
+	"github.com/tiglabs/baudengine/proto/metapb"
 	"math/rand"
 	"time"
-	"github.com/tiglabs/baudengine/proto/metapb"
 )
 
 type Selector interface {

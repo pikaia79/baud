@@ -24,7 +24,6 @@ type Partition struct {
 	*topo.PartitionTopo // !!! Do not directly operate the Replicas，must be firstly take the propertyLock
 
 	Leader *metapb.Replica `json:"leader"`
-	parent *Space
 
 	// TODO: temporary policy, finally using global task to replace it
 	taskFlag    bool
@@ -57,7 +56,7 @@ func (p *Partition) addReplica(topoServer *topo.TopoServer, metaReplicas ...*met
 //    or current cluster partition have no leader
 // 2. update only the leader when confVer of partitionInfo is equals to confVer of cluster partition,
 //    and the leader of partitionInfo is exists in replica group of current cluster partition
-func (p *Partition) UpdateReplicaGroupByCond(zone string, topoServer *topo.TopoServer, info *masterpb.PartitionInfo,
+func (p *Partition) UpdateReplicaGroupByCond(cluster *Cluster, info *masterpb.PartitionInfo,
 	leaderReplica *metapb.Replica) (verExpired, updateOk bool) {
 	p.propertyLock.Lock()
 	defer p.propertyLock.Unlock()
@@ -69,7 +68,7 @@ func (p *Partition) UpdateReplicaGroupByCond(zone string, topoServer *topo.TopoS
 
 	ctx, cancel := context.WithTimeout(context.Background(), TOPO_TIMEOUT)
 	defer cancel()
-	topoServer.SetPartitionInfoByZone(ctx, zone, info)
+	cluster.topoServer.SetPartitionInfoByZone(ctx, cluster.config.ClusterCfg.ZoneID, info)
 
 	copy := deepcopy.Iface(p.Partition).(*metapb.Partition)
 	copy.Epoch = info.Epoch
@@ -179,6 +178,13 @@ func (p *Partition) takeChangeMemberTask() bool {
 	return false
 }
 
+func (p *Partition) Update(partitionTopo *topo.PartitionTopo) {
+	p.propertyLock.Lock()
+	defer p.propertyLock.Unlock()
+
+	p.PartitionTopo = partitionTopo
+}
+
 // internal use, need to write lock external
 func doMetaMarshal(p *metapb.Partition) ([]byte, []byte, error) {
 	val, err := proto.Marshal(p)
@@ -219,6 +225,13 @@ func (c *PartitionCache) AddPartition(partition *Partition) {
 	defer c.lock.Unlock()
 
 	c.partitions[partition.ID] = partition
+}
+
+func (c *PartitionCache) DelPartition(ID metapb.PartitionID) {
+	c.lock.Lock()
+	defer c.lock.Unlock()
+
+	delete(c.partitions, ID)
 }
 
 func (c *PartitionCache) GetAllPartitions() *[]Partition {
@@ -352,9 +365,9 @@ func (t *PartitionTree) remove(rng *Partition) {
 // search returns a region that contains the key.
 func (t *PartitionTree) search(slot metapb.SlotID) *Partition {
 	rng := &Partition{
-		PartitionTopo: &metapb.Partition{
+		PartitionTopo: &topo.PartitionTopo{Partition: &metapb.Partition{
 			StartSlot: slot,
-		},
+		}},
 	}
 	log.Debug("################### len=%v", t.tree.Len())
 	result := t.find(rng)
@@ -366,9 +379,9 @@ func (t *PartitionTree) search(slot metapb.SlotID) *Partition {
 
 func (t *PartitionTree) multipleSearch(slot metapb.SlotID, num int) []*Partition {
 	rng := &Partition{
-		PartitionTopo: &metapb.Partition{
+		PartitionTopo: &topo.PartitionTopo{Partition: &metapb.Partition{
 			StartSlot: slot,
-		},
+		}},
 	}
 	results := t.ascendScan(rng, num)
 	var ranges = make([]*Partition, 0, num)

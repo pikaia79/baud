@@ -1,7 +1,6 @@
 package zm
 
 import (
-	"context"
 	"github.com/tiglabs/baudengine/proto/metapb"
 	"github.com/tiglabs/baudengine/topo"
 	"github.com/tiglabs/baudengine/util/log"
@@ -20,7 +19,6 @@ type PartitionPolicy struct {
 
 type Space struct {
 	*topo.SpaceTopo
-	parent       *DB
 	searchTree   *PartitionTree `json:"-"`
 	propertyLock sync.RWMutex   `json:"-"`
 }
@@ -49,9 +47,9 @@ func (s *Space) putPartition(partition *Partition) {
 
 func (s *Space) AscendScanPartition(pivotSlot metapb.SlotID, batchNum int) []*Partition {
 	searchPivot := &Partition{
-		Partition: &metapb.Partition{
+		PartitionTopo: &topo.PartitionTopo{Partition: &metapb.Partition{
 			StartSlot: pivotSlot,
-		},
+		}},
 	}
 	items := s.searchTree.ascendScan(searchPivot, batchNum)
 	if items == nil || len(items) == 0 {
@@ -64,11 +62,18 @@ func (s *Space) AscendScanPartition(pivotSlot metapb.SlotID, batchNum int) []*Pa
 	}
 	return result
 }
+func (space *Space) Update(spaceTopo *topo.SpaceTopo) {
+	space.propertyLock.Lock()
+	defer space.propertyLock.Unlock()
+
+	space.SpaceTopo = spaceTopo
+}
 
 type SpaceCache struct {
-	lock     sync.RWMutex
-	name2Ids map[string]metapb.SpaceID
-	spaces   map[metapb.SpaceID]*Space
+	lock        sync.RWMutex
+	name2Ids    map[string]metapb.SpaceID
+	spaces      map[metapb.SpaceID]*Space
+	cancelWatch topo.CancelFunc
 }
 
 func NewSpaceCache() *SpaceCache {
@@ -78,15 +83,15 @@ func NewSpaceCache() *SpaceCache {
 	}
 }
 
-func (c *SpaceCache) FindSpaceByName(spaceName string) *Space {
-	c.lock.RLock()
-	defer c.lock.RUnlock()
+func (sc *SpaceCache) FindSpaceByName(spaceName string) *Space {
+	sc.lock.RLock()
+	defer sc.lock.RUnlock()
 
-	spaceId, ok := c.name2Ids[spaceName]
+	spaceId, ok := sc.name2Ids[spaceName]
 	if !ok {
 		return nil
 	}
-	space, ok := c.spaces[spaceId]
+	space, ok := sc.spaces[spaceId]
 	if !ok {
 		log.Error("!!!space cache map not consistent, space[%v : %v] not exists. never happened", spaceName, spaceId)
 		return nil
@@ -94,61 +99,44 @@ func (c *SpaceCache) FindSpaceByName(spaceName string) *Space {
 	return space
 }
 
-func (c *SpaceCache) FindSpaceById(spaceId metapb.SpaceID) *Space {
-	c.lock.RLock()
-	defer c.lock.RUnlock()
+func (sc *SpaceCache) FindSpaceById(spaceId metapb.SpaceID) *Space {
+	sc.lock.RLock()
+	defer sc.lock.RUnlock()
 
-	space, ok := c.spaces[spaceId]
+	space, ok := sc.spaces[spaceId]
 	if !ok {
 		return nil
 	}
 	return space
 }
 
-func (c *SpaceCache) GetAllSpaces() []*Space {
-	c.lock.RLock()
-	defer c.lock.RUnlock()
+func (sc *SpaceCache) GetAllSpaces() []*Space {
+	sc.lock.RLock()
+	defer sc.lock.RUnlock()
 
-	spaces := make([]*Space, 0, len(c.spaces))
-	for _, space := range c.spaces {
+	spaces := make([]*Space, 0, len(sc.spaces))
+	for _, space := range sc.spaces {
 		spaces = append(spaces, space)
 	}
 
 	return spaces
 }
 
-func (c *SpaceCache) AddSpace(space *Space) {
-	c.lock.Lock()
-	defer c.lock.Unlock()
+func (sc *SpaceCache) AddSpace(space *Space) {
+	sc.lock.Lock()
+	defer sc.lock.Unlock()
 
-	c.name2Ids[space.Name] = space.ID
-	c.spaces[space.ID] = space
+	sc.name2Ids[space.Name] = space.ID
+	sc.spaces[space.ID] = space
 }
 
-func (c *SpaceCache) DeleteSpace(space *Space) {
-	c.lock.Lock()
-	defer c.lock.Unlock()
+func (sc *SpaceCache) DeleteSpace(space *Space) {
+	sc.lock.Lock()
+	defer sc.lock.Unlock()
 
-	oldSpace, ok := c.spaces[space.ID]
+	oldSpace, ok := sc.spaces[space.ID]
 	if !ok {
 		return
 	}
-	delete(c.name2Ids, oldSpace.Name)
-}
-
-func (c *SpaceCache) Recovery(topoServer *topo.TopoServer) ([]*Space, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), TOPO_TIMEOUT)
-	defer cancel()
-
-	spaces, err := topoServer.GetAllSpaces(ctx)
-	if err != nil {
-		log.Error("topoServer.GetAllSpaces() failed: %s", err.Error())
-	}
-
-	resultSpaces := make([]*Space, 0)
-	for _, space := range spaces {
-		resultSpaces = append(resultSpaces, NewSpaceByMeta(space))
-	}
-
-	return resultSpaces, nil
+	delete(sc.name2Ids, oldSpace.Name)
 }
