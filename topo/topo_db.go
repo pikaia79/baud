@@ -123,6 +123,7 @@ func (s *TopoServer) DeleteDB(ctx context.Context, db *DBTopo) error {
 	return s.backend.Delete(ctx, GlobalZone, path.Join(dbsPath, fmt.Sprint(db.ID), DBTopoFile), db.Version)
 }
 
+// get current children and watch dbs
 // []*DBTopo : initial children dbs returned
 // error     : error returned when first watching
 func (s *TopoServer) WatchDBs(ctx context.Context) (error, []*DBTopo, <-chan *DBWatchData, CancelFunc) {

@@ -152,6 +152,7 @@ func (s *TopoServer) DeleteSpace(ctx context.Context, space *SpaceTopo) error {
 	return s.backend.Delete(ctx, GlobalZone, nodePath, space.Version)
 }
 
+// get current children and watch space
 func (s *TopoServer) WatchSpaces(ctx context.Context) (error, []*SpaceTopo, <-chan *SpaceWatchData, CancelFunc) {
 	if ctx == nil {
 		return ErrNoNode, nil, nil, nil
