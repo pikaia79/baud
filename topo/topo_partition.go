@@ -240,7 +240,8 @@ func (s *TopoServer) SetPartitionsOnPSByZone(ctx context.Context, zoneName strin
 		}
 
 		nodePath := path.Join(parentPath, fmt.Sprint(partition.ID), PartitionTopoFile)
-		txn.Create(nodePath, contents)
+
+		txn.Put(nodePath, contents, &topoVerison{version: 0})
 	}
 	if _, err := txn.Commit(); err != nil {
 		return err
@@ -285,6 +286,7 @@ func parseZonesData(data []byte) []string {
 	return strings.Split(string(data), "|")
 }
 
+// get current children and watch zones
 func (s *TopoServer) WatchZonesForPartition(ctx context.Context, partitionId metapb.PartitionID) (*ZonesForPartitionWatchData, <-chan *ZonesForPartitionWatchData, CancelFunc) {
 	if ctx == nil {
 		return &ZonesForPartitionWatchData{Err: ErrNoNode}, nil, nil
@@ -315,6 +317,7 @@ func (s *TopoServer) WatchZonesForPartition(ctx context.Context, partitionId met
 	return &ZonesForPartitionWatchData{zones: curVal}, changes, wdCancel
 }
 
+// get current children and watch partitions
 func (s *TopoServer) WatchPartitions(ctx context.Context) (error, []*PartitionTopo, <-chan *PartitionWatchData, CancelFunc) {
 	if ctx == nil {
 		return ErrNoNode, nil, nil, nil

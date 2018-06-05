@@ -1,3 +1,6 @@
+// Copyright 2014, Google Inc. All rights reserved.
+// Use of this source code is governed by a BSD-style
+// license that can be found in the LICENSE file.
 package etcd3topo
 
 import (
@@ -9,7 +12,6 @@ import (
 	"golang.org/x/net/context"
 )
 
-// ListDir is part of the topo.Backend interface.
 func (s *Server) ListDir(ctx context.Context, cell, dirPath string) ([]string, topo.Version, error) {
 	c, err := s.clientForCell(ctx, cell)
 	if err != nil {
