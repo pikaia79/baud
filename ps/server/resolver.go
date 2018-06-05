@@ -15,19 +15,19 @@ type nodeRef struct {
 	replicateAddr string
 }
 
-// NodeResolver resolve NodeID to net.Addr addresses
-type NodeResolver struct {
+// RaftResolver resolve NodeID to net.Addr addresses
+type RaftResolver struct {
 	nodes *sync.Map
 }
 
-// NewNodeResolver create NodeResolver
-func NewNodeResolver() *NodeResolver {
-	return &NodeResolver{
+// NewRaftResolver create RaftResolver
+func NewRaftResolver() *RaftResolver {
+	return &RaftResolver{
 		nodes: new(sync.Map),
 	}
 }
 
-func (r *NodeResolver) addNode(id metapb.NodeID, addrs metapb.ReplicaAddrs) {
+func (r *RaftResolver) AddNode(id metapb.NodeID, addrs metapb.ReplicaAddrs) {
 	if id == 0 {
 		return
 	}
@@ -39,7 +39,7 @@ func (r *NodeResolver) addNode(id metapb.NodeID, addrs metapb.ReplicaAddrs) {
 	atomic.AddInt32(&(obj.(*nodeRef).refCount), 1)
 }
 
-func (r *NodeResolver) deleteNode(id metapb.NodeID) {
+func (r *RaftResolver) DeleteNode(id metapb.NodeID) {
 	if obj, _ := r.nodes.Load(id); obj != nil {
 		if count := atomic.AddInt32(&(obj.(*nodeRef).refCount), -1); count <= 0 {
 			r.nodes.Delete(id)
@@ -47,7 +47,7 @@ func (r *NodeResolver) deleteNode(id metapb.NodeID) {
 	}
 }
 
-func (r *NodeResolver) getNode(id metapb.NodeID) (*nodeRef, error) {
+func (r *RaftResolver) GetNode(id metapb.NodeID) (*nodeRef, error) {
 	if obj, _ := r.nodes.Load(id); obj != nil {
 		return obj.(*nodeRef), nil
 	}
@@ -55,8 +55,8 @@ func (r *NodeResolver) getNode(id metapb.NodeID) (*nodeRef, error) {
 }
 
 // NodeAddress resolve NodeID to net.Addr addresses.
-func (r *NodeResolver) NodeAddress(nodeID uint64, stype raft.SocketType) (string, error) {
-	node, err := r.getNode(metapb.NodeID(nodeID))
+func (r *RaftResolver) NodeAddress(nodeID uint64, stype raft.SocketType) (string, error) {
+	node, err := r.GetNode(metapb.NodeID(nodeID))
 	if err != nil {
 		return "", err
 	}

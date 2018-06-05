@@ -49,7 +49,7 @@ func (h *heartbeatWork) start() {
 		h.lastHeartbeat = time.Time{}
 		for {
 			select {
-			case <-h.server.ctx.Done():
+			case <-h.server.Ctx.Done():
 				close(quitCh)
 				return
 
@@ -84,7 +84,7 @@ func (h *heartbeatWork) stop() {
 	h.stopCh <- nil
 }
 
-func (h *heartbeatWork) trigger() {
+func (h *heartbeatWork) Trigger() {
 	select {
 	case h.triggerCh <- nil:
 	default:
@@ -102,7 +102,7 @@ func (h *heartbeatWork) update(timer *time.Timer) {
 func (h *heartbeatWork) doHeartbeat() {
 	retryOpt := util.DefaultRetryOption
 	retryOpt.MaxRetries = 3
-	retryOpt.Context = h.server.ctx
+	retryOpt.Context = h.server.Ctx
 
 	err := util.RetryMaxAttempt(&retryOpt, func() error {
 		masterAddr := h.server.MasterServer
@@ -121,7 +121,7 @@ func (h *heartbeatWork) doHeartbeat() {
 			Partitions:    make([]masterpb.PartitionInfo, 0),
 		}
 		h.server.partitions.Range(func(key, value interface{}) bool {
-			pinfo := value.(*partition).getPartitionInfo()
+			pinfo := value.(PartitionStore).GetStats()
 			req.Partitions = append(req.Partitions, *pinfo)
 			stats.Ops += pinfo.Statistics.Ops
 			return true
@@ -129,7 +129,7 @@ func (h *heartbeatWork) doHeartbeat() {
 		req.SysStats = *stats
 
 		log.Debug("heartbeat to master request is: %s", req)
-		goCtx, cancel := context.WithTimeout(h.server.ctx, heartbeatTimeout)
+		goCtx, cancel := context.WithTimeout(h.server.Ctx, heartbeatTimeout)
 		resp, err := masterClient.(masterpb.MasterRpcClient).PSHeartbeat(goCtx, req)
 		cancel()
 

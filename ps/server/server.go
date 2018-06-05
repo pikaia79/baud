@@ -35,21 +35,21 @@ const (
 // Server partition server
 type Server struct {
 	Config
-	meta *serverMeta
+	Ctx       context.Context
+	ctxCancel context.CancelFunc
 
 	ip           string
 	masterLeader string
-	ctx          context.Context
-	ctxCancel    context.CancelFunc
+	meta         *serverMeta
 
-	nodeResolver *NodeResolver
-	raftConfig   *raft.Config
-	raftServer   *raft.RaftServer
+	RaftResolver *RaftResolver
+	RaftConfig   *raft.Config
+	RaftServer   *raft.RaftServer
 
 	connMgr         *rpc.ConnectionMgr
 	adminServer     *grpc.Server
 	masterClient    *rpc.Client
-	masterHeartbeat *heartbeatWork
+	MasterHeartbeat *heartbeatWork
 
 	systemMetric *metric.SystemMetric
 	partitions   sync.Map
@@ -64,25 +64,25 @@ func NewServer(conf *Config) *Server {
 		Config:       *conf,
 		ip:           netutil.GetPrivateIP().String(),
 		meta:         newServerMeta(conf.StorePath),
-		nodeResolver: NewNodeResolver(),
+		RaftResolver: NewRaftResolver(),
 		systemMetric: metric.NewSystemMetric(conf.StorePath, conf.DiskQuota),
 		adminEventCh: make(chan proto.Message, 64),
 	}
-	s.ctx, s.ctxCancel = context.WithCancel(context.Background())
+	s.Ctx, s.ctxCancel = context.WithCancel(context.Background())
 
 	serverOpt := rpc.DefaultServerOption
 	serverOpt.ClusterID = conf.ClusterID
 	s.adminServer = rpc.NewGrpcServer(&serverOpt)
 
 	connMgrOpt := rpc.DefaultManagerOption
-	s.connMgr = rpc.NewConnectionMgr(s.ctx, &connMgrOpt)
+	s.connMgr = rpc.NewConnectionMgr(s.Ctx, &connMgrOpt)
 	clientOpt := rpc.DefaultClientOption
 	clientOpt.Compression = true
 	clientOpt.ClusterID = conf.ClusterID
 	clientOpt.ConnectMgr = s.connMgr
 	clientOpt.CreateFunc = func(cc *grpc.ClientConn) interface{} { return masterpb.NewMasterRpcClient(cc) }
 	s.masterClient = rpc.NewClient(1, &clientOpt)
-	s.masterHeartbeat = newHeartbeatWork(s)
+	s.MasterHeartbeat = newHeartbeatWork(s)
 
 	return s
 }
@@ -119,21 +119,21 @@ func (s *Server) doStart(init bool) error {
 		initPartitions = registerResp.Partitions
 		if s.NodeID != registerResp.NodeID {
 			s.NodeID = registerResp.NodeID
-			if s.raftServer != nil {
-				s.raftServer.Stop()
-				s.raftServer = nil
+			if s.RaftServer != nil {
+				s.RaftServer.Stop()
+				s.RaftServer = nil
 			}
 		}
 	}
 
 	// create raft server
-	if s.raftServer == nil {
+	if s.isRaftStore && s.RaftServer == nil {
 		rc := raft.DefaultConfig()
 		rc.NodeID = uint64(s.NodeID)
 		rc.LeaseCheck = true
 		rc.HeartbeatAddr = fmt.Sprintf(":%d", s.RaftHeartbeatPort)
 		rc.ReplicateAddr = fmt.Sprintf(":%d", s.RaftReplicatePort)
-		rc.Resolver = s.nodeResolver
+		rc.Resolver = s.RaftResolver
 		if s.RaftReplicaConcurrency > 0 {
 			rc.MaxReplConcurrency = s.RaftReplicaConcurrency
 		}
@@ -151,8 +151,8 @@ func (s *Server) doStart(init bool) error {
 		if err != nil {
 			return fmt.Errorf("boot raft server failed, error: %s", err)
 		}
-		s.raftServer = rs
-		s.raftConfig = rc
+		s.RaftServer = rs
+		s.RaftConfig = rc
 	}
 
 	// clear old partition
@@ -179,14 +179,14 @@ func (s *Server) doStart(init bool) error {
 			log.Info("Server admin grpc listen on: %s", fmt.Sprintf(":%d", s.AdminPort))
 		}
 
-		routine.RunWorkDaemon("ADMIN-EVENTHANDLER", s.adminEventHandler, s.ctx.Done())
+		routine.RunWorkDaemon("ADMIN-EVENTHANDLER", s.adminEventHandler, s.Ctx.Done())
 	}
 
 	// start heartbeat to master
 	s.stopping.Set(false)
 	if s.MasterServer != "" {
-		s.masterHeartbeat.start()
-		s.masterHeartbeat.trigger()
+		s.MasterHeartbeat.start()
+		s.MasterHeartbeat.Trigger()
 	}
 
 	log.Info("Baud server successful startup...")
@@ -198,8 +198,8 @@ func (s *Server) Close() error {
 	s.stopping.Set(true)
 	s.ctxCancel()
 
-	if s.masterHeartbeat != nil {
-		s.masterHeartbeat.stop()
+	if s.MasterHeartbeat != nil {
+		s.MasterHeartbeat.stop()
 	}
 	if s.adminServer != nil {
 		s.adminServer.GracefulStop()
@@ -208,8 +208,8 @@ func (s *Server) Close() error {
 	routine.Stop()
 	s.closeAllRange()
 
-	if s.raftServer != nil {
-		s.raftServer.Stop()
+	if s.RaftServer != nil {
+		s.RaftServer.Stop()
 	}
 	if s.masterClient != nil {
 		s.masterClient.Close()
@@ -223,12 +223,13 @@ func (s *Server) Close() error {
 
 func (s *Server) closeAllRange() {
 	s.partitions.Range(func(key, value interface{}) bool {
-		p := value.(*partition)
+		p := value.(PartitionStore)
+		meta := p.GetMeta()
 		p.Close()
-		s.partitions.Delete(p.meta.ID)
+		s.partitions.Delete(meta.ID)
 
-		for _, r := range p.meta.Replicas {
-			s.nodeResolver.deleteNode(r.NodeID)
+		for _, r := range meta.Replicas {
+			s.RaftResolver.DeleteNode(r.NodeID)
 		}
 		return true
 	})
@@ -237,7 +238,7 @@ func (s *Server) closeAllRange() {
 func (s *Server) register() (*masterpb.PSRegisterResponse, error) {
 	retryOpt := util.DefaultRetryOption
 	retryOpt.MaxRetries = 10
-	retryOpt.Context = s.ctx
+	retryOpt.Context = s.Ctx
 
 	buildInfo := build.GetInfo()
 	request := &masterpb.PSRegisterRequest{
@@ -263,7 +264,7 @@ func (s *Server) register() (*masterpb.PSRegisterResponse, error) {
 			return fmt.Errorf("get master register rpc client[%s] error: %s", masterAddr, err)
 		}
 
-		goCtx, cancel := context.WithTimeout(s.ctx, registerTimeout)
+		goCtx, cancel := context.WithTimeout(s.Ctx, registerTimeout)
 		resp, err := masterClient.(masterpb.MasterRpcClient).PSRegister(goCtx, request)
 		cancel()
 
@@ -312,7 +313,7 @@ func (s *Server) recoverPartitions(partitions []metapb.Partition) {
 func (s *Server) restart() {
 	// do close
 	s.stopping.Set(true)
-	s.masterHeartbeat.stop()
+	s.MasterHeartbeat.stop()
 	s.masterClient.Close()
 
 	// clear admin event channel
@@ -334,4 +335,9 @@ func (s *Server) restart() {
 	if err := s.doStart(false); err != nil {
 		panic(fmt.Errorf("restart error: %s", err))
 	}
+}
+
+// CreateDataAndRaftPath create store path of data and raft log.
+func (s *Server) CreateDataAndRaftPath(id metapb.PartitionID) (data, raft string, err error) {
+	return s.meta.getDataAndRaftPath(id)
 }
