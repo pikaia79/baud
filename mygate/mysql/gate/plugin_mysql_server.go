@@ -27,12 +27,12 @@ import (
 
 	"golang.org/x/net/context"
 
-	"github.com/tiglabs/baudengine/mygate/mysql/server"
-	"github.com/tiglabs/baudengine/mygate/mysql/sqltypes"
 	"github.com/tiglabs/baudengine/util/log"
 
-	"github.com/tiglabs/baudengine/mygate/mysql/sqlparser"
-	"github.com/tiglabs/baudengine/mygate/mysql/tls"
+	"vitess.io/vitess/go/mysql"
+	"vitess.io/vitess/go/sqltypes"
+	"vitess.io/vitess/go/vt/sqlparser"
+	"vitess.io/vitess/go/vt/vttls"
 )
 
 var (
@@ -145,7 +145,7 @@ func InitMySQLProtocol() {
 			mysqlListener.ServerVersion = *mysqlServerVersion
 		}
 		if *mysqlSslCert != "" && *mysqlSslKey != "" {
-			mysqlListener.TLSConfig, err = tls.ServerConfig(*mysqlSslCert, *mysqlSslKey, *mysqlSslCa)
+			mysqlListener.TLSConfig, err = vttls.ServerConfig(*mysqlSslCert, *mysqlSslKey, *mysqlSslCa)
 			if err != nil {
 				log.Fatal("grpcutils.TLSServerConfig failed: %v", err)
 				return

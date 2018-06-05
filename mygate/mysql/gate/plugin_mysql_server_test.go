@@ -24,8 +24,8 @@ import (
 
 	"golang.org/x/net/context"
 
-	"github.com/tiglabs/baudengine/mygate/mysql/server"
-	"github.com/tiglabs/baudengine/mygate/mysql/sqltypes"
+	"vitess.io/vitess/go/mysql"
+	"vitess.io/vitess/go/sqltypes"
 )
 
 type testHandler struct {
