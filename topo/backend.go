@@ -6,6 +6,7 @@ package topo
 import (
 	"golang.org/x/net/context"
 	"time"
+	"fmt"
 )
 
 const (
@@ -197,11 +198,11 @@ func (op *TxnErrorOpResult) getErr() error {
 }
 
 type Transaction interface {
-	Create(filePath string, contents []byte)
+	// non-conditional create, conditional create, update
+	Put(filePath string, contents []byte, version Version)
 
+	// non-conditional delete, conditional delete
 	Delete(filePath string, version Version)
-
-	// Update(filePath string, contents []byte, version Version)
 
 	Commit() ([]TxnOpResult, error)
 }
@@ -210,6 +211,14 @@ type Transaction interface {
 type Version interface {
 	// String returns a text representation of the version.
 	String() string
+}
+
+type topoVerison struct {
+	version int64
+}
+
+func (zv *topoVerison) String() string {
+	return fmt.Sprintf("%d", zv.version)
 }
 
 // LockDescriptor is an interface that describes a lock.

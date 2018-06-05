@@ -19,17 +19,25 @@ type etcd3Transaction struct {
 	elseOps []clientv3.Op
 }
 
-func (t *etcd3Transaction) Create(filePath string, contents []byte) {
+func (t *etcd3Transaction) Put(filePath string, contents []byte, version topo.Version) {
 	nodePath := path.Join(t.client.root, filePath)
-	t.cmps = append(t.cmps, clientv3.Compare(clientv3.Version(nodePath), "=", 0))
+	if version != nil {
+	    ver := int64(version.(EtcdVersion))
+	    if ver == 0 {
+            t.cmps = append(t.cmps, clientv3.Compare(clientv3.Version(nodePath), "=", ver))
+        } else {
+            t.cmps = append(t.cmps, clientv3.Compare(clientv3.ModRevision(nodePath), "=", ver))
+        }
+    }
 	t.thenOps = append(t.thenOps, clientv3.OpPut(nodePath, string(contents)))
 
 }
 
 func (t *etcd3Transaction) Delete(filePath string, version topo.Version) {
-	// TODO: force to delete it when version is nil
 	nodePath := path.Join(t.client.root, filePath)
-	t.cmps = append(t.cmps, clientv3.Compare(clientv3.ModRevision(nodePath), "=", int64(version.(EtcdVersion))))
+	if version != nil {
+        t.cmps = append(t.cmps, clientv3.Compare(clientv3.ModRevision(nodePath), "=", int64(version.(EtcdVersion))))
+    }
 	t.thenOps = append(t.thenOps, clientv3.OpDelete(nodePath))
 	t.elseOps = append(t.elseOps, clientv3.OpGet(nodePath))
 }

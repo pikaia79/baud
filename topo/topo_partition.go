@@ -240,7 +240,8 @@ func (s *TopoServer) SetPartitionsOnPSByZone(ctx context.Context, zoneName strin
 		}
 
 		nodePath := path.Join(parentPath, fmt.Sprint(partition.ID), PartitionTopoFile)
-		txn.Create(nodePath, contents)
+
+		txn.Put(nodePath, contents, &topoVerison{version: 0})
 	}
 	if _, err := txn.Commit(); err != nil {
 		return err
