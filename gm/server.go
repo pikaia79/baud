@@ -46,8 +46,8 @@ func (gm *GM) Start(config *Config) error {
 	}
 	TopoServer = topoServer
 
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	ctx, _ := context.WithTimeout(context.Background(), ETCD_TIMEOUT)
+
 	gm.cluster = NewCluster(ctx, gm.config, gm)
 	if err := gm.cluster.Start(); err != nil {
 		log.Error("fail to start cluster. err:[%v]", err)

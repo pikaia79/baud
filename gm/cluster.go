@@ -236,6 +236,10 @@ func (c *Cluster) clearAllCache() {
 	c.clusterLock.Lock()
 	defer c.clusterLock.Unlock()
 
+	c.cancelPartitionWatch()
+	c.cancelSpaceWatch()
+	c.cancelDBWatch()
+
 	c.PartitionCache.Clear()
 	// SpaceCache in DbCache
 	c.DbCache.Clear()
@@ -247,10 +251,7 @@ func (c *Cluster) CreateZone(zoneName, zoneEtcdAddr, zoneRootDir string) (*Zone,
 	c.clusterLock.Lock()
 	defer c.clusterLock.Unlock()
 
-	ctx, cancel := context.WithTimeout(context.Background(), ETCD_TIMEOUT)
-	defer cancel()
-
-	zoneTopo, err := TopoServer.GetZone(ctx, zoneName)
+	zoneTopo, err := TopoServer.GetZone(c.ctx, zoneName)
 	if err != nil {
 		log.Error("TopoServer GetZone error, err: [%v]", err)
 		return nil, err
@@ -275,10 +276,7 @@ func (c *Cluster) DeleteZone(zoneName string) error {
 	c.clusterLock.Lock()
 	defer c.clusterLock.Unlock()
 
-	ctx, cancel := context.WithTimeout(context.Background(), ETCD_TIMEOUT)
-	defer cancel()
-
-	zoneTopo, err := TopoServer.GetZone(ctx, zoneName)
+	zoneTopo, err := TopoServer.GetZone(c.ctx, zoneName)
 	if err != nil {
 		log.Error("TopoServer GetZone error, err: [%v]", err)
 		return err
@@ -301,10 +299,7 @@ func (c *Cluster) GetAllZones() ([]*Zone, error) {
 	defer c.clusterLock.Unlock()
 
 	zones := make([]*Zone, 0)
-	ctx, cancel := context.WithTimeout(context.Background(), ETCD_TIMEOUT)
-	defer cancel()
-
-	zonesTopo, err := TopoServer.GetAllZones(ctx)
+	zonesTopo, err := TopoServer.GetAllZones(c.ctx)
 	if err != nil {
 		log.Error("TopoServer GetAllZones error, err: [%v]", err)
 		return nil, err
@@ -320,10 +315,7 @@ func (c *Cluster) GetAllZonesMap() (map[string]*Zone, error) {
 	defer c.clusterLock.Unlock()
 
 	zonesMap := make(map[string]*Zone)
-	ctx, cancel := context.WithTimeout(context.Background(), ETCD_TIMEOUT)
-	defer cancel()
-
-	zonesTopo, err := TopoServer.GetAllZones(ctx)
+	zonesTopo, err := TopoServer.GetAllZones(c.ctx)
 	if err != nil {
 		log.Error("TopoServer GetAllZones error, err: [%v]", err)
 		return nil, err
@@ -339,10 +331,7 @@ func (c *Cluster) GetAllZonesName() ([]string, error) {
 	defer c.clusterLock.Unlock()
 
 	zonesName := make([]string, 0)
-	ctx, cancel := context.WithTimeout(context.Background(), ETCD_TIMEOUT)
-	defer cancel()
-
-	zonesTopo, err := TopoServer.GetAllZones(ctx)
+	zonesTopo, err := TopoServer.GetAllZones(c.ctx)
 	if err != nil {
 		log.Error("TopoServer GetAllZones error, err: [%v]", err)
 		return nil, err
@@ -357,10 +346,7 @@ func (c *Cluster) GetZone(zoneName string) (*Zone, error) {
 	c.clusterLock.Lock()
 	defer c.clusterLock.Unlock()
 
-	ctx, cancel := context.WithTimeout(context.Background(), ETCD_TIMEOUT)
-	defer cancel()
-
-	zoneTopo, err := TopoServer.GetZone(ctx, zoneName)
+	zoneTopo, err := TopoServer.GetZone(c.ctx, zoneName)
 	if err != nil {
 		log.Error("TopoServer GetZone error, err: [%v]", err)
 		return nil, err
