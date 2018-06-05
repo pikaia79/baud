@@ -32,6 +32,7 @@ const (
 	PARTITION_NUM   = "partition_num"
 	PARTITION_ID    = "partition_id"
 	SPACE_SCHEMA    = "space_schema"
+	REPLICA_ID      = "replica_id"
 )
 
 type ApiServer struct {
@@ -105,6 +106,9 @@ func (s *ApiServer) initAdminHandler() {
 
 	s.httpServer.Handle(netutil.GET, "/manage/partition/list", s.handlePartitionList)
 	s.httpServer.Handle(netutil.GET, "/manage/partition/detail", s.handlePartitionDetail)
+
+	s.httpServer.Handle(netutil.POST, "/manage/replica/create", s.handleReplicaCreate)
+	s.httpServer.Handle(netutil.DELETE, "/manage/replica/delete", s.handleReplicaDelete)
 }
 
 func (s *ApiServer) handleZoneCreate(w http.ResponseWriter, r *http.Request, params netutil.UriParams) {
@@ -196,6 +200,24 @@ func (s *ApiServer) handleDbCreate(w http.ResponseWriter, r *http.Request, param
 	sendReply(w, newHttpSucReply(db))
 }
 
+func (s *ApiServer) handleDbDelete(w http.ResponseWriter, r *http.Request, params netutil.UriParams) {
+	if err := s.checkLeader(w); err != nil {
+		return
+	}
+
+	dbName, err := checkMissingParam(w, r, DB_NAME)
+	if err != nil {
+		return
+	}
+	err = s.cluster.DeleteDb(dbName)
+	if err != nil {
+		sendReply(w, newHttpErrReply(err))
+		return
+	}
+
+	sendReply(w, newHttpSucReply(""))
+}
+
 func (s *ApiServer) handleDbRename(w http.ResponseWriter, r *http.Request, params netutil.UriParams) {
 	if err := s.checkLeader(w); err != nil {
 		return
@@ -211,24 +233,6 @@ func (s *ApiServer) handleDbRename(w http.ResponseWriter, r *http.Request, param
 	}
 
 	if err := s.cluster.RenameDb(srcDbName, destDbName); err != nil {
-		sendReply(w, newHttpErrReply(err))
-		return
-	}
-
-	sendReply(w, newHttpSucReply(""))
-}
-
-func (s *ApiServer) handleDbDelete(w http.ResponseWriter, r *http.Request, params netutil.UriParams) {
-	if err := s.checkLeader(w); err != nil {
-		return
-	}
-
-	dbName, err := checkMissingParam(w, r, DB_NAME)
-	if err != nil {
-		return
-	}
-	err = s.cluster.DeleteDb(dbName)
-	if err != nil {
 		sendReply(w, newHttpErrReply(err))
 		return
 	}
@@ -302,6 +306,28 @@ func (s *ApiServer) handleSpaceCreate(w http.ResponseWriter, r *http.Request, pa
 	sendReply(w, newHttpSucReply(space))
 }
 
+func (s *ApiServer) handleSpaceDelete(w http.ResponseWriter, r *http.Request, params netutil.UriParams) {
+	if err := s.checkLeader(w); err != nil {
+		return
+	}
+
+	dbName, err := checkMissingParam(w, r, DB_NAME)
+	if err != nil {
+		return
+	}
+	spaceName, err := checkMissingParam(w, r, SPACE_NAME)
+	if err != nil {
+		return
+	}
+	err = s.cluster.DeleteSpace(dbName, spaceName)
+	if err != nil {
+		sendReply(w, newHttpErrReply(err))
+		return
+	}
+
+	sendReply(w, newHttpSucReply(""))
+}
+
 func (s *ApiServer) handleSpaceRename(w http.ResponseWriter, r *http.Request, params netutil.UriParams) {
 	if err := s.checkLeader(w); err != nil {
 		return
@@ -322,28 +348,6 @@ func (s *ApiServer) handleSpaceRename(w http.ResponseWriter, r *http.Request, pa
 
 	if err := s.cluster.RenameSpace(dbName, srcSpaceName, destSpaceName); err != nil {
 		sendReply(w, newHttpErrReply(err))
-	}
-
-	sendReply(w, newHttpSucReply(""))
-}
-
-func (s *ApiServer) handleSpaceDelete(w http.ResponseWriter, r *http.Request, params netutil.UriParams) {
-	if err := s.checkLeader(w); err != nil {
-		return
-	}
-
-	dbName, err := checkMissingParam(w, r, DB_NAME)
-	if err != nil {
-		return
-	}
-	spaceName, err := checkMissingParam(w, r, SPACE_NAME)
-	if err != nil {
-		return
-	}
-	err = s.cluster.DeleteSpace(dbName, spaceName)
-	if err != nil {
-		sendReply(w, newHttpErrReply(err))
-		return
 	}
 
 	sendReply(w, newHttpSucReply(""))
@@ -425,6 +429,50 @@ func (s *ApiServer) handlePartitionDetail(w http.ResponseWriter, r *http.Request
 		return
 	}
 	sendReply(w, newHttpSucReply(partition))
+}
+
+func (s *ApiServer) handleReplicaCreate(w http.ResponseWriter, r *http.Request, params netutil.UriParams) {
+	if err := s.checkLeader(w); err != nil {
+		return
+	}
+
+	partitionId, err := checkMissingAndUint64Param(w, r, PARTITION_ID)
+	if err != nil {
+		return
+	}
+	zoneName, err := checkMissingParam(w, r, ZONE_NAME)
+	if err != nil {
+		return
+	}
+	err = s.cluster.CreateReplica(partitionId, zoneName)
+	if err != nil {
+		sendReply(w, newHttpErrReply(err))
+		return
+	}
+
+	sendReply(w, newHttpSucReply(""))
+}
+
+func (s *ApiServer) handleReplicaDelete(w http.ResponseWriter, r *http.Request, params netutil.UriParams) {
+	if err := s.checkLeader(w); err != nil {
+		return
+	}
+
+	partitionId, err := checkMissingAndUint64Param(w, r, PARTITION_ID)
+	if err != nil {
+		return
+	}
+	replicaId, err := checkMissingAndUint64Param(w, r, REPLICA_ID)
+	if err != nil {
+		return
+	}
+	err = s.cluster.DeleteReplica(partitionId, replicaId)
+	if err != nil {
+		sendReply(w, newHttpErrReply(err))
+		return
+	}
+
+	sendReply(w, newHttpSucReply(""))
 }
 
 // http protocal

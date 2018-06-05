@@ -11,6 +11,8 @@ import (
 	"time"
 )
 
+//go:generate mockgen -destination work_mock.go -package gm github.com/tiglabs/baudengine/gm SpaceStateTransitionWorker
+
 type WorkerManager struct {
 	ctx    context.Context
 	cancel context.CancelFunc
@@ -186,7 +188,7 @@ func (w *SpaceStateTransitionWorker) run() {
 			}
 		}
 		// Compensation
-		err := w.handleCompensation(partitionInfoInCacheMap, zonesName)
+		err := handleCompensation(partitionInfoInCacheMap, zonesName, w.cluster)
 		if err != nil {
 			log.Error("handleCompensation error, err:[%v]", err)
 			continue
@@ -204,19 +206,19 @@ func (w *SpaceStateTransitionWorker) run() {
 				partitionsMap := space.partitions
 
 				if space.Status == metapb.SS_Init {
-					err := w.handleSpaceStateSSInit(db, space, partitionsMap, zonesName)
+					err := handleSpaceStateSSInit(db, space, partitionsMap, zonesName, w.cluster)
 					if err != nil {
 						log.Error("handleSpaceStateSSInit error, err:[%v]", err)
 						return
 					}
 				} else if space.Status == metapb.SS_Running {
-					err := w.handleSpaceStateSSRunning(db, space, partitionsMap, zonesName)
+					err := handleSpaceStateSSRunning(db, space, partitionsMap, zonesName)
 					if err != nil {
 						log.Error("handleSpaceStateSSRunning error, err:[%v]", err)
 						return
 					}
 				} else if space.Status == metapb.SS_Deleting {
-					err := w.handleSpaceStateSSDeleting(db, space, partitionsMap, zonesName)
+					err := handleSpaceStateSSDeleting(db, space, partitionsMap, zonesName, w.cluster)
 					if err != nil {
 						log.Error("handleSpaceStateSSDeleting error, err:[%v]", err)
 						return
@@ -227,61 +229,11 @@ func (w *SpaceStateTransitionWorker) run() {
 	}
 }
 
-func (w *SpaceStateTransitionWorker) handleCompensation(partitionInfo *masterpb.PartitionInfo, zonesName []string) error {
-	partitionInCluster := w.cluster.PartitionCache.FindPartitionById(partitionInfo.ID)
-	// partition元数据已经不存在, 但是partitionInfo存在
-	if partitionInCluster == nil {
-		log.Info("received a partition[%v], that not existed in cluster.", partitionInfo.ID)
-		// force to delete
-		replica := pickReplicaToDelete(partitionInfo)
-		replicaZoneAddr, err := w.getZMLeaderAddr(replica.Zone, w.cluster.config.ClusterCfg.GmNodeId)
-		if err != nil {
-			log.Error("getZMLeaderAddr() replicaZoneAddr error. err:[%v]", err)
-			return err
-		}
-		if replicaZoneAddr == "" {
-			log.Info("getZMLeaderAddr() replicaZoneAddr has no leader now.")
-			return ErrNoMSLeader
-		}
-
-		isGrabed, err := partitionInCluster.grabPartitionTaskLock(topo.GlobalZone, "partition", string(partitionInCluster.ID))
-		if err != nil {
-			log.Error("partition grab Partition Task error, partition:[%d]", partitionInCluster.ID)
-			return err
-		}
-		if !isGrabed {
-			log.Info("partition has task now, partition:[%d]", partitionInCluster.ID)
-			return nil
-		}
-		if err := GetPMSingle(w.cluster).PushEvent(NewPartitionForceDeleteEvent(replicaZoneAddr, partitionInCluster.ID)); err != nil {
-			log.Error("fail to push event for force delete partition[%v].", partitionInCluster.ID)
-			return err
-		}
-		return nil
-	}
-
+func handleCompensation(partitionInfo *masterpb.PartitionInfo, zonesName []string, cluster *Cluster) error {
+	partitionInCluster := cluster.PartitionCache.FindPartitionById(partitionInfo.ID)
 	log.Info("partition id[%v], confVerPartitionInfo[%v], confVerPartitionInCluster[%v]", partitionInCluster.ID, partitionInfo.Epoch.ConfVersion, partitionInCluster.Epoch.ConfVersion)
-	// partitionInfo confver小于 partition元数据的confver, 说明这个版本的副本有问题, 应该删除
 	if partitionInfo.Epoch.ConfVersion < partitionInCluster.Epoch.ConfVersion {
-		// delete all replicas and leader
-		replicaZoneAddr, replica, replicaLeaderZoneAddr, err := w.getReplicaZoneAddrAndRelicaLeaderZoneAddrForDelete(nil, partitionInfo)
-		if err != nil {
-			log.Error("getReplicaZoneAddrAndRelicaLeaderZoneAddr error, err:[%v]", err)
-			return err
-		}
-		isGrabed, err := partitionInCluster.grabPartitionTaskLock(topo.GlobalZone, "partition", string(partitionInCluster.ID))
-		if err != nil {
-			log.Error("partition grab Partition Task error, partition:[%d]", partitionInCluster.ID)
-			return err
-		}
-		if !isGrabed {
-			log.Info("partition has task now, partition:[%d]", partitionInCluster.ID)
-			return nil
-		}
-		if err := GetPMSingle(w.cluster).PushEvent(NewPartitionDeleteEvent(replicaZoneAddr, replicaLeaderZoneAddr, partitionInfo.ID, replica)); err != nil {
-			log.Error("fail to push event for deleting partitionInfo[%v].", partitionInfo)
-			return err
-		}
+		// TODO add ump告警
 		return nil
 	} else if partitionInfo.Epoch.ConfVersion == partitionInCluster.Epoch.ConfVersion {
 		if partitionInCluster.ReplicaLeader != nil && partitionInfo.RaftStatus.Replica.ID == partitionInCluster.ReplicaLeader.ID {
@@ -289,25 +241,7 @@ func (w *SpaceStateTransitionWorker) handleCompensation(partitionInfo *masterpb.
 		}
 		if partitionInCluster.ReplicaLeader != nil && partitionInfo.RaftStatus.Replica.ID != partitionInCluster.ReplicaLeader.ID {
 			if partitionInfo.RaftStatus.Term < partitionInCluster.Term {
-				// delete all replicas and leader
-				replicaZoneAddr, replica, replicaLeaderZoneAddr, err := w.getReplicaZoneAddrAndRelicaLeaderZoneAddrForDelete(nil, partitionInfo)
-				if err != nil {
-					log.Error("getReplicaZoneAddrAndRelicaLeaderZoneAddr error, err:[%v]", err)
-					return err
-				}
-				isGrabed, err := partitionInCluster.grabPartitionTaskLock(topo.GlobalZone, "partition", string(partitionInCluster.ID))
-				if err != nil {
-					log.Error("partition grab Partition Task error, partition:[%d]", partitionInCluster.ID)
-					return err
-				}
-				if !isGrabed {
-					log.Info("partition has task now, partition:[%d]", partitionInCluster.ID)
-					return nil
-				}
-				if err := GetPMSingle(w.cluster).PushEvent(NewPartitionDeleteEvent(replicaZoneAddr, replicaLeaderZoneAddr, partitionInfo.ID, replica)); err != nil {
-					log.Error("fail to push event for deleting partitionInfo[%v].", partitionInfo)
-					return err
-				}
+				// TODO add ump告警
 				return nil
 			}
 		}
@@ -315,7 +249,7 @@ func (w *SpaceStateTransitionWorker) handleCompensation(partitionInfo *masterpb.
 	return nil
 }
 
-func (w *SpaceStateTransitionWorker) handleSpaceStateSSInit(db *DB, space *Space, partitionsMap map[metapb.PartitionID]*Partition, zonesName []string) error {
+func handleSpaceStateSSInit(db *DB, space *Space, partitionsMap map[metapb.PartitionID]*Partition, zonesName []string, cluster *Cluster) error {
 	var isSpaceReady = true
 	if partitionsMap == nil || len(partitionsMap) == 0 {
 		log.Error("space has no partition, db:[%s], space:[%s]", db.Name, space.Name)
@@ -324,7 +258,8 @@ func (w *SpaceStateTransitionWorker) handleSpaceStateSSInit(db *DB, space *Space
 	for _, partition := range partitionsMap {
 		if partition.countReplicas() < FIXED_REPLICA_NUM {
 			isSpaceReady = false
-			replicaZoneAddr, replicaZoneName, replicaLeaderZoneAddr, err := w.getReplicaZoneAddrAndRelicaLeaderZoneAddrForCreate(zonesName, partition)
+			replicaZoneName := NewZoneSelector().SelectTarget(zonesName)
+			replicaZoneAddr, replicaLeaderZoneAddr, err := getReplicaZoneAddrAndReplicaLeaderZoneAddrForCreate(replicaZoneName, partition, cluster)
 			if err != nil {
 				log.Error("getReplicaZoneAddrAndRelicaLeaderZoneAddr error, err:[%v]", err)
 				continue
@@ -338,7 +273,7 @@ func (w *SpaceStateTransitionWorker) handleSpaceStateSSInit(db *DB, space *Space
 				log.Info("partition has task now, db:[%s], space:[%s], partition:[%d]", db.Name, space.Name, partition.ID)
 				continue
 			}
-			if err := GetPMSingle(w.cluster).PushEvent(NewPartitionCreateEvent(replicaZoneAddr, replicaZoneName, replicaLeaderZoneAddr, partition)); err != nil {
+			if err := GetPMSingle(cluster).PushEvent(NewPartitionCreateEvent(replicaZoneAddr, replicaZoneName, replicaLeaderZoneAddr, partition)); err != nil {
 				log.Error("fail to push event for creating partition[%v].", partition)
 				continue
 			}
@@ -351,7 +286,7 @@ func (w *SpaceStateTransitionWorker) handleSpaceStateSSInit(db *DB, space *Space
 	return nil
 }
 
-func (w *SpaceStateTransitionWorker) handleSpaceStateSSRunning(db *DB, space *Space, partitionsMap map[metapb.PartitionID]*Partition, zonesName []string) error {
+func handleSpaceStateSSRunning(db *DB, space *Space, partitionsMap map[metapb.PartitionID]*Partition, zonesName []string) error {
 	if partitionsMap == nil || len(partitionsMap) == 0 {
 		log.Error("space has no partition, db:[%s], space:[%s]", db.Name, space.Name)
 		return nil
@@ -359,50 +294,16 @@ func (w *SpaceStateTransitionWorker) handleSpaceStateSSRunning(db *DB, space *Sp
 	for _, partition := range partitionsMap {
 		if partition.countReplicas() != FIXED_REPLICA_NUM {
 			if partition.countReplicas() < FIXED_REPLICA_NUM {
-				replicaZoneAddr, replicaZoneName, replicaLeaderZoneAddr, err := w.getReplicaZoneAddrAndRelicaLeaderZoneAddrForCreate(zonesName, partition)
-				if err != nil {
-					log.Error("getReplicaZoneAddrAndRelicaLeaderZoneAddr error, err:[%v]", err)
-					continue
-				}
-				isGrabed, err := partition.grabPartitionTaskLock(topo.GlobalZone, "partition", string(partition.ID))
-				if err != nil {
-					log.Error("Partition grab Partition Task error, db:[%s], space:[%s], partition:[%d]", db.Name, space.Name, partition.ID)
-					continue
-				}
-				if !isGrabed {
-					log.Info("partition has task now, db:[%s], space:[%s], partition:[%d]", db.Name, space.Name, partition.ID)
-					continue
-				}
-				if err := GetPMSingle(w.cluster).PushEvent(NewPartitionCreateEvent(replicaZoneAddr, replicaZoneName, replicaLeaderZoneAddr, partition)); err != nil {
-					log.Error("fail to push event for creating partition[%v].", partition)
-					continue
-				}
+				// TODO add UMP告警
 			} else if partition.countReplicas() > FIXED_REPLICA_NUM {
-				replicaZoneAddr, replica, replicaLeaderZoneAddr, err := w.getReplicaZoneAddrAndRelicaLeaderZoneAddrForDelete(partition, nil)
-				if err != nil {
-					log.Error("getReplicaZoneAddrAndRelicaLeaderZoneAddr error, err:[%v]", err)
-					continue
-				}
-				isGrabed, err := partition.grabPartitionTaskLock(topo.GlobalZone, "partition", string(partition.ID))
-				if err != nil {
-					log.Error("partition grab Partition Task error, db:[%s], space:[%s], partition:[%d]", db.Name, space.Name, partition.ID)
-					continue
-				}
-				if !isGrabed {
-					log.Info("partition has task now, db:[%s], space:[%s], partition:[%d]", db.Name, space.Name, partition.ID)
-					continue
-				}
-				if err := GetPMSingle(w.cluster).PushEvent(NewPartitionDeleteEvent(replicaZoneAddr, replicaLeaderZoneAddr, partition.ID, replica)); err != nil {
-					log.Error("fail to push event for deleting partition[%v].", partition)
-					continue
-				}
+				// TODO add UMP告警
 			}
 		}
 	}
 	return nil
 }
 
-func (w *SpaceStateTransitionWorker) handleSpaceStateSSDeleting(db *DB, space *Space, partitionsMap map[metapb.PartitionID]*Partition, zonesName []string) error {
+func handleSpaceStateSSDeleting(db *DB, space *Space, partitionsMap map[metapb.PartitionID]*Partition, zonesName []string, cluster *Cluster) error {
 	var isSpaceCanDelete = true
 	if partitionsMap == nil || len(partitionsMap) == 0 {
 		log.Error("space has no partition, db:[%s], space:[%s]", db.Name, space.Name)
@@ -411,7 +312,7 @@ func (w *SpaceStateTransitionWorker) handleSpaceStateSSDeleting(db *DB, space *S
 	for _, partition := range partitionsMap {
 		if partition.countReplicas() > 0 {
 			isSpaceCanDelete = false
-			replicaZoneAddr, replica, replicaLeaderZoneAddr, err := w.getReplicaZoneAddrAndRelicaLeaderZoneAddrForDelete(partition, nil)
+			replicaZoneAddr, replica, replicaLeaderZoneAddr, err := getReplicaZoneAddrAndReplicaLeaderZoneAddrForDelete(partition, nil, nil, cluster)
 			if err != nil {
 				log.Error("getReplicaZoneAddrAndRelicaLeaderZoneAddr error, err:[%v]", err)
 				continue
@@ -425,7 +326,7 @@ func (w *SpaceStateTransitionWorker) handleSpaceStateSSDeleting(db *DB, space *S
 				log.Info("partition has task now, db:[%s], space:[%s], partition:[%d]", db.Name, space.Name, partition.ID)
 				continue
 			}
-			if err := GetPMSingle(w.cluster).PushEvent(NewPartitionDeleteEvent(replicaZoneAddr, replicaLeaderZoneAddr, partition.ID, replica)); err != nil {
+			if err := GetPMSingle(cluster).PushEvent(NewPartitionDeleteEvent(replicaZoneAddr, replicaLeaderZoneAddr, partition.ID, replica)); err != nil {
 				log.Error("fail to push event for deleting partition[%v].", partition)
 				continue
 			}
@@ -438,8 +339,7 @@ func (w *SpaceStateTransitionWorker) handleSpaceStateSSDeleting(db *DB, space *S
 	return nil
 }
 
-func (w *SpaceStateTransitionWorker) getReplicaZoneAddrAndRelicaLeaderZoneAddrForCreate(zonesName []string, partition *Partition) (string, string, string, error) {
-	replicaZoneName := NewZoneSelector().SelectTarget(zonesName)
+func getReplicaZoneAddrAndReplicaLeaderZoneAddrForCreate(replicaZoneName string, partition *Partition, cluster *Cluster) (string, string, error) {
 	var replicaLeaderZone string
 	if partition.ReplicaLeader != nil {
 		replicaLeaderZone = partition.ReplicaLeader.Zone
@@ -447,29 +347,29 @@ func (w *SpaceStateTransitionWorker) getReplicaZoneAddrAndRelicaLeaderZoneAddrFo
 		replicaLeaderZone = replicaZoneName
 	}
 
-	replicaZoneAddr, err := w.getZMLeaderAddr(replicaZoneName, w.cluster.config.ClusterCfg.GmNodeId)
+	replicaZoneAddr, err := getZMLeaderAddr(replicaZoneName, cluster.config.ClusterCfg.GmNodeId)
 	if err != nil {
 		log.Error("getZMLeaderAddr() replicaZoneAddr error. err:[%v]", err)
-		return "", "", "", err
+		return "", "", err
 	}
 	if replicaZoneAddr == "" {
 		log.Info("getZMLeaderAddr() replicaZoneAddr has no leader now.")
-		return "", "", "", ErrNoMSLeader
+		return "", "", ErrNoMSLeader
 	}
 
-	replicaLeaderZoneAddr, err := w.getZMLeaderAddr(replicaLeaderZone, w.cluster.config.ClusterCfg.GmNodeId)
+	replicaLeaderZoneAddr, err := getZMLeaderAddr(replicaLeaderZone, cluster.config.ClusterCfg.GmNodeId)
 	if err != nil {
 		log.Error("getZMLeaderAddr() replicaLeaderZoneAddr error. err:[%v]", err)
-		return "", "", "", err
+		return "", "", err
 	}
 	if replicaLeaderZoneAddr == "" {
 		log.Info("getZMLeaderAddr() replicaLeaderZoneAddr has no leader now.")
-		return "", "", "", ErrNoMSLeader
+		return "", "", ErrNoMSLeader
 	}
-	return replicaZoneAddr, replicaZoneName, replicaLeaderZoneAddr, nil
+	return replicaZoneAddr, replicaLeaderZoneAddr, nil
 }
 
-func (w *SpaceStateTransitionWorker) getReplicaZoneAddrAndRelicaLeaderZoneAddrForDelete(partition *Partition, partitionInfo *masterpb.PartitionInfo) (string, *metapb.Replica, string, error) {
+func getReplicaZoneAddrAndReplicaLeaderZoneAddrForDelete(partition *Partition, partitionInfo *masterpb.PartitionInfo, replicaToDelete *metapb.Replica, cluster *Cluster) (string, *metapb.Replica, string, error) {
 	var replicaLeaderZone string
 	var replica *metapb.Replica
 	if partition != nil {
@@ -479,7 +379,12 @@ func (w *SpaceStateTransitionWorker) getReplicaZoneAddrAndRelicaLeaderZoneAddrFo
 			return "", nil, "", ErrNoMSLeader
 		}
 		replicaLeaderZone = partition.ReplicaLeader.Zone
-		replica = partition.pickReplicaToDelete()
+		if replicaToDelete == nil {
+			replica = partition.pickReplicaToDelete()
+		} else {
+			replica = replicaToDelete
+		}
+
 	}
 	if partitionInfo != nil {
 		log.Debug("getAddr by partitionInfo")
@@ -488,10 +393,15 @@ func (w *SpaceStateTransitionWorker) getReplicaZoneAddrAndRelicaLeaderZoneAddrFo
 			return "", nil, "", ErrNoMSLeader
 		}
 		replicaLeaderZone = partitionInfo.RaftStatus.Replica.Zone
-		replica = pickReplicaToDelete(partitionInfo)
+		if replicaToDelete == nil {
+			replica = pickReplicaToDelete(partitionInfo)
+		} else {
+			replica = replicaToDelete
+		}
 	}
+
 	replicaZoneName := replica.Zone
-	replicaZoneAddr, err := w.getZMLeaderAddr(replicaZoneName, w.cluster.config.ClusterCfg.GmNodeId)
+	replicaZoneAddr, err := getZMLeaderAddr(replicaZoneName, cluster.config.ClusterCfg.GmNodeId)
 	if err != nil {
 		log.Error("getZMLeaderAddr() replicaZoneAddr error. err:[%v]", err)
 		return "", nil, "", err
@@ -501,7 +411,7 @@ func (w *SpaceStateTransitionWorker) getReplicaZoneAddrAndRelicaLeaderZoneAddrFo
 		return "", nil, "", ErrNoMSLeader
 	}
 
-	replicaLeaderZoneAddr, err := w.getZMLeaderAddr(replicaLeaderZone, w.cluster.config.ClusterCfg.GmNodeId)
+	replicaLeaderZoneAddr, err := getZMLeaderAddr(replicaLeaderZone, cluster.config.ClusterCfg.GmNodeId)
 	if err != nil {
 		log.Error("getZMLeaderAddr() replicaLeaderZoneAddr error. err:[%v]", err)
 		return "", nil, "", err
@@ -513,15 +423,15 @@ func (w *SpaceStateTransitionWorker) getReplicaZoneAddrAndRelicaLeaderZoneAddrFo
 	return replicaZoneAddr, replica, replicaLeaderZoneAddr, nil
 }
 
-func (w *SpaceStateTransitionWorker) getZMLeaderAddr(zoneName, id string) (string, error) {
+func getZMLeaderAddr(zoneName, id string) (string, error) {
 	replicaZoneParticipation, err := TopoServer.NewMasterParticipation(zoneName, id)
 	if err != nil {
 		log.Error("TopoServer NewMasterParticipation error. err:[%v]", err)
 		return "", err
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), ETCD_TIMEOUT)
+	defer cancel()
 	replicaZoneAddr, err := replicaZoneParticipation.GetCurrentMasterID(ctx)
-	cancel()
 	if err != nil {
 		log.Error("replicaZoneParticipation GetCurrentMasterID error. err:[%v]", err)
 		return "", err
