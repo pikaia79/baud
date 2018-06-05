@@ -32,6 +32,11 @@ service MasterRpc {
     rpc ChangeLeader(ChangeLeaderRequest) returns (ChangeLeaderResponse) {}
 }
 
+service GMRpc {
+    rpc GetDB(GetDBRequest)             returns (GetDBResponse) {}
+    rpc GetSpace(GetSpaceRequest)       returns (GetSpaceResponse) {}
+}
+
 message GMaster {
     uint32      id         = 1;
     string      ip         = 2;
