@@ -1,6 +1,6 @@
-# The Architecture of BaudEngine
+# The Architecture of BAUD
 
-BaudEngine is a distributed document database.
+BaudEngine is a multi-model distributed database.
 
 ## Features
 
@@ -12,7 +12,7 @@ BaudEngine is a distributed document database.
 
 * cloud-native
 
-* multi-model
+* flexible deployment configuration
 
 ## Data Model
 
@@ -87,13 +87,7 @@ both are based on raft replication for high availability
 
 * Partition Server
 
-the writer role, i.e. Writer Partition Server (WPS)
-
-the reader role, i.e. Reader Partition Server (RPS)
-
-* Client
-
-the Go SDK directly talking with masters and PSes.
+host one or mulitple partitions of three roles: leader, sync replica, async replica
 
 * Gateway Servers
 
@@ -105,7 +99,7 @@ Router - the NoSQL gateway with ElasticSearch-compatible protocol
 
 * cluster management
 
-conainer-native - BaudEngine can be run in Kubernetes, or on bare metal. 
+conainer-native - run in Kubernetes, or on bare metal. 
 
 each zone has a DCOS/Kubernetes interface to allocate PS nodes and router nodes. 
 
@@ -113,7 +107,7 @@ each DB is allocated with its own set of PS across different zones.
 
 * BaudStorage
 
-As the shared datacenter storage, BS is mounted to store partition data, which is log-structured sorted key-value files and redo-logs (WALs). 
+As the shared datacenter storage, BS can be mounted to store partition data, which is log-structured sorted key-value files and redo-logs (WALs). 
 
 Note BaudEngine can also run on local filesystems - actually BS is transparent to BE. 
 
@@ -125,13 +119,11 @@ The partition count is planned according to the maximum write throughput that th
 
 ### replication
 
-* cross-zone replication
+raft, async, and partial
 
-Each partition has a Raft state machine located in three 'writer-role' partitionservers of different zones. Actually the writer-role partitionservers run the 'multi-raft' protocol. 
+Each partition has a Raft state machine located in three partitionservers of different zones, running the 'multi-raft' protocol. 
 
-* within-zone replication
-
-In any zone, a partition can have any number of read-only replicas, which are served by the 'Reader-Role' partitionservers reading the underlying Baudstorage files. 
+Moreover, a partition can several read-only replicas, which pull the raft log asynchronously. 
 
 ### scalability
 
@@ -147,7 +139,7 @@ Moving partitions between PS nodes for load balancing is easy by leveraging the 
 
 * scaling out/in - online re-sharding
 
-Partition splitting & merging is implemented via filtered replication. 
+Partition splitting & merging is implemented via the partial replication (filtered or merged). 
 
 However, we recommand that a space is pre-sharded and somehow over-sharded to avoid re-sharding on runtime.
 
@@ -205,20 +197,9 @@ distributed voting of PS health
 * placement driver (PD)
 
 
-### implementation
-
-based on a distributed coordination service like etcd.
-
-
 ## PartitionServer
 
-there are two PS roles, i.e. two modes of running instances: 
-
-* the writer role. participating multi-raft, a raft statemachine per partition, and logging the raft operations locally 
-
-* the reader role. just reading from BaudStorage to serve partition read-only requests
-
-### partition storage engine
+### storage engine
 
 Each partition has a storage engine for storing and indexing its objects. 
 
@@ -226,17 +207,28 @@ And the underlying storage engine should be log-structured so as to be persisted
 
 There are two pluggable storage engines: blevesearch, and kernel. 
 
-### batch operations
+* batch operations
 
 multiple writes grouped into one batch within a partition
+
+### replication engine
+
+* multi-raft
+
+* async replication
+
+### execution engine
+
 
 ### change streaming
 
 each individual change record contains the change type (insert/update/delete) and the pre and post-image of the fields modified. 
 
-## Router
+## Partition Splitting and Merging
 
-A zone has a group of router nodes as the service gateway for the application of the same zone. Note a router needs to interact with not only the zonemaster of its own zone but also the zonemasters of other zones. 
+## Distributed Transaction
+
+## Router
 
 ### query language
 
@@ -302,6 +294,18 @@ GC
 SlowLog
 
 ### Ops Center
+
+
+## Search
+
+vector space model (VSM) as the ranking model
+
+## Graph
+
+Baudengine is a native graph database - all edges are stored together with vertices (i.e. documents). 
+
+TinkerPop Gremlin
+
 
 
 ## Applications

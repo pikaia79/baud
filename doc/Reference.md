@@ -4,6 +4,8 @@
 
 ## AWS DynamoDB
 
+## Blevesearch
+
 ## CockroachDB
 
 ## Cosmos DB
