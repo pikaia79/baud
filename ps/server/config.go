@@ -18,6 +18,7 @@ type Config struct {
 	ClusterID         string        `json:"cluster-id,omitempty"`
 	NodeID            metapb.NodeID `json:"node-id,omitempty"`
 	MasterServer      string        `json:"master-server,omitempty"`
+	PartitionStore    string        `json:"partition-store,omitempty"`
 	StoreEngine       string        `json:"store-engine,omitempty"`
 	StorePath         string        `json:"store-path,omitempty"`
 	StoreOption       string        `json:"store-option,omitempty"`
@@ -36,6 +37,8 @@ type Config struct {
 	LogDir    string `json:"log-dir,omitempty"`
 	LogModule string `json:"log-module,omitempty"`
 	LogLevel  string `json:"log-level,omitempty"`
+
+	isRaftStore bool
 }
 
 // LoadConfig load server config from environment and file
@@ -53,6 +56,13 @@ func LoadConfig(conf *config.Config) *Config {
 	c.LogDir = conf.GetString("log.dir")
 	c.LogModule = conf.GetString("log.module")
 	c.LogLevel = conf.GetString("log.level")
+	c.PartitionStore = conf.GetString("partition.store")
+	if c.PartitionStore == "" {
+		c.PartitionStore = "raftstore"
+	}
+	if c.PartitionStore == "raftstore" {
+		c.isRaftStore = true
+	}
 
 	if nodeID := conf.GetString("node.id"); nodeID != "" {
 		id, _ := strconv.ParseUint(nodeID, 10, 32)
@@ -100,6 +110,9 @@ func (c *Config) Validate() error {
 	if c.ClusterID == "" {
 		multierr.Append(errors.New("cluster.id not specified"))
 	}
+	if !ExistPartitionStore(c.PartitionStore) {
+		multierr.Append(fmt.Errorf("partition.store(%s) not exist", c.PartitionStore))
+	}
 	if c.StoreEngine == "" {
 		multierr.Append(errors.New("store.engine not specified"))
 	} else if !engine.Exist(c.StoreEngine) {
@@ -128,14 +141,16 @@ func (c *Config) Validate() error {
 		multierr.Append(errors.New("heartbeat.interval not specified"))
 	}
 
-	if c.RaftHeartbeatPort <= 0 {
-		multierr.Append(errors.New("raft.heartbeat.port not specified"))
-	}
-	if c.RaftReplicatePort <= 0 {
-		multierr.Append(errors.New("raft.repl.port not specified"))
-	}
-	if c.RaftHeartbeatInterval <= 0 {
-		multierr.Append(errors.New("raft.heartbeat.interval not specified"))
+	if c.isRaftStore {
+		if c.RaftHeartbeatPort <= 0 {
+			multierr.Append(errors.New("raft.heartbeat.port not specified"))
+		}
+		if c.RaftReplicatePort <= 0 {
+			multierr.Append(errors.New("raft.repl.port not specified"))
+		}
+		if c.RaftHeartbeatInterval <= 0 {
+			multierr.Append(errors.New("raft.heartbeat.interval not specified"))
+		}
 	}
 
 	return multierr.ErrorOrNil()

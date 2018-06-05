@@ -126,8 +126,8 @@
     "table",
     "y"
   ]
-  revision = "3ff1bfbb11c02c78c11269096669396c2d2cbbd3"
-  version = "v1.5.0"
+  revision = "690400e629977977ecddfa8ab3a7f9285e1041a8"
+  version = "v1.5.1"
 
 [[projects]]
   branch = "master"
@@ -293,8 +293,8 @@
     "mem",
     "net"
   ]
-  revision = "c95755e4bcd7a62bb8bd33f3a597a7c7f35e2cf3"
-  version = "v2.18.04"
+  revision = "eeb1d38d69593f121e060d24d17f7b1f0936b203"
+  version = "v2.18.05"
 
 [[projects]]
   name = "github.com/smartystreets/assertions"
@@ -410,7 +410,7 @@
   branch = "master"
   name = "google.golang.org/genproto"
   packages = ["googleapis/rpc/status"]
-  revision = "4065a77fc542a455295382a23a996a08ed18813a"
+  revision = "81158efcc9f219c511e4d3c0d61a0e6e49c01a24"
 
 [[projects]]
   name = "google.golang.org/grpc"
@@ -452,9 +452,38 @@
   packages = ["."]
   revision = "d3ae77c26ac8db90639677e4831a728d33c36111"
 
+[[projects]]
+  name = "vitess.io/vitess"
+  packages = [
+    "go/bytes2",
+    "go/cache",
+    "go/event",
+    "go/hack",
+    "go/mysql",
+    "go/netutil",
+    "go/sqltypes",
+    "go/stats",
+    "go/sync2",
+    "go/tb",
+    "go/vt/log",
+    "go/vt/logutil",
+    "go/vt/proto/binlogdata",
+    "go/vt/proto/logutil",
+    "go/vt/proto/query",
+    "go/vt/proto/replicationdata",
+    "go/vt/proto/topodata",
+    "go/vt/proto/vtgate",
+    "go/vt/proto/vtrpc",
+    "go/vt/sqlparser",
+    "go/vt/vterrors",
+    "go/vt/vttls"
+  ]
+  revision = "66e84fadcc1a7e956e7ffcebcaaba0b04132ca1f"
+  version = "v2.2"
+
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "8b43b41fe49bce4f3610b587dc41b202a3a9c4e1f2d562456a91d291d7727e04"
+  inputs-digest = "aaefe71fb684029d37c6fae566fab0052561bfe8be7c911286b937f1e7546a84"
   solver-name = "gps-cdcl"
   solver-version = 1

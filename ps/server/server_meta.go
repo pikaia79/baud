@@ -5,7 +5,6 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
-
 	"strconv"
 
 	"github.com/tiglabs/baudengine/proto/metapb"
