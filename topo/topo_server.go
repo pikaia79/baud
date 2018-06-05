@@ -161,7 +161,7 @@ func OpenServer(implementation, globalServerAddrs, globalRootDir string) (*TopoS
 
 	backend, err := factory(globalServerAddrs, globalRootDir)
 	if err != nil {
-		log.Error("Fail to create etcd3 server. err[%v]", err)
+		log.Error("Fail to create server for impl[%s]. err[%v]", implementation, err)
 		return nil, err
 	}
 	return &TopoServer{
