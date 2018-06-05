@@ -377,6 +377,23 @@ func (c *Cluster) CreateDb(dbName string) (*DB, error) {
 	return db, nil
 }
 
+func (c *Cluster) DeleteDb(dbName string) error {
+	c.clusterLock.Lock()
+	defer c.clusterLock.Unlock()
+
+	db := c.DbCache.FindDbByName(dbName)
+	if db == nil {
+		return ErrDbNotExists
+	}
+
+	if err := db.erase(); err != nil {
+		return err
+	}
+	c.DbCache.DeleteDb(db)
+
+	return nil
+}
+
 func (c *Cluster) RenameDb(srcDbName, destDbName string) error {
 	c.clusterLock.Lock()
 	defer c.clusterLock.Unlock()
@@ -396,23 +413,6 @@ func (c *Cluster) RenameDb(srcDbName, destDbName string) error {
 		return err
 	}
 	c.DbCache.AddDb(srcDb)
-
-	return nil
-}
-
-func (c *Cluster) DeleteDb(dbName string) error {
-	c.clusterLock.Lock()
-	defer c.clusterLock.Unlock()
-
-	db := c.DbCache.FindDbByName(dbName)
-	if db == nil {
-		return ErrDbNotExists
-	}
-
-	if err := db.erase(); err != nil {
-		return err
-	}
-	c.DbCache.DeleteDb(db)
 
 	return nil
 }
@@ -461,6 +461,30 @@ func (c *Cluster) CreateSpace(dbName, spaceName, spaceSchema string, policy *Par
 	return space, nil
 }
 
+func (c *Cluster) DeleteSpace(dbName, spaceName string) error {
+	c.clusterLock.Lock()
+	defer c.clusterLock.Unlock()
+
+	db := c.DbCache.FindDbByName(dbName)
+	if db == nil {
+		return ErrDbNotExists
+	}
+	space := db.SpaceCache.FindSpaceByName(spaceName)
+	if space == nil {
+		return ErrSpaceNotExists
+	}
+
+	if err := space.erase(); err != nil {
+		return err
+	}
+	db.SpaceCache.DeleteSpace(space)
+	for _, partition := range space.partitions {
+		c.PartitionCache.DeletePartition(partition.PartitionTopo.Partition.ID)
+	}
+
+	return nil
+}
+
 func (c *Cluster) RenameSpace(dbName, srcSpaceName, destSpaceName string) error {
 	c.clusterLock.Lock()
 	defer c.clusterLock.Unlock()
@@ -489,25 +513,101 @@ func (c *Cluster) RenameSpace(dbName, srcSpaceName, destSpaceName string) error 
 	return nil
 }
 
-func (c *Cluster) DeleteSpace(dbName, spaceName string) error {
+// replica
+func (c *Cluster) CreateReplica(partitionId metapb.PartitionID, replicaZoneName string) error {
 	c.clusterLock.Lock()
 	defer c.clusterLock.Unlock()
 
-	db := c.DbCache.FindDbByName(dbName)
-	if db == nil {
+	partition := c.PartitionCache.FindPartitionById(partitionId)
+	if partition == nil {
+		log.Error("partition not found, partitionId:[%d]", partitionId)
+		return ErrPartitionNotExists
+	}
+	db := c.DbCache.FindDbById(partition.DB)
+	if partition == nil {
+		log.Error("db not found, dbId:[%d]", partition.DB)
 		return ErrDbNotExists
 	}
-	space := db.SpaceCache.FindSpaceByName(spaceName)
+	space := db.SpaceCache.FindSpaceById(partition.Space)
 	if space == nil {
+		log.Error("space not found, spaceId:[%d]", partition.Space)
 		return ErrSpaceNotExists
 	}
 
-	if err := space.erase(); err != nil {
+	replicaZoneAddr, replicaLeaderZoneAddr, err := getReplicaZoneAddrAndReplicaLeaderZoneAddrForCreate(replicaZoneName, partition, c)
+	if err != nil {
+		log.Error("getReplicaZoneAddrAndRelicaLeaderZoneAddr error, err:[%v]", err)
 		return err
 	}
-	db.SpaceCache.DeleteSpace(space)
-	for _, partition := range space.partitions {
-		c.PartitionCache.DeletePartition(partition.PartitionTopo.Partition.ID)
+	isGrabed, err := partition.grabPartitionTaskLock(topo.GlobalZone, "partition", string(partition.ID))
+	if err != nil {
+		log.Error("partition grab Partition Task error, db:[%s], space:[%s], partition:[%d]", db.Name, space.Name, partition.ID)
+		return err
+	}
+	if !isGrabed {
+		log.Info("partition has task now, db:[%s], space:[%s], partition:[%d]", db.Name, space.Name, partition.ID)
+		return ErrPartitionHasTaskNow
+	}
+	if err := GetPMSingle(c).PushEvent(NewPartitionCreateEvent(replicaZoneAddr, replicaZoneName, replicaLeaderZoneAddr, partition)); err != nil {
+		log.Error("fail to push event for creating partition[%v].", partition)
+		return ErrInternalError
+	}
+
+	return nil
+}
+
+func (c *Cluster) DeleteReplica(partitionId metapb.PartitionID, replicaId metapb.ReplicaID) error {
+	c.clusterLock.Lock()
+	defer c.clusterLock.Unlock()
+
+	partition := c.PartitionCache.FindPartitionById(partitionId)
+	if partition == nil {
+		log.Error("partition not found, partitionId:[%d]", partitionId)
+		return ErrPartitionNotExists
+	}
+	db := c.DbCache.FindDbById(partition.DB)
+	if partition == nil {
+		log.Error("db not found, dbId:[%d]", partition.DB)
+		return ErrDbNotExists
+	}
+	space := db.SpaceCache.FindSpaceById(partition.Space)
+	if space == nil {
+		log.Error("space not found, spaceId:[%d]", partition.Space)
+		return ErrSpaceNotExists
+	}
+	if partition.ReplicaLeader != nil && partition.ReplicaLeader.ID == replicaId {
+		log.Error("partition replica leader can't delete, partitionId:[%d], replicaId:[%d]", partitionId, replicaId)
+		return ErrPartitionReplicaLeaderNotDelete
+	}
+	var replicaToDelete *metapb.Replica
+	for _, replica := range partition.Replicas {
+		if replica.ID == replicaId {
+			replicaToDelete = &replica
+			break
+		}
+	}
+	if replicaToDelete == nil {
+		log.Error("partition replica not exist, partitionId:[%d], replicaId:[%d]", partitionId, replicaId)
+		return ErrReplicaNotExists
+	}
+
+	replicaZoneAddr, replica, replicaLeaderZoneAddr, err := getReplicaZoneAddrAndReplicaLeaderZoneAddrForDelete(partition, nil, replicaToDelete, c)
+	if err != nil {
+		log.Error("getReplicaZoneAddrAndRelicaLeaderZoneAddr error, err:[%v]", err)
+		return err
+	}
+	isGrabed, err := partition.grabPartitionTaskLock(topo.GlobalZone, "partition", string(partition.ID))
+	if err != nil {
+		log.Error("partition grab Partition Task error, db:[%s], space:[%s], partition:[%d]", db.Name, space.Name, partition.ID)
+		return err
+	}
+	if !isGrabed {
+		log.Info("partition has task now, db:[%s], space:[%s], partition:[%d]", db.Name, space.Name, partition.ID)
+		return ErrPartitionHasTaskNow
+	}
+	if err := GetPMSingle(c).PushEvent(NewPartitionDeleteEvent(replicaZoneAddr, replicaLeaderZoneAddr, partition.ID, replica)); err != nil {
+		log.Error("fail to push event for deleting partition[%v].", partition)
+		return ErrInternalError
 	}
 
 	return nil

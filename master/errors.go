@@ -1,4 +1,4 @@
-package gm
+package master
 
 import (
 	"github.com/pkg/errors"
@@ -16,21 +16,15 @@ var (
 	ErrNotMSLeader   = errors.New("the master node is not a leader")
 	ErrNoMSLeader    = errors.New("the master cluster have no a leader")
 
-	ErrZoneNotExists                   = errors.New("zone not exists")
-	ErrDupZone                         = errors.New("duplicated zone")
-	ErrDupDb                           = errors.New("duplicated database")
-	ErrDbNotExists                     = errors.New("db not exists")
-	ErrDupSpace                        = errors.New("duplicated space")
-	ErrSpaceNotExists                  = errors.New("space not exists")
-	ErrPartitionNotExists              = errors.New("partition not exists")
-	ErrPartitionHasTaskNow             = errors.New("partition has task now")
-	ErrReplicaNotExists                = errors.New("replica not exists")
-	ErrPartitionReplicaLeaderNotDelete = errors.New("partition replica leader can not delete")
-	ErrPSNotExists                     = errors.New("partition server is not exists")
-	ErrGenIdFailed                     = errors.New("generate id is failed")
-	ErrLocalDbOpsFailed                = errors.New("local storage db operation error")
-	ErrUnknownRaftCmdType              = errors.New("unknown raft command type")
-	ErrRouteNotFound                   = errors.New("route not found")
+	ErrDupDb              = errors.New("duplicated database")
+	ErrDbNotExists        = errors.New("db not exists")
+	ErrDupSpace           = errors.New("duplicated space")
+	ErrSpaceNotExists     = errors.New("space not exists")
+	ErrPSNotExists        = errors.New("partition server is not exists")
+	ErrGenIdFailed        = errors.New("generate id is failed")
+	ErrLocalDbOpsFailed   = errors.New("local storage db operation error")
+	ErrUnknownRaftCmdType = errors.New("unknown raft command type")
+	ErrRouteNotFound      = errors.New("route not found")
 
 	ErrRpcGetClientFailed  = errors.New("get rpc client handle is failed")
 	ErrRpcInvalidResp      = errors.New("invalid rpc response")
@@ -49,8 +43,6 @@ var (
 	ErrRaftNoSnapshotHandler      = errors.New("raft group not register snapshot handler")
 	ErrRaftNoApplySnapshotHandler = errors.New("raft group not register apply snapshot handler")
 	ErrRaftUnknownResponseType    = errors.New("unknown response type")
-
-	ErrMethodNotImplement = errors.New("method mot implement")
 )
 
 // http response error code and error message definitions
@@ -72,8 +64,6 @@ const (
 	ERRCODE_GENID_FAILED
 	ERRCODE_LOCALDB_OPTFAILED
 
-	ERRCODE_METHOD_NOT_IMPLEMENT
-
 //	ERRCODE_UNKNOWN_RAFTCMDTYPE
 )
 
@@ -92,9 +82,8 @@ var Err2CodeMap = map[error]int32{
 	ErrSpaceNotExists: ERRCODE_SPACE_NOTEXISTS,
 	ErrPSNotExists:    ERRCODE_PS_NOTEXISTS,
 
-	ErrGenIdFailed:        ERRCODE_GENID_FAILED,
-	ErrLocalDbOpsFailed:   ERRCODE_LOCALDB_OPTFAILED,
-	ErrMethodNotImplement: ERRCODE_METHOD_NOT_IMPLEMENT,
+	ErrGenIdFailed:      ERRCODE_GENID_FAILED,
+	ErrLocalDbOpsFailed: ERRCODE_LOCALDB_OPTFAILED,
 }
 
 var Err2RpcCodeMap = map[error]metapb.RespCode{
@@ -108,7 +97,6 @@ var Err2RpcCodeMap = map[error]metapb.RespCode{
 	ErrSpaceNotExists:      metapb.MASTER_RESP_CODE_ROUTE_NOTEXISTS,
 	ErrRpcEmptyFollowers:   metapb.MASTER_RESP_CODE_EMPTY_FOLLOWERS,
 	ErrRpcNoFollowerLeader: metapb.MASTER_RESP_CODE_NO_FOLLOWER_LEADER,
-	ErrMethodNotImplement:  metapb.MASTER_RESP_CODE_METHOD_NOT_IMPLEMENT,
 }
 
 func makeRpcRespHeader(err error) *metapb.ResponseHeader {
