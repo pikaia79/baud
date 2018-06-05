@@ -10,49 +10,26 @@ import (
 )
 
 const (
-	// GlobalCell is the name of the global cell.  It is special
-	// as it contains the global topology, and references the other cells.
+	// zone name for global master
 	GlobalZone = "global"
 )
 
-// Backend defines the interface that must be implemented by topology
-// plug-ins to be used with Vitess.
-//
-// Zookeeper is a good example of an implementation, as defined in
-// go/vt/topo/zk2topo.
-//
-// This API is very generic, and key/value store oriented.  We use
-// regular paths for object names, and we can list all immediate
-// children of a path. All paths sent through this API are relative
-// paths, from the root directory of the cell.
-//
-// FIXME(alainjobart) add all parts of the API, implement them all for
-// all our current systems, and convert the higher levels to talk to
-// this API. This is a long-term project.
+// Backend defines the interface that must be implemented by etcd3, zookeeper, consul etc.
+// cell is the equivalent of zone, it represents a logic IDC
 type Backend interface {
 	Close()
 
-	//
-	// Directory support
-	//
-
-	// ListDir returns the entries in a directory.  The returned
-	// list should be sorted (by sort.Strings for instance).
-	// If there are no files under the provided path, returns ErrNoNode.
-	// dirPath is a path relative to the root directory of the cell.
+	// return sub directories in dirPath, and revision of dirPath
 	ListDir(ctx context.Context, cell, dirPath string) ([]string, Version, error)
 
 	WatchDir(ctx context.Context, cell, dirPath string, version Version) (<-chan *WatchData, CancelFunc, error)
-	//
-	// File support
-	// if version == nil, then it’s an unconditional update / delete.
-	//
 
 	// Create creates the initial version of a file.
 	// Returns ErrNodeExists if the file exists.
-	// filePath is a path relative to the root directory of the cell.
+	// Return error when the file node already exists.
 	Create(ctx context.Context, cell, filePath string, contents []byte) (Version, error)
 
+	// cretate an ephemeral directory with timeout
 	CreateUniqueEphemeral(ctx context.Context, cell string, filePath string, contents []byte,
 		timeout time.Duration) (Version, error)
 
