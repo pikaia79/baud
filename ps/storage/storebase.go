@@ -8,7 +8,6 @@ import (
 	"github.com/tiglabs/baudengine/engine"
 	"github.com/tiglabs/baudengine/proto/masterpb"
 	"github.com/tiglabs/baudengine/proto/metapb"
-	"github.com/tiglabs/baudengine/ps/server"
 )
 
 var (
@@ -22,9 +21,11 @@ type StoreBase struct {
 	Ctx       context.Context
 	CtxCancel context.CancelFunc
 
-	Server    *server.Server
-	Engine    engine.Engine
-	CloseOnce sync.Once
+	NodeID     metapb.NodeID
+	EngineName string
+	Engine     engine.Engine
+	EngineConf engine.EngineConfig
+	CloseOnce  sync.Once
 
 	Meta  metapb.Partition
 	Stats masterpb.PartitionStats

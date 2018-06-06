@@ -59,7 +59,7 @@ func (s *Store) checkReadable(readLeader bool) (err error) {
 		err = &metapb.NoLeader{s.Meta.ID}
 		goto ret
 	}
-	if readLeader && s.Leader != uint64(s.Server.NodeID) {
+	if readLeader && s.Leader != uint64(s.NodeID) {
 		err = &metapb.NotLeader{
 			PartitionID: s.Meta.ID,
 			Leader:      metapb.NodeID(s.Leader),

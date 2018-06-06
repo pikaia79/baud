@@ -7,7 +7,6 @@ import (
 	"github.com/tiglabs/baudengine/engine"
 	"github.com/tiglabs/baudengine/proto/masterpb"
 	"github.com/tiglabs/baudengine/proto/metapb"
-	"github.com/tiglabs/baudengine/ps/server"
 	"github.com/tiglabs/baudengine/ps/storage"
 	"github.com/tiglabs/baudengine/util/log"
 	"github.com/tiglabs/raft"
@@ -18,43 +17,47 @@ import (
 // Store is a contiguous slotspace with writes managed via an instance of the Raft consensus algorithm.
 type Store struct {
 	storage.StoreBase
-	Leader     uint64
-	LeaderAddr string
+	RaftPath      string
+	Leader        uint64
+	LeaderAddr    string
+	RaftConfig    *raft.Config
+	RaftServer    *raft.RaftServer
+	EventListener EventListener
 }
 
-func init() {
-	server.RegisterPartitionStore("raftstore", BuildStore)
+type StoreConfig struct {
+	engine.EngineConfig
+	EngineName string
+	Meta       metapb.Partition
+	NodeID     metapb.NodeID
+
+	RaftPath   string
+	RaftConfig *raft.Config
+	RaftServer *raft.RaftServer
+
+	EventListener EventListener
 }
 
-// BuildStore create an instance of Store.
-func BuildStore(server *server.Server, meta metapb.Partition) (server.PartitionStore, error) {
+// CreateStore create an instance of Store.
+func CreateStore(ctx context.Context, conf *StoreConfig) *Store {
 	s := new(Store)
-	s.Server = server
-	s.Meta = meta
+	s.NodeID = conf.NodeID
+	s.EngineName = conf.EngineName
+	s.EngineConf = conf.EngineConfig
+	s.Meta = conf.Meta
+	s.RaftPath = conf.RaftPath
+	s.RaftConfig = conf.RaftConfig
+	s.RaftServer = conf.RaftServer
+	s.EventListener = conf.EventListener
+	s.Ctx, s.CtxCancel = context.WithCancel(ctx)
 	s.Meta.Status = metapb.PA_NOTREAD
-	s.Ctx, s.CtxCancel = context.WithCancel(server.Ctx)
 
-	return s, nil
+	return s
 }
 
 // Start start the store.
 func (s *Store) Start() {
-	// create and open the underlying engine
-	dataPath, raftPath, err := s.Server.CreateDataAndRaftPath(s.Meta.ID)
-	if err != nil {
-		s.Lock()
-		s.Meta.Status = metapb.PA_INVALID
-		s.Unlock()
-		log.Error("start partition[%d] create data and raft path error: %s", s.Meta.ID, err)
-		return
-	}
-
-	engineOpt := engine.EngineConfig{
-		ReadOnly:     false,
-		Path:         dataPath,
-		ExtraOptions: s.Server.StoreOption,
-	}
-	engine, err := engine.Build(s.Server.StoreEngine, engineOpt)
+	engine, err := engine.Build(s.EngineName, s.EngineConf)
 	if err != nil {
 		s.Lock()
 		s.Meta.Status = metapb.PA_INVALID
@@ -75,7 +78,7 @@ func (s *Store) Start() {
 	}
 
 	// create and open raft replication
-	raftStore, err := wal.NewStorage(raftPath, nil)
+	raftStore, err := wal.NewStorage(s.RaftPath, nil)
 	if err != nil {
 		s.Lock()
 		s.Meta.Status = metapb.PA_INVALID
@@ -97,7 +100,7 @@ func (s *Store) Start() {
 		peer := proto.Peer{Type: proto.PeerNormal, ID: uint64(repl.NodeID)}
 		raftConf.Peers = append(raftConf.Peers, peer)
 	}
-	if s.Server.RaftServer.CreateRaft(raftConf); err != nil {
+	if s.RaftServer.CreateRaft(raftConf); err != nil {
 		s.Lock()
 		s.Meta.Status = metapb.PA_INVALID
 		s.Unlock()
@@ -121,7 +124,7 @@ func (s *Store) Close() error {
 		s.Unlock()
 
 		s.CtxCancel()
-		s.Server.RaftServer.RemoveRaft(s.Meta.ID)
+		s.RaftServer.RemoveRaft(s.Meta.ID)
 		if s.Engine != nil {
 			s.Engine.Close()
 			s.Engine = nil
@@ -136,7 +139,7 @@ func (s *Store) GetStats() *masterpb.PartitionInfo {
 	s.RLock()
 	info := new(masterpb.PartitionInfo)
 	info.ID = s.Meta.ID
-	info.IsLeader = (s.Leader == uint64(s.Server.NodeID))
+	info.IsLeader = (s.Leader == uint64(s.NodeID))
 	info.Status = s.Meta.Status
 	info.Epoch = s.Meta.Epoch
 	info.Statistics = s.Stats
@@ -144,10 +147,10 @@ func (s *Store) GetStats() *masterpb.PartitionInfo {
 	s.RUnlock()
 
 	if info.IsLeader {
-		raftStatus := s.Server.RaftServer.Status(s.Meta.ID)
+		raftStatus := s.RaftServer.Status(s.Meta.ID)
 		info.RaftStatus = new(masterpb.RaftStatus)
 		for _, repl := range replicas {
-			if repl.NodeID == s.Server.NodeID {
+			if repl.NodeID == s.NodeID {
 				info.RaftStatus.Replica = repl
 				info.RaftStatus.Term = raftStatus.Term
 				info.RaftStatus.Index = raftStatus.Index
@@ -164,7 +167,7 @@ func (s *Store) GetStats() *masterpb.PartitionInfo {
 					}
 					since := time.Since(replStatus.LastActive)
 					// 两次心跳内没活跃就视为Down
-					downDuration := since - time.Duration(2*s.Server.RaftConfig.HeartbeatTick)*s.Server.RaftConfig.TickInterval
+					downDuration := since - time.Duration(2*s.RaftConfig.HeartbeatTick)*s.RaftConfig.TickInterval
 					if downDuration > 0 {
 						follower.DownSeconds = uint64(downDuration / time.Second)
 					}
