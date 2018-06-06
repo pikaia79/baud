@@ -75,7 +75,7 @@ func (s *Server) ChangeReplica(ctx context.Context, request *pspb.ChangeReplicaR
 		response.Message = fmt.Sprintf("node[%d] has not found partition[%d]", s.NodeID, request.PartitionID)
 		return response, nil
 	}
-	if !s.RaftServer.IsLeader(request.PartitionID) {
+	if !s.raftServer.IsLeader(request.PartitionID) {
 		response.Code = metapb.PS_RESP_CODE_NOT_LEADER
 		response.Message = fmt.Sprintf("node[%d] is not leader of partition[%d]", s.NodeID, request.PartitionID)
 		return response, nil
@@ -90,7 +90,7 @@ func (s *Server) ChangeReplica(ctx context.Context, request *pspb.ChangeReplicaR
 	}
 	peer := raftproto.Peer{Type: raftproto.PeerNormal, ID: uint64(request.Replica.NodeID), PeerID: request.Replica.ID}
 	ctxData, _ := request.Replica.Marshal()
-	s.RaftServer.ChangeMember(request.PartitionID, ccType, peer, ctxData)
+	s.raftServer.ChangeMember(request.PartitionID, ccType, peer, ctxData)
 
 	return response, nil
 }
@@ -115,17 +115,22 @@ func (s *Server) ChangeLeader(ctx context.Context, request *pspb.ChangeLeaderReq
 		return response, nil
 	}
 
-	s.RaftServer.TryToLeader(request.PartitionID)
+	s.raftServer.TryToLeader(request.PartitionID)
 	return response, nil
 }
 
 func (s *Server) doPartitionCreate(p metapb.Partition) {
-	partition, _ := BuildPartitionStore(s.PartitionStore, s, p)
+	partition, err := s.CreatePartitionStore(p)
+	if err != nil {
+		log.Error("create partition error:%s", err)
+		return
+	}
+
 	if _, ok := s.partitions.LoadOrStore(p.ID, partition); ok {
 		partition.Close()
 	} else {
 		for _, r := range p.Replicas {
-			s.RaftResolver.AddNode(r.NodeID, r.ReplicaAddrs)
+			s.raftResolver.AddNode(r.NodeID, r.ReplicaAddrs)
 		}
 
 		partition.Start()
@@ -138,7 +143,7 @@ func (s *Server) doPartitionDelete(id metapb.PartitionID) {
 		p.(PartitionStore).Close()
 
 		for _, r := range p.(PartitionStore).GetMeta().Replicas {
-			s.RaftResolver.DeleteNode(r.NodeID)
+			s.raftResolver.DeleteNode(r.NodeID)
 		}
 	}
 
@@ -170,7 +175,7 @@ func (s *Server) reset() {
 func (s *Server) adminEventHandler() {
 	for {
 		select {
-		case <-s.Ctx.Done():
+		case <-s.ctx.Done():
 			return
 
 		case event := <-s.adminEventCh:
@@ -196,10 +201,10 @@ func (s *Server) doAdminEvent(event proto.Message) {
 		}
 
 		s.doPartitionCreate(e.Partition)
-		s.MasterHeartbeat.Trigger()
+		s.masterHeartbeat.trigger()
 
 	case *pspb.DeletePartitionRequest:
 		s.doPartitionDelete(e.ID)
-		s.MasterHeartbeat.Trigger()
+		s.masterHeartbeat.trigger()
 	}
 }

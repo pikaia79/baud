@@ -43,7 +43,7 @@ func (s *Store) ApplyMemberChange(confChange *proto.ConfChange, index uint64) (i
 
 		replica := new(metapb.Replica)
 		replica.Unmarshal(confChange.Context)
-		s.Server.RaftResolver.AddNode(replica.NodeID, replica.ReplicaAddrs)
+		s.EventListener.HandleRaftReplicaEvent(&RaftReplicaEvent{Replica: replica})
 
 		s.Meta.Epoch.ConfVersion++
 		s.Meta.Replicas = append(s.Meta.Replicas, *replica)
@@ -51,7 +51,7 @@ func (s *Store) ApplyMemberChange(confChange *proto.ConfChange, index uint64) (i
 	case proto.ConfRemoveNode:
 		replica := new(metapb.Replica)
 		replica.Unmarshal(confChange.Context)
-		s.Server.RaftResolver.DeleteNode(replica.NodeID)
+		s.EventListener.HandleRaftReplicaEvent(&RaftReplicaEvent{Delete: true, Replica: replica})
 
 		s.Meta.Epoch.ConfVersion++
 		replicas := make([]metapb.Replica, 0, len(s.Meta.Replicas)-1)
@@ -97,14 +97,14 @@ func (s *Store) HandleLeaderChange(leader uint64) {
 			}
 		}
 
-		_, term := s.Server.RaftServer.LeaderTerm(s.Meta.ID)
+		_, term := s.RaftServer.LeaderTerm(s.Meta.ID)
 		if s.Meta.Epoch.Version < term {
 			s.Meta.Epoch.Version = term
 		}
 
-		if leader == uint64(s.Server.NodeID) {
+		if leader == uint64(s.NodeID) {
 			s.Meta.Status = metapb.PA_READWRITE
-			s.Server.MasterHeartbeat.Trigger()
+			s.EventListener.HandleRaftLeaderEvent(&RaftLeaderEvent{Store: s})
 		} else {
 			s.Meta.Status = metapb.PA_READONLY
 		}
@@ -118,5 +118,8 @@ func (s *Store) HandleLeaderChange(leader uint64) {
 func (s *Store) HandleFatalEvent(err *raft.FatalError) {
 	log.Error("partition[%d] occur fatal error: %s", s.Meta.ID, err.Err)
 	s.Close()
-	s.Server.MasterHeartbeat.Trigger()
+	s.EventListener.HandleRaftFatalEvent(&RaftFatalEvent{
+		Store: s,
+		Cause: err.Err,
+	})
 }

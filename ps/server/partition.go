@@ -1,13 +1,13 @@
 package server
 
 import (
-	"errors"
 	"fmt"
 
 	"github.com/tiglabs/baudengine/engine"
 	"github.com/tiglabs/baudengine/proto/masterpb"
 	"github.com/tiglabs/baudengine/proto/metapb"
 	"github.com/tiglabs/baudengine/proto/pspb"
+	"github.com/tiglabs/baudengine/ps/storage/raftstore"
 )
 
 type PartitionStore interface {
@@ -21,46 +21,46 @@ type PartitionStore interface {
 	Bulk(requests []pspb.RequestUnion, timeout string) (responses []pspb.ResponseUnion, err error)
 }
 
-// PartitionStoreBuilder is used to build the PartitionStore.
-type PartitionStoreBuilder func(server *Server, meta metapb.Partition) (PartitionStore, error)
+func (s *Server) CreatePartitionStore(p metapb.Partition) (PartitionStore, error) {
+	switch s.PartitionStore {
+	case "raftstore":
+		dataPath, raftPath, err := s.meta.getDataAndRaftPath(p.ID)
+		if err != nil {
+			return nil, err
+		}
 
-var (
-	partitionStores = make(map[string]PartitionStoreBuilder, 8)
+		conf := new(raftstore.StoreConfig)
+		conf.EngineConfig = engine.EngineConfig{
+			Path:         dataPath,
+			ReadOnly:     false,
+			ExtraOptions: s.StoreOption,
+		}
+		conf.EngineName = s.StoreEngine
+		conf.Meta = p
+		conf.NodeID = s.NodeID
+		conf.RaftPath = raftPath
+		conf.RaftConfig = s.raftConfig
+		conf.RaftServer = s.raftServer
+		conf.EventListener = s
+		return raftstore.CreateStore(s.ctx, conf), nil
 
-	errorNameInvalid = errors.New("Registration name is invalid")
-)
-
-// RegisterPartitionStore is used to register the PartitionStore implementers in the initialization phase.
-func RegisterPartitionStore(name string, builder PartitionStoreBuilder) {
-	if name == "" || builder == nil {
-		panic("Registration name and builder cannot be empty")
+	default:
+		return nil, fmt.Errorf("unsupport partition store type: %s", s.PartitionStore)
 	}
-	if _, ok := partitionStores[name]; ok {
-		panic(fmt.Sprintf("Duplicate registration engine name for %s", name))
-	}
-
-	partitionStores[name] = builder
 }
 
-// BuildPartitionStore create an PartitionStore based on the specified name.
-func BuildPartitionStore(name string, server *Server, meta metapb.Partition) (s PartitionStore, err error) {
-	if name == "" {
-		return nil, errorNameInvalid
-	}
-
-	if builder := partitionStores[name]; builder != nil {
-		s, err = builder(server, meta)
+func (s *Server) HandleRaftReplicaEvent(event *raftstore.RaftReplicaEvent) {
+	if event.Delete {
+		s.raftResolver.DeleteNode(event.Replica.NodeID)
 	} else {
-		err = fmt.Errorf("Registered engine[%s] does not exist", name)
+		s.raftResolver.AddNode(event.Replica.NodeID, event.Replica.ReplicaAddrs)
 	}
-	return
 }
 
-// ExistPartitionStore return whether the PartitionStore exists.
-func ExistPartitionStore(name string) bool {
-	if builder := partitionStores[name]; builder != nil {
-		return true
-	}
+func (s *Server) HandleRaftLeaderEvent(event *raftstore.RaftLeaderEvent) {
+	s.masterHeartbeat.trigger()
+}
 
-	return false
+func (s *Server) HandleRaftFatalEvent(event *raftstore.RaftFatalEvent) {
+	s.masterHeartbeat.trigger()
 }

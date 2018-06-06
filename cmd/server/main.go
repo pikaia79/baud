@@ -8,7 +8,6 @@ import (
 	"gopkg.in/urfave/cli.v2"
 
 	ps "github.com/tiglabs/baudengine/ps/server"
-	_ "github.com/tiglabs/baudengine/ps/storage/raftstore"
 	"github.com/tiglabs/baudengine/util/config"
 	"github.com/tiglabs/baudengine/util/log"
 	"github.com/tiglabs/baudengine/util/server"

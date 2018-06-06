@@ -45,7 +45,7 @@ func (s *Store) Bulk(requests []pspb.RequestUnion, timeout string) (responses []
 		err = e
 		log.Error("marshal raftCommand error: [%s]", err)
 	} else {
-		future := s.Server.RaftServer.Submit(s.Meta.ID, data)
+		future := s.RaftServer.Submit(s.Meta.ID, data)
 		respCh, errCh := future.AsyncResponse()
 		raftCmd.Close()
 

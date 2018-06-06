@@ -110,9 +110,6 @@ func (c *Config) Validate() error {
 	if c.ClusterID == "" {
 		multierr.Append(errors.New("cluster.id not specified"))
 	}
-	if !ExistPartitionStore(c.PartitionStore) {
-		multierr.Append(fmt.Errorf("partition.store(%s) not exist", c.PartitionStore))
-	}
 	if c.StoreEngine == "" {
 		multierr.Append(errors.New("store.engine not specified"))
 	} else if !engine.Exist(c.StoreEngine) {
