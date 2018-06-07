@@ -1,9 +1,10 @@
 package query
 
 import (
-	"github.com/blevesearch/bleve/search/query"
 	"encoding/json"
 	"errors"
+
+	"github.com/blevesearch/bleve/search/query"
 )
 
 type FilteredQuery struct {

@@ -8,8 +8,8 @@ import (
 )
 
 func TestFuzzyQuery(t *testing.T) {
-	groups := []QueryTestGroup{QueryTestGroup{`{ "user" : "ki" }`,
-		func() query.Query {
+	groups := []QueryTestGroup{QueryTestGroup{input:`{ "user" : "ki" }`,
+		output: func() query.Query {
 			utq := query.NewFuzzyQuery("ki")
 			utq.SetField("user")
 			utq.SetBoost(1.0)
@@ -18,7 +18,7 @@ func TestFuzzyQuery(t *testing.T) {
 			return q
 		}(),},
 		QueryTestGroup{
-			`{
+			input: `{
         "user" : {
             "value" :         "ki",
             "boost" :         1.0,
@@ -27,7 +27,7 @@ func TestFuzzyQuery(t *testing.T) {
             "max_expansions": 100
         }
     }`,
-			func() query.Query {
+			output: func() query.Query {
 				utq := query.NewFuzzyQuery("ki")
 				utq.SetField("user")
 				utq.SetBoost(1.0)

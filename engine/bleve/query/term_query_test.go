@@ -3,33 +3,35 @@ package query
 import (
 	"testing"
 	"encoding/json"
-	"github.com/blevesearch/bleve/search/query"
 	"reflect"
+
+	"github.com/blevesearch/bleve/search/query"
 )
 
 type QueryTestGroup struct {
 	input string
 	output query.Query
+	err  error
 }
 
 func TestParseTermQuery(t *testing.T) {
-	groups := []QueryTestGroup{QueryTestGroup{`{
+	groups := []QueryTestGroup{QueryTestGroup{input:`{
             "status": {
               "value": "urgent",
               "boost": 2.0
             }
           }`,
-		func() query.Query {
+		output: func() query.Query {
 			utq := query.NewTermQuery("urgent")
 			utq.SetField("status")
 			utq.SetBoost(2.0)
 			return utq
 		}(),},
 		QueryTestGroup{
-			`{
+			input:`{
             "status": "normal"
           }`,
-			func() query.Query {
+			output: func() query.Query {
 				utq := query.NewTermQuery("normal")
 				utq.SetField("status")
 				utq.SetBoost(1.0)

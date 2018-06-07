@@ -26,6 +26,9 @@ type EngineConfig struct {
 	ReadOnly bool
 	// ExtraOptions contains extension options using a json format ("{key1:value1,key2:value2}").
 	ExtraOptions string
+
+	// Schema
+	Schema  string
 }
 
 // Register is used to register the engine implementers in the initialization phase.

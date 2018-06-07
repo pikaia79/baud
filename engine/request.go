@@ -1,6 +1,9 @@
 package engine
 
-import "encoding/json"
+import (
+	"encoding/json"
+	"time"
+)
 
 type SearchRequest struct {
 	//TODO
@@ -12,11 +15,13 @@ type SearchRequest struct {
 	Size      int    `json:"size,omitempty"`
 	// default 0
 	From      int    `json:"from,omitempty"`
-	Query     string `json:"query"`
+	Query     []byte `json:"query"`
+	Explain   bool   `json:"explain,omitempty"`
+	Timeout   time.Duration `json:"time_out,omitempty"`
 }
 
 func NewSearchQuery(_index, _type string) *SearchRequest {
-	return &SearchRequest{Index:_index, Type:_type, ProtocolType: "json", Size: 10, From: 0}
+	return &SearchRequest{Index:_index, Type:_type, ProtocolType: "json", Size: 10, From: 0, Explain: false, Timeout: 0}
 }
 
 func (r *SearchRequest) SetSize(size int) {
@@ -27,24 +32,57 @@ func (r *SearchRequest) SetFrom(from int) {
 	r.From = from
 }
 
-func (r *SearchRequest) SetQuery(query string) {
+func (r *SearchRequest) SetQuery(query []byte) {
 	r.Query = query
+}
+
+func (r *SearchRequest) SetExplain(e bool) {
+	r.Explain = e
+}
+
+func (r *SearchRequest) SetTimeout(t time.Duration) {
+	r.Timeout = t
 }
 
 func (r *SearchRequest)UnmarshalJSON(data []byte) error{
 	tmp := struct {
-		Size  int `json:"size,omitempty"`
-		From  int `json:"from,omitempty"`
+		Size  *int `json:"size,omitempty"`
+		From  *int `json:"from,omitempty"`
 		Query json.RawMessage `json:"query,omitempty"`
+		Explain   *bool   `json:"explain,omitempty"`
+		Timeout   *time.Duration `json:"time_out,omitempty"`
 	}{}
 	err := json.Unmarshal(data, &tmp)
 	if err != nil {
 		return err
 	}
-	r.SetFrom(tmp.From)
-	r.SetSize(tmp.Size)
-	r.SetQuery(string(tmp.Query))
+	if tmp.From != nil {
+		r.SetFrom(*tmp.From)
+	}
+	if tmp.Size != nil {
+		r.SetSize(*tmp.Size)
+	}
+	r.SetQuery(tmp.Query)
+	if tmp.Timeout != nil {
+		r.SetTimeout(*tmp.Timeout)
+	}
+	if tmp.Explain != nil {
+		r.SetExplain(*tmp.Explain)
+	}
 	return nil
+}
+
+func (r *SearchRequest)MarshalJSON() ([]byte, error) {
+	tmp := struct {
+		Index string   `json:"_index""`
+		Type  string   `json:"_type"`
+		// default 10
+		Size      int    `json:"size,omitempty"`
+		// default 0
+		From      int    `json:"from,omitempty"`
+		Query     string `json:"query"`
+	}{Index: r.Index, Type: r.Type, Size: r.Size, From: r.From, Query: string(r.Query)}
+	return json.Marshal(tmp)
 }
 
 func (r *SearchRequest)Parse(data []byte) (error) {

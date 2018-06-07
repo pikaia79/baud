@@ -4,10 +4,13 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"time"
 	"encoding/binary"
 
 	"github.com/blevesearch/bleve/document"
 	"github.com/tiglabs/baudengine/engine"
+	"github.com/tiglabs/baudengine/engine/bleve/query"
+	"github.com/blevesearch/bleve"
 )
 
 func(r *Bleve)GetApplyID() (uint64, error) {
@@ -73,9 +76,53 @@ func(r *Bleve)GetDocument(ctx context.Context, docID engine.DOC_ID) (engine.DOCU
 }
 
 func(r *Bleve)Search(ctx context.Context, req *engine.SearchRequest)(*engine.SearchResult, error) {
-	r.index.SearchInContext(ctx, )
+	q, err := query.ParseQuery(req.Query)
+	if err != nil {
+		return nil, err
+	}
+	searchReq := bleve.NewSearchRequestOptions(q, req.Size, req.From, req.Explain)
+	if req.Explain {
+		searchReq.Explain = true
+	}
+	result, err := r.index.SearchInContext(ctx, searchReq)
+	if err != nil {
+		return nil, err
+	}
+	res := bleveResultToBaudResult(req.Index, req.Type, result)
+	if int64(req.Timeout/time.Millisecond) < res.Took {
+		res.TimeOut = true
+	}
+	return res, nil
 }
 
 func (r *Bleve)Close() error {
 	return r.index.Close()
+}
+
+func bleveResultToBaudResult(_index, _type string, r *bleve.SearchResult) *engine.SearchResult {
+	res := &engine.SearchResult{}
+	// FIXME millisecond ???
+	res.Took = r.Took.Nanoseconds()/int64(time.Millisecond)
+	res.Shards = engine.Shards{
+		Total: r.Status.Total,
+		Successful: r.Status.Successful,
+		Failed: r.Status.Failed,
+	}
+	var hits []engine.HitDoc
+	for _, doc := range r.Hits {
+		hit := engine.HitDoc{
+			Index: _index,
+			Type: _type,
+			Id: doc.ID,
+			Score: doc.Score,
+			Source: doc.Fields,
+		}
+		hits =  append(hits, hit)
+	}
+	res.Hits = engine.Hits{
+		Total: r.Total,
+		MaxScore: r.MaxScore,
+		Hits: hits,
+	}
+	return res
 }

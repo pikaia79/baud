@@ -44,7 +44,7 @@ func TestParseRequest(t *testing.T) {
     if err != nil {
     	t.Fatal(err)
     }
-    if r.Query != query {
+    if string(r.Query) != query {
     	t.Fatal("parse failed")
     }
 }

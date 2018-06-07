@@ -8,11 +8,11 @@ import (
 )
 
 func TestIdsQuery(t *testing.T) {
-	groups := []QueryTestGroup{QueryTestGroup{`{
+	groups := []QueryTestGroup{QueryTestGroup{input:`{
         "type" : "my_type",
         "values" : ["1", "4", "100"]
     }`,
-		func() query.Query {
+		output: func() query.Query {
 			utq := query.NewDocIDQuery([]string{"1", "4", "100"})
 			q := NewIdsQuery()
 			q.SetQuery(utq)

@@ -3,8 +3,9 @@ package query
 import (
 	"testing"
 	"encoding/json"
-	"github.com/blevesearch/bleve/search/query"
 	"reflect"
+
+	"github.com/blevesearch/bleve/search/query"
 )
 
 func TestTermsQuery(t *testing.T) {

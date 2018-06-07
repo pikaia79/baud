@@ -2,22 +2,23 @@ package query
 
 import (
 	"testing"
-	"github.com/blevesearch/bleve/search/query"
 	"reflect"
 	"encoding/json"
+
+	"github.com/blevesearch/bleve/search/query"
 )
 
 func TestPrefixQuery(t *testing.T) {
-	groups := []QueryTestGroup{QueryTestGroup{`{ "user" : "ki" }`,
-		func() query.Query {
+	groups := []QueryTestGroup{QueryTestGroup{input:`{ "user" : "ki" }`,
+		output:func() query.Query {
 			utq := query.NewPrefixQuery("ki")
 			utq.SetField("user")
 			utq.SetBoost(1.0)
 			return utq
 		}(),},
 		QueryTestGroup{
-			`{ "user" :  { "value" : "ki", "boost" : 2.0 } }`,
-			func() query.Query {
+			input:`{ "user" :  { "value" : "ki", "boost" : 2.0 } }`,
+			output: func() query.Query {
 				utq := query.NewPrefixQuery("ki")
 				utq.SetField("user")
 				utq.SetBoost(2.0)
@@ -25,8 +26,8 @@ func TestPrefixQuery(t *testing.T) {
 			}(),},
 
 		QueryTestGroup{
-			`{ "user" :  { "prefix" : "ki", "boost" : 2.0 } }`,
-			func() query.Query {
+			input:`{ "user" :  { "prefix" : "ki", "boost" : 2.0 } }`,
+			output:func() query.Query {
 				utq := query.NewPrefixQuery("ki")
 				utq.SetField("user")
 				utq.SetBoost(2.0)
