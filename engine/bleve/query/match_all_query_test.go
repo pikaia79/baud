@@ -2,22 +2,23 @@ package query
 
 import (
 	"testing"
-	"github.com/blevesearch/bleve/search/query"
 	"reflect"
 	"encoding/json"
+
+	"github.com/blevesearch/bleve/search/query"
 )
 
 func TestMatchAllQuery(t *testing.T) {
-	groups := []QueryTestGroup{QueryTestGroup{`{ }`,
-		func() query.Query {
+	groups := []QueryTestGroup{QueryTestGroup{input:`{ }`,
+		output: func() query.Query {
 			utq := query.NewMatchAllQuery()
 			q := NewMatchAllQuery()
 			q.SetQuery(utq)
 			return q
 		}(),},
 
-		QueryTestGroup{`{ "boost" : 1.2 }`,
-			func() query.Query {
+		QueryTestGroup{input:`{ "boost" : 1.2 }`,
+			output:func() query.Query {
 				utq := query.NewMatchAllQuery()
 				utq.SetBoost(1.2)
 				q := NewMatchAllQuery()

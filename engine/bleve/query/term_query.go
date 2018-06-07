@@ -1,10 +1,11 @@
 package query
 
 import (
-	"github.com/blevesearch/bleve/search/query"
-	"github.com/tiglabs/baudengine/util/json"
+	"encoding/json"
 	"reflect"
 	"errors"
+
+	"github.com/blevesearch/bleve/search/query"
 )
 
 type TermQuery struct {

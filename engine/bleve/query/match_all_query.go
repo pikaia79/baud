@@ -1,8 +1,9 @@
 package query
 
 import (
-	"github.com/blevesearch/bleve/search/query"
 	"encoding/json"
+
+	"github.com/blevesearch/bleve/search/query"
 )
 
 type MatchAllQuery struct {

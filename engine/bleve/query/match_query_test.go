@@ -2,16 +2,17 @@ package query
 
 import (
 	"testing"
-	"github.com/blevesearch/bleve/search/query"
 	"reflect"
 	"encoding/json"
+
+	"github.com/blevesearch/bleve/search/query"
 )
 
 func TestMatchQuery(t *testing.T) {
-	groups := []QueryTestGroup{QueryTestGroup{`{
+	groups := []QueryTestGroup{QueryTestGroup{input:`{
         "message" : "this is a test"
     }`,
-		func() query.Query {
+		output:func() query.Query {
 			utq := query.NewMatchQuery("this is a test")
 			utq.SetField("message")
 			q := NewMatchQuery()
@@ -19,12 +20,12 @@ func TestMatchQuery(t *testing.T) {
 			return q
 		}(),},
 
-		QueryTestGroup{`{"message" : {
+		QueryTestGroup{input:`{"message" : {
             "query" : "this is a test",
             "type" : "phrase"
             }
     }`,
-			func() query.Query {
+			output: func() query.Query {
 				utq := query.NewMatchPhraseQuery("this is a test")
 				utq.SetField("message")
 				q := NewMatchQuery()
@@ -32,13 +33,13 @@ func TestMatchQuery(t *testing.T) {
 				return q
 			}(),},
 
-		QueryTestGroup{`{
+		QueryTestGroup{input:`{
         "message" : {
             "query" : "this is a test",
             "analyzer" : "my_analyzer"
         }
     }`,
-			func() query.Query {
+			output: func() query.Query {
 				utq := query.NewMatchQuery("this is a test")
 				utq.SetField("message")
 				q := NewMatchQuery()
@@ -46,13 +47,13 @@ func TestMatchQuery(t *testing.T) {
 				return q
 			}(),},
 
-		QueryTestGroup{`{
+		QueryTestGroup{input:`{
         "message" : {
             "query" : "this is a test",
             "operator" : "and"
         }
     }`,
-			func() query.Query {
+			output: func() query.Query {
 				utq := query.NewMatchQuery("this is a test")
 				utq.SetField("message")
 				utq.SetOperator(query.MatchQueryOperatorAnd)

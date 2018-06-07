@@ -1,11 +1,12 @@
 package query
 
 import (
-	"github.com/blevesearch/bleve/search/query"
 	"encoding/json"
 	"reflect"
 	"fmt"
 	"errors"
+
+	"github.com/blevesearch/bleve/search/query"
 )
 
 type MatchQuery struct {
@@ -40,7 +41,7 @@ func (m *MatchQuery)unmarshalJSON(data []byte) error {
 	for field, fv := range tmp {
 		switch fv.Type {
 		case "phrase_prefix":
-			return errors.New("not support phrase_prefix match")
+			return ErrNotSupportPhrasePrefix
 		case "phrase":
 			q := query.NewMatchPhraseQuery(fv.Query)
 			q.SetField(field)

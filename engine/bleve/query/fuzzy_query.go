@@ -1,10 +1,9 @@
 package query
 
 import (
-	"github.com/blevesearch/bleve/search/query"
 	"reflect"
 	"encoding/json"
-	"errors"
+	"github.com/blevesearch/bleve/search/query"
 )
 
 type FuzzyQuery struct {
@@ -97,10 +96,10 @@ func (f *FuzzyQuery) UnmarshalJSON(data []byte) error {
 				f.max_expansions = int(*max_expansions)
 			}
 		default:
-			return errors.New("invalid term query")
+			return ErrInvalidTermQuery
 		}
 		if tt == nil {
-			return errors.New("invalid term query")
+			return ErrInvalidTermQuery
 		}
 		f.Query = tt
 		return nil

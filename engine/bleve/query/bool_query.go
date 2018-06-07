@@ -1,8 +1,11 @@
 package query
 
 import (
-	"github.com/blevesearch/bleve/search/query"
 	"encoding/json"
+	"bytes"
+	"strconv"
+	"github.com/blevesearch/bleve/search/query"
+
 )
 
 type BoolQuery struct {
@@ -63,6 +66,82 @@ func (b *BoolQuery)UnmarshalJSON(data []byte) error {
 	if tmp.Boost != nil {
 		q.SetBoost(tmp.Boost.Value())
 	}
+	if tmp.MinimumShouldMatch != nil {
+		min, err := ParseMinShould([]byte(tmp.MinimumShouldMatch), len(should))
+		if err != nil {
+			return err
+		}
+		q.SetMinShould(min)
+	}
 	b.Query = q
 	return nil
+}
+
+/*
+    Integer                 3
+    Negative integer        -2
+    Percentage              75%
+    Negative percentage     -25%
+    Combination             3<90%
+    Multiple combinations   2<-25% 9<-3 [baudengine not support now]
+*/
+func parseMinimumShouldMatch(data []byte, maxShould int) (min float64, err error) {
+	if bytes.ContainsAny(data, "<") {
+		ms := bytes.Split(data, []byte{'<'})
+		if len(ms) != 2 {
+			err = ErrInvalidMinMatch
+			return
+		}
+		var m1, m2 float64
+		m1, err = parseMinimumShouldMatch(ms[0], maxShould)
+		if err != nil {
+			return 0.0, err
+		}
+		m2, err = parseMinimumShouldMatch(ms[1], maxShould)
+		if err != nil {
+			return 0.0, err
+		}
+		if maxShould <= int(m1) {
+			if m2 < m1 {
+				min = m2
+			} else {
+				min = m1
+			}
+		} else {
+			min = m2
+		}
+		return
+	} else if bytes.ContainsAny(data, "%") {
+		min, err = strconv.ParseFloat(string(data[:len(data)-1]), 64)
+		if err != nil {
+			return
+		}
+		if min < -100 || min > 100 {
+			return 0.0, ErrInvalidMinMatch
+		}
+		min = min*0.01*float64(maxShould)
+		if min < 0 {
+			min = float64(maxShould + int(min))
+		}
+		return min, nil
+	} else {
+		min, err = strconv.ParseFloat(string(data), 64)
+		if err != nil {
+			return
+		}
+		if min < 0 {
+			min = float64(maxShould) + min
+		}
+	}
+
+	return
+}
+
+func ParseMinShould(data []byte, maxShould int) (float64, error) {
+	min, err := parseMinimumShouldMatch(data, maxShould)
+	if err != nil {
+		return 0.0, err
+	}
+	min = float64(int(min))
+	return min, nil
 }

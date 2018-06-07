@@ -2,20 +2,21 @@ package query
 
 import (
 	"testing"
-	"github.com/blevesearch/bleve/search/query"
 	"reflect"
 	"encoding/json"
+
+	"github.com/blevesearch/bleve/search/query"
 )
 
 func TestRangeQuery(t *testing.T) {
-	groups := []QueryTestGroup{QueryTestGroup{`{
+	groups := []QueryTestGroup{QueryTestGroup{input:`{
         "age" : {
             "gte" : 10,
             "lte" : 20,
             "boost" : 2.0
         }
     }`,
-		func() query.Query {
+		output: func() query.Query {
 			min := float64(10)
 			max := float64(20)
 			incMin := true
@@ -26,13 +27,13 @@ func TestRangeQuery(t *testing.T) {
 			return utq
 		}(),},
 		QueryTestGroup{
-			`{
+			input:`{
         "date" : {
             "gte" : "now-1d/d",
             "lt" :  "now/d"
         }
     }`,
-			func() query.Query {
+			output: func() query.Query {
 				incMin := true
 				incMax := false
 				utq := query.NewTermRangeInclusiveQuery("now-1d/d", "now/d", &incMin, &incMax)

@@ -1,10 +1,11 @@
 package query
 
 import (
-	"github.com/blevesearch/bleve/search/query"
 	"reflect"
 	"encoding/json"
 	"errors"
+
+	"github.com/blevesearch/bleve/search/query"
 )
 
 type PrefixQuery struct {

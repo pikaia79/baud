@@ -2,16 +2,17 @@ package query
 
 import (
 	"testing"
-	"github.com/blevesearch/bleve/search/query"
 	"reflect"
 	"encoding/json"
+
+	"github.com/blevesearch/bleve/search/query"
 )
 
 func TestRegexpQuery(t *testing.T) {
-	groups := []QueryTestGroup{QueryTestGroup{`{
+	groups := []QueryTestGroup{QueryTestGroup{input:`{
         "name.first": "s.*y"
     }`,
-		func() query.Query {
+		output:func() query.Query {
 			utq := query.NewRegexpQuery("s.*y")
 			utq.SetField("name.first")
 			utq.SetBoost(1.0)
@@ -20,13 +21,13 @@ func TestRegexpQuery(t *testing.T) {
 			return q
 		}(),},
 		QueryTestGroup{
-			`{
+			input:`{
         "name.first":{
             "value":"s.*y",
             "boost":1.2
         }
     }`,
-			func() query.Query {
+			output:func() query.Query {
 				utq := query.NewRegexpQuery("s.*y")
 				utq.SetField("name.first")
 				utq.SetBoost(1.2)
@@ -36,13 +37,13 @@ func TestRegexpQuery(t *testing.T) {
 			}(),},
 
 		QueryTestGroup{
-			`{
+			input:`{
         "name.first": {
             "value": "s.*y",
             "flags" : "INTERSECTION|COMPLEMENT|EMPTY"
         }
     }`,
-			func() query.Query {
+			output:func() query.Query {
 				utq := query.NewRegexpQuery("s.*y")
 				utq.SetField("name.first")
 				utq.SetBoost(1.0)
@@ -53,14 +54,14 @@ func TestRegexpQuery(t *testing.T) {
 			}(),},
 
 		QueryTestGroup{
-			`{
+			input:`{
         "name.first": {
             "value": "s.*y",
             "flags" : "INTERSECTION|COMPLEMENT|EMPTY",
             "max_determinized_states": 20000
         }
     }`,
-			func() query.Query {
+			output:func() query.Query {
 				utq := query.NewRegexpQuery("s.*y")
 				utq.SetField("name.first")
 				utq.SetBoost(1.0)

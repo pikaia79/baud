@@ -2,22 +2,23 @@ package query
 
 import (
 	"testing"
-	"github.com/blevesearch/bleve/search/query"
 	"reflect"
 	"encoding/json"
+
+	"github.com/blevesearch/bleve/search/query"
 )
 
 func TestWildcardQuery(t *testing.T) {
-	groups := []QueryTestGroup{QueryTestGroup{`{ "user" : "ki*y" }`,
-		func() query.Query {
+	groups := []QueryTestGroup{QueryTestGroup{input:`{ "user" : "ki*y" }`,
+		output:func() query.Query {
 			utq := query.NewWildcardQuery("ki*y")
 			utq.SetField("user")
 			utq.SetBoost(1.0)
 			return utq
 		}(),},
 		QueryTestGroup{
-			`{ "user" : { "value" : "ki*y", "boost" : 2.0 } }`,
-			func() query.Query {
+			input:`{ "user" : { "value" : "ki*y", "boost" : 2.0 } }`,
+			output:func() query.Query {
 				utq := query.NewWildcardQuery("ki*y")
 				utq.SetField("user")
 				utq.SetBoost(2.0)
@@ -25,8 +26,8 @@ func TestWildcardQuery(t *testing.T) {
 			}(),},
 
 		QueryTestGroup{
-			`{ "user" : { "wildcard" : "ki*y", "boost" : 2.0 } }`,
-			func() query.Query {
+			input:`{ "user" : { "wildcard" : "ki*y", "boost" : 2.0 } }`,
+			output:func() query.Query {
 				utq := query.NewWildcardQuery("ki*y")
 				utq.SetField("user")
 				utq.SetBoost(2.0)
